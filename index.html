@@ -32,7 +32,7 @@ kbd{padding:2px 6px;border:1px solid #ffffff22;border-radius:5px;background:#fff
 <body>
 <div id="loading"><div id="box"><h1>DEEPSEEKER</h1><p id="loadingText">Loading the horror map…</p><div id="bar"><i></i></div></div></div>
 <div id="ui">
-  <div id="title">DEEPSEEKER — HORROR MAP PROTOTYPE</div>
+  <div id="title">DEEPSEEKER — LIMINAL HORROR PROTOTYPE</div>
   <div id="status">FIRST PERSON • CLICK TO ENTER</div>
   <div id="cross">+</div>
   <div id="help"><kbd>WASD</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; mouse look &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>F</kbd> flashlight &nbsp; <kbd>ESC</kbd> release</div>
@@ -43,7 +43,7 @@ kbd{padding:2px 6px;border:1px solid #ffffff22;border-radius:5px;background:#fff
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import {GLTFLoader} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 
-const MAP_URL='https://cdn.3dassets.dev/assets/27331/v1/model.glb';
+const MAP_URL='https://cdn.3dassets.dev/assets/25333/v1/model.glb';
 
 const loading=document.querySelector('#loading');
 const loadingText=document.querySelector('#loadingText');
@@ -144,7 +144,7 @@ function findGroundY(x,y,z){
 }
 
 async function start(){
-  loadingText.textContent='Loading actual online horror environment…';
+  loadingText.textContent='Loading the new liminal horror environment…';
   bar.style.width='8%';
 
   map=await loadMap();
@@ -166,23 +166,20 @@ async function start(){
   map.position.y-=mapBox.min.y;
   map.updateMatrixWorld(true);
 
-  // Put the player near the street/front of the assembled scene.
+  // Start near the center of the assembled liminal map.
   mapBox=new THREE.Box3().setFromObject(map);
   const size=new THREE.Vector3();
   mapBox.getSize(size);
-  player.x=0;
-  player.z=mapBox.max.z+5;
-  player.y=findGroundY(player.x,80,player.z)+1.72;
-  if(!Number.isFinite(player.y) || player.y < 1.72) player.y=3.0;
-
-  const floor=findGroundY(player.x,player.y,player.z);
+  player.x=(mapBox.min.x+mapBox.max.x)*0.5;
+  player.z=(mapBox.min.z+mapBox.max.z)*0.5;
+  const floor=findGroundY(player.x,mapBox.max.y+10,player.z);
   player.y=(Number.isFinite(floor)?floor:0)+1.72;
   player.vy=0;
   player.grounded=true;
 
   bar.style.width='100%';
   loadingText.textContent='Ready. Click to enter the map.';
-  document.querySelector('#status').textContent='HORROR STREET • FIRST PERSON';
+  document.querySelector('#status').textContent='LIMINAL MAP • FIRST PERSON';
   loading.addEventListener('click',()=>{
     loading.style.display='none';
     renderer.domElement.requestPointerLock();
