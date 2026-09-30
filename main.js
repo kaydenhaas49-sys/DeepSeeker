@@ -21,6 +21,7 @@ const vignette=document.getElementById("vignette");
 const phone=document.getElementById("phone");
 const phoneDepth=document.getElementById("phoneDepth");
 const phoneCardText=document.getElementById("phoneCardText");
+const deepseekerIcon=document.getElementById("deepseekerIcon");
 
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
@@ -81,6 +82,7 @@ let nextEvent=24+Math.random()*16;
 let eventCooldown=0;
 let muted=false;
 let phoneOpen=false;
+let deepseekerAppOpen=false;
 
 
 function toggleFlashlight(){
@@ -88,7 +90,9 @@ function toggleFlashlight(){
 }
 function togglePhone(){
   phoneOpen=!phoneOpen;
+  deepseekerAppOpen=false;
   phone.classList.toggle("open",phoneOpen);
+  phone.classList.remove("app-open");
   phone.setAttribute("aria-hidden",String(!phoneOpen));
 
   if(phoneOpen){
@@ -100,6 +104,14 @@ function togglePhone(){
     player.lock();
   }
 }
+
+function openDeepSeekerApp(){
+  if(!phoneOpen) return;
+  deepseekerAppOpen=true;
+  phone.classList.add("app-open");
+}
+
+deepseekerIcon.addEventListener("click",openDeepSeekerApp);
 
 
 function showControls(){
@@ -135,7 +147,8 @@ document.addEventListener("pointerlockchange",()=>{
   prompt.textContent="CLICK TO RESUME";
   if(locked && phoneOpen){
     phoneOpen=false;
-    phone.classList.remove("open");
+    deepseekerAppOpen=false;
+    phone.classList.remove("open","app-open");
     phone.setAttribute("aria-hidden","true");
   }
 });
