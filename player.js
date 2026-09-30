@@ -67,39 +67,78 @@ export class Player {
 
   setupHands() {
     const hands = new THREE.Group();
-    hands.name = "FirstPersonHands";
+    hands.name = "FirstPersonArms";
 
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc98f72, roughness: 0.78, metalness: 0.0 });
-    const sleeve = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.92, metalness: 0.0 });
+    const skin = new THREE.MeshStandardMaterial({
+      color: 0xb97d62,
+      roughness: 0.9,
+      metalness: 0.0
+    });
+    const sleeve = new THREE.MeshStandardMaterial({
+      color: 0x17191d,
+      roughness: 1.0,
+      metalness: 0.0
+    });
+    const cuff = new THREE.MeshStandardMaterial({
+      color: 0x30343b,
+      roughness: 0.95
+    });
 
-    const makeHand = (side) => {
+    const makeArm = (side) => {
       const g = new THREE.Group();
-      const x = side * 0.34;
 
-      const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.34, 5, 8), sleeve);
-      forearm.rotation.z = side * -0.16;
-      forearm.position.set(x, -0.31, -0.56);
+      const upper = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.085, 0.48, 5, 8),
+        sleeve
+      );
+      upper.rotation.z = side * 0.20;
+      upper.position.set(side * 0.29, -0.40, -0.48);
 
-      const palm = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), skin);
-      palm.scale.set(0.9, 1.1, 1.25);
-      palm.position.set(side * 0.37, -0.20, -0.83);
+      const cuffMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.095, 0.105, 0.12, 8),
+        cuff
+      );
+      cuffMesh.rotation.z = side * 0.20;
+      cuffMesh.position.set(side * 0.31, -0.29, -0.66);
 
-      const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.10, 4, 6), skin);
-      thumb.rotation.y = side * 0.65;
-      thumb.rotation.z = side * -0.7;
-      thumb.position.set(side * 0.47, -0.18, -0.82);
+      const palm = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 12, 8),
+        skin
+      );
+      palm.scale.set(0.82, 1.18, 1.05);
+      palm.position.set(side * 0.34, -0.23, -0.79);
 
-      g.add(forearm, palm, thumb);
+      // A simple clenched-fist silhouette looks much cleaner at gameplay scale
+      // than separate cartoon fingers.
+      const knuckles = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.085, 0.055),
+        skin
+      );
+      knuckles.position.set(side * 0.34, -0.17, -0.89);
+      knuckles.rotation.z = side * 0.10;
+
+      const thumb = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.036, 0.09, 4, 6),
+        skin
+      );
+      thumb.rotation.z = side * 0.85;
+      thumb.rotation.x = -0.25;
+      thumb.position.set(side * 0.45, -0.24, -0.82);
+
+      g.add(upper, cuffMesh, palm, knuckles, thumb);
       return g;
     };
 
     this.hands = hands;
-    this.leftHand = makeHand(-1);
-    this.rightHand = makeHand(1);
+    this.leftHand = makeArm(-1);
+    this.rightHand = makeArm(1);
     hands.add(this.leftHand, this.rightHand);
     this.camera.add(hands);
 
-    this.handBase = { left: new THREE.Vector3(-0.34,-0.20,-0.83), right: new THREE.Vector3(0.34,-0.20,-0.83) };
+    this.handBase = {
+      left: new THREE.Vector3(-0.31, -0.20, -0.79),
+      right: new THREE.Vector3(0.31, -0.20, -0.79)
+    };
   }
 
   attach() {
@@ -232,8 +271,10 @@ export class Player {
       const handDrop = this.crouched ? 0.08 : 0;
       this.leftHand.position.y -= handDrop;
       this.rightHand.position.y -= handDrop;
-      this.leftHand.rotation.z = -0.14 + sway * 2;
-      this.rightHand.rotation.z = 0.14 + sway * 2;
+      this.leftHand.rotation.z = -0.10 + sway * 1.5;
+      this.rightHand.rotation.z = 0.10 + sway * 1.5;
+      this.leftHand.rotation.x = -0.08 + sway * 0.7;
+      this.rightHand.rotation.x = -0.08 - sway * 0.7;
     }
   }
 
