@@ -36,7 +36,7 @@ kbd{padding:2px 6px;border:1px solid #ffffff22;border-radius:5px;background:#fff
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import {GLTFLoader} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 
-const MAP_URL='https://cdn.3dassets.dev/assets/26895/v1/model.glb';
+const MAP_URL='https://cdn.3dassets.dev/assets/27331/v1/model.glb';
 
 const loading=document.querySelector('#loading');
 const loadingText=document.querySelector('#loadingText');
@@ -181,23 +181,21 @@ async function start(){
 }
 
 function move(dt){
-  // Explicit camera-relative forward vector. W = forward, S = backward.
-  const w=keys.has('KeyW')?1:0;
-  const s=keys.has('KeyS')?1:0;
-  const d=keys.has('KeyD')?1:0;
-  const a=keys.has('KeyA')?1:0;
-  const f=w-s;
-  const str=d-a;
+  // Camera-relative movement. W always follows the exact direction the camera faces.
+  const f=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
+  const str=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
   const len=Math.hypot(f,str)||1;
   const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?6.4:3.8;
 
-  const forwardX=-Math.sin(yaw);
-  const forwardZ=-Math.cos(yaw);
-  const rightX=Math.cos(yaw);
-  const rightZ=-Math.sin(yaw);
+  const forward=new THREE.Vector3();
+  camera.getWorldDirection(forward);
+  forward.y=0;
+  forward.normalize();
 
-  player.x-=((forwardX*f+rightX*str)/len)*speed*dt;
-  player.z-=((forwardZ*f+rightZ*str)/len)*speed*dt;
+  const right=new THREE.Vector3().crossVectors(forward,camera.up).normalize();
+
+  player.x+=((forward.x*f+right.x*str)/len)*speed*dt;
+  player.z+=((forward.z*f+right.z*str)/len)*speed*dt;
 
   const floor=findGroundY(player.x,player.y,player.z);
   player.vy-=20*dt;
