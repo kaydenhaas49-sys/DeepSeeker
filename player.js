@@ -146,6 +146,7 @@ export class Player {
     };
 
     this.hands = hands;
+    this.hands.visible = true;
     this.leftHand = makeArm(-1);
     this.rightHand = makeArm(1);
     hands.add(this.leftHand, this.rightHand);
