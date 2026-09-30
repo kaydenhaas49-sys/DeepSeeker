@@ -37,6 +37,23 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 #overlay .sub{margin:0;font-size:13px;letter-spacing:4px;color:#9a8d5e}
 #overlay .prompt{margin:14px 0 0;font-size:17px;letter-spacing:3px;animation:pulse 1.6s ease-in-out infinite}
 #overlay .controls{font-size:12px;letter-spacing:2px;color:#80774f;line-height:1.9}
+#phone{position:fixed;left:50%;bottom:6%;transform:translateX(-50%) translateY(115%);width:min(330px,82vw);aspect-ratio:.49;border:7px solid #090909;border-radius:30px;background:#050505;box-shadow:0 24px 80px #000,0 0 0 1px #ffffff16;z-index:15;opacity:0;pointer-events:none;transition:transform .22s ease,opacity .22s ease}
+#phone.open{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
+#phoneScreen{position:absolute;inset:7px;border-radius:22px;overflow:hidden;background:linear-gradient(180deg,#11130f 0%,#080907 100%);color:#dedbbf}
+#phoneNotch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:24px;border-radius:0 0 15px 15px;background:#050505;z-index:2}
+#phoneStatus{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:10px;letter-spacing:1px;color:#aaa995}
+#phoneApp{padding:22px 20px}
+#phoneAppName{font-size:11px;letter-spacing:4px;color:#aaa477;margin-bottom:8px}
+#phoneDepth{font-size:42px;letter-spacing:2px;font-weight:500;color:#f0eccf;margin:0}
+#phoneDepthLabel{font-size:10px;letter-spacing:3px;color:#6f705f;margin-bottom:24px}
+#phoneCard{border:1px solid #ffffff15;border-radius:14px;padding:15px;background:#ffffff06}
+#phoneCardTitle{font-size:11px;letter-spacing:2px;color:#aaa477;margin-bottom:8px}
+#phoneCardText{font-size:13px;line-height:1.55;color:#c6c5b6}
+#phoneSignal{margin-top:18px;font-size:9px;letter-spacing:2px;color:#67695b}
+#phoneHome{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:105px;height:4px;border-radius:8px;background:#ffffff55}
+#phoneHint{position:fixed;left:50%;bottom:3%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#77745f;z-index:16;opacity:0;pointer-events:none;transition:opacity .2s}
+#phone.open + #phoneHint{opacity:1}
+
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 @media(max-width:700px){.grid{grid-template-columns:1fr}}
 </style>
@@ -44,6 +61,25 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 <body>
 <div id="app"></div>
 <div id="crosshair"></div>
+<div id="phone" aria-hidden="true">
+  <div id="phoneScreen">
+    <div id="phoneNotch"></div>
+    <div id="phoneStatus"><span>9:41</span><span>NO SIGNAL&nbsp;&nbsp;▮▮▮</span></div>
+    <div id="phoneApp">
+      <div id="phoneAppName">DEEPSEEKER</div>
+      <div id="phoneDepth">0</div>
+      <div id="phoneDepthLabel">DEPTH</div>
+      <div id="phoneCard">
+        <div id="phoneCardTitle">CURRENT OBJECTIVE</div>
+        <div id="phoneCardText">Find a way out.</div>
+      </div>
+      <div id="phoneSignal">GPS UNAVAILABLE · NETWORK UNAVAILABLE</div>
+    </div>
+    <div id="phoneHome"></div>
+  </div>
+</div>
+<div id="phoneHint">P — CLOSE PHONE</div>
+
 <div id="vignette"></div>
 <div id="grain"></div>
 
@@ -72,6 +108,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
       <div class="row"><span class="key">C</span><span class="action">Crouch</span></div>
       <div class="row"><span class="key">SPACE</span><span class="action">Jump</span></div>
       <div class="row"><span class="key">F</span><span class="action">Flashlight</span></div>
+      <div class="row"><span class="key">P</span><span class="action">Phone</span></div>
       <div class="row"><span class="key">M</span><span class="action">Mute ambience</span></div>
       <div class="row"><span class="key">N</span><span class="action">New procedural seed</span></div>
       <div class="row"><span class="key">TAB</span><span class="action">Controls</span></div>
@@ -85,7 +122,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
   <h1>DEEPSEEKER</h1>
   <p class="sub">PROCEDURAL LIMINAL HORROR</p>
   <p class="prompt" id="prompt">CLICK TO ENTER</p>
-  <p class="controls">WASD — move &nbsp;•&nbsp; SHIFT — run &nbsp;•&nbsp; F — flashlight<br>C — crouch &nbsp;•&nbsp; TAB — controls &nbsp;•&nbsp; ESC — release cursor</p>
+  <p class="controls">WASD — move &nbsp;•&nbsp; SHIFT — run &nbsp;•&nbsp; F — flashlight &nbsp;•&nbsp; P — phone<br>C — crouch &nbsp;•&nbsp; TAB — controls &nbsp;•&nbsp; ESC — release cursor</p>
 </div>
 
 <script type="importmap">
