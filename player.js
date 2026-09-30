@@ -1,5 +1,6 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { CELL, EYE } from "./world.js";
 
 const WALK_SPEED = 4; // m/s
@@ -66,154 +67,72 @@ export class Player {
   }
 
   setupHands() {
-    const hands = new THREE.Group();
-    hands.name = "FirstPersonArms3D";
-    hands.renderOrder = 1000;
+    this.hands = new THREE.Group();
+    this.hands.name = "FirstPersonRealArms";
+    this.hands.renderOrder = 1000;
+    this.hands.visible = false;
+    this.camera.add(this.hands);
 
-    const skin = new THREE.MeshStandardMaterial({
-      color: 0xc58f73,
-      roughness: 0.72,
-      metalness: 0.0,
-      depthTest: false,
-      depthWrite: false
-    });
-    const skinLight = new THREE.MeshStandardMaterial({
-      color: 0xd8a588,
-      roughness: 0.68,
-      metalness: 0.0,
-      depthTest: false,
-      depthWrite: false
-    });
-    const sleeve = new THREE.MeshStandardMaterial({
-      color: 0x171a1d,
-      roughness: 0.9,
-      metalness: 0.0,
-      depthTest: false,
-      depthWrite: false
-    });
-    const cuff = new THREE.MeshStandardMaterial({
-      color: 0x30343a,
-      roughness: 0.82,
-      depthTest: false,
-      depthWrite: false
-    });
+    // Real CC0 first-person arm/hand mesh by DevMops.
+    const baseUrl =
+      "https://raw.githubusercontent.com/CSUNX233/mineworld/364976a4284fc1719f7c297c2ea92aaa0e5a792b/" +
+      "art/sunlit-actors/starfire-hero/source/devmops-hands/original/";
+    const modelUrl = baseUrl + "arms_low_poly.fbx";
 
-    const capsule = (radius, length, mat, radial=10) => {
-      const mesh = new THREE.Mesh(
-        new THREE.CapsuleGeometry(radius, length, 6, radial),
-        mat
-      );
-      mesh.frustumCulled = false;
-      mesh.renderOrder = 1000;
-      return mesh;
-    };
+    const loader = new FBXLoader();
+    loader.setResourcePath(baseUrl);
 
-    const makeFinger = (group, side, x, y, z, lean=0) => {
-      const proximal = capsule(.042, .12, skin, 10);
-      proximal.position.set(side * x, y, z);
-      proximal.rotation.z = side * lean;
-      proximal.rotation.x = -0.08;
-      group.add(proximal);
+    loader.load(
+      modelUrl,
+      (model) => {
+        model.name = "DevMopsRealArms";
+        model.traverse((obj) => {
+          if (!obj.isMesh) return;
+          obj.frustumCulled = false;
+          obj.renderOrder = 1000;
+          obj.castShadow = false;
+          obj.receiveShadow = false;
 
-      const distal = capsule(.038, .105, skinLight, 10);
-      distal.position.set(
-        side * (x + Math.sin(lean) * .055),
-        y + .095,
-        z - .006
-      );
-      distal.rotation.z = side * lean;
-      distal.rotation.x = -0.08;
-      group.add(distal);
-    };
+          const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (const mat of materials) {
+            if (!mat) continue;
+            mat.side = THREE.DoubleSide;
+            mat.depthTest = false;
+            mat.depthWrite = false;
+          }
+        });
 
-    const makeArm = (side) => {
-      const g = new THREE.Group();
-      g.renderOrder = 1000;
+        // Normalize the imported asset into a comfortable first-person viewmodel.
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
 
-      const forearm = capsule(.12, .62, sleeve, 12);
-      forearm.rotation.z = side * 0.08;
-      forearm.rotation.x = -0.16;
-      forearm.position.set(side * .43, -.52, -1.02);
-
-      const cuffMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(.13, .135, .13, 14),
-        cuff
-      );
-      cuffMesh.position.set(side * .43, -.19, -1.28);
-      cuffMesh.rotation.z = side * 0.08;
-      cuffMesh.renderOrder = 1000;
-      cuffMesh.frustumCulled = false;
-
-      const wrist = new THREE.Mesh(
-        new THREE.SphereGeometry(.125, 16, 12),
-        skin
-      );
-      wrist.scale.set(.95, .82, 1.0);
-      wrist.position.set(side * .43, -.115, -1.39);
-      wrist.renderOrder = 1000;
-      wrist.frustumCulled = false;
-
-      const palm = new THREE.Mesh(
-        new THREE.SphereGeometry(.19, 20, 16),
-        skin
-      );
-      palm.scale.set(.82, 1.25, 1.28);
-      palm.position.set(side * .43, -.055, -1.52);
-      palm.renderOrder = 1000;
-      palm.frustumCulled = false;
-      g.add(palm, wrist, forearm, cuffMesh);
-
-      // Four relaxed, slightly separated fingers.
-      const fingerX=[.095,.032,.032,.095];
-      const fingerY=[.005,.015,.015,.005];
-      const lean=[.14,.045,-.045,-.14];
-      for(let i=0;i<4;i++){
-        makeFinger(g,side,fingerX[i],fingerY[i]-.01,-1.68,lean[i]);
-      }
-
-      // Thumb sits lower and naturally angles inward.
-      const thumbBase=capsule(.045,.12,skin,10);
-      thumbBase.position.set(side*.56,-.095,-1.51);
-      thumbBase.rotation.z=side*.62;
-      thumbBase.rotation.x=-.42;
-      const thumbTip=capsule(.041,.095,skinLight,10);
-      thumbTip.position.set(side*.59,.005,-1.59);
-      thumbTip.rotation.z=side*.42;
-      thumbTip.rotation.x=-.48;
-      g.add(thumbBase,thumbTip);
-
-      // Subtle nails: small rounded pieces, kept low-contrast and natural.
-      for(let i=0;i<4;i++){
-        const nail=new THREE.Mesh(
-          new THREE.SphereGeometry(.025,10,7),
-          new THREE.MeshStandardMaterial({
-            color:0xe2c4af,
-            roughness:.62,
-            depthTest:false,
-            depthWrite:false
-          })
+        const targetWidth = 1.35;
+        const targetHeight = 0.95;
+        const scale = Math.min(
+          targetWidth / Math.max(size.x, 0.001),
+          targetHeight / Math.max(size.y, 0.001)
         );
-        nail.scale.set(.8,.35,.55);
-        nail.position.set(side*(fingerX[i]),.123,-1.786);
-        nail.renderOrder=1001;
-        nail.frustumCulled=false;
-        g.add(nail);
+
+        model.scale.setScalar(scale);
+        model.position.set(
+          -center.x * scale,
+          -0.52 - center.y * scale,
+          -1.18 - center.z * scale
+        );
+
+        // The source asset's camera-facing hand pose is oriented toward +Z.
+        model.rotation.set(0, Math.PI, 0);
+
+        this.hands.add(model);
+        this.hands.visible = true;
+        this.realHands = model;
+      },
+      undefined,
+      (error) => {
+        console.warn("DeepSeeker: real arm model failed to load; using no hand fallback.", error);
       }
-
-      return g;
-    };
-
-    this.hands = hands;
-    this.hands.visible = true;
-    this.leftHand = makeArm(-1);
-    this.rightHand = makeArm(1);
-    hands.add(this.leftHand, this.rightHand);
-    this.camera.add(hands);
-
-    this.handBase = {
-      left: new THREE.Vector3(-.43,-.055,-1.52),
-      right: new THREE.Vector3(.43,-.055,-1.52)
-    };
+    );
   }
 
   attach() {
@@ -329,27 +248,12 @@ export class Player {
     this.camera.rotation.set(this.pitch, this.yaw, 0);
 
     // --- first-person hands ---
-    if (this.hands) {
+    if (this.hands && this.hands.visible) {
       const moving = hSpeed > 0.5 ? Math.min(1, hSpeed / RUN_SPEED) : 0;
-      const sway = moving ? Math.sin(this.bobPhase) * 0.024 : 0;
-      const lift = moving ? Math.abs(Math.cos(this.bobPhase)) * 0.018 : 0;
-      this.leftHand.position.set(
-        this.handBase.left.x,
-        this.handBase.left.y + lift - sway,
-        this.handBase.left.z
-      );
-      this.rightHand.position.set(
-        this.handBase.right.x,
-        this.handBase.right.y + lift + sway,
-        this.handBase.right.z
-      );
-      const handDrop = this.crouched ? 0.08 : 0;
-      this.leftHand.position.y -= handDrop;
-      this.rightHand.position.y -= handDrop;
-      this.leftHand.rotation.z = -0.06 + sway * 1.0;
-      this.rightHand.rotation.z = 0.06 + sway * 1.0;
-      this.leftHand.rotation.x = -0.06 + sway * 0.35;
-      this.rightHand.rotation.x = -0.06 - sway * 0.35;
+      const sway = moving ? Math.sin(this.bobPhase) * 0.018 : 0;
+      const lift = moving ? Math.abs(Math.cos(this.bobPhase)) * 0.012 : 0;
+      this.hands.position.y = lift - (this.crouched ? 0.08 : 0);
+      this.hands.rotation.z = sway;
     }
   }
 
