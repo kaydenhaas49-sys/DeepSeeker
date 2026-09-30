@@ -53,7 +53,7 @@ scene.add(camera);
 const player=new Player(camera,renderer.domElement,world);
 const audio=new HorrorAudio();
 
-player.hands.visible=false;
+player.hands.visible=true;
 
 
 const figure=new THREE.Group();
