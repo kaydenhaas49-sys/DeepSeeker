@@ -184,9 +184,9 @@ export class World {
       wall: new THREE.MeshStandardMaterial({ map: tex.wall, roughness: 0.92 }),
       floor: new THREE.MeshStandardMaterial({ map: tex.floor, roughness: 1.0 }),
       ceiling: new THREE.MeshStandardMaterial({ map: tex.ceiling, roughness: 0.95 }),
-      panel: new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x62605a }),
+      panel: new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x2b2924 }),
       panelOff: new THREE.MeshBasicMaterial({ color: 0x2b2921 }),
-      flicker: [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x68655e })),
+      flicker: [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x302d27 })),
     };
 
     // Shared per-chunk geometry templates (never disposed per chunk).
@@ -331,7 +331,7 @@ export class World {
       const n =
         Math.sin(t * 11.3 + ph) * Math.sin(t * 5.7 + ph * 1.7) +
         Math.sin(t * 23.7 + ph * 0.9);
-      const v = n > 1.2 ? 0.12 : n > 0.8 ? 0.55 : 1.0;
+      const v = n > 1.2 ? 0.035 : n > 0.8 ? 0.16 : 0.32;
       this.materials.flicker[i].color.setScalar(v);
     }
   }
