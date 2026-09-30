@@ -24,7 +24,7 @@ const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-per
 renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=.46;
+renderer.toneMappingExposure=.56;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
 
@@ -35,15 +35,15 @@ scene.fog=new THREE.Fog(0x000100,7,34);
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
 const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
 
-const hemi=new THREE.HemisphereLight(0xb1a47d,0x060604,.055);
+const hemi=new THREE.HemisphereLight(0xb1a47d,0x060604,.085);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0x7f7354,.012);
+const ambient=new THREE.AmbientLight(0x7f7354,.022);
 scene.add(ambient);
 
-const playerLight=new THREE.PointLight(0xa88d63,1.8,16,1.9);
+const playerLight=new THREE.PointLight(0xa88d63,2.8,18,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xe2cf9e,4.2,22,Math.PI/6,.82,1.5);
+const flashlight=new THREE.SpotLight(0xe2cf9e,5.2,24,Math.PI/6,.82,1.5);
 flashlight.castShadow=true;
 flashlight.shadow.mapSize.set(512,512);
 flashlight.target.position.set(0,0,-1);
@@ -202,7 +202,7 @@ function animate(){
   if(battery<=0) flashlightOn=false;
 
   const flicker=.78+.22*Math.sin(t*17.1)*Math.sin(t*7.3);
-  flashlight.intensity=flashlightOn ? 4.2*flicker : 0;
+  flashlight.intensity=flashlightOn ? 5.2*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
   if(figureLife>0){
