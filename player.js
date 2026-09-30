@@ -67,112 +67,152 @@ export class Player {
 
   setupHands() {
     const hands = new THREE.Group();
-    hands.name = "FirstPersonArms";
+    hands.name = "FirstPersonArms3D";
     hands.renderOrder = 1000;
 
     const skin = new THREE.MeshStandardMaterial({
-      color: 0xb87860,
-      roughness: 0.82,
+      color: 0xc58f73,
+      roughness: 0.72,
       metalness: 0.0,
       depthTest: false,
       depthWrite: false
     });
-    const skinDark = new THREE.MeshStandardMaterial({
-      color: 0x8e5748,
-      roughness: 0.9,
+    const skinLight = new THREE.MeshStandardMaterial({
+      color: 0xd8a588,
+      roughness: 0.68,
       metalness: 0.0,
       depthTest: false,
       depthWrite: false
     });
     const sleeve = new THREE.MeshStandardMaterial({
-      color: 0x202126,
-      roughness: 0.92,
+      color: 0x171a1d,
+      roughness: 0.9,
       metalness: 0.0,
       depthTest: false,
       depthWrite: false
     });
     const cuff = new THREE.MeshStandardMaterial({
-      color: 0x4a4c52,
-      roughness: 0.85,
+      color: 0x30343a,
+      roughness: 0.82,
       depthTest: false,
       depthWrite: false
     });
 
-    const capsule = (radius,length,mat)=>{
-      const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(radius,length,8,12),mat);
-      mesh.frustumCulled=false;
-      mesh.renderOrder=1000;
+    const capsule = (radius, length, mat, radial=10) => {
+      const mesh = new THREE.Mesh(
+        new THREE.CapsuleGeometry(radius, length, 6, radial),
+        mat
+      );
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 1000;
       return mesh;
     };
 
-    const makeArm=(side)=>{
-      const g=new THREE.Group();
-      g.renderOrder=1000;
+    const makeFinger = (group, side, x, y, z, lean=0) => {
+      const proximal = capsule(.042, .12, skin, 10);
+      proximal.position.set(side * x, y, z);
+      proximal.rotation.z = side * lean;
+      proximal.rotation.x = -0.08;
+      group.add(proximal);
 
-      const forearm=capsule(.105,.72,sleeve);
-      forearm.rotation.z=side*0.10;
-      forearm.rotation.x=-0.12;
-      forearm.position.set(side*.38,-.43,-1.12);
+      const distal = capsule(.038, .105, skinLight, 10);
+      distal.position.set(
+        side * (x + Math.sin(lean) * .055),
+        y + .095,
+        z - .006
+      );
+      distal.rotation.z = side * lean;
+      distal.rotation.x = -0.08;
+      group.add(distal);
+    };
 
-      const cuffMesh=new THREE.Mesh(
-        new THREE.CylinderGeometry(.12,.125,.14,12),
+    const makeArm = (side) => {
+      const g = new THREE.Group();
+      g.renderOrder = 1000;
+
+      const forearm = capsule(.12, .62, sleeve, 12);
+      forearm.rotation.z = side * 0.08;
+      forearm.rotation.x = -0.16;
+      forearm.position.set(side * .43, -.52, -1.02);
+
+      const cuffMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(.13, .135, .13, 14),
         cuff
       );
-      cuffMesh.rotation.z=side*.1;
-      cuffMesh.position.set(side*.40,-.16,-1.29);
-      cuffMesh.renderOrder=1000;
-      cuffMesh.frustumCulled=false;
+      cuffMesh.position.set(side * .43, -.19, -1.28);
+      cuffMesh.rotation.z = side * 0.08;
+      cuffMesh.renderOrder = 1000;
+      cuffMesh.frustumCulled = false;
 
-      const wrist=new THREE.Mesh(
-        new THREE.SphereGeometry(.125,16,12),
-        skinDark
-      );
-      wrist.scale.set(.95,1,1.05);
-      wrist.position.set(side*.41,-.11,-1.38);
-      wrist.renderOrder=1000;
-      wrist.frustumCulled=false;
-
-      const palm=new THREE.Mesh(
-        new THREE.SphereGeometry(.17,18,14),
+      const wrist = new THREE.Mesh(
+        new THREE.SphereGeometry(.125, 16, 12),
         skin
       );
-      palm.scale.set(.86,1.1,1.2);
-      palm.position.set(side*.42,-.08,-1.52);
-      palm.renderOrder=1000;
-      palm.frustumCulled=false;
+      wrist.scale.set(.95, .82, 1.0);
+      wrist.position.set(side * .43, -.115, -1.39);
+      wrist.renderOrder = 1000;
+      wrist.frustumCulled = false;
 
-      const fingerOffsets=[-.085,-.028,.028,.085];
+      const palm = new THREE.Mesh(
+        new THREE.SphereGeometry(.19, 20, 16),
+        skin
+      );
+      palm.scale.set(.82, 1.25, 1.28);
+      palm.position.set(side * .43, -.055, -1.52);
+      palm.renderOrder = 1000;
+      palm.frustumCulled = false;
+      g.add(palm, wrist, forearm, cuffMesh);
+
+      // Four relaxed, slightly separated fingers.
+      const fingerX=[.095,.032,.032,.095];
+      const fingerY=[.005,.015,.015,.005];
+      const lean=[.14,.045,-.045,-.14];
       for(let i=0;i<4;i++){
-        const f=capsule(.031,.16,skin);
-        f.rotation.x=-.18;
-        f.rotation.z=side*(.05+(i-1.5)*.045);
-        f.position.set(
-          side*.42+fingerOffsets[i],
-          -.005-Math.abs(i-1.5)*.008,
-          -1.67
-        );
-        g.add(f);
+        makeFinger(g,side,fingerX[i],fingerY[i]-.01,-1.68,lean[i]);
       }
 
-      const thumb=capsule(.038,.16,skin);
-      thumb.rotation.z=side*.7;
-      thumb.rotation.x=-.38;
-      thumb.position.set(side*.53,-.08,-1.56);
+      // Thumb sits lower and naturally angles inward.
+      const thumbBase=capsule(.045,.12,skin,10);
+      thumbBase.position.set(side*.56,-.095,-1.51);
+      thumbBase.rotation.z=side*.62;
+      thumbBase.rotation.x=-.42;
+      const thumbTip=capsule(.041,.095,skinLight,10);
+      thumbTip.position.set(side*.59,.005,-1.59);
+      thumbTip.rotation.z=side*.42;
+      thumbTip.rotation.x=-.48;
+      g.add(thumbBase,thumbTip);
 
-      g.add(forearm,cuffMesh,wrist,palm,thumb);
+      // Subtle nails: small rounded pieces, kept low-contrast and natural.
+      for(let i=0;i<4;i++){
+        const nail=new THREE.Mesh(
+          new THREE.SphereGeometry(.025,10,7),
+          new THREE.MeshStandardMaterial({
+            color:0xe2c4af,
+            roughness:.62,
+            depthTest:false,
+            depthWrite:false
+          })
+        );
+        nail.scale.set(.8,.35,.55);
+        nail.position.set(side*(fingerX[i]),.123,-1.786);
+        nail.renderOrder=1001;
+        nail.frustumCulled=false;
+        g.add(nail);
+      }
+
       return g;
     };
 
-    this.hands=hands;
-    this.hands.visible=true;
-    this.leftHand=makeArm(-1);
-    this.rightHand=makeArm(1);
-    hands.add(this.leftHand,this.rightHand);
+    this.hands = hands;
+    this.hands.visible = true;
+    this.leftHand = makeArm(-1);
+    this.rightHand = makeArm(1);
+    hands.add(this.leftHand, this.rightHand);
     this.camera.add(hands);
 
-    this.handBase={
-      left:new THREE.Vector3(-.42,-.08,-1.52),
-      right:new THREE.Vector3(.42,-.08,-1.52)
+    this.handBase = {
+      left: new THREE.Vector3(-.43,-.055,-1.52),
+      right: new THREE.Vector3(.43,-.055,-1.52)
     };
   }
 
