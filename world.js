@@ -79,7 +79,7 @@ export function generateChunk(cx, cz, seed) {
   };
 
   // 1) Freestanding wall segments — the sparse partitions of the reference.
-  const nSeg = 6 + Math.floor(rng() * 5); // 6–10
+  const nSeg = 12 + Math.floor(rng() * 6); // 12–17
   for (let i = 0; i < nSeg; i++) {
     const horiz = rng() < 0.5;
     const len = 2 + Math.floor(rng() * 7); // 2–8 cells
@@ -104,7 +104,7 @@ export function generateChunk(cx, cz, seed) {
   };
 
   // 2) Occasional enclosed room with one doorway.
-  if (rng() < 0.15) {
+  if (rng() < 0.28) {
     const w = 3 + Math.floor(rng() * 3); // 3–5 cells
     const h = 3 + Math.floor(rng() * 3);
     const x0 = 1 + Math.floor(rng() * (CHUNK_CELLS - w - 2));
@@ -117,8 +117,8 @@ export function generateChunk(cx, cz, seed) {
     addRingSide(x0 + w - 1, z0 + 1, h - 2, false, side === 3 ? gap(h - 2) : -1);
   }
 
-  // 3) Occasional long corridor: two parallel walls with an open lane between.
-  if (rng() < 0.15) {
+  // 3) More common long corridors: two parallel walls with an open lane between.
+  if (rng() < 0.24) {
     const horiz = rng() < 0.5;
     const len = 8 + Math.floor(rng() * 9); // 8–16 cells
     const lane = 1 + Math.floor(rng() * 2); // 1–2 cells wide
