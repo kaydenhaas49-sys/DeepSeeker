@@ -2,7 +2,6 @@ import * as THREE from "three";
 import { World, EYE } from "./world.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -56,61 +55,161 @@ const audio=new HorrorAudio();
 
 // Keep the built-in arms visible until the external model has loaded successfully.
 
-const armsLoader=new GLTFLoader();
-const armsUrl="https://raw.githubusercontent.com/wwwriks/wrad-arms/main/arms.glb";
+function makeFirstPersonHands(){
+  const canvas=document.createElement("canvas");
+  canvas.width=1600;
+  canvas.height=900;
+  const ctx=canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-armsLoader.load(
-  armsUrl,
-  gltf=>{
-    const arms=gltf.scene;
-    arms.name="WRADFirstPersonArms";
-    arms.renderOrder=1000;
+  const skin="#c99778";
+  const skinLight="#dfb092";
+  const skinDark="#9b6953";
+  const sleeve="#15181b";
 
-    arms.traverse(obj=>{
-      if(!obj.isMesh) return;
-      obj.frustumCulled=false;
-      obj.renderOrder=1000;
-      obj.castShadow=false;
-      obj.receiveShadow=false;
+  function hand(side){
+    ctx.save();
+    if(side==="left"){
+      ctx.translate(0,0);
+    }else{
+      ctx.translate(1600,0);
+      ctx.scale(-1,1);
+    }
 
-      const mats=Array.isArray(obj.material)?obj.material:[obj.material];
-      for(const mat of mats){
-        if(!mat) continue;
-        mat.side=THREE.DoubleSide;
-        mat.depthTest=false;
-        mat.depthWrite=false;
-      }
-    });
+    // Forearm / sleeve
+    ctx.fillStyle=sleeve;
+    ctx.beginPath();
+    ctx.moveTo(95,900);
+    ctx.lineTo(210,900);
+    ctx.quadraticCurveTo(300,820,345,700);
+    ctx.lineTo(455,610);
+    ctx.lineTo(325,545);
+    ctx.quadraticCurveTo(240,650,175,760);
+    ctx.quadraticCurveTo(125,830,95,900);
+    ctx.fill();
 
-    // Auto-fit the downloaded viewmodel so the full forearms stay visible.
-    arms.updateMatrixWorld(true);
-    const box=new THREE.Box3().setFromObject(arms,true);
-    const size=box.getSize(new THREE.Vector3());
-    const center=box.getCenter(new THREE.Vector3());
-    const targetHeight=1.55;
-    const scale=targetHeight/Math.max(size.y,.001);
+    // Forearm skin
+    const grad=ctx.createLinearGradient(250,850,450,500);
+    grad.addColorStop(0,skinDark);
+    grad.addColorStop(.32,skin);
+    grad.addColorStop(.72,skinLight);
+    grad.addColorStop(1,skin);
+    ctx.fillStyle=grad;
 
-    arms.scale.setScalar(scale);
-    arms.position.set(
-      -center.x*scale,
-      -0.72-center.y*scale,
-      -1.05-center.z*scale
-    );
+    ctx.beginPath();
+    ctx.moveTo(250,900);
+    ctx.quadraticCurveTo(265,815,330,715);
+    ctx.quadraticCurveTo(380,635,435,570);
+    ctx.lineTo(540,620);
+    ctx.quadraticCurveTo(475,700,430,775);
+    ctx.quadraticCurveTo(390,845,375,900);
+    ctx.closePath();
+    ctx.fill();
 
-    // Slight downward camera tilt for a natural FPS resting pose.
-    arms.rotation.set(-0.10,0,0);
+    // Palm
+    ctx.beginPath();
+    ctx.moveTo(395,650);
+    ctx.quadraticCurveTo(365,595,385,535);
+    ctx.quadraticCurveTo(405,480,455,455);
+    ctx.quadraticCurveTo(505,432,558,458);
+    ctx.quadraticCurveTo(603,481,620,532);
+    ctx.quadraticCurveTo(636,582,614,640);
+    ctx.quadraticCurveTo(590,690,530,708);
+    ctx.quadraticCurveTo(455,720,395,650);
+    ctx.fill();
 
-    camera.add(arms);
-    player.hands.visible=false;
-    player.realHands=arms;
-  },
-  undefined,
-  err=>{
-    console.warn("Could not load WRAD first-person arms:",err);
-    player.hands.visible=true;
-    player.realHands=null;
+    // Fingers: relaxed, slightly curled, short and broad
+    const fingers=[
+      {x:585,y:505,w:48,h:145,a:-.16},
+      {x:540,y:463,w:49,h:158,a:-.08},
+      {x:492,y:450,w:48,h:164,a:.02},
+      {x:445,y:463,w:46,h:150,a:.10}
+    ];
+    for(const f of fingers){
+      ctx.save();
+      ctx.translate(f.x,f.y);
+      ctx.rotate(f.a);
+      const fg=ctx.createLinearGradient(0,0,0,f.h);
+      fg.addColorStop(0,skinLight);
+      fg.addColorStop(.72,skin);
+      fg.addColorStop(1,skinDark);
+      ctx.fillStyle=fg;
+      ctx.beginPath();
+      ctx.roundRect(-f.w/2,0,f.w,f.h,f.w*.42);
+      ctx.fill();
+      ctx.strokeStyle="rgba(104,67,53,.22)";
+      ctx.lineWidth=5;
+      ctx.beginPath();
+      ctx.moveTo(-f.w*.27,f.h*.72);
+      ctx.quadraticCurveTo(0,f.h*.77,f.w*.27,f.h*.72);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Thumb
+    ctx.fillStyle=skin;
+    ctx.beginPath();
+    ctx.moveTo(410,565);
+    ctx.quadraticCurveTo(350,515,305,555);
+    ctx.quadraticCurveTo(270,588,315,618);
+    ctx.quadraticCurveTo(370,650,430,620);
+    ctx.closePath();
+    ctx.fill();
+
+    // Palm creases / knuckle detail
+    ctx.strokeStyle="rgba(95,61,49,.28)";
+    ctx.lineWidth=6;
+    ctx.lineCap="round";
+    ctx.beginPath();
+    ctx.moveTo(425,585);
+    ctx.quadraticCurveTo(475,610,545,590);
+    ctx.moveTo(445,625);
+    ctx.quadraticCurveTo(500,647,555,624);
+    ctx.stroke();
+
+    ctx.restore();
   }
-);
+
+  hand("left");
+  hand("right");
+
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.minFilter=THREE.LinearFilter;
+  texture.magFilter=THREE.LinearFilter;
+  texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);
+
+  const material=new THREE.MeshBasicMaterial({
+    map:texture,
+    transparent:true,
+    depthTest:false,
+    depthWrite:false,
+    toneMapped:false
+  });
+
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1.7778,1),material);
+  mesh.name="CleanFirstPersonHands";
+  mesh.renderOrder=1000;
+  mesh.frustumCulled=false;
+  camera.add(mesh);
+
+  function fit(){
+    const dist=1.0;
+    const h=2*Math.tan(THREE.MathUtils.degToRad(camera.fov*.5))*dist;
+    const w=h*camera.aspect;
+    const aspect=1600/900;
+    const height=Math.max(h,w/aspect)*1.02;
+    mesh.scale.set(height*aspect,height,1);
+    mesh.position.set(0,-.02,-dist);
+  }
+
+  fit();
+  return {mesh,fit};
+}
+
+const firstPersonHands=makeFirstPersonHands();
+player.hands.visible=false;
+player.realHands=firstPersonHands.mesh;
 
 const figure=new THREE.Group();
 const figureMat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1,metalness:0});
@@ -228,9 +327,9 @@ function animate(){
   flashlight.intensity=flashlightOn ? 11.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
   if(player.realHands){
-    const handSway=Math.sin(t*1.8)*.008;
-    const handLift=Math.abs(Math.sin(t*1.8))*.006;
-    player.realHands.position.y=-0.72+handLift;
+    const handSway=Math.sin(t*1.8)*.004;
+    const handLift=Math.abs(Math.sin(t*1.8))*.004;
+    player.realHands.position.y=-0.02+handLift;
     player.realHands.rotation.z=handSway;
   }
 
