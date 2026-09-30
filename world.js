@@ -6,7 +6,7 @@ import { createTextures } from "./textures.js";
 export const CELL = 4; // meters per grid cell
 export const CHUNK_CELLS = 16; // cells per chunk side
 export const CHUNK_SIZE = CELL * CHUNK_CELLS; // 64 m
-export const WALL_H = 3; // wall / ceiling height
+export const WALL_H = 4.2; // taller wall / ceiling height so jumps stay inside
 export const WALL_T = 0.35; // wall thickness
 export const EYE = 1.6; // eye height
 
@@ -80,7 +80,7 @@ export function generateChunk(cx, cz, seed) {
 
   // 1) Large architectural partitions — fewer, longer walls create
   // believable rooms and long Backrooms sightlines instead of a noisy maze.
-  const nSeg = 8 + Math.floor(rng() * 5); // 8–12
+  const nSeg = 12 + Math.floor(rng() * 5); // 12–16
   for (let i = 0; i < nSeg; i++) {
     const horiz = rng() < 0.5;
     const len = 4 + Math.floor(rng() * 7); // 4–10 cells
@@ -105,7 +105,7 @@ export function generateChunk(cx, cz, seed) {
   };
 
   // 2) Larger side rooms / service spaces with a deliberate doorway.
-  if (rng() < 0.42) {
+  if (rng() < 0.50) {
     const w = 4 + Math.floor(rng() * 5); // 4–8 cells
     const h = 4 + Math.floor(rng() * 5);
     const x0 = 1 + Math.floor(rng() * (CHUNK_CELLS - w - 2));
@@ -120,7 +120,7 @@ export function generateChunk(cx, cz, seed) {
 
   // 3) Main corridor spines: broad, long lanes with enough breathing room
   // to create readable spaces and strong lines of sight.
-  if (rng() < 0.32) {
+  if (rng() < 0.38) {
     const horiz = rng() < 0.5;
     const len = 9 + Math.floor(rng() * 8); // 9–16 cells
     const lane = 2 + Math.floor(rng() * 2); // 2–3 cells wide
@@ -137,7 +137,7 @@ export function generateChunk(cx, cz, seed) {
 
   // 4) One occasional "backroom" motif: a wide partial divider. It creates
   // a large room that still feels connected rather than becoming a dead-end box.
-  if (rng() < 0.30) {
+  if (rng() < 0.38) {
     const horiz = rng() < 0.5;
     const len = 6 + Math.floor(rng() * 6); // 6–11 cells
     const start = 2 + Math.floor(rng() * Math.max(1, CHUNK_CELLS - len - 4));
