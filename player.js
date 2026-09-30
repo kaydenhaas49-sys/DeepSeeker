@@ -113,9 +113,8 @@ export class Player {
               mat.side = THREE.DoubleSide;
               mat.depthTest = false;
               mat.depthWrite = false;
-              // The mirrored hand can invert tangent-space normals; remove the
-              // normal map only on that copy so it cannot produce black wedges.
-              if (side > 0 && mat.normalMap) mat.normalMap = null;
+              // Keep the original material maps intact; both hands use
+              // positive scale so tangent-space normals remain valid.
               mat.needsUpdate = true;
             }
           });
@@ -129,13 +128,12 @@ export class Player {
 
           hand.scale.setScalar(baseScale);
 
-          // Mirror the left/right pair. The material winding is corrected above
-          // so the mirrored copy keeps proper surface shading.
-          if (side > 0) hand.scale.x *= -1;
+          // Keep positive scale on both copies. Negative-X mirroring can
+          // corrupt tangent-space shading on the source model and create wedges.
 
           const pivot = new THREE.Group();
           pivot.name = side < 0 ? "LeftHandPivot" : "RightHandPivot";
-          pivot.position.set(side < 0 ? -0.49 : 0.62, -0.43, -1.34);
+          pivot.position.set(side < 0 ? -0.58 : 0.72, -0.43, -0.96);
           pivot.rotation.set(
             THREE.MathUtils.degToRad(-8),
             Math.PI + THREE.MathUtils.degToRad(side * 8),
