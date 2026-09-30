@@ -184,9 +184,9 @@ export class World {
       wall: new THREE.MeshStandardMaterial({ map: tex.wall, roughness: 0.92 }),
       floor: new THREE.MeshStandardMaterial({ map: tex.floor, roughness: 1.0 }),
       ceiling: new THREE.MeshStandardMaterial({ map: tex.ceiling, roughness: 0.95 }),
-      panel: new THREE.MeshBasicMaterial({ map: tex.panel }),
+      panel: new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x62605a }),
       panelOff: new THREE.MeshBasicMaterial({ color: 0x2b2921 }),
-      flicker: [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ map: tex.panel })),
+      flicker: [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x68655e })),
     };
 
     // Shared per-chunk geometry templates (never disposed per chunk).
