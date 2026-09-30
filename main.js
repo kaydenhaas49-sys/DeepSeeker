@@ -48,7 +48,7 @@ scene.add(ambient);
 const playerLight=new THREE.PointLight(0xb59b68,7.5,24,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xf0dfad,11.5,34,Math.PI/6,.82,1.5);
+const flashlight=new THREE.SpotLight(0xf0dfad,13.5,36,Math.PI/6,.82,1.5);
 flashlight.castShadow=true;
 flashlight.shadow.mapSize.set(512,512);
 flashlight.target.position.set(0,0,-1);
@@ -322,7 +322,7 @@ function animate(){
   if(battery<=0) flashlightOn=false;
 
   const flicker=.78+.22*Math.sin(t*17.1)*Math.sin(t*7.3);
-  flashlight.intensity=flashlightOn ? 11.0*flicker : 0;
+  flashlight.intensity=flashlightOn ? 13.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
   if(figureLife>0){
