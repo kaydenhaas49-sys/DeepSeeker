@@ -286,7 +286,7 @@ export class World {
       const geos = data.walls.map((w) => {
         const g = wallGeometry(w.len, w.horiz);
         g.translate(
-          (w.x + w.len / 2) * CELL, // center along the segment
+          (w.x + (w.horiz ? w.len / 2 : 0.5)) * CELL,
           0,
           (w.z + (w.horiz ? 0.5 : w.len / 2)) * CELL
         );
