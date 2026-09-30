@@ -251,14 +251,15 @@ export class Player {
     }
   }
 
-  // Move along one axis, resolving the player's circle against the
-  // actual thin wall rectangles. Hitting a wall stops the axis movement or
-  // lets the player slide along the wall instead of snapping/teleporting.
+  // Move along one axis using the real thin wall rectangles.
+  // If the proposed step would overlap a wall, reject that step completely.
+  // This prevents the old snap/teleport behavior while still allowing sliding.
   moveAxis(axis, delta) {
     if (delta === 0) return;
 
     const p = this.pos;
     const oldCoord = axis === "x" ? p.x : p.z;
+
     if (axis === "x") p.x += delta;
     else p.z += delta;
 
@@ -271,28 +272,12 @@ export class Player {
       const ddx = p.x - nx;
       const ddz = p.z - nz;
 
-      if (ddx * ddx + ddz * ddz >= r * r) continue;
-
-      if (axis === "x") {
-        if (oldCoord <= wall.minX) {
-          p.x = wall.minX - r;
-        } else if (oldCoord >= wall.maxX) {
-          p.x = wall.maxX + r;
-        } else {
-          const pushLeft = Math.abs(p.x - (wall.minX - r));
-          const pushRight = Math.abs((wall.maxX + r) - p.x);
-          p.x = pushLeft < pushRight ? wall.minX - r : wall.maxX + r;
-        }
-      } else {
-        if (oldCoord <= wall.minZ) {
-          p.z = wall.minZ - r;
-        } else if (oldCoord >= wall.maxZ) {
-          p.z = wall.maxZ + r;
-        } else {
-          const pushBack = Math.abs(p.z - (wall.minZ - r));
-          const pushForward = Math.abs((wall.maxZ + r) - p.z);
-          p.z = pushBack < pushForward ? wall.minZ - r : wall.maxZ + r;
-        }
+      if (ddx * ddx + ddz * ddz < r * r) {
+        // Undo only this axis' attempted move. The other axis remains intact,
+        // which naturally lets the player slide along the wall.
+        if (axis === "x") p.x = oldCoord;
+        else p.z = oldCoord;
+        break;
       }
     }
   }
