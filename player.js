@@ -171,9 +171,31 @@ export class Player {
     this.vel.x += (dx * speed - this.vel.x) * kSm;
     this.vel.z += (dz * speed - this.vel.z) * kSm;
 
-    // --- move with per-axis collision ---
-    this.moveAxis("x", this.vel.x * dt);
-    this.moveAxis("z", this.vel.z * dt);
+    // --- move with candidate-position collision ---
+    // Calculate the whole next position first. The player is only moved to a
+    // position that is actually clear, which prevents snapping/teleporting.
+    const oldX = this.pos.x;
+    const oldZ = this.pos.z;
+    const stepX = this.vel.x * dt;
+    const stepZ = this.vel.z * dt;
+    const nextX = oldX + stepX;
+    const nextZ = oldZ + stepZ;
+
+    if (!this.isWallBlocked(nextX, nextZ)) {
+      this.pos.x = nextX;
+      this.pos.z = nextZ;
+    } else {
+      // Preserve smooth wall sliding: test each axis independently from the
+      // original position instead of correcting the player into a new spot.
+      const canX = !this.isWallBlocked(nextX, oldZ);
+      const canZ = !this.isWallBlocked(oldX, nextZ);
+
+      if (canX) this.pos.x = nextX;
+      else this.vel.x = 0;
+
+      if (canZ) this.pos.z = nextZ;
+      else this.vel.z = 0;
+    }
 
     // --- head bob + FOV kick ---
     const hSpeed = Math.hypot(this.vel.x, this.vel.z);
@@ -251,34 +273,20 @@ export class Player {
     }
   }
 
-  // Move along one axis using the real thin wall rectangles.
-  // If the proposed step would overlap a wall, reject that step completely.
-  // This prevents the old snap/teleport behavior while still allowing sliding.
-  moveAxis(axis, delta) {
-    if (delta === 0) return;
-
-    const p = this.pos;
-    const oldCoord = axis === "x" ? p.x : p.z;
-
-    if (axis === "x") p.x += delta;
-    else p.z += delta;
-
+  // Exact circle-vs-thin-wall test at a proposed player position.
+  isWallBlocked(x, z) {
     const r = PLAYER_RADIUS;
-    const walls = this.world.getNearbyWallBounds(p.x, p.z, r + 1.0);
+    const walls = this.world.getNearbyWallBounds(x, z, r + 1.0);
 
     for (const wall of walls) {
-      const nx = Math.max(wall.minX, Math.min(p.x, wall.maxX));
-      const nz = Math.max(wall.minZ, Math.min(p.z, wall.maxZ));
-      const ddx = p.x - nx;
-      const ddz = p.z - nz;
+      const nx = Math.max(wall.minX, Math.min(x, wall.maxX));
+      const nz = Math.max(wall.minZ, Math.min(z, wall.maxZ));
+      const dx = x - nx;
+      const dz = z - nz;
 
-      if (ddx * ddx + ddz * ddz < r * r) {
-        // Undo only this axis' attempted move. The other axis remains intact,
-        // which naturally lets the player slide along the wall.
-        if (axis === "x") p.x = oldCoord;
-        else p.z = oldCoord;
-        break;
-      }
+      if (dx * dx + dz * dz < r * r) return true;
     }
+
+    return false;
   }
 }
