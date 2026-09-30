@@ -135,7 +135,7 @@ export class Player {
 
           const pivot = new THREE.Group();
           pivot.name = side < 0 ? "LeftHandPivot" : "RightHandPivot";
-          pivot.position.set(side * 0.49, -0.43, -1.12);
+          pivot.position.set(side < 0 ? -0.49 : 0.62, -0.43, -1.34);
           pivot.rotation.set(
             THREE.MathUtils.degToRad(-8),
             Math.PI + THREE.MathUtils.degToRad(side * 8),
