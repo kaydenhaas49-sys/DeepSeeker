@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DeepSeeker — Live World Prototype</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#08100b;font-family:Inter,system-ui,sans-serif;color:#eef7ed}
+  canvas{display:block}
+  #ui{position:fixed;inset:0;pointer-events:none}
+  #title{position:absolute;top:18px;left:20px;font-weight:800;letter-spacing:.08em;font-size:18px;text-shadow:0 2px 12px #000}
+  #help{position:absolute;left:20px;bottom:20px;padding:12px 14px;border:1px solid #ffffff24;background:#07100bcc;backdrop-filter:blur(8px);border-radius:12px;font-size:13px;line-height:1.55}
+  #status{position:absolute;right:20px;top:18px;padding:8px 11px;border-radius:999px;background:#6fd08b22;border:1px solid #6fd08b55;color:#a9f0ba;font-size:12px}
+  #cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:22px;opacity:.7}
+  kbd{padding:2px 6px;border:1px solid #ffffff28;border-bottom-color:#ffffff45;border-radius:5px;background:#ffffff0d}
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="title">DEEPSEEKER — LIVE WORLD PROTOTYPE</div>
+  <div id="status">WEB DEMO • CLICK TO CAPTURE</div>
+  <div id="cross">+</div>
+  <div id="help">
+    <kbd>WASD</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; mouse look &nbsp; <kbd>ESC</kbd> release mouse
+  </div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x78a8c8);
+scene.fog = new THREE.Fog(0x78a8c8, 90, 300);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, .1, 500);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const hemi = new THREE.HemisphereLight(0xd8f0ff,0x385338,2.0);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d6,3.0);
+sun.position.set(-80,120,-70);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-120; sun.shadow.camera.right=120;
+sun.shadow.camera.top=120; sun.shadow.camera.bottom=-120;
+scene.add(sun);
+
+const WORLD=220, GRID=140, STEP=WORLD/GRID, WATER=2;
+const height=(x,z)=>{
+  const broad=Math.sin(x*.035)*8 + Math.cos(z*.028)*7;
+  const hills=Math.sin((x+z)*.075)*3.5 + Math.cos((x-z)*.055)*3;
+  const detail=Math.sin(x*.16+z*.09)*.9;
+  return Math.max(-1.5,broad+hills+detail);
+};
+
+const terrain = new THREE.PlaneGeometry(WORLD,WORLD,GRID,GRID);
+terrain.rotateX(-Math.PI/2);
+const pos=terrain.attributes.position;
+for(let i=0;i<pos.count;i++){
+  const x=pos.getX(i), z=pos.getZ(i);
+  pos.setY(i,height(x,z));
+}
+terrain.computeVertexNormals();
+const terrainMat=new THREE.MeshStandardMaterial({color:0x5a7b48,roughness:1});
+const ground=new THREE.Mesh(terrain,terrainMat);
+ground.receiveShadow=true;
+scene.add(ground);
+
+const waterGeo=new THREE.PlaneGeometry(WORLD,WORLD);
+waterGeo.rotateX(-Math.PI/2);
+const waterMat=new THREE.MeshPhysicalMaterial({
+  color:0x1f6172,transparent:true,opacity:.66,
+  roughness:.12,metalness:.05,clearcoat:1,clearcoatRoughness:.15
+});
+const water=new THREE.Mesh(waterGeo,waterMat);
+water.position.y=WATER;
+scene.add(water);
+
+function seeded(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}}
+const rand=seeded(184729);
+
+const trunkMat=new THREE.MeshStandardMaterial({color:0x5a4532,roughness:1});
+const leafMat=new THREE.MeshStandardMaterial({color:0x315c35,roughness:1});
+const rockMat=new THREE.MeshStandardMaterial({color:0x59605a,roughness:1});
+
+for(let i=0;i<260;i++){
+  const x=(rand()-.5)*WORLD*.92, z=(rand()-.5)*WORLD*.92, y=height(x,z);
+  if(y<WATER+.8 || Math.hypot(x,z)<18) continue;
+  const s=.75+rand()*.7, g=new THREE.Group();
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.16,.24,2.8,7),trunkMat);
+  trunk.position.y=1.4;
+  const crown=new THREE.Mesh(new THREE.SphereGeometry(1.25,9,7),leafMat);
+  crown.scale.y=1.0; crown.position.y=3.25;
+  g.add(trunk,crown); g.position.set(x,y,z); g.scale.setScalar(s);
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true});
+  scene.add(g);
+}
+for(let i=0;i<120;i++){
+  const x=(rand()-.5)*WORLD*.9, z=(rand()-.5)*WORLD*.9, y=height(x,z);
+  if(y<WATER+.5) continue;
+  const s=.45+rand()*1.5;
+  const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(1,0),rockMat);
+  rock.position.set(x,y+s*.35,z);
+  rock.scale.set(s,s*.7,s*.9);
+  rock.rotation.set(rand()*2,rand()*3,rand()*2);
+  rock.castShadow=true; rock.receiveShadow=true;
+  scene.add(rock);
+}
+
+// Simple landmark.
+const landmark=new THREE.Mesh(
+  new THREE.CylinderGeometry(2.3,1.8,8,12),
+  new THREE.MeshStandardMaterial({color:0x77786b,roughness:.9})
+);
+landmark.position.set(-48,height(-48,-42)+4,-42);
+landmark.castShadow=true;
+scene.add(landmark);
+
+const player=new THREE.Group();
+const body=new THREE.Mesh(new THREE.CapsuleGeometry(.45,.9,8,12),new THREE.MeshStandardMaterial({color:0xd7e7df,roughness:.8}));
+body.position.y=1.35; body.castShadow=true;
+player.add(body);
+scene.add(player);
+player.position.set(0,height(0,0)+.05,0);
+
+const keys=new Set();
+addEventListener('keydown',e=>keys.add(e.code));
+addEventListener('keyup',e=>keys.delete(e.code));
+let yaw=0,pitch=-.15,locked=false;
+renderer.domElement.addEventListener('click',()=>renderer.domElement.requestPointerLock());
+document.addEventListener('pointerlockchange',()=>locked=document.pointerLockElement===renderer.domElement);
+document.addEventListener('mousemove',e=>{
+  if(!locked)return;
+  yaw-=e.movementX*.0025;
+  pitch-=e.movementY*.0025;
+  pitch=Math.max(-1.05,Math.min(.55,pitch));
+});
+
+const clock=new THREE.Clock();
+function tick(){
+  const dt=Math.min(clock.getDelta(),.05);
+  const forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
+  const strafe=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
+  const len=Math.hypot(forward,strafe)||1;
+  const sprint=keys.has('ShiftLeft')||keys.has('ShiftRight');
+  const speed=sprint?11:7;
+  const fx=Math.sin(yaw), fz=Math.cos(yaw);
+  const rx=Math.cos(yaw), rz=-Math.sin(yaw);
+  player.position.x += ((fx*forward + rx*strafe)/len)*speed*dt;
+  player.position.z += ((fz*forward + rz*strafe)/len)*speed*dt;
+  const half=WORLD*.46;
+  player.position.x=THREE.MathUtils.clamp(player.position.x,-half,half);
+  player.position.z=THREE.MathUtils.clamp(player.position.z,-half,half);
+  player.position.y=height(player.position.x,player.position.z)+.05;
+  player.rotation.y=yaw;
+
+  const target=new THREE.Vector3(player.position.x,player.position.y+1.25,player.position.z);
+  const distance=6.5;
+  const dir=new THREE.Vector3(
+    Math.sin(yaw)*Math.cos(pitch),
+    Math.sin(pitch),
+    Math.cos(yaw)*Math.cos(pitch)
+  );
+  camera.position.copy(target).addScaledVector(dir,distance);
+  camera.lookAt(target);
+  renderer.render(scene,camera);
+  requestAnimationFrame(tick);
+}
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+tick();
+</script>
+</body>
+</html>
