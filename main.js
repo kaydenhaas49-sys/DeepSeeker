@@ -80,6 +80,7 @@ figure.add(fallbackFigure);
 
 let bacteriaMixer=null;
 let bacteriaLoaded=false;
+const debugSpawnBacteria=true;
 
 const bacteriaLoader=new GLTFLoader();
 bacteriaLoader.load(
@@ -108,6 +109,19 @@ bacteriaLoader.load(
     model.scale.setScalar(scale);
     figure.add(model);
     bacteriaLoaded=true;
+
+    if (debugSpawnBacteria) {
+      const dx = -Math.sin(player.yaw);
+      const dz = -Math.cos(player.yaw);
+      figure.position.set(
+        player.pos.x + dx * 6,
+        0,
+        player.pos.z + dz * 6
+      );
+      figure.rotation.y = player.yaw + Math.PI;
+      figureLife = Infinity;
+      figure.visible = true;
+    }
 
     if(gltf.animations.length){
       bacteriaMixer=new THREE.AnimationMixer(model);
@@ -378,9 +392,9 @@ function animate(){
   if(bacteriaMixer) bacteriaMixer.update(dt);
 
   if(figureLife>0){
-    figureLife=Math.max(0,figureLife-dt);
+    if (Number.isFinite(figureLife)) figureLife=Math.max(0,figureLife-dt);
     figure.visible=true;
-    const fade=figureLife>0.85 ? 1 : figureLife/0.85;
+    const fade=!Number.isFinite(figureLife) ? 1 : (figureLife>0.85 ? 1 : figureLife/0.85);
     if(bacteriaLoaded){
       for(const child of figure.children){
         if(child===fallbackFigure) continue;
