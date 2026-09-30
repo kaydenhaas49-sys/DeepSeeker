@@ -130,7 +130,7 @@ controls.addEventListener("click",e=>{
 
 document.addEventListener("pointerlockchange",()=>{
   const locked=document.pointerLockElement===renderer.domElement;
-  if(!controlsOpen) overlay.classList.toggle("hidden",locked);
+  if(!controlsOpen && !phoneOpen) overlay.classList.toggle("hidden",locked);
   crosshair.style.display=locked?"block":"none";
   prompt.textContent="CLICK TO RESUME";
   if(locked && phoneOpen){
