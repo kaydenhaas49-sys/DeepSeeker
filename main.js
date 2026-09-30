@@ -98,7 +98,7 @@ bacteriaLoader.load(
     const box=new THREE.Box3().setFromObject(model);
     const size=box.getSize(new THREE.Vector3());
     const center=box.getCenter(new THREE.Vector3());
-    const targetHeight=2.8;
+    const targetHeight=3.6;
     const scale=targetHeight/Math.max(size.y,0.001);
 
     model.position.set(
@@ -114,26 +114,36 @@ bacteriaLoader.load(
       const dx = -Math.sin(player.yaw);
       const dz = -Math.cos(player.yaw);
       figure.position.set(
-        player.pos.x + dx * 6,
+        player.pos.x + dx * 5,
         0,
-        player.pos.z + dz * 6
+        player.pos.z + dz * 5
       );
       figure.rotation.y = player.yaw + Math.PI;
       figureLife = Infinity;
       figure.visible = true;
+      eventText.textContent = "BACTERIA LOADED";
+      eventText.style.opacity = "1";
     }
 
-    if(gltf.animations.length){
-      bacteriaMixer=new THREE.AnimationMixer(model);
-      const action=bacteriaMixer.clipAction(gltf.animations[0]);
-      action.reset();
-      action.setLoop(THREE.LoopRepeat,Infinity);
-      action.play();
-    }
+    // Leave animation disabled during the visual test so the model stays
+    // exactly where it was spawned.
   },
   undefined,
   ()=>{
-    // Keep the fallback hidden if the optional local model is missing.
+    // Make the failure obvious during the test instead of silently showing nothing.
+    fallbackFigure.visible = true;
+    const dx = -Math.sin(player.yaw);
+    const dz = -Math.cos(player.yaw);
+    figure.position.set(
+      player.pos.x + dx * 5,
+      0,
+      player.pos.z + dz * 5
+    );
+    figure.rotation.y = player.yaw + Math.PI;
+    figureLife = Infinity;
+    figure.visible = true;
+    eventText.textContent = "BACTERIA GLB FAILED TO LOAD";
+    eventText.style.opacity = "1";
   }
 );
 let figureLife=0;
