@@ -98,7 +98,7 @@ bacteriaLoader.load(
     const box=new THREE.Box3().setFromObject(model);
     const size=box.getSize(new THREE.Vector3());
     const center=box.getCenter(new THREE.Vector3());
-    const targetHeight=3.6;
+    const targetHeight=6.2;
     const scale=targetHeight/Math.max(size.y,0.001);
 
     model.position.set(
@@ -106,7 +106,7 @@ bacteriaLoader.load(
       -box.min.y*scale,
       -center.z*scale
     );
-    model.scale.setScalar(scale);
+    model.scale.set(scale * 1.65, scale, scale * 1.65);
     figure.add(model);
     bacteriaLoaded=true;
 
