@@ -53,6 +53,8 @@ scene.add(camera);
 const player=new Player(camera,renderer.domElement,world);
 const audio=new HorrorAudio();
 
+player.hands.visible=false;
+
 
 const figure=new THREE.Group();
 const figureMat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1,metalness:0});
