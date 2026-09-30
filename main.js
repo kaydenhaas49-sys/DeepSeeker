@@ -54,7 +54,7 @@ scene.add(camera);
 const player=new Player(camera,renderer.domElement,world);
 const audio=new HorrorAudio();
 
-player.hands.visible=false;
+// Keep the built-in arms visible until the external model has loaded successfully.
 
 const armsLoader=new GLTFLoader();
 const armsUrl="https://raw.githubusercontent.com/Grumoth/godot-character-creator/master/MainCharacter/Mesh/Parts/arms.glb";
@@ -84,6 +84,7 @@ armsLoader.load(
     arms.rotation.set(-0.10,Math.PI,0);
     arms.scale.setScalar(.78);
 
+    player.hands.visible=false;
     camera.add(arms);
     player.importedArms=arms;
   },
