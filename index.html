@@ -62,6 +62,14 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 #phoneCardTitle{font-size:11px;letter-spacing:2px;color:#aaa477;margin-bottom:8px}
 #phoneCardText{font-size:13px;line-height:1.55;color:#c6c5b6}
 #phoneSignal{margin-top:18px;font-size:9px;letter-spacing:2px;color:#67695b}
+#phoneStory{margin-top:18px;max-height:235px;overflow:auto;padding-right:3px}
+#phoneStory::-webkit-scrollbar{width:3px}
+#phoneStory::-webkit-scrollbar-thumb{background:#ffffff18;border-radius:9px}
+.storyEntry{padding:12px 0;border-top:1px solid #ffffff10}
+.storyMeta{font-size:9px;letter-spacing:2px;color:#787866;margin-bottom:6px}
+.storyText{font-size:12px;line-height:1.55;color:#c8c7bb}
+.storyLocked{color:#57584e;font-size:10px;letter-spacing:1px;padding:8px 0}
+
 #phoneHome{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:105px;height:4px;border-radius:8px;background:#ffffff55}
 #phoneHint{position:fixed;left:50%;bottom:3%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#77745f;z-index:16;opacity:0;pointer-events:none;transition:opacity .2s}
 #phone.open + #phoneHint{opacity:1}
@@ -94,6 +102,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
         <div id="phoneCardTitle">CURRENT OBJECTIVE</div>
         <div id="phoneCardText">Find a way out.</div>
       </div>
+      <div id="phoneStory"></div>
       <div id="phoneSignal">GPS UNAVAILABLE · NETWORK UNAVAILABLE</div>
     </div>
   </div>
