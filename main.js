@@ -3,6 +3,7 @@ import { World, EYE } from "./world.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -56,47 +57,115 @@ const audio=new HorrorAudio();
 
 // Keep the built-in arms visible until the external model has loaded successfully.
 
-const armsLoader=new GLTFLoader();
-const armsUrl="https://raw.githubusercontent.com/Grumoth/godot-character-creator/master/MainCharacter/Mesh/Parts/arms.glb";
+const handLoader=new GLTFLoader();
+const handUrl="https://raw.githubusercontent.com/blechdom/morphazoid/c3cd4614959e13b6eed2836ff7452dc9e8f0aea6/assets/gesticulating-hand/hand.glb";
 
-armsLoader.load(
-  armsUrl,
-  (gltf)=>{
-    const arms=gltf.scene;
-    arms.name="ImportedRealArms";
-
-    arms.traverse((obj)=>{
-      if(!obj.isMesh) return;
-      obj.castShadow=false;
-      obj.receiveShadow=false;
+function orientHandModel(model){
+  const bones=[];
+  model.traverse(obj=>{
+    if(obj.isBone) bones.push(obj);
+    if(obj.isMesh){
       obj.frustumCulled=false;
-
-      // The source file contains a whole humanoid rig. Keep only the
-      // visible upper-body/arm pieces for the first-person viewmodel.
-      const n=(obj.name||"").toLowerCase();
-      if(/leg|thigh|shin|foot|toe|pelvis|head|neck|torso|spine|shoulder/.test(n)){
-        obj.visible=false;
+      obj.renderOrder=1000;
+      const mats=Array.isArray(obj.material)?obj.material:[obj.material];
+      for(const mat of mats){
+        if(!mat) continue;
+        mat.side=THREE.DoubleSide;
+        mat.depthTest=false;
+        mat.depthWrite=false;
       }
+    }
+  });
+
+  const findBone=name=>bones.find(b=>b.name===name);
+  const wrist=findBone("handR_02");
+  const middle=findBone("middle_01");
+  const index=findBone("index_01");
+  const pinky=findBone("pinky_01");
+
+  if(wrist&&middle&&index&&pinky){
+    const wristPoint=wrist.getWorldPosition(new THREE.Vector3());
+    const middlePoint=middle.getWorldPosition(new THREE.Vector3());
+    const across=index.getWorldPosition(new THREE.Vector3())
+      .sub(pinky.getWorldPosition(new THREE.Vector3())).normalize();
+    const up=middlePoint.sub(wristPoint).normalize();
+    const normal=new THREE.Vector3().crossVectors(across,up).normalize();
+    const right=new THREE.Vector3().crossVectors(up,normal).normalize();
+    model.quaternion.setFromRotationMatrix(
+      new THREE.Matrix4().makeBasis(right,up,normal).invert()
+    );
+  }
+
+  model.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(model,true);
+  const size=box.getSize(new THREE.Vector3());
+  const targetLength=.42;
+  const scale=targetLength/Math.max(size.y,.001);
+  model.scale.setScalar(scale);
+  model.updateMatrixWorld(true);
+}
+
+handLoader.load(
+  handUrl,
+  gltf=>{
+    const right=SkeletonUtils.clone(gltf.scene);
+    const left=SkeletonUtils.clone(gltf.scene);
+
+    orientHandModel(right);
+    orientHandModel(left);
+
+    // Mirror the right-hand mesh to create the opposite hand.
+    left.scale.x*=-1;
+
+    const handsRoot=new THREE.Group();
+    handsRoot.name="RealFirstPersonHands";
+    handsRoot.renderOrder=1000;
+
+    right.position.set(.34,-.30,-.82);
+    right.rotation.x=-.28;
+    right.rotation.y=-.18;
+    right.rotation.z=.10;
+
+    left.position.set(-.34,-.30,-.82);
+    left.rotation.x=-.28;
+    left.rotation.y=.18;
+    left.rotation.z=-.10;
+
+    // Simple dark sleeves sit behind the real hand meshes.
+    const sleeveMat=new THREE.MeshStandardMaterial({
+      color:0x17191c,
+      roughness:.95,
+      metalness:0,
+      depthTest:false,
+      depthWrite:false
     });
 
-    // Place the arms at the base of the camera, large enough to actually read
-    // as a first-person body part instead of disappearing below the screen.
-    arms.position.set(0,-0.78,-0.92);
-    arms.rotation.set(-0.10,Math.PI,0);
-    arms.scale.setScalar(.78);
+    const sleeveGeo=new THREE.CylinderGeometry(.115,.135,.48,12);
+    const sleeveR=new THREE.Mesh(sleeveGeo,sleeveMat);
+    const sleeveL=new THREE.Mesh(sleeveGeo.clone(),sleeveMat);
 
-    // Keep this asset loaded for later refinement, but use the guaranteed
-    // procedural viewmodel for the current playable build.
-    player.importedArms=arms;
-    arms.visible=false;
-    player.hands.visible=true;
+    sleeveR.position.set(.35,-.46,-.91);
+    sleeveL.position.set(-.35,-.46,-.91);
+    sleeveR.rotation.z=-.18;
+    sleeveL.rotation.z=.18;
+    sleeveR.renderOrder=999;
+    sleeveL.renderOrder=999;
+    sleeveR.frustumCulled=false;
+    sleeveL.frustumCulled=false;
+
+    handsRoot.add(sleeveL,sleeveR,left,right);
+    camera.add(handsRoot);
+
+    player.hands.visible=false;
+    player.realHands=handsRoot;
+    player.realLeftHand=left;
+    player.realRightHand=right;
   },
   undefined,
-  (err)=>{
-    console.warn("Could not load imported arms:",err);
-    // Keep the player hands visible as a guaranteed fallback.
+  err=>{
+    console.warn("Could not load real hand asset:",err);
     player.hands.visible=true;
-    player.importedArms=null;
+    player.realHands=null;
   }
 );
 
@@ -215,6 +284,12 @@ function animate(){
   const flicker=.78+.22*Math.sin(t*17.1)*Math.sin(t*7.3);
   flashlight.intensity=flashlightOn ? 11.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
+  if(player.realHands){
+    const handSway=Math.sin(t*1.8)*.008;
+    const handLift=Math.abs(Math.sin(t*1.8))*.006;
+    player.realHands.position.y=handLift;
+    player.realHands.rotation.z=handSway;
+  }
 
   if(figureLife>0){
     figureLife=Math.max(0,figureLife-dt);
