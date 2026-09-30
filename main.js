@@ -23,26 +23,26 @@ const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-per
 renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=.9;
+renderer.toneMappingExposure=.72;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x010201);
-scene.fog=new THREE.Fog(0x030403,19,70);
+scene.fog=new THREE.Fog(0x020302,15,58);
 
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
 const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
 
-const hemi=new THREE.HemisphereLight(0xffefc5,0x28231a,.38);
+const hemi=new THREE.HemisphereLight(0xffefc5,0x1b1812,.18);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0xffd9a0,.18);
+const ambient=new THREE.AmbientLight(0xffd9a0,.06);
 scene.add(ambient);
 
-const playerLight=new THREE.PointLight(0xffe6b0,18,30,1.9);
+const playerLight=new THREE.PointLight(0xffd9a0,6,24,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xfff5cf,10,29,Math.PI/6,.72,1.2);
+const flashlight=new THREE.SpotLight(0xfff2c2,7,27,Math.PI/6,.78,1.35);
 flashlight.castShadow=true;
 flashlight.shadow.mapSize.set(512,512);
 flashlight.target.position.set(0,0,-1);
@@ -165,8 +165,8 @@ function animate(){
   }
   if(battery<=0) flashlightOn=false;
 
-  const flicker=.93+.07*Math.sin(t*17.1)*Math.sin(t*7.3);
-  flashlight.intensity=flashlightOn ? 9.5*flicker : 0;
+  const flicker=.88+.12*Math.sin(t*17.1)*Math.sin(t*7.3);
+  flashlight.intensity=flashlightOn ? 7.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
   if(figureLife>0){
@@ -190,15 +190,15 @@ function animate(){
 
   if(pulse>0){
     pulse=Math.max(0,pulse-dt*2.8);
-    vignette.style.opacity=String(.78+.20*pulse);
+    vignette.style.opacity=String(.84+.14*pulse);
     camera.position.x+=Math.sin(t*70)*pulse*.008;
     camera.position.y+=Math.sin(t*61)*pulse*.006;
-    hemi.intensity=.38*(1-pulse*.72);
-    ambient.intensity=.18*(1-pulse*.85);
+    hemi.intensity=.18*(1-pulse*.78);
+    ambient.intensity=.06*(1-pulse*.88);
   }else{
-    vignette.style.opacity=".78";
-    hemi.intensity=.38;
-    ambient.intensity=.18;
+    vignette.style.opacity=".84";
+    hemi.intensity=.18;
+    ambient.intensity=.06;
   }
 
   const stamina=player.stamina;
