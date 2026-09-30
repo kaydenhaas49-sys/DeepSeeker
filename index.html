@@ -196,8 +196,8 @@ function move(dt){
   const rightX=Math.cos(yaw);
   const rightZ=-Math.sin(yaw);
 
-  player.x+=((forwardX*f+rightX*str)/len)*speed*dt;
-  player.z+=((forwardZ*f+rightZ*str)/len)*speed*dt;
+  player.x-=((forwardX*f+rightX*str)/len)*speed*dt;
+  player.z-=((forwardZ*f+rightZ*str)/len)*speed*dt;
 
   const floor=findGroundY(player.x,player.y,player.z);
   player.vy-=20*dt;
