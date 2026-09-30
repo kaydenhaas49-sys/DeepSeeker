@@ -52,6 +52,18 @@ scene.add(camera);
 
 const player=new Player(camera,renderer.domElement,world);
 const audio=new HorrorAudio();
+
+const figure=new THREE.Group();
+const figureMat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1,metalness:0});
+const figureBody=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.95,6,10),figureMat);
+figureBody.position.y=1.05;
+const figureHead=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),figureMat);
+figureHead.position.y=1.85;
+figure.add(figureBody,figureHead);
+figure.visible=false;
+scene.add(figure);
+
+let figureLife=0;
 player.onStep=({intensity})=>audio.step(intensity);
 
 let flashlightOn=true;
@@ -112,6 +124,16 @@ document.addEventListener("keydown",e=>{
 function triggerEvent(){
   eventCooldown=3.5;
   pulse=1;
+  figureLife=1.25;
+  const dx=-Math.sin(player.yaw), dz=-Math.cos(player.yaw);
+  const side=Math.random()>.5?1:-1;
+  figure.position.set(
+    player.pos.x + dx*(9+Math.random()*7) + Math.cos(player.yaw)*side*2.5,
+    0,
+    player.pos.z + dz*(9+Math.random()*7) - Math.sin(player.yaw)*side*2.5
+  );
+  figure.rotation.y=player.yaw+Math.PI;
+  figure.visible=true;
   audio.scare();
   objective.textContent=Math.random()>.5 ? "Something moved nearby." : "The lights don't feel right.";
   eventText.textContent=Math.random()>.5 ? "DID YOU HEAR THAT?" : "THE LIGHTS ARE FLICKERING";
@@ -146,6 +168,19 @@ function animate(){
   const flicker=.93+.07*Math.sin(t*17.1)*Math.sin(t*7.3);
   flashlight.intensity=flashlightOn ? 9.5*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
+
+  if(figureLife>0){
+    figureLife=Math.max(0,figureLife-dt);
+    figure.visible=true;
+    const fade=figureLife>0.85 ? 1 : figureLife/0.85;
+    figure.scale.setScalar(.96 + .08*Math.sin(t*12));
+    figureBody.material.opacity=fade;
+    figureHead.material.opacity=fade;
+    figureBody.material.transparent=true;
+    figureHead.material.transparent=true;
+  }else{
+    figure.visible=false;
+  }
 
   if(eventCooldown>0) eventCooldown-=dt;
   if(eventCooldown<=0 && t>nextEvent){
