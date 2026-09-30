@@ -3,7 +3,6 @@ import { World, EYE } from "./world.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -57,16 +56,23 @@ const audio=new HorrorAudio();
 
 // Keep the built-in arms visible until the external model has loaded successfully.
 
-const handLoader=new GLTFLoader();
-const handUrl="https://raw.githubusercontent.com/blechdom/morphazoid/c3cd4614959e13b6eed2836ff7452dc9e8f0aea6/assets/gesticulating-hand/hand.glb";
+const armsLoader=new GLTFLoader();
+const armsUrl="https://raw.githubusercontent.com/wwwriks/wrad-arms/main/arms.glb";
 
-function orientHandModel(model){
-  const bones=[];
-  model.traverse(obj=>{
-    if(obj.isBone) bones.push(obj);
-    if(obj.isMesh){
+armsLoader.load(
+  armsUrl,
+  gltf=>{
+    const arms=gltf.scene;
+    arms.name="WRADFirstPersonArms";
+    arms.renderOrder=1000;
+
+    arms.traverse(obj=>{
+      if(!obj.isMesh) return;
       obj.frustumCulled=false;
       obj.renderOrder=1000;
+      obj.castShadow=false;
+      obj.receiveShadow=false;
+
       const mats=Array.isArray(obj.material)?obj.material:[obj.material];
       for(const mat of mats){
         if(!mat) continue;
@@ -74,96 +80,33 @@ function orientHandModel(model){
         mat.depthTest=false;
         mat.depthWrite=false;
       }
-    }
-  });
-
-  const findBone=name=>bones.find(b=>b.name===name);
-  const wrist=findBone("handR_02");
-  const middle=findBone("middle_01");
-  const index=findBone("index_01");
-  const pinky=findBone("pinky_01");
-
-  if(wrist&&middle&&index&&pinky){
-    const wristPoint=wrist.getWorldPosition(new THREE.Vector3());
-    const middlePoint=middle.getWorldPosition(new THREE.Vector3());
-    const across=index.getWorldPosition(new THREE.Vector3())
-      .sub(pinky.getWorldPosition(new THREE.Vector3())).normalize();
-    const up=middlePoint.sub(wristPoint).normalize();
-    const normal=new THREE.Vector3().crossVectors(across,up).normalize();
-    const right=new THREE.Vector3().crossVectors(up,normal).normalize();
-    model.quaternion.setFromRotationMatrix(
-      new THREE.Matrix4().makeBasis(right,up,normal).invert()
-    );
-  }
-
-  model.updateMatrixWorld(true);
-  const box=new THREE.Box3().setFromObject(model,true);
-  const size=box.getSize(new THREE.Vector3());
-  const targetLength=.42;
-  const scale=targetLength/Math.max(size.y,.001);
-  model.scale.setScalar(scale);
-  model.updateMatrixWorld(true);
-}
-
-handLoader.load(
-  handUrl,
-  gltf=>{
-    const right=SkeletonUtils.clone(gltf.scene);
-    const left=SkeletonUtils.clone(gltf.scene);
-
-    orientHandModel(right);
-    orientHandModel(left);
-
-    // Mirror the right-hand mesh to create the opposite hand.
-    left.scale.x*=-1;
-
-    const handsRoot=new THREE.Group();
-    handsRoot.name="RealFirstPersonHands";
-    handsRoot.renderOrder=1000;
-
-    right.position.set(.34,-.30,-.82);
-    right.rotation.x=-.28;
-    right.rotation.y=-.18;
-    right.rotation.z=.10;
-
-    left.position.set(-.34,-.30,-.82);
-    left.rotation.x=-.28;
-    left.rotation.y=.18;
-    left.rotation.z=-.10;
-
-    // Simple dark sleeves sit behind the real hand meshes.
-    const sleeveMat=new THREE.MeshStandardMaterial({
-      color:0x17191c,
-      roughness:.95,
-      metalness:0,
-      depthTest:false,
-      depthWrite:false
     });
 
-    const sleeveGeo=new THREE.CylinderGeometry(.115,.135,.48,12);
-    const sleeveR=new THREE.Mesh(sleeveGeo,sleeveMat);
-    const sleeveL=new THREE.Mesh(sleeveGeo.clone(),sleeveMat);
+    // Auto-fit the downloaded viewmodel so the full forearms stay visible.
+    arms.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(arms,true);
+    const size=box.getSize(new THREE.Vector3());
+    const center=box.getCenter(new THREE.Vector3());
+    const targetHeight=1.55;
+    const scale=targetHeight/Math.max(size.y,.001);
 
-    sleeveR.position.set(.35,-.46,-.91);
-    sleeveL.position.set(-.35,-.46,-.91);
-    sleeveR.rotation.z=-.18;
-    sleeveL.rotation.z=.18;
-    sleeveR.renderOrder=999;
-    sleeveL.renderOrder=999;
-    sleeveR.frustumCulled=false;
-    sleeveL.frustumCulled=false;
+    arms.scale.setScalar(scale);
+    arms.position.set(
+      -center.x*scale,
+      -0.72-center.y*scale,
+      -1.05-center.z*scale
+    );
 
-    handsRoot.add(sleeveL,sleeveR,left,right);
-    camera.add(handsRoot);
+    // Slight downward camera tilt for a natural FPS resting pose.
+    arms.rotation.set(-0.10,0,0);
 
+    camera.add(arms);
     player.hands.visible=false;
-    player.realHands=handsRoot;
-    player.realLeftHand=left;
-    player.realRightHand=right;
+    player.realHands=arms;
   },
   undefined,
   err=>{
-    console.warn("Could not load real hand asset:",err);
+    console.warn("Could not load WRAD first-person arms:",err);
     player.hands.visible=true;
     player.realHands=null;
   }
@@ -287,7 +230,7 @@ function animate(){
   if(player.realHands){
     const handSway=Math.sin(t*1.8)*.008;
     const handLift=Math.abs(Math.sin(t*1.8))*.006;
-    player.realHands.position.y=handLift;
+    player.realHands.position.y=-0.72+handLift;
     player.realHands.rotation.z=handSway;
   }
 
