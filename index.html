@@ -7,25 +7,87 @@
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,sans-serif}
 #app,#app canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
-#crosshair{position:fixed;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#fff9;box-shadow:0 0 5px #000;pointer-events:none;z-index:2}
-#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,.84);color:#d8c98a;cursor:pointer;user-select:none;z-index:10;text-align:center}
+#crosshair{position:fixed;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#fff9;box-shadow:0 0 5px #000;pointer-events:none;z-index:4}
+#vignette{position:fixed;inset:0;background:radial-gradient(circle at center,transparent 25%,rgba(0,0,0,.78) 100%);pointer-events:none;z-index:2;opacity:.78;transition:opacity .12s}
+#grain{position:fixed;inset:-50%;pointer-events:none;z-index:3;opacity:.065;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");animation:grain .18s steps(2) infinite}
+@keyframes grain{0%{transform:translate3d(0,0,0)}25%{transform:translate3d(2%,-1%,0)}50%{transform:translate3d(-1%,2%,0)}75%{transform:translate3d(1%,1%,0)}100%{transform:translate3d(-2%,-2%,0)}}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5;color:#eee}
+#hudTop{position:absolute;left:18px;top:16px;display:flex;flex-direction:column;gap:7px;text-shadow:0 2px 10px #000}
+#hudTitle{font-size:12px;letter-spacing:3px;color:#b8b48c}
+#objective{font-size:13px;color:#e4dfbc;opacity:.9;max-width:360px}
+#hudRight{position:absolute;right:18px;bottom:18px;width:180px}
+.meterLabel{display:flex;justify-content:space-between;font-size:11px;letter-spacing:1.5px;color:#b9b6a3;margin-bottom:5px}
+.meter{height:7px;background:#ffffff13;border:1px solid #ffffff18;border-radius:99px;overflow:hidden;box-shadow:0 3px 14px #0008}
+.meter i{display:block;height:100%;width:100%;background:#d4c98e;transition:width .08s}
+#battery i{background:#d3d0ab}
+#event{position:absolute;left:50%;top:25%;transform:translate(-50%,-50%);font-size:14px;letter-spacing:4px;color:#d6cfa8;text-align:center;text-shadow:0 0 18px #000;opacity:0;transition:opacity .2s}
+#controlsPanel{position:fixed;inset:0;z-index:12;display:grid;place-items:center;background:rgba(0,0,0,.76);backdrop-filter:blur(7px);color:#ddd}
+#controlsPanel.hidden{display:none}
+#controlsBox{width:min(680px,calc(100vw - 42px));padding:28px;border:1px solid #fff2;border-radius:18px;background:#090b09f5;box-shadow:0 25px 100px #000}
+#controlsBox h2{margin:0 0 8px;font-size:22px;letter-spacing:4px;font-weight:500;color:#e2dcb5}
+#controlsBox p{margin:0 0 20px;color:#969788;font-size:12px;line-height:1.6}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 24px}
+.row{display:flex;justify-content:space-between;gap:15px;padding:8px 0;border-bottom:1px solid #fff1;font-size:13px}
+.key{color:#e1d9af;font-weight:700}
+.action{color:#aaa}
+.closeHint{margin-top:20px;color:#736f58!important;font-size:11px!important;letter-spacing:1px}
+#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,.9);color:#d8c98a;cursor:pointer;user-select:none;z-index:10;text-align:center}
 #overlay.hidden{display:none}
 #overlay h1{margin:0;font-size:42px;letter-spacing:12px;font-weight:500;text-shadow:0 0 24px #d6be5a55}
 #overlay .sub{margin:0;font-size:13px;letter-spacing:4px;color:#9a8d5e}
 #overlay .prompt{margin:14px 0 0;font-size:17px;letter-spacing:3px;animation:pulse 1.6s ease-in-out infinite}
 #overlay .controls{font-size:12px;letter-spacing:2px;color:#80774f;line-height:1.9}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div id="crosshair"></div>
+<div id="vignette"></div>
+<div id="grain"></div>
+
+<div id="hud">
+  <div id="hudTop">
+    <div id="hudTitle">DEEPSEEKER • LIMINAL HORROR</div>
+    <div id="objective">Find a way deeper. Stay in the light.</div>
+  </div>
+  <div id="event"></div>
+  <div id="hudRight">
+    <div class="meterLabel"><span>STAMINA</span><span id="staminaValue">100</span></div>
+    <div class="meter"><i id="staminaBar"></i></div>
+    <div style="height:12px"></div>
+    <div class="meterLabel"><span>FLASHLIGHT</span><span id="batteryValue">100%</span></div>
+    <div class="meter"><i id="batteryBar"></i></div>
+  </div>
+</div>
+
+<div id="controlsPanel" class="hidden">
+  <div id="controlsBox">
+    <h2>CONTROLS</h2>
+    <p>You are alone. The halls keep changing. Listen carefully.</p>
+    <div class="grid">
+      <div class="row"><span class="key">W A S D</span><span class="action">Move</span></div>
+      <div class="row"><span class="key">SHIFT</span><span class="action">Sprint</span></div>
+      <div class="row"><span class="key">C</span><span class="action">Crouch</span></div>
+      <div class="row"><span class="key">SPACE</span><span class="action">Jump</span></div>
+      <div class="row"><span class="key">F</span><span class="action">Flashlight</span></div>
+      <div class="row"><span class="key">M</span><span class="action">Mute ambience</span></div>
+      <div class="row"><span class="key">N</span><span class="action">New procedural seed</span></div>
+      <div class="row"><span class="key">TAB</span><span class="action">Controls</span></div>
+      <div class="row"><span class="key">ESC</span><span class="action">Release mouse</span></div>
+    </div>
+    <p class="closeHint">TAB to close • click the world to resume</p>
+  </div>
+</div>
+
 <div id="overlay">
   <h1>DEEPSEEKER</h1>
   <p class="sub">PROCEDURAL LIMINAL HORROR</p>
   <p class="prompt" id="prompt">CLICK TO ENTER</p>
-  <p class="controls">WASD — move &nbsp;•&nbsp; SHIFT — run &nbsp;•&nbsp; MOUSE — look<br>ESC — release cursor &nbsp;•&nbsp; Every seed makes a new map</p>
+  <p class="controls">WASD — move &nbsp;•&nbsp; SHIFT — run &nbsp;•&nbsp; F — flashlight<br>C — crouch &nbsp;•&nbsp; TAB — controls &nbsp;•&nbsp; ESC — release cursor</p>
 </div>
+
 <script type="importmap">
 {
   "imports": {
