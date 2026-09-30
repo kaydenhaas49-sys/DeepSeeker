@@ -56,9 +56,16 @@ export function generateChunk(cx, cz, seed) {
   const inClear = (x, z) => spawnClear && x >= 5 && x <= 10 && z >= 5 && z <= 10;
 
   const tryAdd = (lx, lz, len, horiz) => {
+    // Never occupy the outermost cell of a chunk. The perimeter stays open so
+    // the player can always cross into the next procedural chunk without
+    // hitting an accidental wall seam.
+    if (horiz && (lz <= 0 || lz >= CHUNK_CELLS - 1)) return false;
+    if (!horiz && (lx <= 0 || lx >= CHUNK_CELLS - 1)) return false;
+
     for (let i = 0; i < len; i++) {
       const x = horiz ? lx + i : lx;
       const z = horiz ? lz : lz + i;
+      if (x <= 0 || z <= 0 || x >= CHUNK_CELLS - 1 || z >= CHUNK_CELLS - 1) return false;
       if (inClear(x, z)) return false;
       if (cells.has(cellKey(cx * CHUNK_CELLS + x, cz * CHUNK_CELLS + z))) return false;
     }
