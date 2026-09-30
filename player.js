@@ -1,6 +1,6 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
-import { CELL, EYE } from "./world.js";
+import { EYE } from "./world.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -235,31 +235,30 @@ export class Player {
     }
   }
 
-  // Move along one axis, resolving circle (player) vs AABB (wall cell)
-  // overlaps by pushing back to the cell boundary.
+  // Move along one axis, resolving the player's circle against the
+  // actual thin wall rectangles rather than entire grid cells.
   moveAxis(axis, delta) {
     if (delta === 0) return;
+
     const p = this.pos;
     if (axis === "x") p.x += delta;
     else p.z += delta;
 
     const r = PLAYER_RADIUS;
-    const minX = Math.floor((p.x - r) / CELL);
-    const maxX = Math.floor((p.x + r) / CELL);
-    const minZ = Math.floor((p.z - r) / CELL);
-    const maxZ = Math.floor((p.z + r) / CELL);
+    const walls = this.world.getNearbyWallBounds(p.x, p.z, r + 1.0);
 
-    for (let cx = minX; cx <= maxX; cx++) {
-      for (let cz = minZ; cz <= maxZ; cz++) {
-        if (!this.world.isCellBlocked(cx, cz)) continue;
-        const nx = Math.max(cx * CELL, Math.min(p.x, (cx + 1) * CELL));
-        const nz = Math.max(cz * CELL, Math.min(p.z, (cz + 1) * CELL));
-        const ddx = p.x - nx;
-        const ddz = p.z - nz;
-        if (ddx * ddx + ddz * ddz < r * r) {
-          if (axis === "x") p.x = delta > 0 ? cx * CELL - r : (cx + 1) * CELL + r;
-          else p.z = delta > 0 ? cz * CELL - r : (cz + 1) * CELL + r;
-        }
+    for (const wall of walls) {
+      const nx = Math.max(wall.minX, Math.min(p.x, wall.maxX));
+      const nz = Math.max(wall.minZ, Math.min(p.z, wall.maxZ));
+      const ddx = p.x - nx;
+      const ddz = p.z - nz;
+
+      if (ddx * ddx + ddz * ddz >= r * r) continue;
+
+      if (axis === "x") {
+        p.x = delta > 0 ? wall.minX - r : wall.maxX + r;
+      } else {
+        p.z = delta > 0 ? wall.minZ - r : wall.maxZ + r;
       }
     }
   }
