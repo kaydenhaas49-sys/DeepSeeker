@@ -21,6 +21,13 @@ canvas{display:block}
 #bar i{display:block;height:100%;width:0;background:#9ad5a2;border-radius:99px;transition:width .2s}
 kbd{padding:2px 6px;border:1px solid #ffffff22;border-radius:5px;background:#ffffff09}
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+  }
+}
+</script>
 </head>
 <body>
 <div id="loading"><div id="box"><h1>DEEPSEEKER</h1><p id="loadingText">Loading the horror map…</p><div id="bar"><i></i></div></div></div>
@@ -164,16 +171,18 @@ async function start(){
   const size=new THREE.Vector3();
   mapBox.getSize(size);
   player.x=0;
-  player.z=size.z*.34;
-  player.y=findGroundY(player.x,2.5,player.z)+1.72;
+  player.z=mapBox.max.z+5;
+  player.y=findGroundY(player.x,80,player.z)+1.72;
+  if(!Number.isFinite(player.y) || player.y < 1.72) player.y=3.0;
 
-  const floor=findGroundY(player.x,2.5,player.z);
-  player.y=floor+1.72;
+  const floor=findGroundY(player.x,player.y,player.z);
+  player.y=(Number.isFinite(floor)?floor:0)+1.72;
   player.vy=0;
   player.grounded=true;
 
   bar.style.width='100%';
   loadingText.textContent='Ready. Click to enter the map.';
+  document.querySelector('#status').textContent='HORROR STREET • FIRST PERSON';
   loading.addEventListener('click',()=>{
     loading.style.display='none';
     renderer.domElement.requestPointerLock();
