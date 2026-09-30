@@ -83,7 +83,7 @@ let bacteriaLoaded=false;
 
 const bacteriaLoader=new GLTFLoader();
 bacteriaLoader.load(
-  "./assets/bacteria.glb",
+  "./assets/backrooms_bacteria_rigged_3d_model_unofficial.glb",
   (gltf)=>{
     const model=gltf.scene;
     model.name="BacteriaModel";
