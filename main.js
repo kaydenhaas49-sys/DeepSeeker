@@ -241,6 +241,13 @@ overlay.addEventListener("click",()=>{
   player.lock();
 });
 
+renderer.domElement.addEventListener("click",()=>{
+  if(!phoneOpen && !controlsOpen && document.pointerLockElement!==renderer.domElement){
+    audio.start();
+    player.lock();
+  }
+});
+
 controls.addEventListener("click",e=>{
   if(e.target===controls) hideControls();
 });
