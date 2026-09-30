@@ -150,15 +150,17 @@ export class Player {
               gltf.animations.find((clip) => /neutral/i.test(clip.name)) ||
               gltf.animations.find((clip) => /flat|open|spread/i.test(clip.name)) ||
               null;
-            if (!preferred) {
-              // Do not silently choose the first clip — the source's first clip
-              // is a gesture pose, which is wrong for the default viewmodel.
-              return;
+
+            // Only play a clearly neutral/open pose. Do not fall back to the
+            // first clip because the source export starts with a gesture pose.
+            if (preferred) {
+              const action = mixer.clipAction(preferred);
+              action.reset();
+              action.setLoop(THREE.LoopRepeat, Infinity);
+              action.play();
             }
-            const action = mixer.clipAction(preferred);
-            action.reset();
-            action.setLoop(THREE.LoopRepeat, Infinity);
-            action.play();
+            // With no matching neutral/open clip, keep the model in its bind
+            // pose instead of aborting the whole hand setup.
           }
 
           this.handMixers.push(mixer);
