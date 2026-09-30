@@ -80,10 +80,10 @@ export function generateChunk(cx, cz, seed) {
 
   // 1) Large architectural partitions — fewer, longer walls create
   // believable rooms and long Backrooms sightlines instead of a noisy maze.
-  const nSeg = 18 + Math.floor(rng() * 7); // 18–24
+  const nSeg = 32 + Math.floor(rng() * 11); // 32–42 wall attempts
   for (let i = 0; i < nSeg; i++) {
     const horiz = rng() < 0.5;
-    const len = 4 + Math.floor(rng() * 7); // 4–10 cells
+    const len = 3 + Math.floor(rng() * 6); // 3–8 cells
     let lx = Math.floor(rng() * CHUNK_CELLS);
     let lz = Math.floor(rng() * CHUNK_CELLS);
     if (horiz && lx + len > CHUNK_CELLS) lx = CHUNK_CELLS - len;
@@ -104,8 +104,19 @@ export function generateChunk(cx, cz, seed) {
       tryAdd(x + (horiz ? gapAt + 1 : 0), z + (horiz ? 0 : gapAt + 1), rest, horiz);
   };
 
+  // Extra short partitions: these break up the big empty expanses and make
+  // each chunk feel much more like a dense Backrooms floor plan.
+  const nShort = 12 + Math.floor(rng() * 8); // 12–19 extra attempts
+  for (let i = 0; i < nShort; i++) {
+    const horiz = rng() < 0.5;
+    const len = 2 + Math.floor(rng() * 4); // 2–5 cells
+    let lx = 1 + Math.floor(rng() * (CHUNK_CELLS - len - 2));
+    let lz = 1 + Math.floor(rng() * (CHUNK_CELLS - len - 2));
+    tryAdd(lx, lz, len, horiz);
+  }
+
   // 2) Larger side rooms / service spaces with a deliberate doorway.
-  if (rng() < 0.60) {
+  if (rng() < 0.82) {
     const w = 4 + Math.floor(rng() * 5); // 4–8 cells
     const h = 4 + Math.floor(rng() * 5);
     const x0 = 1 + Math.floor(rng() * (CHUNK_CELLS - w - 2));
@@ -120,7 +131,7 @@ export function generateChunk(cx, cz, seed) {
 
   // 3) Main corridor spines: broad, long lanes with enough breathing room
   // to create readable spaces and strong lines of sight.
-  if (rng() < 0.48) {
+  if (rng() < 0.72) {
     const horiz = rng() < 0.5;
     const len = 9 + Math.floor(rng() * 8); // 9–16 cells
     const lane = 2 + Math.floor(rng() * 2); // 2–3 cells wide
@@ -137,7 +148,7 @@ export function generateChunk(cx, cz, seed) {
 
   // 4) One occasional "backroom" motif: a wide partial divider. It creates
   // a large room that still feels connected rather than becoming a dead-end box.
-  if (rng() < 0.46) {
+  if (rng() < 0.68) {
     const horiz = rng() < 0.5;
     const len = 6 + Math.floor(rng() * 6); // 6–11 cells
     const start = 2 + Math.floor(rng() * Math.max(1, CHUNK_CELLS - len - 4));
