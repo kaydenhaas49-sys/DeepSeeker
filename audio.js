@@ -70,7 +70,7 @@ export class HorrorAudio {
   }
 
   step(intensity=.7){
-    if(!this.ctx||this.muted)return;
+    if(!this.ctx)return;
 
     const now=this.ctx.currentTime;
     const osc=this.ctx.createOscillator();
