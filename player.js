@@ -48,7 +48,10 @@ export class Player {
       }
       if(e.repeat && (e.code === "KeyC" || e.code === "Space")) return;
       if(e.code === "KeyC") this.crouched = !this.crouched;
-      if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched) this.jumpVelocity = 5.8;
+      if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched){
+        this.jumpVelocity = 4.8;
+        this.stamina = Math.max(0, this.stamina - 8);
+      }
       this.keys.add(e.code);
     };
     this.onKeyUp = (e) => this.keys.delete(e.code);
