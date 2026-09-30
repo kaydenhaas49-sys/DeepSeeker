@@ -69,63 +69,79 @@ export class Player {
     const hands = new THREE.Group();
     hands.name = "FirstPersonArms";
 
+    // Low-profile first-person forearms: the wrists originate off-screen,
+    // so the hands read as attached to the player instead of floating.
     const skin = new THREE.MeshStandardMaterial({
-      color: 0xb97d62,
-      roughness: 0.9,
+      color: 0x9a624f,
+      roughness: 0.96,
+      metalness: 0.0
+    });
+    const skinDark = new THREE.MeshStandardMaterial({
+      color: 0x7d4d40,
+      roughness: 1.0,
       metalness: 0.0
     });
     const sleeve = new THREE.MeshStandardMaterial({
-      color: 0x17191d,
+      color: 0x0c0d10,
       roughness: 1.0,
       metalness: 0.0
     });
     const cuff = new THREE.MeshStandardMaterial({
-      color: 0x30343b,
-      roughness: 0.95
+      color: 0x25272b,
+      roughness: 0.9
     });
+
+    const capsule = (radius, length, mat) =>
+      new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 6, 10), mat);
 
     const makeArm = (side) => {
       const g = new THREE.Group();
 
-      const upper = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.085, 0.48, 5, 8),
-        sleeve
-      );
-      upper.rotation.z = side * 0.20;
-      upper.position.set(side * 0.29, -0.40, -0.48);
+      const forearm = capsule(0.085, 0.55, sleeve);
+      forearm.rotation.z = side * 0.10;
+      forearm.rotation.x = -0.04;
+      forearm.position.set(side * 0.27, -0.39, -0.34);
 
       const cuffMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.095, 0.105, 0.12, 8),
+        new THREE.CylinderGeometry(0.096, 0.102, 0.11, 10),
         cuff
       );
-      cuffMesh.rotation.z = side * 0.20;
-      cuffMesh.position.set(side * 0.31, -0.29, -0.66);
+      cuffMesh.rotation.z = side * 0.10;
+      cuffMesh.position.set(side * 0.30, -0.24, -0.61);
+
+      const wrist = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 12, 10),
+        skinDark
+      );
+      wrist.scale.set(.9,1.0,1.0);
+      wrist.position.set(side * 0.31, -0.19, -0.68);
 
       const palm = new THREE.Mesh(
-        new THREE.SphereGeometry(0.13, 12, 8),
+        new THREE.SphereGeometry(0.145, 14, 10),
         skin
       );
-      palm.scale.set(0.82, 1.18, 1.05);
-      palm.position.set(side * 0.34, -0.23, -0.79);
+      palm.scale.set(0.78, 1.08, 1.18);
+      palm.position.set(side * 0.32, -0.16, -0.80);
 
-      // A simple clenched-fist silhouette looks much cleaner at gameplay scale
-      // than separate cartoon fingers.
-      const knuckles = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.085, 0.055),
-        skin
-      );
-      knuckles.position.set(side * 0.34, -0.17, -0.89);
-      knuckles.rotation.z = side * 0.10;
+      const fingerOffsets = [-0.075,-0.025,0.025,0.075];
+      for(let i=0;i<4;i++){
+        const f = capsule(0.027, 0.095 - Math.abs(i-1.5)*0.008, skin);
+        f.rotation.x = -0.12;
+        f.rotation.z = side * (0.04 + (i-1.5)*0.055);
+        f.position.set(
+          side * 0.32 + fingerOffsets[i],
+          -0.10 - Math.abs(i-1.5)*0.006,
+          -0.94
+        );
+        g.add(f);
+      }
 
-      const thumb = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.036, 0.09, 4, 6),
-        skin
-      );
-      thumb.rotation.z = side * 0.85;
-      thumb.rotation.x = -0.25;
-      thumb.position.set(side * 0.45, -0.24, -0.82);
+      const thumb = capsule(0.033, 0.12, skin);
+      thumb.rotation.z = side * 0.72;
+      thumb.rotation.x = -0.35;
+      thumb.position.set(side * 0.43, -0.16, -0.84);
 
-      g.add(upper, cuffMesh, palm, knuckles, thumb);
+      g.add(forearm, cuffMesh, wrist, palm, thumb);
       return g;
     };
 
@@ -136,8 +152,8 @@ export class Player {
     this.camera.add(hands);
 
     this.handBase = {
-      left: new THREE.Vector3(-0.31, -0.20, -0.79),
-      right: new THREE.Vector3(0.31, -0.20, -0.79)
+      left: new THREE.Vector3(-0.31, -0.16, -0.80),
+      right: new THREE.Vector3(0.31, -0.16, -0.80)
     };
   }
 
@@ -271,10 +287,10 @@ export class Player {
       const handDrop = this.crouched ? 0.08 : 0;
       this.leftHand.position.y -= handDrop;
       this.rightHand.position.y -= handDrop;
-      this.leftHand.rotation.z = -0.10 + sway * 1.5;
-      this.rightHand.rotation.z = 0.10 + sway * 1.5;
-      this.leftHand.rotation.x = -0.08 + sway * 0.7;
-      this.rightHand.rotation.x = -0.08 - sway * 0.7;
+      this.leftHand.rotation.z = -0.06 + sway * 1.0;
+      this.rightHand.rotation.z = 0.06 + sway * 1.0;
+      this.leftHand.rotation.x = -0.06 + sway * 0.35;
+      this.rightHand.rotation.x = -0.06 - sway * 0.35;
     }
   }
 
