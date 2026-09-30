@@ -18,6 +18,10 @@ const batteryValue=document.getElementById("batteryValue");
 const eventText=document.getElementById("event");
 const objective=document.getElementById("objective");
 const vignette=document.getElementById("vignette");
+const phone=document.getElementById("phone");
+const phoneDepth=document.getElementById("phoneDepth");
+const phoneCardText=document.getElementById("phoneCardText");
+
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setSize(innerWidth,innerHeight);
@@ -76,10 +80,27 @@ let pulse=0;
 let nextEvent=24+Math.random()*16;
 let eventCooldown=0;
 let muted=false;
+let phoneOpen=false;
+
 
 function toggleFlashlight(){
   flashlightOn=!flashlightOn;
 }
+function togglePhone(){
+  phoneOpen=!phoneOpen;
+  phone.classList.toggle("open",phoneOpen);
+  phone.setAttribute("aria-hidden",String(!phoneOpen));
+
+  if(phoneOpen){
+    if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
+    crosshair.style.display="none";
+    phoneDepth.textContent="0";
+    phoneCardText.textContent="Find a way out.";
+  }else if(!controlsOpen){
+    player.lock();
+  }
+}
+
 
 function showControls(){
   controlsOpen=true;
@@ -112,12 +133,18 @@ document.addEventListener("pointerlockchange",()=>{
   if(!controlsOpen) overlay.classList.toggle("hidden",locked);
   crosshair.style.display=locked?"block":"none";
   prompt.textContent="CLICK TO RESUME";
+  if(locked && phoneOpen){
+    phoneOpen=false;
+    phone.classList.remove("open");
+    phone.setAttribute("aria-hidden","true");
+  }
 });
 
 document.addEventListener("keydown",e=>{
-  if(e.code==="KeyF") toggleFlashlight();
-  else if(e.code==="KeyM"){ muted=audio.toggleMute(); }
-  else if(e.code==="KeyN"){ newSeed(); }
+  if(e.code==="KeyF" && !phoneOpen) toggleFlashlight();
+  else if(e.code==="KeyM" && !phoneOpen){ muted=audio.toggleMute(); }
+  else if(e.code==="KeyN" && !phoneOpen){ newSeed(); }
+  else if(e.code==="KeyP" && !e.repeat) togglePhone();
   else if(e.code==="Tab"){
     e.preventDefault();
     controlsOpen?hideControls():showControls();
