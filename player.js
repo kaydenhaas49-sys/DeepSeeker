@@ -4,6 +4,7 @@ import { CELL, EYE } from "./world.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
+const CROUCH_SPEED = 2.2; // m/s
 const PLAYER_RADIUS = 0.4; // m
 const MOUSE_SENS = 0.0022;
 const ACCEL = 12; // velocity smoothing (per second)
@@ -25,6 +26,10 @@ export class Player {
     this.bobPhase = 0;
     this.bobOffset = 0;
     this.fov = 70;
+    this.crouched = false;
+    this.stamina = 100;
+    this.stepDistance = 0;
+    this.onStep = null;
 
     camera.rotation.order = "YXZ";
     this.setupHands();
@@ -39,6 +44,7 @@ export class Player {
       ) {
         e.preventDefault();
       }
+      if(e.code === "KeyC") this.crouched = !this.crouched;
       this.keys.add(e.code);
     };
     this.onKeyUp = (e) => this.keys.delete(e.code);
@@ -117,8 +123,12 @@ export class Player {
     }
   }
 
-  get isRunning() {
+  get wantsToRun() {
     return this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
+  }
+
+  get isRunning() {
+    return this.locked && !this.crouched && this.wantsToRun && this.stamina > 1;
   }
 
   update(dt) {
@@ -133,7 +143,8 @@ export class Player {
       ? (k.has("KeyD") || k.has("ArrowRight") ? 1 : 0) -
           (k.has("KeyA") || k.has("ArrowLeft") ? 1 : 0)
       : 0;
-    const speed = active && this.isRunning ? RUN_SPEED : WALK_SPEED;
+    const running = active && this.isRunning;
+    const speed = this.crouched ? CROUCH_SPEED : running ? RUN_SPEED : WALK_SPEED;
 
     const fx = -Math.sin(this.yaw);
     const fz = -Math.cos(this.yaw);
@@ -158,12 +169,27 @@ export class Player {
 
     // --- head bob + FOV kick ---
     const hSpeed = Math.hypot(this.vel.x, this.vel.z);
+
+    if(running && hSpeed > 0.5) {
+      this.stamina = Math.max(0, this.stamina - 28 * dt);
+    } else {
+      this.stamina = Math.min(100, this.stamina + (this.crouched ? 12 : 19) * dt);
+    }
+
+    if(hSpeed > 0.45) {
+      this.stepDistance += hSpeed * dt;
+      const stride = this.crouched ? 2.0 : running ? 2.15 : 2.45;
+      if(this.stepDistance >= stride) {
+        this.stepDistance -= stride;
+        if(this.onStep) this.onStep({running,crouched:this.crouched,intensity:Math.min(1,hSpeed/RUN_SPEED)});
+      }
+    }
     if (hSpeed > 0.5) this.bobPhase += dt * hSpeed * 1.8;
     const bobTarget =
-      Math.sin(this.bobPhase) * 0.05 * Math.min(1, hSpeed / WALK_SPEED);
+      Math.sin(this.bobPhase) * (this.crouched ? 0.025 : 0.05) * Math.min(1, hSpeed / WALK_SPEED);
     this.bobOffset += (bobTarget - this.bobOffset) * (1 - Math.exp(-10 * dt));
 
-    const targetFov = active && this.isRunning && hSpeed > 1 ? 74 : 70;
+    const targetFov = running && hSpeed > 1 ? 74 : this.crouched ? 67 : 70;
     this.fov += (targetFov - this.fov) * (1 - Math.exp(-8 * dt));
     if (Math.abs(this.fov - this.camera.fov) > 0.01) {
       this.camera.fov = this.fov;
@@ -171,7 +197,10 @@ export class Player {
     }
 
     // --- camera ---
-    this.camera.position.set(this.pos.x, EYE + this.bobOffset, this.pos.z);
+    const targetEye = this.crouched ? 1.12 : EYE;
+    const currentEye = this.camera.position.y - this.bobOffset;
+    const eye = currentEye + (targetEye - currentEye) * (1 - Math.exp(-12 * dt));
+    this.camera.position.set(this.pos.x, eye + this.bobOffset, this.pos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0);
 
     // --- first-person hands ---
@@ -189,6 +218,9 @@ export class Player {
         this.handBase.right.y + lift + sway,
         this.handBase.right.z
       );
+      const handDrop = this.crouched ? 0.08 : 0;
+      this.leftHand.position.y -= handDrop;
+      this.rightHand.position.y -= handDrop;
       this.leftHand.rotation.z = -0.14 + sway * 2;
       this.rightHand.rotation.z = 0.14 + sway * 2;
     }
