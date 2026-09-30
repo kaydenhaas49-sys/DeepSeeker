@@ -30,6 +30,8 @@ export class Player {
     this.stamina = 100;
     this.stepDistance = 0;
     this.onStep = null;
+    this.jumpY = 0;
+    this.jumpVelocity = 0;
 
     camera.rotation.order = "YXZ";
     this.setupHands();
@@ -44,7 +46,9 @@ export class Player {
       ) {
         e.preventDefault();
       }
+      if(e.repeat && (e.code === "KeyC" || e.code === "Space")) return;
       if(e.code === "KeyC") this.crouched = !this.crouched;
+      if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched) this.jumpVelocity = 5.8;
       this.keys.add(e.code);
     };
     this.onKeyUp = (e) => this.keys.delete(e.code);
@@ -197,10 +201,17 @@ export class Player {
     }
 
     // --- camera ---
+    this.jumpVelocity -= 18 * dt;
+    this.jumpY += this.jumpVelocity * dt;
+    if(this.jumpY <= 0){
+      this.jumpY = 0;
+      this.jumpVelocity = 0;
+    }
+
     const targetEye = this.crouched ? 1.12 : EYE;
     const currentEye = this.camera.position.y - this.bobOffset;
     const eye = currentEye + (targetEye - currentEye) * (1 - Math.exp(-12 * dt));
-    this.camera.position.set(this.pos.x, eye + this.bobOffset, this.pos.z);
+    this.camera.position.set(this.pos.x, eye + this.bobOffset + this.jumpY, this.pos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0);
 
     // --- first-person hands ---
