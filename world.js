@@ -144,7 +144,7 @@ const R_GENERATE = 2; // keep chunks within this Chebyshev radius
 const R_DISPOSE = 3; // ...and drop anything farther than this
 const PANEL_W = 2.2; // light fixture size (m)
 const PANEL_D = 0.5;
-const PANEL_SPACING = 8; // m between fixtures
+const PANEL_SPACING = 28; // m between the sparse fixtures
 
 // BoxGeometry face order: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z (4 verts each).
 // Scale the U coordinate of a face so the wallpaper repeats every CELL meters.
@@ -191,9 +191,9 @@ export class World {
       wall: new THREE.MeshStandardMaterial({ map: tex.wall, roughness: 0.92 }),
       floor: new THREE.MeshStandardMaterial({ map: tex.floor, roughness: 1.0 }),
       ceiling: new THREE.MeshStandardMaterial({ map: tex.ceiling, roughness: 0.95 }),
-      panel: new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x666157 }),
+      panel: new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x8f8a78 }),
       panelOff: new THREE.MeshBasicMaterial({ color: 0x2b2921 }),
-      flicker: [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x6b665b })),
+      flicker: [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x969081 })),
     };
 
     // Shared per-chunk geometry templates (never disposed per chunk).
@@ -302,17 +302,17 @@ export class World {
   }
 
   buildPanels(group, data, ox, oz) {
-    // Fixture grid: local 4 + 8i (i = 0..7) — continuous across chunk borders.
-    // ~15% dead, ~10% flickering (3 shared animated materials), rest on.
+    // Sparse fixture grid: only four fixtures per 64m chunk. The large gaps make
+    // the halls feel emptier and let darkness collect between pools of light.
     const prng = mulberry32(hashSeed(data.cx * 3 + 7, data.cz * 3 + 13, this.seed ^ 0x9e3779b9));
     const on = [];
     const off = [];
     const flick = [[], [], []];
-    for (let j = 0; j < CHUNK_CELLS / 2; j++) {
-      for (let i = 0; i < CHUNK_CELLS / 2; i++) {
+    for (let j = 0; j < 2; j++) {
+      for (let i = 0; i < 2; i++) {
         const r = prng();
-        const x = ox + 4 + i * PANEL_SPACING;
-        const z = oz + 4 + j * PANEL_SPACING;
+        const x = ox + 18 + i * PANEL_SPACING;
+        const z = oz + 18 + j * PANEL_SPACING;
         const geo = this.panelGeo.clone();
         geo.translate(x, WALL_H - 0.03, z);
         if (r < 0.15) off.push(geo);
@@ -338,7 +338,7 @@ export class World {
       const n =
         Math.sin(t * 11.3 + ph) * Math.sin(t * 5.7 + ph * 1.7) +
         Math.sin(t * 23.7 + ph * 0.9);
-      const v = n > 1.2 ? 0.11 : n > 0.8 ? 0.36 : 0.62;
+      const v = n > 1.2 ? 0.18 : n > 0.8 ? 0.48 : 0.78;
       this.materials.flicker[i].color.setScalar(v);
     }
   }
