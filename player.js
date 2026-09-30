@@ -1,6 +1,7 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
-import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { CELL, EYE } from "./world.js";
 
 const WALK_SPEED = 4; // m/s
@@ -68,69 +69,99 @@ export class Player {
 
   setupHands() {
     this.hands = new THREE.Group();
-    this.hands.name = "FirstPersonRealArms";
+    this.hands.name = "FirstPersonAnimatedHumanHands";
     this.hands.renderOrder = 1000;
     this.hands.visible = false;
     this.camera.add(this.hands);
 
-    // Real CC0 first-person arm/hand mesh by DevMops.
-    const baseUrl =
-      "https://raw.githubusercontent.com/CSUNX233/mineworld/364976a4284fc1719f7c297c2ea92aaa0e5a792b/" +
-      "art/sunlit-actors/starfire-hero/source/devmops-hands/original/";
-    const modelUrl = baseUrl + "arms_low_poly.fbx";
+    this.handMixers = [];
+    this.handModels = [];
 
-    const loader = new FBXLoader();
-    loader.setResourcePath(baseUrl);
+    // Realistic rigged/animated anatomical hand model.
+    // Source is pinned to a specific commit for reproducibility.
+    const modelUrl =
+      "https://raw.githubusercontent.com/emmalieker/anatomical-hand-model/" +
+      "f27f19f55f8270b3108ea0b53ce5aa81c543ff7c/exports/hand_model.glb";
+
+    const loader = new GLTFLoader();
 
     loader.load(
       modelUrl,
-      (model) => {
-        model.name = "DevMopsRealArms";
-        model.traverse((obj) => {
-          if (!obj.isMesh) return;
-          obj.frustumCulled = false;
-          obj.renderOrder = 1000;
-          obj.castShadow = false;
-          obj.receiveShadow = false;
+      (gltf) => {
+        const source = gltf.scene;
+        const sourceBox = new THREE.Box3().setFromObject(source);
+        const sourceSize = sourceBox.getSize(new THREE.Vector3());
+        const sourceCenter = sourceBox.getCenter(new THREE.Vector3());
 
-          const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
-          for (const mat of materials) {
-            if (!mat) continue;
-            mat.side = THREE.DoubleSide;
-            mat.depthTest = false;
-            mat.depthWrite = false;
+        const targetHeight = 0.82;
+        const baseScale = targetHeight / Math.max(sourceSize.y, 0.001);
+
+        const makeHand = (side) => {
+          const hand = SkeletonUtils.clone(source);
+          hand.name = side < 0 ? "LeftHumanHand" : "RightHumanHand";
+
+          hand.traverse((obj) => {
+            if (!obj.isMesh) return;
+            obj.frustumCulled = false;
+            obj.renderOrder = 1000;
+            obj.castShadow = false;
+            obj.receiveShadow = false;
+
+            const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+            for (const mat of materials) {
+              if (!mat) continue;
+              mat.side = THREE.DoubleSide;
+              mat.depthTest = false;
+              mat.depthWrite = false;
+            }
+          });
+
+          // Center the source mesh before placing it as a camera viewmodel.
+          hand.position.set(
+            -sourceCenter.x * baseScale,
+            -sourceCenter.y * baseScale,
+            -sourceCenter.z * baseScale
+          );
+
+          hand.scale.setScalar(baseScale);
+
+          // Mirror one copy to get a natural pair.
+          if (side > 0) hand.scale.x *= -1;
+
+          const pivot = new THREE.Group();
+          pivot.name = side < 0 ? "LeftHandPivot" : "RightHandPivot";
+          pivot.position.set(side * 0.43, -0.48, -1.06);
+          pivot.rotation.set(
+            THREE.MathUtils.degToRad(-8),
+            THREE.MathUtils.degToRad(side * 8),
+            THREE.MathUtils.degToRad(side * 4)
+          );
+          pivot.add(hand);
+
+          const mixer = new THREE.AnimationMixer(hand);
+
+          if (gltf.animations.length) {
+            const preferred =
+              gltf.animations.find((clip) => /neutral|idle/i.test(clip.name)) ||
+              gltf.animations[0];
+            const action = mixer.clipAction(preferred);
+            action.reset();
+            action.setLoop(THREE.LoopRepeat, Infinity);
+            action.play();
           }
-        });
 
-        // Normalize the imported asset into a comfortable first-person viewmodel.
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
+          this.handMixers.push(mixer);
+          this.handModels.push(pivot);
+          return pivot;
+        };
 
-        const targetWidth = 1.35;
-        const targetHeight = 0.95;
-        const scale = Math.min(
-          targetWidth / Math.max(size.x, 0.001),
-          targetHeight / Math.max(size.y, 0.001)
-        );
-
-        model.scale.setScalar(scale);
-        model.position.set(
-          -center.x * scale,
-          -0.52 - center.y * scale,
-          -1.18 - center.z * scale
-        );
-
-        // The source asset's camera-facing hand pose is oriented toward +Z.
-        model.rotation.set(0, Math.PI, 0);
-
-        this.hands.add(model);
+        this.hands.add(makeHand(-1), makeHand(1));
         this.hands.visible = true;
-        this.realHands = model;
       },
       undefined,
-      (error) => {
-        console.warn("DeepSeeker: real arm model failed to load; using no hand fallback.", error);
+      () => {
+        // Keep the model group hidden rather than bringing back the old crude hands.
+        this.hands.visible = false;
       }
     );
   }
@@ -249,11 +280,20 @@ export class Player {
 
     // --- first-person hands ---
     if (this.hands && this.hands.visible) {
+      for (const mixer of this.handMixers) mixer.update(dt);
+
       const moving = hSpeed > 0.5 ? Math.min(1, hSpeed / RUN_SPEED) : 0;
-      const sway = moving ? Math.sin(this.bobPhase) * 0.018 : 0;
+      const sway = moving ? Math.sin(this.bobPhase) * 0.018 : Math.sin(this.bobPhase * 0.35) * 0.004;
       const lift = moving ? Math.abs(Math.cos(this.bobPhase)) * 0.012 : 0;
-      this.hands.position.y = lift - (this.crouched ? 0.08 : 0);
-      this.hands.rotation.z = sway;
+
+      for (let i = 0; i < this.handModels.length; i++) {
+        const side = i === 0 ? -1 : 1;
+        const pivot = this.handModels[i];
+        pivot.position.y = -0.48 + lift - (this.crouched ? 0.08 : 0);
+        pivot.position.x = side * 0.43 + sway * side * 0.35;
+        pivot.rotation.z =
+          THREE.MathUtils.degToRad(side * 4) + sway * side;
+      }
     }
   }
 
