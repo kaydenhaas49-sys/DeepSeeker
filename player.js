@@ -201,9 +201,9 @@ export class Player {
     const hSpeed = Math.hypot(this.vel.x, this.vel.z);
 
     if(running && hSpeed > 0.5) {
-      this.stamina = Math.max(0, this.stamina - 28 * dt);
+      this.stamina = Math.max(0, this.stamina - 18 * dt);
     } else {
-      this.stamina = Math.min(100, this.stamina + (this.crouched ? 12 : 19) * dt);
+      this.stamina = Math.min(100, this.stamina + (this.crouched ? 7 : 10) * dt);
     }
 
     if(hSpeed > 0.45) {
