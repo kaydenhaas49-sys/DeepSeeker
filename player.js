@@ -1,7 +1,5 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { CELL, EYE } from "./world.js";
 
 const WALK_SPEED = 4; // m/s
@@ -69,112 +67,102 @@ export class Player {
 
   setupHands() {
     this.hands = new THREE.Group();
-    this.hands.name = "FirstPersonAnimatedHumanHands";
+    this.hands.name = "FirstPersonStickHands";
     this.hands.renderOrder = 1000;
-    this.hands.visible = false;
+    this.hands.visible = true;
     this.camera.add(this.hands);
 
     this.handMixers = [];
     this.handModels = [];
 
-    // Realistic rigged/animated anatomical hand model.
-    // Source is pinned to a specific commit for reproducibility.
-    const modelUrl =
-      "https://raw.githubusercontent.com/emmalieker/anatomical-hand-model/" +
-      "f27f19f55f8270b3108ea0b53ce5aa81c543ff7c/exports/hand_model.glb";
+    const skin = new THREE.MeshStandardMaterial({
+      color: 0xd6b08a,
+      roughness: 0.9,
+      metalness: 0,
+    });
 
-    const loader = new GLTFLoader();
+    const joint = (position, radius = 0.038) => {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 8, 6),
+        skin
+      );
+      mesh.position.copy(position);
+      mesh.renderOrder = 1000;
+      mesh.frustumCulled = false;
+      return mesh;
+    };
 
-    loader.load(
-      modelUrl,
-      (gltf) => {
-        const source = gltf.scene;
-        const sourceBox = new THREE.Box3().setFromObject(source);
-        const sourceSize = sourceBox.getSize(new THREE.Vector3());
-        const sourceCenter = sourceBox.getCenter(new THREE.Vector3());
+    const stick = (a, b, radius = 0.028) => {
+      const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
+      const dir = new THREE.Vector3().subVectors(b, a);
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, dir.length(), 8),
+        skin
+      );
+      mesh.position.copy(mid);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        dir.normalize()
+      );
+      mesh.renderOrder = 1000;
+      mesh.frustumCulled = false;
+      return mesh;
+    };
 
-        const targetHeight = 0.94;
-        const baseScale = targetHeight / Math.max(sourceSize.y, 0.001);
+    const makeHand = (side) => {
+      const pivot = new THREE.Group();
+      pivot.name = side < 0 ? "LeftStickHand" : "RightStickHand";
+      pivot.position.set(side < 0 ? -0.62 : 0.62, -0.47, -0.92);
+      pivot.rotation.set(
+        THREE.MathUtils.degToRad(-10),
+        THREE.MathUtils.degToRad(side * 8),
+        THREE.MathUtils.degToRad(side * 7)
+      );
 
-        const makeHand = (side) => {
-          const hand = SkeletonUtils.clone(source);
-          hand.name = side < 0 ? "LeftHumanHand" : "RightHumanHand";
+      // Tiny wrist + palm: intentionally simple, like a 3D stick figure hand.
+      pivot.add(stick(
+        new THREE.Vector3(0, 0.16, 0.03),
+        new THREE.Vector3(0, 0.02, -0.01),
+        0.035
+      ));
 
-          hand.traverse((obj) => {
-            if (!obj.isMesh) return;
-            obj.frustumCulled = false;
-            obj.renderOrder = 1000;
-            obj.castShadow = false;
-            obj.receiveShadow = false;
+      const palm = new THREE.Mesh(
+        new THREE.SphereGeometry(0.10, 8, 6),
+        skin
+      );
+      palm.scale.set(0.82, 1.08, 0.72);
+      palm.position.set(0, 0.0, -0.04);
+      palm.renderOrder = 1000;
+      palm.frustumCulled = false;
+      pivot.add(palm);
 
-            const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
-            for (const mat of materials) {
-              if (!mat) continue;
-              mat.side = THREE.DoubleSide;
-              mat.depthTest = false;
-              mat.depthWrite = false;
-              // Keep the original material maps intact; both hands use
-              // positive scale so tangent-space normals remain valid.
-              mat.needsUpdate = true;
-            }
-          });
-
-          // Center the source mesh before placing it as a camera viewmodel.
-          hand.position.set(
-            -sourceCenter.x * baseScale,
-            -sourceCenter.y * baseScale,
-            -sourceCenter.z * baseScale
-          );
-
-          hand.scale.setScalar(baseScale);
-
-          // Keep positive scale on both copies. Negative-X mirroring can
-          // corrupt tangent-space shading on the source model and create wedges.
-
-          const pivot = new THREE.Group();
-          pivot.name = side < 0 ? "LeftHandPivot" : "RightHandPivot";
-          pivot.position.set(side < 0 ? -0.58 : 0.72, -0.43, -0.96);
-          pivot.rotation.set(
-            THREE.MathUtils.degToRad(-8),
-            Math.PI + THREE.MathUtils.degToRad(side * 8),
-            THREE.MathUtils.degToRad(side * 4)
-          );
-          pivot.add(hand);
-
-          const mixer = new THREE.AnimationMixer(hand);
-
-          if (gltf.animations.length) {
-            const preferred =
-              gltf.animations.find((clip) => /neutral/i.test(clip.name)) ||
-              gltf.animations.find((clip) => /flat|open|spread/i.test(clip.name)) ||
-              null;
-
-            // Only play a clearly neutral/open pose. Do not fall back to the
-            // first clip because the source export starts with a gesture pose.
-            if (preferred) {
-              const action = mixer.clipAction(preferred);
-              action.reset();
-              action.setLoop(THREE.LoopRepeat, Infinity);
-              action.play();
-            }
-            // With no matching neutral/open clip, keep the model in its bind
-            // pose instead of aborting the whole hand setup.
-          }
-
-          this.handMixers.push(mixer);
-          this.handModels.push(pivot);
-          return pivot;
-        };
-
-        this.hands.add(makeHand(-1), makeHand(1));
-        this.hands.visible = true;
-      },
-      undefined,
-      () => {
-        // Keep the model group hidden rather than bringing back the old crude hands.
-        this.hands.visible = false;
+      // Four simple fingers pointing forward.
+      const fingers = [
+        [-0.060, 0.00, -0.22],
+        [-0.020, 0.018, -0.255],
+        [ 0.022, 0.020, -0.26],
+        [ 0.062, 0.005, -0.215],
+      ];
+      for (const [x, y, z] of fingers) {
+        const base = new THREE.Vector3(x * 0.72, y, -0.08);
+        const tip = new THREE.Vector3(x, y, z);
+        pivot.add(stick(base, tip, 0.024));
+        pivot.add(joint(tip, 0.030));
       }
-    );
+
+      // Thumb sticks outward and slightly forward.
+      const thumbBase = new THREE.Vector3(side * 0.065, -0.015, -0.035);
+      const thumbTip = new THREE.Vector3(side * 0.145, -0.010, -0.145);
+      pivot.add(stick(thumbBase, thumbTip, 0.026));
+      pivot.add(joint(thumbTip, 0.030));
+
+      pivot.add(joint(new THREE.Vector3(0, 0.02, -0.01), 0.026));
+      this.handModels.push(pivot);
+      this.hands.add(pivot);
+    };
+
+    makeHand(-1);
+    makeHand(1);
   }
 
   attach() {
@@ -291,8 +279,6 @@ export class Player {
 
     // --- first-person hands ---
     if (this.hands && this.hands.visible) {
-      for (const mixer of this.handMixers) mixer.update(dt);
-
       const moving = hSpeed > 0.5 ? Math.min(1, hSpeed / RUN_SPEED) : 0;
       const sway = moving ? Math.sin(this.bobPhase) * 0.018 : Math.sin(this.bobPhase * 0.35) * 0.004;
       const lift = moving ? Math.abs(Math.cos(this.bobPhase)) * 0.012 : 0;
