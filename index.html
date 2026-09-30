@@ -11,171 +11,356 @@
   #title{position:absolute;top:18px;left:20px;font-weight:800;letter-spacing:.08em;font-size:18px;text-shadow:0 2px 12px #000}
   #help{position:absolute;left:20px;bottom:20px;padding:12px 14px;border:1px solid #ffffff24;background:#07100bcc;backdrop-filter:blur(8px);border-radius:12px;font-size:13px;line-height:1.55}
   #status{position:absolute;right:20px;top:18px;padding:8px 11px;border-radius:999px;background:#6fd08b22;border:1px solid #6fd08b55;color:#a9f0ba;font-size:12px}
-  #cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:22px;opacity:.7}
+  #cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:20px;opacity:.75}
+  #loading{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(#07100bf0,#08140bee);z-index:5}
+  #loadingBox{max-width:520px;padding:28px 32px;border:1px solid #ffffff18;border-radius:18px;background:#07100bf2;box-shadow:0 20px 80px #0008;text-align:center}
+  #loadingBox h1{margin:0 0 8px;font-size:26px}
+  #loadingBox p{margin:8px 0;color:#b9cab9;line-height:1.5}
+  #bar{height:8px;margin-top:18px;background:#ffffff0d;border-radius:99px;overflow:hidden}
+  #bar i{display:block;width:0;height:100%;background:#83d894;border-radius:99px;transition:width .2s}
+  #error{color:#ffadad!important}
   kbd{padding:2px 6px;border:1px solid #ffffff28;border-bottom-color:#ffffff45;border-radius:5px;background:#ffffff0d}
 </style>
 </head>
 <body>
-<div id="ui">
-  <div id="title">DEEPSEEKER — LIVE WORLD PROTOTYPE</div>
-  <div id="status">WEB DEMO • CLICK TO CAPTURE</div>
-  <div id="cross">+</div>
-  <div id="help">
-    <kbd>WASD</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; mouse look &nbsp; <kbd>ESC</kbd> release mouse
+<div id="loading">
+  <div id="loadingBox">
+    <h1>DEEPSEEKER</h1>
+    <p id="loadingText">Loading the new terrain map…</p>
+    <div id="bar"><i></i></div>
   </div>
 </div>
+
+<div id="ui">
+  <div id="title">DEEPSEEKER — LIVE WORLD PROTOTYPE</div>
+  <div id="status">FIRST PERSON • CLICK TO CAPTURE</div>
+  <div id="cross">+</div>
+  <div id="help">
+    <kbd>WASD</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; mouse look &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>ESC</kbd> release
+  </div>
+</div>
+
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x78a8c8);
-scene.fog = new THREE.Fog(0x78a8c8, 90, 300);
+const MAP_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Hand_made_terrain_heightmap.png/1280px-Hand_made_terrain_heightmap.png';
 
-const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, .1, 500);
+const loading = document.querySelector('#loading');
+const loadingText = document.querySelector('#loadingText');
+const bar = document.querySelector('#bar i');
 const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
-renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
-const hemi = new THREE.HemisphereLight(0xd8f0ff,0x385338,2.0);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8bb8d2);
+scene.fog = new THREE.Fog(0x8bb8d2, 180, 720);
+
+const camera = new THREE.PerspectiveCamera(78, innerWidth/innerHeight, 0.08, 1200);
+camera.rotation.order = 'YXZ';
+
+const hemi = new THREE.HemisphereLight(0xdff4ff, 0x34452f, 2.2);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff2d6,3.0);
-sun.position.set(-80,120,-70);
+
+const sun = new THREE.DirectionalLight(0xfff3d4, 3.5);
+sun.position.set(-170, 250, -110);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048,2048);
-sun.shadow.camera.left=-120; sun.shadow.camera.right=120;
-sun.shadow.camera.top=120; sun.shadow.camera.bottom=-120;
+sun.shadow.camera.left = -260;
+sun.shadow.camera.right = 260;
+sun.shadow.camera.top = 260;
+sun.shadow.camera.bottom = -260;
 scene.add(sun);
 
-const WORLD=220, GRID=140, STEP=WORLD/GRID, WATER=2;
-const height=(x,z)=>{
-  const broad=Math.sin(x*.035)*8 + Math.cos(z*.028)*7;
-  const hills=Math.sin((x+z)*.075)*3.5 + Math.cos((x-z)*.055)*3;
-  const detail=Math.sin(x*.16+z*.09)*.9;
-  return Math.max(-1.5,broad+hills+detail);
-};
-
-const terrain = new THREE.PlaneGeometry(WORLD,WORLD,GRID,GRID);
-terrain.rotateX(-Math.PI/2);
-const pos=terrain.attributes.position;
-for(let i=0;i<pos.count;i++){
-  const x=pos.getX(i), z=pos.getZ(i);
-  pos.setY(i,height(x,z));
-}
-terrain.computeVertexNormals();
-const terrainMat=new THREE.MeshStandardMaterial({color:0x5a7b48,roughness:1});
-const ground=new THREE.Mesh(terrain,terrainMat);
-ground.receiveShadow=true;
-scene.add(ground);
-
-const waterGeo=new THREE.PlaneGeometry(WORLD,WORLD);
-waterGeo.rotateX(-Math.PI/2);
-const waterMat=new THREE.MeshPhysicalMaterial({
-  color:0x1f6172,transparent:true,opacity:.66,
-  roughness:.12,metalness:.05,clearcoat:1,clearcoatRoughness:.15
-});
-const water=new THREE.Mesh(waterGeo,waterMat);
-water.position.y=WATER;
-scene.add(water);
-
-function seeded(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}}
-const rand=seeded(184729);
-
-const trunkMat=new THREE.MeshStandardMaterial({color:0x5a4532,roughness:1});
-const leafMat=new THREE.MeshStandardMaterial({color:0x315c35,roughness:1});
-const rockMat=new THREE.MeshStandardMaterial({color:0x59605a,roughness:1});
-
-for(let i=0;i<260;i++){
-  const x=(rand()-.5)*WORLD*.92, z=(rand()-.5)*WORLD*.92, y=height(x,z);
-  if(y<WATER+.8 || Math.hypot(x,z)<18) continue;
-  const s=.75+rand()*.7, g=new THREE.Group();
-  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.16,.24,2.8,7),trunkMat);
-  trunk.position.y=1.4;
-  const crown=new THREE.Mesh(new THREE.SphereGeometry(1.25,9,7),leafMat);
-  crown.scale.y=1.0; crown.position.y=3.25;
-  g.add(trunk,crown); g.position.set(x,y,z); g.scale.setScalar(s);
-  g.traverse(o=>{if(o.isMesh)o.castShadow=true});
-  scene.add(g);
-}
-for(let i=0;i<120;i++){
-  const x=(rand()-.5)*WORLD*.9, z=(rand()-.5)*WORLD*.9, y=height(x,z);
-  if(y<WATER+.5) continue;
-  const s=.45+rand()*1.5;
-  const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(1,0),rockMat);
-  rock.position.set(x,y+s*.35,z);
-  rock.scale.set(s,s*.7,s*.9);
-  rock.rotation.set(rand()*2,rand()*3,rand()*2);
-  rock.castShadow=true; rock.receiveShadow=true;
-  scene.add(rock);
+function loadImage(url){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = ()=>resolve(img);
+    img.onerror = ()=>reject(new Error('Could not load the terrain map.'));
+    img.src = url;
+  });
 }
 
-// Simple landmark.
-const landmark=new THREE.Mesh(
-  new THREE.CylinderGeometry(2.3,1.8,8,12),
-  new THREE.MeshStandardMaterial({color:0x77786b,roughness:.9})
-);
-landmark.position.set(-48,height(-48,-42)+4,-42);
-landmark.castShadow=true;
-scene.add(landmark);
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
-const player=new THREE.Group();
-const body=new THREE.Mesh(new THREE.CapsuleGeometry(.45,.9,8,12),new THREE.MeshStandardMaterial({color:0xd7e7df,roughness:.8}));
-body.position.y=1.35; body.castShadow=true;
-player.add(body);
-scene.add(player);
-player.position.set(0,height(0,0)+.05,0);
+async function buildWorld(){
+  loadingText.textContent = 'Downloading the new CC0 heightmap…';
+  bar.style.width = '12%';
 
-const keys=new Set();
-addEventListener('keydown',e=>keys.add(e.code));
-addEventListener('keyup',e=>keys.delete(e.code));
-let yaw=0,pitch=-.15,locked=false;
-renderer.domElement.addEventListener('click',()=>renderer.domElement.requestPointerLock());
-document.addEventListener('pointerlockchange',()=>locked=document.pointerLockElement===renderer.domElement);
-document.addEventListener('mousemove',e=>{
-  if(!locked)return;
-  yaw-=e.movementX*.0025;
-  pitch-=e.movementY*.0025;
-  pitch=Math.max(-1.05,Math.min(.55,pitch));
-});
+  const img = await loadImage(MAP_URL);
+  bar.style.width = '25%';
 
-const clock=new THREE.Clock();
-function tick(){
-  const dt=Math.min(clock.getDelta(),.05);
-  const forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
-  const strafe=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
-  const len=Math.hypot(forward,strafe)||1;
-  const sprint=keys.has('ShiftLeft')||keys.has('ShiftRight');
-  const speed=sprint?11:7;
-  const fx=Math.sin(yaw), fz=Math.cos(yaw);
-  const rx=Math.cos(yaw), rz=-Math.sin(yaw);
-  player.position.x += ((fx*forward + rx*strafe)/len)*speed*dt;
-  player.position.z += ((fz*forward + rz*strafe)/len)*speed*dt;
-  const half=WORLD*.46;
-  player.position.x=THREE.MathUtils.clamp(player.position.x,-half,half);
-  player.position.z=THREE.MathUtils.clamp(player.position.z,-half,half);
-  player.position.y=height(player.position.x,player.position.z)+.05;
-  player.rotation.y=yaw;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(img,0,0);
+  const pixels = ctx.getImageData(0,0,canvas.width,canvas.height).data;
 
-  const target=new THREE.Vector3(player.position.x,player.position.y+1.25,player.position.z);
-  const distance=6.5;
-  const dir=new THREE.Vector3(
-    Math.sin(yaw)*Math.cos(pitch),
-    Math.sin(pitch),
-    Math.cos(yaw)*Math.cos(pitch)
-  );
-  camera.position.copy(target).addScaledVector(dir,distance);
-  camera.lookAt(target);
-  renderer.render(scene,camera);
-  requestAnimationFrame(tick);
+  const mw = canvas.width;
+  const mh = canvas.height;
+  const WORLD = 600;
+  const GRID = 240;
+  const HEIGHT = 105;
+  const WATER = 22;
+
+  function sample(u,v){
+    u = clamp(u,0,1) * (mw-1);
+    v = clamp(v,0,1) * (mh-1);
+    const x0 = Math.floor(u), y0 = Math.floor(v);
+    const x1 = Math.min(x0+1,mw-1), y1 = Math.min(y0+1,mh-1);
+    const tx = u-x0, ty = v-y0;
+    const at=(x,y)=>pixels[(y*mw+x)*4]/255;
+    const a=at(x0,y0), b=at(x1,y0), c=at(x0,y1), d=at(x1,y1);
+    const h=a+(b-a)*tx;
+    const h2=c+(d-c)*tx;
+    return h+(h2-h)*ty;
+  }
+
+  const heightAt=(x,z)=>sample(x/WORLD+0.5,z/WORLD+0.5)*HEIGHT;
+
+  const geometry = new THREE.PlaneGeometry(WORLD,WORLD,GRID,GRID);
+  geometry.rotateX(-Math.PI/2);
+
+  const positions = geometry.attributes.position;
+  const colors = [];
+  const tmp = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+
+  for(let i=0;i<positions.count;i++){
+    const x=positions.getX(i), z=positions.getZ(i);
+    const y=heightAt(x,z);
+    positions.setY(i,y);
+
+    const eps=2.5;
+    const hL=heightAt(x-eps,z), hR=heightAt(x+eps,z);
+    const hD=heightAt(x,z-eps), hU=heightAt(x,z+eps);
+    tmp.set(hL-hR,eps*2,hD-hU).normalize();
+    normal.copy(tmp);
+    const slope=1-Math.abs(normal.y);
+
+    const low=clamp((y-WATER)/18,0,1);
+    const rock=clamp((y-70)/35,0,1);
+    let r,g,b;
+    if(y < WATER+5){
+      r=0.22; g=0.38; b=0.20;
+    }else if(slope>.38 || rock>.5){
+      r=.27+.13*rock; g=.29+.11*rock; b=.26+.09*rock;
+    }else{
+      r=.24+.13*low; g=.46+.20*low; b=.20+.06*low;
+    }
+    colors.push(r,g,b);
+  }
+
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.computeVertexNormals();
+
+  const terrainMat=new THREE.MeshStandardMaterial({
+    vertexColors:true,
+    roughness:1,
+    metalness:0
+  });
+  const ground=new THREE.Mesh(geometry,terrainMat);
+  ground.receiveShadow=true;
+  ground.castShadow=false;
+  scene.add(ground);
+
+  const waterGeo = new THREE.PlaneGeometry(WORLD*1.05,WORLD*1.05);
+  waterGeo.rotateX(-Math.PI/2);
+  const waterMat = new THREE.MeshPhysicalMaterial({
+    color:0x2b7180,
+    transparent:true,
+    opacity:.7,
+    roughness:.15,
+    metalness:.03,
+    clearcoat:1,
+    clearcoatRoughness:.12
+  });
+  const water = new THREE.Mesh(waterGeo,waterMat);
+  water.position.y=WATER;
+  scene.add(water);
+
+  function seeded(seed){
+    return ()=>{
+      seed=(seed*1664525+1013904223)>>>0;
+      return seed/4294967296;
+    };
+  }
+  const rand=seeded(184729);
+
+  const trunkMat=new THREE.MeshStandardMaterial({color:0x5a4532,roughness:1});
+  const leafMat=new THREE.MeshStandardMaterial({color:0x2f6939,roughness:1});
+  const leafMat2=new THREE.MeshStandardMaterial({color:0x3f7f43,roughness:1});
+  const rockMat=new THREE.MeshStandardMaterial({color:0x5c625b,roughness:1});
+
+  for(let i=0;i<700;i++){
+    const x=(rand()-.5)*WORLD*.94;
+    const z=(rand()-.5)*WORLD*.94;
+    const y=heightAt(x,z);
+    if(y<WATER+5) continue;
+
+    const s=.65+rand()*1.0;
+    const g=new THREE.Group();
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.13,.22,2.7,7),trunkMat);
+    trunk.position.y=1.35;
+    const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(1.25,1),rand()>.5?leafMat:leafMat2);
+    crown.position.y=3.15;
+    crown.scale.y=.95;
+    g.add(trunk,crown);
+    g.position.set(x,y,z);
+    g.scale.setScalar(s);
+    g.rotation.y=rand()*Math.PI*2;
+    g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+    scene.add(g);
+  }
+
+  for(let i=0;i<240;i++){
+    const x=(rand()-.5)*WORLD*.92;
+    const z=(rand()-.5)*WORLD*.92;
+    const y=heightAt(x,z);
+    if(y<WATER+4) continue;
+    const s=.35+rand()*1.5;
+    const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(1,0),rockMat);
+    rock.position.set(x,y+s*.35,z);
+    rock.scale.set(s,s*(.65+rand()*.25),s*(.8+rand()*.25));
+    rock.rotation.set(rand()*2,rand()*3,rand()*2);
+    rock.castShadow=true;
+    rock.receiveShadow=true;
+    scene.add(rock);
+  }
+
+  // A couple of simple exploration landmarks.
+  for(const p of [[-115,-90,16],[105,72,13],[38,-145,10]]){
+    const [x,z,h]=p;
+    const y=heightAt(x,z);
+    const tower=new THREE.Mesh(
+      new THREE.CylinderGeometry(h*.18,h*.24,h,10),
+      new THREE.MeshStandardMaterial({color:0x776f61,roughness:.9})
+    );
+    tower.position.set(x,y+h*.5,z);
+    tower.castShadow=true;
+    scene.add(tower);
+  }
+
+  // Find a dry, elevated spawn close to the center.
+  let spawn={x:0,z:0,y:heightAt(0,0)};
+  for(let r=20;r<=120;r+=20){
+    for(let a=0;a<Math.PI*2;a+=Math.PI/12){
+      const x=Math.cos(a)*r, z=Math.sin(a)*r, y=heightAt(x,z);
+      if(y>WATER+10){
+        spawn={x,z,y};
+        r=999;
+        break;
+      }
+    }
+    if(r===999)break;
+  }
+
+  const player={
+    x:spawn.x,
+    z:spawn.z,
+    y:spawn.y+1.72,
+    vy:0,
+    grounded:true,
+    bob:0
+  };
+
+  const keys=new Set();
+  addEventListener('keydown',e=>{
+    keys.add(e.code);
+    if(e.code==='Space' && player.grounded){
+      player.vy=10.5;
+      player.grounded=false;
+    }
+  });
+  addEventListener('keyup',e=>keys.delete(e.code));
+
+  let yaw=0;
+  let pitch=-.05;
+  let locked=false;
+
+  renderer.domElement.addEventListener('click',()=>renderer.domElement.requestPointerLock());
+  document.addEventListener('pointerlockchange',()=>locked=document.pointerLockElement===renderer.domElement);
+  document.addEventListener('mousemove',e=>{
+    if(!locked)return;
+    yaw-=e.movementX*.0025;
+    pitch-=e.movementY*.0022;
+    pitch=clamp(pitch,-1.35,1.35);
+  });
+
+  const clock=new THREE.Clock();
+
+  function tick(){
+    const dt=Math.min(clock.getDelta(),.05);
+
+    const forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
+    const strafe=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
+    const len=Math.hypot(forward,strafe)||1;
+    const sprint=keys.has('ShiftLeft')||keys.has('ShiftRight');
+    const speed=sprint?14:8;
+
+    // First-person movement: W always travels where the camera is facing.
+    const fx=Math.sin(yaw);
+    const fz=-Math.cos(yaw);
+    const rx=Math.cos(yaw);
+    const rz=Math.sin(yaw);
+
+    if(forward || strafe){
+      player.x += ((fx*forward + rx*strafe)/len)*speed*dt;
+      player.z += ((fz*forward + rz*strafe)/len)*speed*dt;
+      player.bob += dt*(sprint?14:10);
+    }
+
+    const half=WORLD*.48;
+    player.x=clamp(player.x,-half,half);
+    player.z=clamp(player.z,-half,half);
+
+    const groundY=heightAt(player.x,player.z)+1.72;
+    player.vy-=24*dt;
+    player.y+=player.vy*dt;
+    if(player.y<=groundY){
+      player.y=groundY;
+      player.vy=0;
+      player.grounded=true;
+    }
+
+    const bobAmount=(forward||strafe) && player.grounded ? Math.sin(player.bob)*.035 : 0;
+    camera.position.set(player.x,player.y+bobAmount,player.z);
+    camera.rotation.y=yaw;
+    camera.rotation.x=pitch;
+
+    renderer.render(scene,camera);
+    requestAnimationFrame(tick);
+  }
+
+  bar.style.width='100%';
+  loadingText.textContent='Ready. Click the world to start.';
+  loading.style.cursor='pointer';
+  loading.addEventListener('click',()=>{
+    renderer.domElement.requestPointerLock();
+    loading.style.display='none';
+  },{once:true});
+
+  tick();
+}
+
+try{
+  await buildWorld();
+}catch(err){
+  console.error(err);
+  loadingText.innerHTML='<span id="error">The terrain map could not be loaded. Refresh the page and try again.</span>';
+  bar.style.width='0';
 }
 addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
-tick();
 </script>
 </body>
 </html>
