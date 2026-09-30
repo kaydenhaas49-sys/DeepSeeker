@@ -3,6 +3,8 @@ export class HorrorAudio {
   constructor(){
     this.ctx=null;
     this.master=null;
+    this.ambienceGain=null;
+    this.sfxGain=null;
     this.muted=false;
     this.humGain=null;
   }
@@ -18,15 +20,24 @@ export class HorrorAudio {
     this.ctx=ctx;
 
     this.master=ctx.createGain();
-    this.master.gain.value=.055;
+    this.master.gain.value=1;
     this.master.connect(ctx.destination);
+
+    this.ambienceGain=ctx.createGain();
+    this.ambienceGain.gain.value=this.muted?0:1;
+    this.ambienceGain.connect(this.sfxGain);
+
+    this.sfxGain=ctx.createGain();
+    this.sfxGain.gain.value=1;
+    this.sfxGain.connect(this.master);
 
     const hum=ctx.createOscillator();
     hum.type="sine";
     hum.frequency.value=118;
     this.humGain=ctx.createGain();
     this.humGain.gain.value=.32;
-    hum.connect(this.humGain).connect(this.master);
+    this.humGain.gain.value*=.055;
+    hum.connect(this.humGain).connect(this.ambienceGain);
     hum.start();
 
     const hum2=ctx.createOscillator();
@@ -34,7 +45,8 @@ export class HorrorAudio {
     hum2.frequency.value=236;
     const g2=ctx.createGain();
     g2.gain.value=.06;
-    hum2.connect(g2).connect(this.master);
+    g2.gain.value*=.055;
+    hum2.connect(g2).connect(this.ambienceGain);
     hum2.start();
 
     const lfo=ctx.createOscillator();
@@ -47,7 +59,10 @@ export class HorrorAudio {
 
   toggleMute(){
     this.muted=!this.muted;
-    if(this.master) this.master.gain.setTargetAtTime(this.muted?0:.055,this.ctx.currentTime,.15);
+    if(this.ambienceGain && this.ctx){
+      this.ambienceGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.ambienceGain.gain.setTargetAtTime(this.muted?0:1,this.ctx.currentTime,.05);
+    }
     return this.muted;
   }
 
