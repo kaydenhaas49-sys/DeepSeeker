@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { World, EYE } from "./world.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -52,6 +53,41 @@ scene.add(camera);
 
 const player=new Player(camera,renderer.domElement,world);
 const audio=new HorrorAudio();
+
+player.hands.visible=false;
+
+const armsLoader=new GLTFLoader();
+const armsUrl="https://raw.githubusercontent.com/Grumoth/godot-character-creator/master/MainCharacter/Mesh/Parts/arms.glb";
+
+armsLoader.load(
+  armsUrl,
+  (gltf)=>{
+    const arms=gltf.scene;
+    arms.name="ImportedRealArms";
+
+    arms.traverse((obj)=>{
+      if(!obj.isMesh) return;
+      obj.castShadow=false;
+      obj.receiveShadow=false;
+
+      // The source file contains a whole humanoid rig. Keep only the
+      // visible upper-body/arm pieces for the first-person viewmodel.
+      const n=(obj.name||"").toLowerCase();
+      if(/leg|thigh|shin|foot|toe|pelvis|head|neck|torso|spine|shoulder/.test(n)){
+        obj.visible=false;
+      }
+    });
+
+    arms.position.set(0,-1.38,-1.08);
+    arms.rotation.set(0,Math.PI,0);
+    arms.scale.setScalar(.42);
+
+    camera.add(arms);
+    player.importedArms=arms;
+  },
+  undefined,
+  (err)=>console.warn("Could not load imported arms:",err)
+);
 
 const figure=new THREE.Group();
 const figureMat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1,metalness:0});
