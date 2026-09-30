@@ -69,6 +69,7 @@ armsLoader.load(
       if(!obj.isMesh) return;
       obj.castShadow=false;
       obj.receiveShadow=false;
+      obj.frustumCulled=false;
 
       // The source file contains a whole humanoid rig. Keep only the
       // visible upper-body/arm pieces for the first-person viewmodel.
@@ -84,9 +85,11 @@ armsLoader.load(
     arms.rotation.set(-0.10,Math.PI,0);
     arms.scale.setScalar(.78);
 
-    player.hands.visible=false;
-    camera.add(arms);
+    // Keep this asset loaded for later refinement, but use the guaranteed
+    // procedural viewmodel for the current playable build.
     player.importedArms=arms;
+    arms.visible=false;
+    player.hands.visible=true;
   },
   undefined,
   (err)=>{
