@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { World, EYE } from "./world.js";
 import { Player } from "./player.js";
+import { HorrorAudio } from "./audio.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -9,39 +10,114 @@ const container=document.getElementById("app");
 const overlay=document.getElementById("overlay");
 const prompt=document.getElementById("prompt");
 const crosshair=document.getElementById("crosshair");
+const controls=document.getElementById("controlsPanel");
+const staminaBar=document.getElementById("staminaBar");
+const staminaValue=document.getElementById("staminaValue");
+const batteryBar=document.getElementById("batteryBar");
+const batteryValue=document.getElementById("batteryValue");
+const eventText=document.getElementById("event");
+const objective=document.getElementById("objective");
+const vignette=document.getElementById("vignette");
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=.95;
+renderer.toneMappingExposure=.9;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x020202);
-scene.fog=new THREE.Fog(0x050505,22,76);
+scene.background=new THREE.Color(0x010201);
+scene.fog=new THREE.Fog(0x030403,19,70);
 
-const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,300);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
 const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
 
-scene.add(new THREE.HemisphereLight(0xfff0c0,0x6b5f38,.48));
-scene.add(new THREE.AmbientLight(0xffd9a0,.25));
+const hemi=new THREE.HemisphereLight(0xffefc5,0x28231a,.38);
+scene.add(hemi);
+const ambient=new THREE.AmbientLight(0xffd9a0,.18);
+scene.add(ambient);
 
-const playerLight=new THREE.PointLight(0xffe6b0,33,38,1.8);
+const playerLight=new THREE.PointLight(0xffe6b0,18,30,1.9);
 scene.add(playerLight);
 
+const flashlight=new THREE.SpotLight(0xfff5cf,10,29,Math.PI/6,.72,1.2);
+flashlight.castShadow=true;
+flashlight.shadow.mapSize.set(512,512);
+flashlight.target.position.set(0,0,-1);
+camera.add(flashlight);
+camera.add(flashlight.target);
+scene.add(camera);
+
 const player=new Player(camera,renderer.domElement,world);
+const audio=new HorrorAudio();
+player.onStep=({intensity})=>audio.step(intensity);
+
+let flashlightOn=true;
+let battery=100;
+let controlsOpen=false;
+let pulse=0;
+let nextEvent=24+Math.random()*16;
+let eventCooldown=0;
+let muted=false;
+
+function toggleFlashlight(){
+  flashlightOn=!flashlightOn;
+}
+
+function showControls(){
+  controlsOpen=true;
+  controls.classList.remove("hidden");
+  if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
+}
+function hideControls(){
+  controlsOpen=false;
+  controls.classList.add("hidden");
+}
+
+function newSeed(){
+  const seed=Math.floor(Math.random()*2147483647);
+  location.href=location.pathname+"?seed="+seed;
+}
+
 player.attach();
 
-overlay.addEventListener("click",()=>player.lock());
+overlay.addEventListener("click",()=>{
+  audio.start();
+  player.lock();
+});
+
+controls.addEventListener("click",e=>{
+  if(e.target===controls) hideControls();
+});
 
 document.addEventListener("pointerlockchange",()=>{
   const locked=document.pointerLockElement===renderer.domElement;
-  overlay.classList.toggle("hidden",locked);
+  if(!controlsOpen) overlay.classList.toggle("hidden",locked);
   crosshair.style.display=locked?"block":"none";
-  prompt.textContent=locked?"CLICK TO ENTER":"CLICK TO RESUME";
+  prompt.textContent="CLICK TO RESUME";
 });
+
+document.addEventListener("keydown",e=>{
+  if(e.code==="KeyF") toggleFlashlight();
+  else if(e.code==="KeyM"){ muted=audio.toggleMute(); }
+  else if(e.code==="KeyN"){ newSeed(); }
+  else if(e.code==="Tab"){
+    e.preventDefault();
+    controlsOpen?hideControls():showControls();
+  }
+});
+
+function triggerEvent(){
+  eventCooldown=3.5;
+  pulse=1;
+  audio.scare();
+  objective.textContent=Math.random()>.5 ? "Something moved nearby." : "The lights don't feel right.";
+  eventText.textContent=Math.random()>.5 ? "DID YOU HEAR THAT?" : "THE LIGHTS ARE FLICKERING";
+  eventText.style.opacity="1";
+  setTimeout(()=>{eventText.style.opacity="0";},1800);
+}
 
 addEventListener("resize",()=>{
   camera.aspect=innerWidth/innerHeight;
@@ -54,10 +130,49 @@ function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05);
   const t=clock.elapsedTime;
+
   player.update(dt);
   world.update(player.pos.x,player.pos.z);
   world.updateFlicker(t);
-  playerLight.position.set(player.pos.x,EYE+.4,player.pos.z);
+  audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
+
+  if(flashlightOn && battery>0){
+    battery=Math.max(0,battery-dt*.72);
+  }else{
+    battery=Math.min(100,battery+dt*.38);
+  }
+  if(battery<=0) flashlightOn=false;
+
+  const flicker=.93+.07*Math.sin(t*17.1)*Math.sin(t*7.3);
+  flashlight.intensity=flashlightOn ? 9.5*flicker : 0;
+  playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
+
+  if(eventCooldown>0) eventCooldown-=dt;
+  if(eventCooldown<=0 && t>nextEvent){
+    triggerEvent();
+    nextEvent=t+28+Math.random()*35;
+  }
+
+  if(pulse>0){
+    pulse=Math.max(0,pulse-dt*2.8);
+    vignette.style.opacity=String(.78+.20*pulse);
+    camera.position.x+=Math.sin(t*70)*pulse*.008;
+    camera.position.y+=Math.sin(t*61)*pulse*.006;
+    hemi.intensity=.38*(1-pulse*.72);
+    ambient.intensity=.18*(1-pulse*.85);
+  }else{
+    vignette.style.opacity=".78";
+    hemi.intensity=.38;
+    ambient.intensity=.18;
+  }
+
+  const stamina=player.stamina;
+  staminaBar.style.width=stamina+"%";
+  staminaValue.textContent=Math.round(stamina);
+  batteryBar.style.width=battery+"%";
+  batteryValue.textContent=Math.round(battery)+"%";
+  batteryBar.style.opacity=flashlightOn?1:.45;
+
   renderer.render(scene,camera);
 }
 animate();
