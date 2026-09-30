@@ -1,264 +1,40 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DeepSeeker — Horror Map Prototype</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DeepSeeker — Procedural Horror</title>
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#020403;font-family:Inter,system-ui,sans-serif;color:#eef7ed}
-canvas{display:block}
-#ui{position:fixed;inset:0;pointer-events:none}
-#title{position:absolute;top:18px;left:20px;font-weight:800;letter-spacing:.09em;font-size:18px;text-shadow:0 2px 15px #000}
-#status{position:absolute;right:20px;top:18px;padding:8px 11px;border-radius:999px;background:#0008;border:1px solid #ffffff22;color:#dce9df;font-size:12px}
-#help{position:absolute;left:20px;bottom:20px;padding:12px 14px;border:1px solid #ffffff1c;background:#030604cf;backdrop-filter:blur(8px);border-radius:12px;font-size:13px;line-height:1.55}
-#cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:18px;opacity:.58}
-#vignette{position:absolute;inset:0;background:radial-gradient(circle at center,transparent 35%,#0008 100%)}
-#loading{position:fixed;inset:0;display:grid;place-items:center;background:#020403f8;z-index:5}
-#box{width:min(520px,calc(100vw - 48px));padding:28px 30px;border:1px solid #ffffff17;border-radius:18px;background:#07100bf5;box-shadow:0 25px 100px #000}
-#box h1{margin:0 0 8px;font-size:28px}
-#box p{color:#b9c5ba;line-height:1.5;margin:8px 0}
-#bar{height:8px;background:#ffffff0b;border-radius:99px;overflow:hidden;margin-top:18px}
-#bar i{display:block;height:100%;width:0;background:#9ad5a2;border-radius:99px;transition:width .2s}
-kbd{padding:2px 6px;border:1px solid #ffffff22;border-radius:5px;background:#ffffff09}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,sans-serif}
+#app,#app canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#crosshair{position:fixed;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#fff9;box-shadow:0 0 5px #000;pointer-events:none;z-index:2}
+#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,.84);color:#d8c98a;cursor:pointer;user-select:none;z-index:10;text-align:center}
+#overlay h1{margin:0;font-size:42px;letter-spacing:12px;font-weight:500;text-shadow:0 0 24px #d6be5a55}
+#overlay .sub{margin:0;font-size:13px;letter-spacing:4px;color:#9a8d5e}
+#overlay .prompt{margin:14px 0 0;font-size:17px;letter-spacing:3px;animation:pulse 1.6s ease-in-out infinite}
+#overlay .controls{font-size:12px;letter-spacing:2px;color:#80774f;line-height:1.9}
+#badge{position:fixed;left:16px;top:16px;padding:8px 11px;border:1px solid #fff2;border-radius:999px;background:#0008;color:#ddd;font-size:12px;z-index:2;pointer-events:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
+</head>
+<body>
+<div id="app"></div>
+<div id="badge">DEEPSEEKER • PROCEDURAL HORROR</div>
+<div id="crosshair"></div>
+<div id="overlay">
+  <h1>DEEPSEEKER</h1>
+  <p class="sub">PROCEDURAL LIMINAL HORROR</p>
+  <p class="prompt" id="prompt">CLICK TO ENTER</p>
+  <p class="controls">WASD — move &nbsp;•&nbsp; SHIFT — run &nbsp;•&nbsp; MOUSE — look<br>ESC — release cursor &nbsp;•&nbsp; Every seed makes a new map</p>
+</div>
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
   }
 }
 </script>
-</head>
-<body>
-<div id="loading"><div id="box"><h1>DEEPSEEKER</h1><p id="loadingText">Loading the horror map…</p><div id="bar"><i></i></div></div></div>
-<div id="ui">
-  <div id="title">DEEPSEEKER — LIMINAL HORROR PROTOTYPE</div>
-  <div id="status">FIRST PERSON • CLICK TO ENTER</div>
-  <div id="cross">+</div>
-  <div id="help"><kbd>WASD</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; mouse look &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>F</kbd> flashlight &nbsp; <kbd>ESC</kbd> release</div>
-  <div id="vignette"></div>
-</div>
-
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-import {GLTFLoader} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
-
-const MAP_URL='https://cdn.3dassets.dev/assets/25333/v1/model.glb';
-
-const loading=document.querySelector('#loading');
-const loadingText=document.querySelector('#loadingText');
-const bar=document.querySelector('#bar i');
-
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x020706);
-scene.fog=new THREE.FogExp2(0x07110d,0.035);
-
-const camera=new THREE.PerspectiveCamera(78,innerWidth/innerHeight,.06,500);
-camera.rotation.order='YXZ';
-
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.65));
-renderer.setSize(innerWidth,innerHeight);
-renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.outputColorSpace=THREE.SRGBColorSpace;
-document.body.appendChild(renderer.domElement);
-
-const moon=new THREE.DirectionalLight(0x9db9ff,1.15);
-moon.position.set(-15,30,-20);
-moon.castShadow=true;
-moon.shadow.mapSize.set(1024,1024);
-scene.add(moon);
-
-const ambient=new THREE.HemisphereLight(0x7890a7,0x11150e,.55);
-scene.add(ambient);
-
-const loader=new GLTFLoader();
-let map=null;
-let mapBox=null;
-
-function loadMap(){
-  return new Promise((resolve,reject)=>{
-    loader.load(
-      MAP_URL,
-      gltf=>resolve(gltf.scene),
-      xhr=>{
-        if(xhr.total){
-          const p=Math.round(xhr.loaded/xhr.total*100);
-          bar.style.width=(20+p*.7)+'%';
-          loadingText.textContent='Loading horror map… '+p+'%';
-        }
-      },
-      reject
-    );
-  });
-}
-
-const player={
-  x:0,y:2,z:0,
-  vy:0,
-  grounded:false
-};
-
-let yaw=0;
-let pitch=0;
-let locked=false;
-let flashlightOn=true;
-
-const keys=new Set();
-const down=new Set();
-
-addEventListener('keydown',e=>{
-  keys.add(e.code);
-  down.add(e.code);
-  if(e.code==='KeyF') flashlightOn=!flashlightOn;
-  if(e.code==='Space') e.preventDefault();
-});
-addEventListener('keyup',e=>keys.delete(e.code));
-
-renderer.domElement.addEventListener('click',()=>renderer.domElement.requestPointerLock());
-document.addEventListener('pointerlockchange',()=>{
-  locked=document.pointerLockElement===renderer.domElement;
-  if(!locked) down.clear();
-});
-document.addEventListener('mousemove',e=>{
-  if(!locked)return;
-  yaw-=e.movementX*.0025;
-  pitch-=e.movementY*.0022;
-  pitch=THREE.MathUtils.clamp(pitch,-1.35,1.35);
-});
-
-const flashlight=new THREE.SpotLight(0xdcecff,22,32,Math.PI/6,.62,1.45);
-flashlight.castShadow=true;
-flashlight.shadow.mapSize.set(512,512);
-flashlight.target.position.set(0,0,-1);
-camera.add(flashlight);
-camera.add(flashlight.target);
-scene.add(camera);
-
-function findGroundY(x,y,z){
-  const origin=new THREE.Vector3(x,y+80,z);
-  const ray=new THREE.Raycaster(origin,new THREE.Vector3(0,-1,0),0,160);
-  const hits=ray.intersectObject(map,true);
-  return hits.length ? hits[0].point.y : 0;
-}
-
-async function start(){
-  loadingText.textContent='Loading the new liminal horror environment…';
-  bar.style.width='8%';
-
-  map=await loadMap();
-  scene.add(map);
-  map.traverse(o=>{
-    if(o.isMesh){
-      o.castShadow=true;
-      o.receiveShadow=true;
-    }
-  });
-
-  // Center the supplied map horizontally and place its lowest surface at ground level.
-  map.updateMatrixWorld(true);
-  mapBox=new THREE.Box3().setFromObject(map);
-  const center=new THREE.Vector3();
-  mapBox.getCenter(center);
-  map.position.x-=center.x;
-  map.position.z-=center.z;
-  map.position.y-=mapBox.min.y;
-  map.updateMatrixWorld(true);
-
-  // Start near the center of the assembled liminal map.
-  mapBox=new THREE.Box3().setFromObject(map);
-  const size=new THREE.Vector3();
-  mapBox.getSize(size);
-  player.x=(mapBox.min.x+mapBox.max.x)*0.5;
-  player.z=(mapBox.min.z+mapBox.max.z)*0.5;
-  const floor=findGroundY(player.x,mapBox.max.y+10,player.z);
-  player.y=(Number.isFinite(floor)?floor:0)+1.72;
-  player.vy=0;
-  player.grounded=true;
-
-  bar.style.width='100%';
-  loadingText.textContent='Ready. Click to enter the map.';
-  document.querySelector('#status').textContent='LIMINAL MAP • FIRST PERSON';
-  loading.addEventListener('click',()=>{
-    loading.style.display='none';
-    renderer.domElement.requestPointerLock();
-  },{once:true});
-}
-
-function move(dt){
-  // Camera-relative movement. W always follows the exact direction the camera faces.
-  const f=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
-  const str=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
-  const len=Math.hypot(f,str)||1;
-  const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?6.4:3.8;
-
-  const forward=new THREE.Vector3();
-  camera.getWorldDirection(forward);
-  forward.y=0;
-  forward.normalize();
-
-  const right=new THREE.Vector3().crossVectors(forward,camera.up).normalize();
-
-  player.x+=((forward.x*f+right.x*str)/len)*speed*dt;
-  player.z+=((forward.z*f+right.z*str)/len)*speed*dt;
-
-  const floor=findGroundY(player.x,player.y,player.z);
-  player.vy-=20*dt;
-
-  if(keys.has('Space') && player.grounded){
-    player.vy=7.5;
-    player.grounded=false;
-  }
-
-  player.y+=player.vy*dt;
-  const wanted=floor+1.72;
-  if(player.y<=wanted){
-    player.y=wanted;
-    player.vy=0;
-    player.grounded=true;
-  }
-
-  if(mapBox){
-    const margin=.8;
-    player.x=THREE.MathUtils.clamp(player.x,mapBox.min.x+margin,mapBox.max.x-margin);
-    player.z=THREE.MathUtils.clamp(player.z,mapBox.min.z+margin,mapBox.max.z-margin);
-  }
-
-  camera.position.set(player.x,player.y,player.z);
-  camera.rotation.y=yaw;
-  camera.rotation.x=pitch;
-
-  flashlight.intensity=flashlightOn ? 22+Math.sin(performance.now()*.013)*.5 : 0;
-}
-
-const clock=new THREE.Clock();
-
-async function boot(){
-  try{
-    await start();
-    tick();
-  }catch(err){
-    console.error(err);
-    loadingText.textContent='The online map failed to load. Refresh and try again.';
-    bar.style.width='0';
-  }
-}
-
-function tick(){
-  const dt=Math.min(clock.getDelta(),.04);
-  if(locked) move(dt);
-  renderer.render(scene,camera);
-  requestAnimationFrame(tick);
-}
-
-addEventListener('resize',()=>{
-  camera.aspect=innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-});
-
-boot();
-</script>
+<script type="module" src="./main.js"></script>
 </body>
 </html>
