@@ -67,7 +67,7 @@ export class Player {
 
   setupHands() {
     this.hands = new THREE.Group();
-    this.hands.name = "FirstPersonStickHands";
+    this.hands.name = "FirstPersonSimpleArms";
     this.hands.renderOrder = 1000;
     this.hands.visible = true;
     this.camera.add(this.hands);
@@ -75,94 +75,32 @@ export class Player {
     this.handMixers = [];
     this.handModels = [];
 
-    const skin = new THREE.MeshStandardMaterial({
+    const armMaterial = new THREE.MeshStandardMaterial({
       color: 0xd6b08a,
       roughness: 0.9,
       metalness: 0,
     });
 
-    const joint = (position, radius = 0.038) => {
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(radius, 8, 6),
-        skin
+    const makeArm = (side) => {
+      const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.78, 0.16),
+        armMaterial
       );
-      mesh.position.copy(position);
-      mesh.renderOrder = 1000;
-      mesh.frustumCulled = false;
-      return mesh;
+      arm.name = side < 0 ? "LeftArm" : "RightArm";
+      arm.position.set(side * 0.58, -0.47, -0.92);
+      arm.rotation.set(
+        THREE.MathUtils.degToRad(-22),
+        THREE.MathUtils.degToRad(side * 7),
+        THREE.MathUtils.degToRad(side * 8)
+      );
+      arm.renderOrder = 1000;
+      arm.frustumCulled = false;
+      this.handModels.push(arm);
+      this.hands.add(arm);
     };
 
-    const stick = (a, b, radius = 0.028) => {
-      const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
-      const dir = new THREE.Vector3().subVectors(b, a);
-      const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius, radius, dir.length(), 8),
-        skin
-      );
-      mesh.position.copy(mid);
-      mesh.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0),
-        dir.normalize()
-      );
-      mesh.renderOrder = 1000;
-      mesh.frustumCulled = false;
-      return mesh;
-    };
-
-    const makeHand = (side) => {
-      const pivot = new THREE.Group();
-      pivot.name = side < 0 ? "LeftStickHand" : "RightStickHand";
-      pivot.position.set(side < 0 ? -0.62 : 0.62, -0.47, -0.92);
-      pivot.rotation.set(
-        THREE.MathUtils.degToRad(-10),
-        THREE.MathUtils.degToRad(side * 8),
-        THREE.MathUtils.degToRad(side * 7)
-      );
-
-      // Tiny wrist + palm: intentionally simple, like a 3D stick figure hand.
-      pivot.add(stick(
-        new THREE.Vector3(0, 0.16, 0.03),
-        new THREE.Vector3(0, 0.02, -0.01),
-        0.035
-      ));
-
-      const palm = new THREE.Mesh(
-        new THREE.SphereGeometry(0.10, 8, 6),
-        skin
-      );
-      palm.scale.set(0.82, 1.08, 0.72);
-      palm.position.set(0, 0.0, -0.04);
-      palm.renderOrder = 1000;
-      palm.frustumCulled = false;
-      pivot.add(palm);
-
-      // Four simple fingers pointing forward.
-      const fingers = [
-        [-0.060, 0.00, -0.22],
-        [-0.020, 0.018, -0.255],
-        [ 0.022, 0.020, -0.26],
-        [ 0.062, 0.005, -0.215],
-      ];
-      for (const [x, y, z] of fingers) {
-        const base = new THREE.Vector3(x * 0.72, y, -0.08);
-        const tip = new THREE.Vector3(x, y, z);
-        pivot.add(stick(base, tip, 0.024));
-        pivot.add(joint(tip, 0.030));
-      }
-
-      // Thumb sticks outward and slightly forward.
-      const thumbBase = new THREE.Vector3(side * 0.065, -0.015, -0.035);
-      const thumbTip = new THREE.Vector3(side * 0.145, -0.010, -0.145);
-      pivot.add(stick(thumbBase, thumbTip, 0.026));
-      pivot.add(joint(thumbTip, 0.030));
-
-      pivot.add(joint(new THREE.Vector3(0, 0.02, -0.01), 0.026));
-      this.handModels.push(pivot);
-      this.hands.add(pivot);
-    };
-
-    makeHand(-1);
-    makeHand(1);
+    makeArm(-1);
+    makeArm(1);
   }
 
   attach() {
