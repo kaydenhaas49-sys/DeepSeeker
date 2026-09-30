@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { World, EYE } from "./world.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -63,15 +64,64 @@ player.hands.visible=true;
 
 
 const figure=new THREE.Group();
+figure.name="BackroomsBacteriaEntity";
+figure.visible=false;
+scene.add(figure);
+
+const fallbackFigure=new THREE.Group();
 const figureMat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1,metalness:0});
 const figureBody=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.95,6,10),figureMat);
 figureBody.position.y=1.05;
 const figureHead=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),figureMat);
 figureHead.position.y=1.85;
-figure.add(figureBody,figureHead);
-figure.visible=false;
-scene.add(figure);
+fallbackFigure.add(figureBody,figureHead);
+fallbackFigure.visible=false;
+figure.add(fallbackFigure);
 
+let bacteriaMixer=null;
+let bacteriaLoaded=false;
+
+const bacteriaLoader=new GLTFLoader();
+bacteriaLoader.load(
+  "./assets/bacteria.glb",
+  (gltf)=>{
+    const model=gltf.scene;
+    model.name="BacteriaModel";
+    model.traverse((obj)=>{
+      if(!obj.isMesh) return;
+      obj.frustumCulled=false;
+      obj.castShadow=true;
+      obj.receiveShadow=true;
+    });
+
+    const box=new THREE.Box3().setFromObject(model);
+    const size=box.getSize(new THREE.Vector3());
+    const center=box.getCenter(new THREE.Vector3());
+    const targetHeight=2.8;
+    const scale=targetHeight/Math.max(size.y,0.001);
+
+    model.position.set(
+      -center.x*scale,
+      -box.min.y*scale,
+      -center.z*scale
+    );
+    model.scale.setScalar(scale);
+    figure.add(model);
+    bacteriaLoaded=true;
+
+    if(gltf.animations.length){
+      bacteriaMixer=new THREE.AnimationMixer(model);
+      const action=bacteriaMixer.clipAction(gltf.animations[0]);
+      action.reset();
+      action.setLoop(THREE.LoopRepeat,Infinity);
+      action.play();
+    }
+  },
+  undefined,
+  ()=>{
+    // Keep the fallback hidden if the optional local model is missing.
+  }
+);
 let figureLife=0;
 player.onStep=({intensity})=>audio.step(intensity);
 
@@ -325,17 +375,32 @@ function animate(){
   flashlight.intensity=flashlightOn ? 13.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
+  if(bacteriaMixer) bacteriaMixer.update(dt);
+
   if(figureLife>0){
     figureLife=Math.max(0,figureLife-dt);
     figure.visible=true;
     const fade=figureLife>0.85 ? 1 : figureLife/0.85;
-    figure.scale.setScalar(.96 + .08*Math.sin(t*12));
-    figureBody.material.opacity=fade;
-    figureHead.material.opacity=fade;
-    figureBody.material.transparent=true;
-    figureHead.material.transparent=true;
+    if(bacteriaLoaded){
+      for(const child of figure.children){
+        if(child===fallbackFigure) continue;
+        child.traverse((obj)=>{
+          if(!obj.isMesh || !obj.material) return;
+          const mats=Array.isArray(obj.material)?obj.material:[obj.material];
+          for(const mat of mats){
+            if(!mat) continue;
+            mat.transparent=fade<1;
+            mat.opacity=fade;
+          }
+        });
+      }
+    }
+    fallbackFigure.visible=!bacteriaLoaded && fade>0.01;
+    fallbackFigure.scale.setScalar(.96 + .08*Math.sin(t*12));
+    figure.rotation.y=figure.rotation.y;
   }else{
     figure.visible=false;
+    fallbackFigure.visible=false;
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
