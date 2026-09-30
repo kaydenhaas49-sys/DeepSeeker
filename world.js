@@ -78,11 +78,12 @@ export function generateChunk(cx, cz, seed) {
     return true;
   };
 
-  // 1) Freestanding wall segments — the sparse partitions of the reference.
-  const nSeg = 12 + Math.floor(rng() * 6); // 12–17
+  // 1) Large architectural partitions — fewer, longer walls create
+  // believable rooms and long Backrooms sightlines instead of a noisy maze.
+  const nSeg = 8 + Math.floor(rng() * 5); // 8–12
   for (let i = 0; i < nSeg; i++) {
     const horiz = rng() < 0.5;
-    const len = 2 + Math.floor(rng() * 7); // 2–8 cells
+    const len = 4 + Math.floor(rng() * 7); // 4–10 cells
     let lx = Math.floor(rng() * CHUNK_CELLS);
     let lz = Math.floor(rng() * CHUNK_CELLS);
     if (horiz && lx + len > CHUNK_CELLS) lx = CHUNK_CELLS - len;
@@ -103,10 +104,10 @@ export function generateChunk(cx, cz, seed) {
       tryAdd(x + (horiz ? gapAt + 1 : 0), z + (horiz ? 0 : gapAt + 1), rest, horiz);
   };
 
-  // 2) Occasional enclosed room with one doorway.
-  if (rng() < 0.28) {
-    const w = 3 + Math.floor(rng() * 3); // 3–5 cells
-    const h = 3 + Math.floor(rng() * 3);
+  // 2) Larger side rooms / service spaces with a deliberate doorway.
+  if (rng() < 0.42) {
+    const w = 4 + Math.floor(rng() * 5); // 4–8 cells
+    const h = 4 + Math.floor(rng() * 5);
     const x0 = 1 + Math.floor(rng() * (CHUNK_CELLS - w - 2));
     const z0 = 1 + Math.floor(rng() * (CHUNK_CELLS - h - 2));
     const side = Math.floor(rng() * 4); // 0 top, 1 bottom, 2 left, 3 right
@@ -117,11 +118,12 @@ export function generateChunk(cx, cz, seed) {
     addRingSide(x0 + w - 1, z0 + 1, h - 2, false, side === 3 ? gap(h - 2) : -1);
   }
 
-  // 3) More common long corridors: two parallel walls with an open lane between.
-  if (rng() < 0.24) {
+  // 3) Main corridor spines: broad, long lanes with enough breathing room
+  // to create readable spaces and strong lines of sight.
+  if (rng() < 0.32) {
     const horiz = rng() < 0.5;
-    const len = 8 + Math.floor(rng() * 9); // 8–16 cells
-    const lane = 1 + Math.floor(rng() * 2); // 1–2 cells wide
+    const len = 9 + Math.floor(rng() * 8); // 9–16 cells
+    const lane = 2 + Math.floor(rng() * 2); // 2–3 cells wide
     const a = Math.floor(rng() * (CHUNK_CELLS - len));
     const b = Math.floor(rng() * (CHUNK_CELLS - lane - 2));
     if (horiz) {
@@ -131,6 +133,17 @@ export function generateChunk(cx, cz, seed) {
       tryAdd(a, b, len, false);
       tryAdd(a + lane + 1, b, len, false);
     }
+  }
+
+  // 4) One occasional "backroom" motif: a wide partial divider. It creates
+  // a large room that still feels connected rather than becoming a dead-end box.
+  if (rng() < 0.30) {
+    const horiz = rng() < 0.5;
+    const len = 6 + Math.floor(rng() * 6); // 6–11 cells
+    const start = 2 + Math.floor(rng() * Math.max(1, CHUNK_CELLS - len - 4));
+    const offset = 3 + Math.floor(rng() * 5);
+    if (horiz) tryAdd(start, offset, len, true);
+    else tryAdd(offset, start, len, false);
   }
 
   return { cx, cz, walls, cells };
@@ -144,7 +157,7 @@ const R_GENERATE = 2; // keep chunks within this Chebyshev radius
 const R_DISPOSE = 3; // ...and drop anything farther than this
 const PANEL_W = 2.2; // light fixture size (m)
 const PANEL_D = 0.5;
-const PANEL_SPACING = 28; // m between the sparse fixtures
+const PANEL_SPACING = 22; // m between fixtures; enough lights to read the architecture
 
 // BoxGeometry face order: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z (4 verts each).
 // Scale the U coordinate of a face so the wallpaper repeats every CELL meters.
@@ -302,8 +315,8 @@ export class World {
   }
 
   buildPanels(group, data, ox, oz) {
-    // Sparse fixture grid: only four fixtures per 64m chunk. The large gaps make
-    // the halls feel emptier and let darkness collect between pools of light.
+    // Regular-but-imperfect fixture grid: the repeated rhythm helps sell a
+    // believable ceiling while the randomized failures keep it unsettling.
     const prng = mulberry32(hashSeed(data.cx * 3 + 7, data.cz * 3 + 13, this.seed ^ 0x9e3779b9));
     const on = [];
     const off = [];
