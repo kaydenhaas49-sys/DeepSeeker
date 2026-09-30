@@ -110,9 +110,12 @@ export class Player {
             const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
             for (const mat of materials) {
               if (!mat) continue;
-              mat.side = side < 0 ? THREE.FrontSide : THREE.BackSide;
+              mat.side = THREE.DoubleSide;
               mat.depthTest = false;
               mat.depthWrite = false;
+              // The mirrored hand can invert tangent-space normals; remove the
+              // normal map only on that copy so it cannot produce black wedges.
+              if (side > 0 && mat.normalMap) mat.normalMap = null;
               mat.needsUpdate = true;
             }
           });
@@ -135,7 +138,7 @@ export class Player {
           pivot.position.set(side * 0.49, -0.43, -1.12);
           pivot.rotation.set(
             THREE.MathUtils.degToRad(-8),
-            THREE.MathUtils.degToRad(side * 8),
+            Math.PI + THREE.MathUtils.degToRad(side * 8),
             THREE.MathUtils.degToRad(side * 4)
           );
           pivot.add(hand);
@@ -144,9 +147,14 @@ export class Player {
 
           if (gltf.animations.length) {
             const preferred =
+              gltf.animations.find((clip) => /neutral/i.test(clip.name)) ||
               gltf.animations.find((clip) => /flat|open|spread/i.test(clip.name)) ||
-              gltf.animations.find((clip) => /neutral|idle/i.test(clip.name)) ||
-              gltf.animations[0];
+              null;
+            if (!preferred) {
+              // Do not silently choose the first clip — the source's first clip
+              // is a gesture pose, which is wrong for the default viewmodel.
+              return;
+            }
             const action = mixer.clipAction(preferred);
             action.reset();
             action.setLoop(THREE.LoopRepeat, Infinity);
