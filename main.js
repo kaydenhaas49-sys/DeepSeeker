@@ -21,6 +21,7 @@ const vignette=document.getElementById("vignette");
 const phone=document.getElementById("phone");
 const phoneDepth=document.getElementById("phoneDepth");
 const phoneCardText=document.getElementById("phoneCardText");
+const phoneStory=document.getElementById("phoneStory");
 const deepseekerIcon=document.getElementById("deepseekerIcon");
 
 
@@ -82,8 +83,110 @@ let nextEvent=24+Math.random()*16;
 let eventCooldown=0;
 let muted=false;
 let phoneOpen=false;
-let deepseekerAppOpen=false;
 
+let deepseekerAppOpen=false;
+let storyStage=0;
+let maxStoryDistance=0;
+
+const STORY = [
+  {
+    distance: 0,
+    depth: 0,
+    title: "NOCLIP",
+    text: "You fell through the floor. The carpet is wet. The lights will not stop buzzing.",
+    objective: "Find a way out."
+  },
+  {
+    distance: 45,
+    depth: 0,
+    title: "M — ENTRY 01",
+    text: "If you found this, you're probably where I was. Don't panic. Keep moving. There are no doors where you think there should be.",
+    objective: "Follow the trail. Stay in the light."
+  },
+  {
+    distance: 90,
+    depth: 1,
+    title: "M — ENTRY 02",
+    text: "I tried to map the place. Every time I turned around, the corridors were different. I think the building knows when we're looking.",
+    objective: "Keep exploring. Do not stay in one place."
+  },
+  {
+    distance: 150,
+    depth: 1,
+    title: "M — ENTRY 03",
+    text: "Don't trust the levels. I found the same room three times today, but none of them had the same exit.",
+    objective: "Something is wrong with the layout."
+  },
+  {
+    distance: 230,
+    depth: 2,
+    title: "M — ENTRY 04",
+    text: "If you see someone who looks like you, don't follow them. I made that mistake once.",
+    objective: "If you see someone, keep your distance."
+  },
+  {
+    distance: 330,
+    depth: 3,
+    title: "DEEPSEEKER FILE 01",
+    text: "Found a record with the name DEEPSEEKER. They weren't trying to escape. They were going deeper on purpose.",
+    objective: "Find out what the DeepSeeker was looking for."
+  },
+  {
+    distance: 450,
+    depth: 4,
+    title: "M — ENTRY 05",
+    text: "We're close. I can hear something underneath the walls. The others want to turn back. I don't think there is a way back anymore.",
+    objective: "Keep going deeper."
+  },
+  {
+    distance: 600,
+    depth: 5,
+    title: "M — FINAL ENTRY",
+    text: "We found the bottom. You are not following my trail. I'm following yours.",
+    objective: "Find the bottom."
+  }
+];
+
+
+
+function renderStoryLog(){
+  const unlocked=STORY.slice(0,storyStage+1);
+  phoneStory.innerHTML=unlocked.map(entry=>`
+    <div class="storyEntry">
+      <div class="storyMeta">${entry.title} · DEPTH ${entry.depth}</div>
+      <div class="storyText">${entry.text}</div>
+    </div>
+  `).join("");
+}
+
+function applyStoryStage(index, announce=true){
+  storyStage=index;
+  const entry=STORY[storyStage];
+  phoneDepth.textContent=String(entry.depth);
+  phoneCardText.textContent=entry.objective;
+  objective.textContent=entry.objective;
+  renderStoryLog();
+
+  if(announce && storyStage>0){
+    eventText.textContent=entry.title==="DEEPSEEKER FILE 01" ? "NEW DEEPSEEKER FILE" : "NEW MESSAGE FROM M";
+    eventText.style.opacity="1";
+    setTimeout(()=>{eventText.style.opacity="0";},2200);
+  }
+}
+
+function updateStoryProgress(){
+  const dx=player.pos.x-32;
+  const dz=player.pos.z-32;
+  maxStoryDistance=Math.max(maxStoryDistance,Math.hypot(dx,dz));
+
+  let nextStage=storyStage;
+  while(nextStage+1<STORY.length && maxStoryDistance>=STORY[nextStage+1].distance){
+    nextStage++;
+  }
+  if(nextStage!==storyStage){
+    applyStoryStage(nextStage,true);
+  }
+}
 
 function toggleFlashlight(){
   flashlightOn=!flashlightOn;
@@ -98,8 +201,9 @@ function togglePhone(){
   if(phoneOpen){
     if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
     crosshair.style.display="none";
-    phoneDepth.textContent="0";
-    phoneCardText.textContent="Find a way out.";
+    phoneDepth.textContent=String(STORY[storyStage].depth);
+    phoneCardText.textContent=STORY[storyStage].objective;
+    renderStoryLog();
   }else if(!controlsOpen){
     player.lock();
   }
@@ -130,6 +234,7 @@ function newSeed(){
 }
 
 player.attach();
+applyStoryStage(0,false);
 
 overlay.addEventListener("click",()=>{
   audio.start();
@@ -197,6 +302,7 @@ function animate(){
   const t=clock.elapsedTime;
 
   player.update(dt);
+  updateStoryProgress();
   world.update(player.pos.x,player.pos.z);
   world.updateFlicker(t);
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
