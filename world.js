@@ -290,6 +290,40 @@ export class World {
     return chunk ? chunk.data.cells.has(cellKey(ax, az)) : false;
   }
 
+  // Return the actual axis-aligned wall rectangles near a world position.
+  // Collision uses these real bounds instead of treating an entire 4m cell as solid.
+  getNearbyWallBounds(px, pz, radius = 1.0) {
+    const minCx = Math.floor((px - radius) / CHUNK_SIZE);
+    const maxCx = Math.floor((px + radius) / CHUNK_SIZE);
+    const minCz = Math.floor((pz - radius) / CHUNK_SIZE);
+    const maxCz = Math.floor((pz + radius) / CHUNK_SIZE);
+    const bounds = [];
+
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cz = minCz; cz <= maxCz; cz++) {
+        const entry = this.chunks.get(cellKey(cx, cz));
+        if (!entry) continue;
+
+        for (const w of entry.data.walls) {
+          if (w.horiz) {
+            const minX = w.x * CELL;
+            const maxX = (w.x + w.len) * CELL;
+            const midZ = (w.z + 0.5) * CELL;
+            const halfT = WALL_T * 0.5;
+            bounds.push({ minX, maxX, minZ: midZ - halfT, maxZ: midZ + halfT });
+          } else {
+            const midX = (w.x + 0.5) * CELL;
+            const halfT = WALL_T * 0.5;
+            const minZ = w.z * CELL;
+            const maxZ = (w.z + w.len) * CELL;
+            bounds.push({ minX: midX - halfT, maxX: midX + halfT, minZ, maxZ });
+          }
+        }
+      }
+    }
+    return bounds;
+  }
+
   // -- mesh building ---------------------------------------------------------
 
   buildChunkMeshes(data, cx, cz) {
