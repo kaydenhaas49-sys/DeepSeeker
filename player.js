@@ -220,6 +220,21 @@ export class Player {
 
     // --- first-person hands ---
     if (this.hands && this.hands.visible) {
+      // Viewmodel arms should never visibly pass through walls. When the
+      // player gets close to a wall, retract the simple arm rectangles toward
+      // the camera until they are safely on the player's side.
+      let nearestWall = Infinity;
+      for (const wall of this.world.getNearbyWallBounds(this.pos.x, this.pos.z, 1.2)) {
+        const nx = Math.max(wall.minX, Math.min(this.pos.x, wall.maxX));
+        const nz = Math.max(wall.minZ, Math.min(this.pos.z, wall.maxZ));
+        nearestWall = Math.min(
+          nearestWall,
+          Math.hypot(this.pos.x - nx, this.pos.z - nz)
+        );
+      }
+      const wallNear = nearestWall < 0.9;
+      const armDepthTarget = wallNear ? -0.30 : -0.92;
+
       const moving = hSpeed > 0.5 ? Math.min(1, hSpeed / RUN_SPEED) : 0;
       const sway = moving ? Math.sin(this.bobPhase) * 0.018 : Math.sin(this.bobPhase * 0.35) * 0.004;
       const lift = moving ? Math.abs(Math.cos(this.bobPhase)) * 0.012 : 0;
@@ -229,6 +244,7 @@ export class Player {
         const pivot = this.handModels[i];
         pivot.position.y = -0.43 + lift - (this.crouched ? 0.08 : 0);
         pivot.position.x = side * 0.49 + sway * side * 0.35;
+        pivot.position.z += (armDepthTarget - pivot.position.z) * (1 - Math.exp(-18 * dt));
         pivot.rotation.z =
           THREE.MathUtils.degToRad(side * 4) + sway * side;
       }
