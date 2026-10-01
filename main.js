@@ -100,6 +100,15 @@ housePortalLight.position.set(
 );
 scene.add(housePortalLight);
 
+const houseExitPortal=housePortal.clone();
+houseExitPortal.name="HouseTestReturnPad";
+houseExitPortal.visible=false;
+scene.add(houseExitPortal);
+
+const houseExitPortalLight=housePortalLight.clone();
+houseExitPortalLight.visible=false;
+scene.add(houseExitPortalLight);
+
 function boxContainsPlayer(box,x,z,r=0.42){
   const nx=Math.max(box.min.x,Math.min(x,box.max.x));
   const nz=Math.max(box.min.z,Math.min(z,box.max.z));
@@ -202,6 +211,8 @@ function setHouseMode(enabled){
   world.root.visible=!houseMode;
   housePortal.visible=!houseMode;
   housePortalLight.visible=!houseMode;
+  houseExitPortal.visible=houseMode;
+  houseExitPortalLight.visible=houseMode;
 
   if(houseModel) houseModel.visible=houseMode;
 
@@ -214,7 +225,9 @@ function setHouseMode(enabled){
     player.pos.set(houseSpawn.x,houseSpawn.y-EYE,houseSpawn.z);
     player.jumpY=0;
     player.jumpVelocity=0;
-    objective.textContent="Explore the house. Press E at the test pad to return.";
+    houseExitPortal.position.set(houseSpawn.x,houseSpawn.y-0.7,houseSpawn.z);
+    houseExitPortalLight.position.set(houseSpawn.x,houseSpawn.y+0.2,houseSpawn.z-0.4);
+    objective.textContent="Explore the house. Press E at the glowing test pad to return.";
     eventText.textContent="HOUSE TEST LEVEL";
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},1600);
@@ -222,6 +235,8 @@ function setHouseMode(enabled){
     player.pos.set(32, EYE, 32);
     player.jumpY=0;
     player.jumpVelocity=0;
+    houseExitPortal.visible=false;
+    houseExitPortalLight.visible=false;
     objective.textContent=STORY[storyStage].objective;
   }
 }
