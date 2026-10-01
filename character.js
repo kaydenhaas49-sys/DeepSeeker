@@ -271,26 +271,60 @@ function aimBoneAtWorldDirection(bone, worldDirection){
   return true;
 }
 
+function findArmBoneByHierarchy(root, side){
+  const candidates=[];
+  root.traverse(obj=>{
+    if(!obj.isBone) return;
+
+    const child=getBoneChild(obj);
+    if(!child) return;
+
+    const p=obj.getWorldPosition(new THREE.Vector3());
+    const c=child.getWorldPosition(new THREE.Vector3());
+    const delta=c.clone().sub(p);
+
+    const horizontal=Math.hypot(delta.x,delta.z);
+    const vertical=Math.abs(delta.y);
+    const sideOk=side==="left" ? delta.x<-.03 : delta.x>.03;
+    const heightOk=p.y>.75 && p.y<1.65;
+    const armShape=horizontal>.04 && horizontal>vertical*.55;
+
+    if(!sideOk || !heightOk || !armShape) return;
+
+    const n=normalizeBoneName(obj.name);
+    let score=horizontal*100;
+    if(n.includes("shoulder") || n.includes("arm")) score+=40;
+    if(n.includes("forearm") || n.includes("hand") || n.includes("wrist")) score-=80;
+
+    candidates.push({bone:obj,score});
+  });
+
+  candidates.sort((a,b)=>b.score-a.score);
+  return candidates[0]?.bone || null;
+}
+
 function applyNeutralMixamoPose(model){
   model.updateMatrixWorld(true);
 
-  const leftUpper=findBoneByNameParts(model,[
-    "mixamorigleftarm","mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"
+  let leftUpper=findBoneByNameParts(model,[
+    "mixamorigleftupperarm","mixamorigleftarm","leftupperarm","leftarm","upperarml","arml"
   ]);
-  const rightUpper=findBoneByNameParts(model,[
-    "mixamorigrightarm","mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"
+  let rightUpper=findBoneByNameParts(model,[
+    "mixamorigrightupperarm","mixamorigrightarm","rightupperarm","rightarm","upperarmr","armr"
   ]);
+
+  if(!leftUpper) leftUpper=findArmBoneByHierarchy(model,"left");
+  if(!rightUpper) rightUpper=findArmBoneByHierarchy(model,"right");
 
   const leftForearm=findBoneByNameParts(model,[
     "mixamorigleftforearm","leftforearm","leftlowerarm","leftelbow","forearml"
-  ]);
+  ]) || getBoneChild(leftUpper);
+
   const rightForearm=findBoneByNameParts(model,[
     "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
-  ]);
+  ]) || getBoneChild(rightUpper);
 
-  // Do not assume a particular Mixamo Euler axis. Instead, aim each
-  // arm segment from its actual current bind-pose direction into a
-  // natural relaxed/downward pose.
+  // Aim real skeleton segments downward instead of guessing Euler axes.
   const leftDown=new THREE.Vector3(-0.08,-0.98,-0.12).normalize();
   const rightDown=new THREE.Vector3(0.08,-0.98,-0.12).normalize();
   const leftHandDir=new THREE.Vector3(-0.12,-0.96,-0.22).normalize();
