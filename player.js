@@ -117,6 +117,8 @@ export class Player {
       this.characterModel = character.model;
       this.characterMixer = character.mixer;
       this.characterFlashlight = character.flashlight;
+      this.characterFlashlightLens =
+        character.flashlight?.getObjectByName("FlashlightLens") || null;
       this.worldAvatar.add(character.model);
       this.characterLoaded = true;
 
@@ -126,16 +128,6 @@ export class Player {
     }
   }
 
-  setFlashlightVisual(on){
-    if(!this.characterFlashlight) return;
-
-    const lens = this.characterFlashlight.getObjectByName("HeldFlashlight")
-      ?.getObjectByProperty("type","Mesh");
-
-    if(lens?.material?.emissiveIntensity !== undefined){
-      lens.material.emissiveIntensity=on ? 2.4 : 0.18;
-    }
-  }
   setFlashlightVisual(on){
     const lens=this.characterFlashlightLens;
     if(!lens) return;
@@ -293,25 +285,6 @@ export class Player {
     this.camera.rotation.set(this.pitch, this.yaw, 0);
 
     if(this.characterMixer) {
-      this.characterMixer.update(dt);
-    }
-
-    if(this.characterLoaded && this.characterRoot){
-      const walkAmount=Math.min(1,hSpeed/WALK_SPEED);
-      const viewBob=Math.sin(this.bobPhase)*0.018*walkAmount;
-      const sway=Math.cos(this.bobPhase)*0.012*walkAmount;
-
-      this.characterRoot.position.y=-1.58 + this.bobOffset*0.65 + viewBob;
-      this.characterRoot.position.x=sway;
-      this.characterRoot.rotation.z=sway*0.15;
-
-      if(this.characterFlashlight){
-        this.characterFlashlight.rotation.z=
-          THREE.MathUtils.degToRad(2)+sway*1.8;
-      }
-    }
-
-    if(this.characterMixer){
       this.characterMixer.update(dt);
     }
 
