@@ -126,6 +126,24 @@ const houseExitPortalLight=housePortalLight.clone();
 houseExitPortalLight.visible=false;
 scene.add(houseExitPortalLight);
 
+const houseFill=new THREE.HemisphereLight(0xffe9c5,0x3b342b,0);
+houseFill.name="HouseInteriorFill";
+scene.add(houseFill);
+
+const houseKey=new THREE.DirectionalLight(0xfff1d2,0);
+houseKey.name="HouseInteriorKey";
+houseKey.castShadow=true;
+houseKey.shadow.mapSize.set(1024,1024);
+houseKey.position.set(20,18,10);
+scene.add(houseKey);
+
+const houseDebugBounds=new THREE.Box3Helper(
+  new THREE.Box3(),
+  0xffd36a
+);
+houseDebugBounds.visible=false;
+scene.add(houseDebugBounds);
+
 function boxContainsPlayer(box,x,z,r=0.42){
   const nx=Math.max(box.min.x,Math.min(x,box.max.x));
   const nz=Math.max(box.min.z,Math.min(z,box.max.z));
@@ -172,12 +190,25 @@ function loadHouse(){
       houseModel=gltf.scene;
       houseModel.name="DeepSeekerHouse";
       houseModel.visible=false;
+      let houseMeshCount=0;
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
+        houseMeshCount++;
         obj.castShadow=true;
         obj.receiveShadow=true;
         obj.frustumCulled=false;
+
+        const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
+        for(const material of materials){
+          if(!material) continue;
+          material.side=THREE.DoubleSide;
+          material.toneMapped=true;
+        }
       });
+
+      if(houseMeshCount===0){
+        throw new Error("House GLB loaded but contained no renderable meshes.");
+      }
 
       let box=new THREE.Box3().setFromObject(houseModel);
       const size=box.getSize(new THREE.Vector3());
@@ -194,6 +225,24 @@ function loadHouse(){
 
       box=new THREE.Box3().setFromObject(houseModel);
 
+      if(!Number.isFinite(box.min.x) || box.isEmpty()){
+        throw new Error("House GLB produced an empty/invalid bounding box.");
+      }
+
+      houseDebugBounds.box.copy(box);
+      houseDebugBounds.visible=true;
+
+      // Keep imported materials visible even in the very dark horror scene.
+      // The original textures/colors are retained; this is an exposure safeguard.
+      houseModel.traverse((obj)=>{
+        if(!obj.isMesh) return;
+        const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
+        for(const material of materials){
+          if(!material) continue;
+          if("envMapIntensity" in material) material.envMapIntensity=1;
+        }
+      });
+
       houseCollisionBoxes.length=0;
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
@@ -208,6 +257,8 @@ function loadHouse(){
       houseSpawn=findHouseSpawn(box);
       player.extraCollisionBoxes=houseCollisionBoxes;
       houseLoaded=true;
+      houseFill.position.set(box.min.x,box.max.y,box.min.z);
+      houseKey.position.set(box.min.x,box.max.y,box.min.z);
       objective.textContent="Test pad ready. Press E to enter the house.";
       eventText.textContent="HOUSE TEST LEVEL READY";
       eventText.style.opacity="1";
@@ -242,6 +293,10 @@ function setHouseMode(enabled){
   houseExitPortalLight.visible=houseMode;
 
   if(houseModel) houseModel.visible=houseMode;
+  houseDebugBounds.visible=houseMode;
+
+  houseFill.intensity=houseMode?1.35:0;
+  houseKey.intensity=houseMode?1.6:0;
 
   player.ignoreWorldCollision=houseMode;
 
