@@ -190,22 +190,71 @@ function pickIdleAnimation(clips){
 
   const ranked=clips.map((clip,index)=>{
     const name=(clip.name || "").toLowerCase();
-
     let score=0;
 
     if(/idle|standing|stand|rest|neutral|breath/.test(name)) score+=1000;
-    if(/walk|walking/.test(name)) score+=100;
+    if(/walk|walking/.test(name)) score+=120;
     if(/run|running|sprint|jog|jump|fall|attack|hit|death|roll|slide/.test(name)) score-=1000;
 
-    if(clip.duration>=1.5 && clip.duration<=8) score+=20;
+    if(clip.duration>=1.0 && clip.duration<=8.0) score+=20;
     score-=index*0.01;
 
     return {clip,score};
   });
 
-  ranked.sort((a,b)=>b.score-a.score);
+  ranked.sort((x,y)=>y.score-x.score);
 
-  return ranked[0].score>0 ? ranked[0].clip : null;
+  // For a generic Mixamo-exported rig, use its best available clip rather
+  // than silently leaving the skinned character in its bind/T-pose.
+  return ranked[0]?.clip || null;
+}
+
+function attachRemoteBeam(flashlight){
+  const beamMaterial=new THREE.MeshBasicMaterial({
+    color:0xffedb4,
+    transparent:true,
+    opacity:0.075,
+    depthWrite:false,
+    side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending
+  });
+
+  const beamLength=10;
+  const beamRadius=1.45;
+  const beamGeometry=new THREE.ConeGeometry(beamRadius,beamLength,24,1,true);
+  beamGeometry.rotateX(Math.PI/2);
+  beamGeometry.translate(0,0,-beamLength/2);
+
+  const beam=new THREE.Mesh(beamGeometry,beamMaterial);
+  beam.name="RemoteFlashlightBeam";
+  beam.position.set(0,0,-0.02);
+  beam.frustumCulled=false;
+
+  const target=new THREE.Object3D();
+  target.name="RemoteFlashlightTarget";
+  target.position.set(0,0,-10);
+
+  const light=new THREE.SpotLight(0xffe9af,5.5,16,Math.PI/9,.92,1.35);
+  light.name="RemoteFlashlightLight";
+  light.castShadow=false;
+  light.target=target;
+
+  flashlight.add(beam,light,target);
+
+  flashlight.userData.remoteBeam=beam;
+  flashlight.userData.remoteBeamLight=light;
+
+  return {beam,light};
+}
+
+function setRemoteFlashlightVisible(flashlight,on){
+  if(!flashlight) return;
+  const beam=flashlight.userData.remoteBeam;
+  const light=flashlight.userData.remoteBeamLight;
+
+  if(beam) beam.visible=on;
+  if(light) light.visible=on;
+  flashlight.userData.remoteFlashlightOn=on;
 }
 
 export async function createHazmatCharacter(){
@@ -226,6 +275,7 @@ export async function createHazmatCharacter(){
   }
 
   const flashlight=attachFlashlight(model);
+  if(flashlight) attachRemoteBeam(flashlight);
 
   return {
     model,
@@ -236,3 +286,5 @@ export async function createHazmatCharacter(){
     idleClip
   };
 }
+
+export { setRemoteFlashlightVisible };
