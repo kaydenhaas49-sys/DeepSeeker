@@ -34,6 +34,7 @@ export class Player {
     this.jumpVelocity = 0;
     this.extraCollisionBoxes = [];
     this.ignoreWorldCollision = false;
+    this.nearbyWallBounds = [];
 
     camera.rotation.order = "YXZ";
     this.setupHands();
@@ -142,6 +143,10 @@ export class Player {
   }
 
   update(dt) {
+    // Query nearby walls once per frame instead of once for every collision test.
+    // This removes a large amount of garbage/CPU work on low-end devices.
+    this.nearbyWallBounds=this.world.getNearbyWallBounds(this.pos.x,this.pos.z,2.5);
+
     // --- input direction (relative to yaw); ignored while unlocked ---
     const k = this.keys;
     const active = this.locked;
@@ -258,7 +263,7 @@ export class Player {
       // player gets close to a wall, retract the simple arm rectangles toward
       // the camera until they are safely on the player's side.
       let nearestWall = Infinity;
-      for (const wall of this.world.getNearbyWallBounds(this.pos.x, this.pos.z, 1.2)) {
+      for (const wall of this.nearbyWallBounds) {
         const nx = Math.max(wall.minX, Math.min(this.pos.x, wall.maxX));
         const nz = Math.max(wall.minZ, Math.min(this.pos.z, wall.maxZ));
         nearestWall = Math.min(
@@ -290,8 +295,7 @@ export class Player {
     const r = PLAYER_RADIUS;
 
     if (!this.ignoreWorldCollision) {
-      const walls = this.world.getNearbyWallBounds(x, z, r + 1.0);
-      for (const wall of walls) {
+      for (const wall of this.nearbyWallBounds) {
         const nx = Math.max(wall.minX, Math.min(x, wall.maxX));
         const nz = Math.max(wall.minZ, Math.min(z, wall.maxZ));
         const dx = x - nx;
