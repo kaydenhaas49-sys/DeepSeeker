@@ -74,7 +74,7 @@ player.hands.visible=true;
 // ---------------------------------------------------------------------------
 // House level — the GLB itself is the level.
 // ---------------------------------------------------------------------------
-const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
+const HOUSE_MODEL_PATH="./assets/house_interior.glb";
 const HOUSE_TARGET_HEIGHT=7.2;
 const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
 
