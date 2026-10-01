@@ -25,6 +25,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Analyze house doors
+        run: |
+          python3 - <<'PY'
+          import json, struct
+          from pathlib import Path
+          b=Path("assets/house_interior.glb").read_bytes()
+          _,_,length=struct.unpack_from("<4sII",b,0)
+          pos=12
+          gltf=None
+          while pos<length:
+              n,typ=struct.unpack_from("<I4s",b,pos); pos+=8
+              chunk=b[pos:pos+n]; pos+=n
+              if typ==b"JSON": gltf=json.loads(chunk.decode("utf-8"))
+          nodes=gltf.get("nodes",[])
+          print("NODES",len(nodes),"MESHES",len(gltf.get("meshes",[])))
+          print("DOOR CANDIDATES")
+          for i,n in enumerate(nodes):
+              name=n.get("name","")
+              low=name.lower()
+              if any(k in low for k in ("door","porte","puerta","pintu","gate","entrance")):
+                  print(i, json.dumps(n, ensure_ascii=False))
+          print("ALL NAMED NODES")
+          for i,n in enumerate(nodes):
+              if n.get("name"):
+                  print(i, n["name"], "mesh", n.get("mesh"), "children", n.get("children",[]))
+          PY
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
