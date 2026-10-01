@@ -61,6 +61,7 @@ scene.fog=new THREE.Fog(0x030302,14,lowEndDevice?46:62);
 
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
 const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
+if(HOUSE_ONLY_LEVEL) world.root.visible=false;
 
 const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,.08);
 scene.add(hemi);
@@ -88,6 +89,7 @@ player.hands.visible=true;
 // ---------------------------------------------------------------------------
 // The uploaded house is kept separate from the procedural world so it can
 // become a real level later without rewriting the current map.
+const HOUSE_ONLY_LEVEL=true;
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
 const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
 const HOUSE_TARGET_HEIGHT=7.2;
@@ -119,6 +121,7 @@ housePortalRing.position.y=-.84;
 housePortalGroup.add(housePortal,housePortalRing);
 
 housePortalGroup.position.copy(HOUSE_TEST_PORTAL_POSITION);
+housePortalGroup.visible=false;
 scene.add(housePortalGroup);
 
 const housePortalLight=new THREE.PointLight(0xc6a85c,3.5,8,2);
@@ -127,6 +130,7 @@ housePortalLight.position.set(
   HOUSE_TEST_PORTAL_POSITION.y+0.5,
   HOUSE_TEST_PORTAL_POSITION.z-0.4
 );
+housePortalLight.visible=false;
 scene.add(housePortalLight);
 
 const houseExitPortal=housePortal.clone();
@@ -293,9 +297,11 @@ function loadHouse(){
         if(!obj.isMesh) return;
         const meshBox=new THREE.Box3().setFromObject(obj);
         const meshSize=meshBox.getSize(new THREE.Vector3());
-        // Skip paper-thin floors/ceilings and giant encompassing meshes.
+        // Skip floors/ceilings, giant encompassing meshes, and tiny decoration.
         if(meshSize.y<0.18) return;
         if(meshSize.x>45 && meshSize.z>45) return;
+        if(meshSize.x>8 && meshSize.z>8 && meshSize.y<0.8) return;
+        if(meshSize.x<0.22 && meshSize.z<0.22) return;
         houseCollisionBoxes.push(meshBox);
       });
 
@@ -309,10 +315,9 @@ function loadHouse(){
       houseLoaded=true;
       houseFill.position.set(box.min.x,box.max.y,box.min.z);
       houseKey.position.set(box.min.x,box.max.y,box.min.z);
-      objective.textContent="Test pad ready. Press E to enter the house.";
-      eventText.textContent="HOUSE TEST LEVEL READY";
-      eventText.style.opacity="1";
-      setTimeout(()=>{eventText.style.opacity="0";},2200);
+      player.ceilingHeight=box.max.y;
+      objective.textContent="Explore the house.";
+      if(HOUSE_ONLY_LEVEL) setHouseMode(true);
     },
     xhr=>{
       if(xhr.total){
@@ -333,68 +338,31 @@ function loadHouse(){
 }
 
 function setHouseMode(enabled){
-  if(enabled && !houseLoaded) return;
-  houseMode=enabled;
+  if(!houseLoaded) return;
+  houseMode=true;
 
-  world.root.visible=!houseMode;
-  housePortalGroup.visible=!houseMode;
-  housePortalLight.visible=!houseMode;
-  houseExitPortal.visible=houseMode;
-  houseExitPortalLight.visible=houseMode;
+  world.root.visible=false;
+  housePortalGroup.visible=false;
+  housePortalLight.visible=false;
+  houseExitPortal.visible=false;
+  houseExitPortalLight.visible=false;
 
-  if(houseModel) houseModel.visible=houseMode;
-  houseDebugBounds.visible=houseMode;
+  if(houseModel) houseModel.visible=true;
+  houseDebugBounds.visible=false;
 
-  houseFill.intensity=houseMode?1.35:0;
-  houseKey.intensity=houseMode?1.6:0;
+  houseFill.intensity=1.15;
+  houseKey.intensity=1.0;
 
-  player.ignoreWorldCollision=houseMode;
+  player.ignoreWorldCollision=true;
+  player.extraCollisionBoxes=houseCollisionBoxes;
 
   figure.visible=false;
   figureLife=0;
 
-  if(houseMode){
-    player.pos.set(houseSpawn.x,houseSpawn.y-EYE,houseSpawn.z);
-    player.jumpY=0;
-    player.jumpVelocity=0;
-    houseExitPortal.position.set(houseSpawn.x,houseSpawn.y-0.7,houseSpawn.z);
-    houseExitPortalLight.position.set(houseSpawn.x,houseSpawn.y+0.2,houseSpawn.z-0.4);
-    objective.textContent="Explore the house. Press E at the glowing test pad to return.";
-    eventText.textContent="HOUSE TEST LEVEL";
-    eventText.style.opacity="1";
-    setTimeout(()=>{eventText.style.opacity="0";},1600);
-  }else{
-    player.pos.set(32, EYE, 32);
-    player.jumpY=0;
-    player.jumpVelocity=0;
-    houseExitPortal.visible=false;
-    houseExitPortalLight.visible=false;
-    objective.textContent=STORY[storyStage].objective;
-  }
-}
-
-function tryHouseTeleport(){
-  if(!houseLoaded){
-    eventText.textContent="HOUSE STILL LOADING...";
-    eventText.style.opacity="1";
-    setTimeout(()=>{eventText.style.opacity="0";},1200);
-    return;
-  }
-
-  if(houseMode){
-    const d=Math.hypot(
-      player.pos.x-houseSpawn.x,
-      player.pos.z-houseSpawn.z
-    );
-    if(d<2.6) setHouseMode(false);
-    return;
-  }
-
-  const d=Math.hypot(
-    player.pos.x-HOUSE_TEST_PORTAL_POSITION.x,
-    player.pos.z-HOUSE_TEST_PORTAL_POSITION.z
-  );
-  if(d<3.0) setHouseMode(true);
+  player.pos.set(houseSpawn.x,houseSpawn.y-EYE,houseSpawn.z);
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  objective.textContent="Explore the house.";
 }
 
 loadHouse();
@@ -531,7 +499,7 @@ const bacteriaAnimationPaths={
   attack:"./assets/bacteria/generated/bacteria_attack.glb"
 };
 
-for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
+if(!HOUSE_ONLY_LEVEL) for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
   bacteriaLoader.load(
     path,
     (gltf)=>{
@@ -553,10 +521,10 @@ for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
       bacteriaModels.set(name,{model,gltf});
       bacteriaLoaded=true;
 
-      if(name==="stalk"){
+      if(!HOUSE_ONLY_LEVEL && name==="stalk"){
         setBacteriaAnimation("stalk");
         if(debugSpawnBacteria) spawnBacteriaAtPlayer();
-      }else if(!bacteriaState){
+      }else if(!HOUSE_ONLY_LEVEL && !bacteriaState){
         setBacteriaAnimation("idle");
       }
 
@@ -774,10 +742,6 @@ document.addEventListener("pointerlockchange",()=>{
 });
 
 document.addEventListener("keydown",e=>{
-  if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen){
-    tryHouseTeleport();
-    return;
-  }
   if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !phoneOpen && !controlsOpen){ newSeed(); }
@@ -828,8 +792,10 @@ function animate(){
 
   player.update(dt);
   if(!houseMode) updateStoryProgress();
-  world.update(player.pos.x,player.pos.z);
-  world.updateFlicker(t);
+  if(!houseMode){
+    world.update(player.pos.x,player.pos.z);
+    world.updateFlicker(t);
+  }
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
 
   if(flashlightOn && battery>0){
