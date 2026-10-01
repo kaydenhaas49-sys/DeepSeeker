@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-const SEND_INTERVAL = 0.05;
+const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
 
 export class Multiplayer {
@@ -259,9 +259,7 @@ export class Multiplayer {
       );
       head.position.y = 1.86;
 
-      const beacon = new THREE.PointLight(0xc9bc82, 0.7, 4.5, 2);
-      beacon.position.set(0, 1.65, 0);
-      group.add(body, head, beacon);
+      group.add(body, head);
       this.scene.add(group);
 
       remote = {
@@ -344,7 +342,10 @@ export class Multiplayer {
       remote.group.rotation.y = remote.current.yaw;
 
       const sameLevel = remote.current.level === (this.getLevel() ? "house" : "backrooms");
-      remote.group.visible = sameLevel;
+      const dx = remote.current.x - this.player.pos.x;
+      const dz = remote.current.z - this.player.pos.z;
+      const nearby = dx * dx + dz * dz < 60 * 60;
+      remote.group.visible = sameLevel && nearby;
 
       const targetBodyY = remote.current.crouched ? 0.72 : 1.0;
       remote.body.position.y += (targetBodyY - remote.body.position.y) * (1 - Math.exp(-12 * dt));
