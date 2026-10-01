@@ -86,13 +86,14 @@ let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
 let houseLoadFailed=false;
 
+const multiplayerStatus=document.getElementById("multiplayerStatus");
+
 const multiplayer=new Multiplayer({
   scene,
   player,
   getLevel:()=>houseMode,
   onStatus:(message)=>{
     if(!message){
-      eventText.style.opacity="0";
       return;
     }
     eventText.textContent=message;
@@ -105,6 +106,10 @@ const multiplayer=new Multiplayer({
         if(eventText.textContent===message) eventText.style.opacity="0";
       },1800);
     }
+  },
+  onCount:(count,max)=>{
+    multiplayerStatus.textContent="MULTIPLAYER · "+count+"/"+max;
+    multiplayerStatus.style.color=count>1 ? "#d8c98a" : "#8d8b76";
   }
 });
 
