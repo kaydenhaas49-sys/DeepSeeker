@@ -191,127 +191,90 @@ function pickIdleAnimation(clips){
   // createHazmatCharacter() freezes that pose immediately.
   return clips?.[0] || null;
 }
-function findBone(root, patterns){
-  const tests=Array.isArray(patterns)?patterns:[patterns];
+function findBone(root, pattern){
   let found=null;
-
   root.traverse(obj=>{
     if(found || !obj.isBone) return;
-    const name=(obj.name||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-    if(tests.some(pattern=>pattern.test(name))) found=obj;
+    if(pattern.test((obj.name || "").toLowerCase())) found=obj;
   });
-
   return found;
 }
 
-function poseScore(root){
-  const lShoulder=findBone(root,[/leftarm$/,/leftupperarm$/,/leftshoulder/]);
-  const rShoulder=findBone(root,[/rightarm$/,/rightupperarm$/,/rightshoulder/]);
-  const lHand=findBone(root,[/lefthand$/,/leftwrist$/]);
-  const rHand=findBone(root,[/righthand$/,/rightwrist$/]);
-  const lFoot=findBone(root,[/leftfoot$/,/leftankle$/]);
-  const rFoot=findBone(root,[/rightfoot$/,/rightankle$/]);
+function pointBoneToward(bone, targetDirection){
+  if(!bone) return false;
+  const child=bone.children.find(child=>child.isBone);
+  if(!child) return false;
 
-  const lp=new THREE.Vector3();
-  const rp=new THREE.Vector3();
-  const lh=new THREE.Vector3();
-  const rh=new THREE.Vector3();
-  const lf=new THREE.Vector3();
-  const rf=new THREE.Vector3();
+  bone.updateMatrixWorld(true);
+  child.updateMatrixWorld(true);
 
-  root.updateMatrixWorld(true);
+  const from=new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
+  const to=new THREE.Vector3().setFromMatrixPosition(child.matrixWorld);
+  const current=to.sub(from);
+  if(current.lengthSq()<1e-8) return false;
+  current.normalize();
 
-  if(lShoulder) lShoulder.getWorldPosition(lp);
-  if(rShoulder) rShoulder.getWorldPosition(rp);
-  if(lHand) lHand.getWorldPosition(lh);
-  if(rHand) rHand.getWorldPosition(rh);
-  if(lFoot) lFoot.getWorldPosition(lf);
-  if(rFoot) rFoot.getWorldPosition(rf);
+  const target=targetDirection.clone().normalize();
+  const delta=new THREE.Quaternion().setFromUnitVectors(current,target);
 
-  let score=0;
+  const worldQuat=new THREE.Quaternion();
+  bone.getWorldQuaternion(worldQuat);
+  worldQuat.premultiply(delta);
 
-  if(lShoulder && lHand){
-    const drop=Math.max(0,lp.y-lh.y);
-    const side=Math.abs(lh.x-lp.x);
-    const depth=Math.abs(lh.z-lp.z);
-    score += drop*4;
-    score -= side*1.5;
-    score -= depth*0.6;
+  if(bone.parent){
+    const parentWorld=new THREE.Quaternion();
+    bone.parent.getWorldQuaternion(parentWorld);
+    parentWorld.invert();
+    bone.quaternion.copy(parentWorld.multiply(worldQuat));
+  }else{
+    bone.quaternion.copy(worldQuat);
   }
 
-  if(rShoulder && rHand){
-    const drop=Math.max(0,rp.y-rh.y);
-    const side=Math.abs(rh.x-rp.x);
-    const depth=Math.abs(rh.z-rp.z);
-    score += drop*4;
-    score -= side*1.5;
-    score -= depth*0.6;
-  }
-
-  if(lFoot && rFoot){
-    score -= Math.abs(lf.y-rf.y)*4;
-  }
-
-  return score;
+  bone.updateMatrixWorld(true);
+  return true;
 }
 
-function findBestStandingTime(model, mixer, clip){
-  const samples=48;
-  let bestTime=0;
-  let bestScore=-Infinity;
+function applyNeutralStandingPose(model){
+  const leftArm=findBone(model,/(?:mixamorig[:._-]?)?leftarm$/i) ||
+               findBone(model,/left.*upper.*arm|upper.*arm.*left/i);
+  const rightArm=findBone(model,/(?:mixamorig[:._-]?)?rightarm$/i) ||
+                findBone(model,/right.*upper.*arm|upper.*arm.*right/i);
 
-  const action=mixer.clipAction(clip);
-  action.reset();
-  action.setLoop(THREE.LoopRepeat,Infinity);
-  action.play();
+  const leftForeArm=findBone(model,/(?:mixamorig[:._-]?)?leftforearm$/i) ||
+                    findBone(model,/left.*forearm|left.*lower.*arm/i);
+  const rightForeArm=findBone(model,/(?:mixamorig[:._-]?)?rightforearm$/i) ||
+                     findBone(model,/right.*forearm|right.*lower.*arm/i);
 
-  for(let i=0;i<samples;i++){
-    const t=(clip.duration*i)/samples;
-    mixer.setTime(t);
-    const score=poseScore(model);
-    if(score>bestScore){
-      bestScore=score;
-      bestTime=t;
-    }
-  }
+  // Drop the arms from the rig's T/rest position to a relaxed standing pose.
+  pointBoneToward(leftArm,new THREE.Vector3(0.10,-0.99,0.03));
+  model.updateMatrixWorld(true);
+  pointBoneToward(rightArm,new THREE.Vector3(-0.10,-0.99,0.03));
+  model.updateMatrixWorld(true);
 
-  mixer.setTime(bestTime);
-
-  return {action,bestTime,bestScore};
+  // Give the elbows a tiny natural bend rather than perfectly straight arms.
+  pointBoneToward(leftForeArm,new THREE.Vector3(0.08,-0.98,0.10));
+  model.updateMatrixWorld(true);
+  pointBoneToward(rightForeArm,new THREE.Vector3(-0.08,-0.98,0.10));
+  model.updateMatrixWorld(true);
 }
 
 export async function createHazmatCharacter(){
   const template = await loadHazmatCharacter();
-  const model = cloneSkeleton(templaexport async function createHazmatCharacter(){
-  const template = await loadHazmatCharacter();
   const model = cloneSkeleton(template.scene);
-  const mixer = new THREE.AnimationMixer(model);
 
-  // The GLB has no true idle clip. Its exported locomotion clip still contains
-  // a usable standing frame. Find the most standing-looking frame instead of
-  // falling back to the bind/T-pose or freezing a random running frame.
-  const clip = template.animations?.[0] || null;
-  let action=null;
-  let idleClip=null;
+  // Do not use the asset's single locomotion clip. It has no real idle
+  // animation, so any sampled frame looks like a frozen running pose.
+  // Instead, pose the rig itself into a neutral standing stance.
+  applyNeutralStandingPose(model);
 
-  if(clip){
-    const best=findBestStandingTime(model,mixer,clip);
-    action=best.action;
-    idleClip=clip;
-    action.time=best.bestTime;
-    action.paused=true;
-    mixer.setTime(best.bestTime);
-  }
-
-  const flashlight=attachFlashlight(model);
+  const flashlight = attachFlashlight(model);
 
   return {
     model,
-    mixer,
-    action,
+    mixer: null,
+    action: null,
     flashlight,
-    animations:template.animations,
-    idleClip
+    animations: template.animations,
+    idleClip: null
   };
 }
-
