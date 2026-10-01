@@ -39,6 +39,16 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 #overlay .sub{margin:0;font-size:13px;letter-spacing:4px;color:#9a8d5e}
 #overlay .prompt{margin:14px 0 0;font-size:17px;letter-spacing:3px;animation:pulse 1.6s ease-in-out infinite}
 #overlay .controls{font-size:12px;letter-spacing:2px;color:#80774f;line-height:1.9}
+#homeScreen,#lobbyScreen{width:min(520px,calc(100vw - 40px));display:flex;flex-direction:column;align-items:center;gap:12px}
+#homeScreen.hidden,#lobbyScreen.hidden{display:none}
+.menuTitle{font-size:11px;letter-spacing:4px;color:#8d8258;margin-bottom:6px}
+.menuButton{width:min(360px,86vw);padding:13px 16px;border:1px solid #ffffff18;border-radius:10px;background:#ffffff08;color:#ded6af;font:inherit;font-size:12px;letter-spacing:2px;cursor:pointer;transition:.15s}
+.menuButton:hover{background:#ffffff12;border-color:#d8c98a55;transform:translateY(-1px)}
+.menuButton.secondary{color:#99947d}
+.menuInput{width:min(360px,86vw);box-sizing:border-box;padding:13px 16px;border:1px solid #ffffff18;border-radius:10px;background:#050605;color:#e2ddbe;text-align:center;font:inherit;font-size:14px;letter-spacing:4px;outline:none}
+.menuInput:focus{border-color:#d8c98a66}
+.menuInfo{font-size:11px;letter-spacing:2px;color:#817b65;text-align:center;line-height:1.7}
+.roomCode{font-size:32px;letter-spacing:8px;color:#ece5bd;text-shadow:0 0 18px #d6be5a33}
 #phone{position:fixed;left:50%;bottom:6%;transform:translateX(-50%) translateY(115%);width:min(330px,82vw);aspect-ratio:.49;border:7px solid #090909;border-radius:30px;background:#050505;box-shadow:0 24px 80px #000,0 0 0 1px #ffffff16;z-index:15;opacity:0;pointer-events:none;transition:transform .22s ease,opacity .22s ease}
 #phone.open{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
 #phoneScreen{position:absolute;inset:7px;border-radius:22px;overflow:hidden;background:linear-gradient(180deg,#11130f 0%,#080907 100%);color:#dedbbf}
@@ -64,6 +74,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 #phoneCardTitle{font-size:11px;letter-spacing:2px;color:#aaa477;margin-bottom:8px}
 #phoneCardText{font-size:13px;line-height:1.55;color:#c6c5b6}
 #phoneSignal{margin-top:18px;font-size:9px;letter-spacing:2px;color:#67695b}
+#saveGameButton{margin-top:12px;width:100%;padding:10px;border:1px solid #ffffff14;border-radius:9px;background:#ffffff06;color:#aaa477;font:inherit;font-size:9px;letter-spacing:2px;cursor:pointer}
+#saveGameButton:hover{background:#ffffff10}
 #phoneStory{margin-top:18px;max-height:235px;overflow:auto;padding-right:3px}
 #phoneStory::-webkit-scrollbar{width:3px}
 #phoneStory::-webkit-scrollbar-thumb{background:#ffffff18;border-radius:9px}
@@ -106,6 +118,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
       </div>
       <div id="phoneStory"></div>
       <div id="phoneSignal">GPS UNAVAILABLE · NETWORK UNAVAILABLE</div>
+      <button id="saveGameButton" type="button">SAVE GAME</button>
       <button id="phoneHome" type="button" aria-label="Return to phone home"></button>
     </div>
   </div>
@@ -154,10 +167,30 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 </div>
 
 <div id="overlay">
-  <h1>DEEPSEEKER</h1>
-  <p class="sub">PROCEDURAL LIMINAL HORROR</p>
-  <p class="prompt" id="prompt">CLICK TO ENTER</p>
-  <p class="controls">WASD — move &nbsp;•&nbsp; SHIFT — run &nbsp;•&nbsp; F — flashlight &nbsp;•&nbsp; P — phone<br>C — crouch &nbsp;•&nbsp; TAB — controls &nbsp;•&nbsp; ESC — release cursor</p>
+  <div id="loadingScreen">
+    <h1>DEEPSEEKER</h1>
+    <p class="sub">PROCEDURAL LIMINAL HORROR</p>
+    <p class="prompt" id="prompt">LOADING HOUSE…</p>
+  </div>
+
+  <div id="homeScreen" class="hidden">
+    <div class="menuTitle">MAIN MENU</div>
+    <button id="newGameButton" class="menuButton">NEW GAME</button>
+    <button id="continueButton" class="menuButton">CONTINUE</button>
+    <button id="createLobbyButton" class="menuButton">CREATE LOBBY</button>
+    <button id="joinLobbyButton" class="menuButton secondary">JOIN LOBBY</button>
+    <div class="menuInfo" id="saveInfo">NO SAVE DATA</div>
+  </div>
+
+  <div id="lobbyScreen" class="hidden">
+    <div class="menuTitle" id="lobbyModeTitle">LOBBY</div>
+    <div class="roomCode" id="roomCode">------</div>
+    <div class="menuInfo">Share this room code with your friends.</div>
+    <div class="menuInfo" id="lobbyPlayers">PLAYERS 1/4</div>
+    <button id="startLobbyButton" class="menuButton">START GAME</button>
+    <button id="copyLobbyButton" class="menuButton secondary">COPY ROOM LINK</button>
+    <button id="leaveLobbyButton" class="menuButton secondary">BACK</button>
+  </div>
 </div>
 
 <script type="importmap">
