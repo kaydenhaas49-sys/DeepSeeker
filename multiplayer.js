@@ -4,11 +4,12 @@ const SEND_INTERVAL = 0.05;
 const REMOTE_LERP = 14;
 
 export class Multiplayer {
-  constructor({ scene, player, getLevel, onStatus }) {
+  constructor({ scene, player, getLevel, onStatus, onCount }) {
     this.scene = scene;
     this.player = player;
     this.getLevel = getLevel;
     this.onStatus = onStatus || (() => {});
+    this.onCount = onCount || (() => {});
 
     this.socket = null;
     this.room = this.getRoomName();
@@ -93,6 +94,7 @@ export class Multiplayer {
       }
       this.players.clear();
       this.playerId = null;
+      this.onCount(0, 4);
 
       if (!this.closedManually) {
         this.setStatus("MULTIPLAYER RECONNECTING...");
@@ -158,12 +160,14 @@ export class Multiplayer {
           if (!player?.id || player.id === this.playerId) continue;
           this.addOrUpdatePlayer(player);
         }
+        this.updateCount();
         break;
 
       case "player_joined":
       case "player_updated":
         if (data.player?.id && data.player.id !== this.playerId) {
           this.addOrUpdatePlayer(data.player);
+          this.updateCount();
         }
         break;
 
@@ -190,9 +194,14 @@ export class Multiplayer {
 
         this.scene.remove(remote.group);
         this.players.delete(data.id);
+        this.updateCount();
         break;
       }
     }
+  }
+
+  updateCount() {
+    this.onCount(Math.min(4, this.players.size + (this.playerId ? 1 : 0)), 4);
   }
 
   normalizeState(state) {
@@ -216,19 +225,23 @@ export class Multiplayer {
 
     if (!remote) {
       const material = new THREE.MeshStandardMaterial({
-        color: 0x111111,
-        roughness: 1,
+        color: 0x8f8a6c,
+        emissive: 0x3f3b2d,
+        emissiveIntensity: 1.35,
+        roughness: 0.95,
         metalness: 0,
         transparent: true,
-        opacity: 0.88,
+        opacity: 0.95,
       });
 
       const headMaterial = new THREE.MeshStandardMaterial({
-        color: 0x020202,
-        roughness: 1,
+        color: 0xd1c79b,
+        emissive: 0x514b35,
+        emissiveIntensity: 1.7,
+        roughness: 0.9,
         metalness: 0,
         transparent: true,
-        opacity: 0.92,
+        opacity: 0.98,
       });
 
       const group = new THREE.Group();
@@ -246,7 +259,9 @@ export class Multiplayer {
       );
       head.position.y = 1.86;
 
-      group.add(body, head);
+      const beacon = new THREE.PointLight(0xc9bc82, 0.7, 4.5, 2);
+      beacon.position.set(0, 1.65, 0);
+      group.add(body, head, beacon);
       this.scene.add(group);
 
       remote = {
