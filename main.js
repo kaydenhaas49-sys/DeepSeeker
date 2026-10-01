@@ -35,9 +35,23 @@ dracoLoader.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.165.0/examples/
 gltfLoader.setDRACOLoader(dracoLoader);
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
-const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
+// Automatically switch to a cheaper render path on low-end Chromebooks.
+// ?quality=low can force the cheap path for testing.
+const qualityParam=new URLSearchParams(location.search).get("quality");
+const lowEndDevice=
+  qualityParam==="low" ||
+  ((navigator.deviceMemory||8)<=4 && (navigator.hardwareConcurrency||8)<=6) ||
+  (navigator.hardwareConcurrency||8)<=4;
+const pixelRatio=lowEndDevice
+  ? Math.min(devicePixelRatio,1.0)
+  : Math.min(devicePixelRatio,1.6);
+
+const renderer=new THREE.WebGLRenderer({
+  antialias:!lowEndDevice,
+  powerPreference:lowEndDevice ? "default" : "high-performance"
+});
 renderer.setSize(innerWidth,innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(pixelRatio);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.08;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -45,7 +59,7 @@ container.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x000100);
-scene.fog=new THREE.Fog(0x030302,14,62);
+scene.fog=new THREE.Fog(0x030302,14,lowEndDevice?46:62);
 
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
 const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
@@ -59,8 +73,8 @@ const playerLight=new THREE.PointLight(0xb59b68,2.0,24,1.9);
 scene.add(playerLight);
 
 const flashlight=new THREE.SpotLight(0xf0dfad,27,60,Math.PI/6,.82,1.5);
-flashlight.castShadow=true;
-flashlight.shadow.mapSize.set(512,512);
+flashlight.castShadow=!lowEndDevice;
+flashlight.shadow.mapSize.set(lowEndDevice?256:512,lowEndDevice?256:512);
 flashlight.target.position.set(0,0,-60);
 camera.add(flashlight);
 camera.add(flashlight.target);
@@ -132,7 +146,7 @@ scene.add(houseFill);
 
 const houseKey=new THREE.DirectionalLight(0xfff1d2,0);
 houseKey.name="HouseInteriorKey";
-houseKey.castShadow=true;
+houseKey.castShadow=false;
 houseKey.shadow.mapSize.set(1024,1024);
 houseKey.position.set(20,18,10);
 scene.add(houseKey);
