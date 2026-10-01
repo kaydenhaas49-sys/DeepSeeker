@@ -164,8 +164,12 @@ export function generateChunk(cx, cz, seed) {
 // Chunk meshes + chunk manager
 // ---------------------------------------------------------------------------
 
-const R_GENERATE = 2; // keep chunks within this Chebyshev radius
-const R_DISPOSE = 3; // ...and drop anything farther than this
+const LOW_END_DEVICE=
+  ((navigator.deviceMemory||8)<=4 && (navigator.hardwareConcurrency||8)<=6) ||
+  (navigator.hardwareConcurrency||8)<=4 ||
+  new URLSearchParams(location.search).get("quality")==="low";
+const R_GENERATE = LOW_END_DEVICE ? 1 : 2;
+const R_DISPOSE = LOW_END_DEVICE ? 1 : 3;
 const PANEL_W = 2.2; // light fixture size (m)
 const PANEL_D = 0.5;
 const PANEL_SPACING = 22; // m between fixtures; enough lights to read the architecture
@@ -267,7 +271,7 @@ export class World {
       }
     }
     missing.sort((a, b) => a[2] - b[2]);
-    let budget = 2;
+    let budget = LOW_END_DEVICE ? 1 : 2;
     for (const [cx, cz] of missing) {
       if (budget-- <= 0) break;
       this.spawnChunk(cx, cz);
