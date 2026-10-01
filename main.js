@@ -56,7 +56,13 @@ gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setSize(innerWidth,innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+
+const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,1.25);
+let currentPixelRatio=BASE_PIXEL_RATIO;
+let perfElapsed=0;
+let perfFrames=0;
+let perfCooldown=0;
+renderer.setPixelRatio(currentPixelRatio);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.08;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -78,8 +84,9 @@ const playerLight=new THREE.PointLight(0xb59b68,2.0,24,1.9);
 scene.add(playerLight);
 
 const flashlight=new THREE.SpotLight(0xf0dfad,30,60,Math.PI/5.5,.88,1.5);
-flashlight.castShadow=true;
-flashlight.shadow.mapSize.set(512,512);
+const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
+flashlight.castShadow=ENABLE_SHADOWS;
+if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
 flashlight.target.position.set(0,0,-60);
 camera.add(flashlight);
 camera.add(flashlight.target);
@@ -842,7 +849,7 @@ function setHouseMode(enabled){
   figureLife=0;
 
   if(houseMode){
-    renderer.setPixelRatio(1);
+    renderer.setPixelRatio(Math.min(currentPixelRatio,1.0));
     flashlight.castShadow=false;
     playerLight.intensity=1.0;
 
@@ -859,8 +866,8 @@ function setHouseMode(enabled){
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},1400);
   }else{
-    renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-    flashlight.castShadow=true;
+    renderer.setPixelRatio(currentPixelRatio);
+    flashlight.castShadow=ENABLE_SHADOWS;
     playerLight.intensity=2.0;
 
     player.pos.set(32,EYE,32);
@@ -1404,6 +1411,35 @@ function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05);
   const t=clock.elapsedTime;
+
+  perfElapsed+=dt;
+  perfFrames++;
+  perfCooldown=Math.max(0,perfCooldown-dt);
+
+  if(perfElapsed>=0.5){
+    const fps=perfFrames/perfElapsed;
+    perfElapsed=0;
+    perfFrames=0;
+
+    if(perfCooldown<=0){
+      let nextRatio=currentPixelRatio;
+
+      if(fps<42){
+        nextRatio=Math.max(0.8,currentPixelRatio-0.1);
+      }else if(fps>58){
+        nextRatio=Math.min(BASE_PIXEL_RATIO,currentPixelRatio+0.1);
+      }
+
+      if(Math.abs(nextRatio-currentPixelRatio)>=0.05){
+        currentPixelRatio=Number(nextRatio.toFixed(2));
+        renderer.setPixelRatio(houseMode
+          ? Math.min(currentPixelRatio,1.0)
+          : currentPixelRatio
+        );
+        perfCooldown=2.0;
+      }
+    }
+  }
 
   if(houseMode){
     updateHouseDoors(dt);
