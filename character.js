@@ -185,70 +185,11 @@ export function attachFlashlight(model){
   return flashlight;
 }
 
-function animationMotionScore(clip){
-  let total=0;
-  let samples=0;
-
-  for(const track of clip.tracks || []){
-    const values=track.values;
-    if(!values || values.length<2) continue;
-
-    const itemSize=track.getValueSize();
-    for(let i=itemSize;i<values.length;i+=itemSize){
-      let delta=0;
-      for(let k=0;k<itemSize;k++){
-        delta += Math.abs(values[i+k]-values[i-itemSize+k]);
-      }
-      total += delta / itemSize;
-      samples++;
-    }
-  }
-
-  return samples ? total / samples : Infinity;
-}
-
 function pickIdleAnimation(clips){
-  if(!clips || !clips.length) return null;
-
-  const ranked=clips.map((clip,index)=>{
-    const name=(clip.name || "").toLowerCase();
-
-    let score=0;
-
-    // Explicit naming always wins.
-    if(/idle|standing|stand|rest|neutral|breath/.test(name)) score+=10000;
-
-    // Never deliberately choose locomotion/action clips for the idle pose.
-    if(/run|running|sprint|walk|walking|jog|move|locomot|crawl|charge/.test(name)) score-=10000;
-    if(/jump|fall|attack|hit|death|crouch|roll|slide/.test(name)) score-=8000;
-
-    // Idle clips are commonly longer and have much less frame-to-frame motion.
-    if(clip.duration>=1.5) score+=100;
-    if(clip.duration>=2.5) score+=50;
-
-    const motion=animationMotionScore(clip);
-    if(Number.isFinite(motion)){
-      score += 250 / (1 + motion * 20);
-    }
-
-    score -= index * 0.01;
-
-    return {clip,score,motion};
-  });
-
-  ranked.sort((a,b)=>b.score-a.score);
-
-  console.log(
-    "[DeepSeeker] hazmat animations:",
-    ranked.map(item=>({
-      name:item.clip.name || "(unnamed)",
-      duration:Number(item.clip.duration.toFixed(2)),
-      motion:Number.isFinite(item.motion) ? Number(item.motion.toFixed(5)) : null,
-      score:Number(item.score.toFixed(2))
-    }))
-  );
-
-  return ranked[0]?.clip || clips[0];
+  // This hazmat asset exports one animation clip and it is a locomotion
+  // cycle, not a true idle. Use it only to establish a useful standing pose;
+  // createHazmatCharacter() freezes that pose immediately.
+  return clips?.[0] || null;
 }
 
 export async function createHazmatCharacter(){
@@ -262,7 +203,14 @@ export async function createHazmatCharacter(){
   if(idleClip){
     action = mixer.clipAction(idleClip);
     action.setLoop(THREE.LoopRepeat, Infinity);
+    action.reset();
+
+    // Sample a single frame from the exported locomotion clip and freeze it.
+    // This prevents the character from constantly running while idle.
+    action.time = Math.min(idleClip.duration * 0.08, 0.18);
     action.play();
+    action.paused = true;
+    mixer.update(0);
   }
 
   const flashlight = attachFlashlight(model);
