@@ -13,6 +13,8 @@ const PLAYER_RADIUS = 0.4; // m
 const MOUSE_SENS = 0.0022;
 const ACCEL = 12; // velocity smoothing (per second)
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
+const JUMP_SPEED = 3.2;
+const JUMP_GRAVITY = 20;
 
 export class Player {
   constructor(camera, domElement, world) {
@@ -67,7 +69,7 @@ export class Player {
       if(e.repeat && (e.code === "KeyC" || e.code === "Space")) return;
       if(e.code === "KeyC" && this.locked) this.crouched = !this.crouched;
       if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched){
-        this.jumpVelocity = 4.8;
+        this.jumpVelocity = JUMP_SPEED;
         this.stamina = Math.max(0, this.stamina - 8);
       }
       this.keys.add(e.code);
@@ -95,8 +97,10 @@ export class Player {
 
     this.characterRoot = new THREE.Group();
     this.characterRoot.name = "BackroomsHazmatCharacter";
-    this.characterRoot.position.set(0,-1.58,-0.08);
-    this.characterRoot.scale.setScalar(0.94);
+    // Keep the full-body model slightly in front of the camera so its
+    // forearms/hands are visible without putting the camera inside it.
+    this.characterRoot.position.set(0,-1.34,-0.72);
+    this.characterRoot.scale.setScalar(0.98);
     this.characterRoot.renderOrder = 1000;
     this.hands.add(this.characterRoot);
 
@@ -129,10 +133,14 @@ export class Player {
           for(const mat of mats){
             if(!mat) continue;
             mat.toneMapped=true;
+            // First-person camera sits very close to the body.
+            // Double-sided materials prevent the inside of the hazmat suit
+            // from disappearing due to backface culling.
+            mat.side=THREE.DoubleSide;
           }
 
-          // Keep the camera out of the head/face geometry in first person.
-          if(obj.name && /head|face|gasmask|mask/i.test(obj.name)){
+          // Hide the head so the camera never intersects the face/helmet.
+          if(obj.name && /head|face|gasmask|mask|helmet/i.test(obj.name)){
             obj.visible=false;
           }
         });
@@ -143,6 +151,7 @@ export class Player {
         const scale=1.78/height;
 
         model.scale.multiplyScalar(scale);
+        model.rotation.y=Math.PI;
 
         const scaledBox=new THREE.Box3().setFromObject(model);
         const scaledCenter=scaledBox.getCenter(new THREE.Vector3());
@@ -465,7 +474,7 @@ export class Player {
     // --- camera ---
     const targetEye = this.crouched ? 1.12 : EYE;
 
-    this.jumpVelocity -= 18 * dt;
+    this.jumpVelocity -= JUMP_GRAVITY * dt;
     this.jumpY += this.jumpVelocity * dt;
 
     // Keep the camera safely below the ceiling even if the map ceiling changes.
