@@ -83,7 +83,7 @@ const bacteriaModels=new Map();
 const bacteriaMixers=new Map();
 let bacteriaState="";
 let generatedBacteriaFailures=0;
-const debugSpawnBacteria=true;
+const debugSpawnBacteria=false;
 
 function fitBacteriaModel(model){
   model.traverse((obj)=>{
@@ -108,18 +108,25 @@ function fitBacteriaModel(model){
 }
 
 function setBacteriaAnimation(name){
-  if(bacteriaState===name) return;
-  const entry=bacteriaModels.get(name);
+  const actualName=bacteriaModels.has(name)
+    ? name
+    : bacteriaModels.has("idle")
+      ? "idle"
+      : bacteriaModels.keys().next().value;
+
+  if(!actualName || bacteriaState===actualName) return;
+
+  const entry=bacteriaModels.get(actualName);
   if(!entry) return;
 
   for(const [key,item] of bacteriaModels){
-    item.model.visible=key===name;
+    item.model.visible=key===actualName;
   }
 
   for(const [key,mixer] of bacteriaMixers){
     const action=mixer._bacteriaAction;
     if(!action) continue;
-    if(key===name){
+    if(key===actualName){
       action.reset();
       action.play();
     }else{
@@ -127,7 +134,7 @@ function setBacteriaAnimation(name){
     }
   }
 
-  bacteriaState=name;
+  bacteriaState=actualName;
 }
 
 function spawnBacteriaAtPlayer(){
@@ -423,12 +430,15 @@ document.addEventListener("pointerlockchange",()=>{
 });
 
 document.addEventListener("keydown",e=>{
-  if(e.code==="KeyF" && !phoneOpen) toggleFlashlight();
-  else if(e.code==="KeyM" && !phoneOpen){ muted=audio.toggleMute(); }
-  else if(e.code==="KeyN" && !phoneOpen){ newSeed(); }
-  else if(e.code==="KeyP" && !e.repeat) togglePhone();
-  else if(e.code==="Tab"){
+  if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
+  else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
+  else if(e.code==="KeyN" && !phoneOpen && !controlsOpen){ newSeed(); }
+  else if(e.code==="KeyP" && !e.repeat){
+    if(controlsOpen) hideControls();
+    else togglePhone();
+  }else if(e.code==="Tab"){
     e.preventDefault();
+    if(phoneOpen) return;
     controlsOpen?hideControls():showControls();
   }
 });
@@ -450,7 +460,10 @@ function triggerEvent(){
   objective.textContent=Math.random()>.5 ? "Something moved nearby." : "The lights don't feel right.";
   eventText.textContent=Math.random()>.5 ? "DID YOU HEAR THAT?" : "THE LIGHTS ARE FLICKERING";
   eventText.style.opacity="1";
-  setTimeout(()=>{eventText.style.opacity="0";},1800);
+  setTimeout(()=>{
+    eventText.style.opacity="0";
+    objective.textContent=STORY[storyStage].objective;
+  },1800);
 }
 
 addEventListener("resize",()=>{
