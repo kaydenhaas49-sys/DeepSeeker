@@ -4,12 +4,13 @@ const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
 
 export class Multiplayer {
-  constructor({ scene, player, getLevel, onStatus, onCount }) {
+  constructor({ scene, player, getLevel, onStatus, onCount, onRoster }) {
     this.scene = scene;
     this.player = player;
     this.getLevel = getLevel;
     this.onStatus = onStatus || (() => {});
     this.onCount = onCount || (() => {});
+    this.onRoster = onRoster || (() => {});
 
     this.socket = null;
     this.room = this.getRoomName();
@@ -204,6 +205,14 @@ export class Multiplayer {
 
   updateCount() {
     this.onCount(Math.min(4, this.players.size + (this.playerId ? 1 : 0)), 4);
+    this.onRoster([
+      {id:this.playerId, name:this.getPlayerName(), self:true},
+      ...Array.from(this.players.values()).map(remote=>({
+        id:remote.id,
+        name:remote.name || "Player",
+        self:false,
+      })),
+    ]);
   }
 
   normalizeState(state) {
