@@ -527,8 +527,8 @@ function buildHouseCollisionProxies(root){
   });
 
   // Keep collision cheap even if the source GLB has hundreds of tiny wall pieces.
-  if(houseCollisionBoxes.length>220){
-    houseCollisionBoxes.splice(220);
+  if(houseCollisionBoxes.length>800){
+    houseCollisionBoxes.splice(800);
   }
 
   console.log("[DeepSeeker] house collision proxies:",houseCollisionBoxes.length);
@@ -547,19 +547,34 @@ function prepareHouseRenderCulling(root){
 }
 
 function updateHouseRenderCulling(x,z){
-  const maxDistance=34;
-  const maxDistanceSq=maxDistance*maxDistance;
+  const maxDistance=22;
+  const candidates=[];
 
   for(const mesh of houseRenderMeshes){
     const p=mesh.userData.houseCullCenter;
     if(!p){
-      mesh.visible=true;
+      mesh.visible=false;
       continue;
     }
+
     const dx=p.x-x;
     const dz=p.z-z;
     const r=mesh.userData.houseCullRadius||0;
-    mesh.visible=dx*dx+dz*dz <= (maxDistance+r)*(maxDistance+r);
+    const distanceSq=dx*dx+dz*dz;
+
+    if(distanceSq <= (maxDistance+r)*(maxDistance+r)){
+      candidates.push({mesh,distanceSq});
+    }
+
+    mesh.visible=false;
+  }
+
+  candidates.sort((a,b)=>a.distanceSq-b.distanceSq);
+
+  // Keep the active house draw budget bounded.
+  const limit=450;
+  for(let i=0;i<Math.min(limit,candidates.length);i++){
+    candidates[i].mesh.visible=true;
   }
 }
 
@@ -680,7 +695,7 @@ function loadHouse(){
 
         for(const material of materials){
           if(!material) continue;
-          material.side=THREE.DoubleSide;
+          material.side=THREE.FrontSide;
           material.toneMapped=true;
         }
       });
@@ -815,6 +830,10 @@ function setHouseMode(enabled){
   figureLife=0;
 
   if(houseMode){
+    renderer.setPixelRatio(1);
+    flashlight.castShadow=false;
+    playerLight.intensity=1.0;
+
     player.pos.copy(houseSpawn);
     updateHouseRenderCulling(houseSpawn.x,houseSpawn.z);
     player.vel.set(0,0,0);
@@ -828,6 +847,10 @@ function setHouseMode(enabled){
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},1400);
   }else{
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    flashlight.castShadow=true;
+    playerLight.intensity=2.0;
+
     player.pos.set(32,EYE,32);
     player.vel.set(0,0,0);
     player.jumpY=0;
