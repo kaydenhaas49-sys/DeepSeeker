@@ -222,6 +222,7 @@ function loadHouse(){
       houseModel=gltf.scene;
       houseModel.name="DeepSeekerHouse";
       houseModel.visible=false;
+      scene.add(houseModel);
       let houseMeshCount=0;
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
