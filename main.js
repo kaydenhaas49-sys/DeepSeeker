@@ -181,39 +181,55 @@ function estimateHouseFloorY(x,z,bounds){
 function findHouseSpawn(bounds){
   const center=bounds.getCenter(new THREE.Vector3());
   const size=bounds.getSize(new THREE.Vector3());
-  const floorY=estimateHouseFloorY(center.x,center.z,bounds);
-  const maxX=size.x*0.28;
-  const maxZ=size.z*0.28;
+  const floorY=bounds.min.y;
 
+  // Search the middle of the imported house for an open interior spot.
+  // Only house wall collision boxes are considered, so furniture does not
+  // accidentally make the spawn appear outside or inside decoration.
   const candidates=[];
-  for(let z=-maxZ;z<=maxZ;z+=1.5){
-    for(let x=-maxX;x<=maxX;x+=1.5){
+  const maxX=Math.max(2,size.x*0.22);
+  const maxZ=Math.max(2,size.z*0.22);
+  for(let z=-maxZ;z<=maxZ;z+=1){
+    for(let x=-maxX;x<=maxX;x+=1){
       candidates.push(new THREE.Vector3(center.x+x,0,center.z+z));
     }
   }
-  candidates.sort((a,b)=>Math.hypot(a.x-center.x,a.z-center.z)-Math.hypot(b.x-center.x,b.z-center.z));
+
+  let best=null;
+  let bestScore=-Infinity;
 
   for(const candidate of candidates){
+    const floor=estimateHouseFloorY(candidate.x,candidate.z,bounds);
+    if(!Number.isFinite(floor)) continue;
+
+    let nearestWall=Infinity;
     let blocked=false;
+
     for(const box of houseCollisionBoxes){
-      if(boxContainsPlayer(box,candidate.x,candidate.z)) {
+      const nx=Math.max(box.min.x,Math.min(candidate.x,box.max.x));
+      const nz=Math.max(box.min.z,Math.min(candidate.z,box.max.z));
+      const d=Math.hypot(candidate.x-nx,candidate.z-nz);
+      nearestWall=Math.min(nearestWall,d);
+      if(d<0.85){
         blocked=true;
         break;
       }
     }
-    if(!blocked) {
-      const localFloorY=estimateHouseFloorY(candidate.x,candidate.z,bounds);
-      return new THREE.Vector3(
-        candidate.x,
-        (Number.isFinite(localFloorY) ? localFloorY : floorY) + EYE,
-        candidate.z
-      );
+
+    if(blocked) continue;
+
+    // Prefer positions near the middle of the house with lots of clearance.
+    const centerDistance=Math.hypot(candidate.x-center.x,candidate.z-center.z);
+    const score=nearestWall-centerDistance*0.03;
+
+    if(score>bestScore){
+      bestScore=score;
+      best=new THREE.Vector3(candidate.x,floor+EYE,candidate.z);
     }
   }
 
-  return new THREE.Vector3(center.x,floorY+EYE,center.z);
+  return best || new THREE.Vector3(center.x,floorY+EYE,center.z);
 }
-
 function loadHouse(){
   const houseUrl=new URL(HOUSE_MODEL_PATH,import.meta.url).href;
   gltfLoader.load(
@@ -279,11 +295,19 @@ function loadHouse(){
       houseCollisionBoxes.length=0;
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
+
         const meshBox=new THREE.Box3().setFromObject(obj);
         const meshSize=meshBox.getSize(new THREE.Vector3());
-        // Skip paper-thin floors/ceilings and giant encompassing meshes.
-        if(meshSize.y<0.18) return;
+
+        // Only use substantial vertical wall-like meshes for collision.
+        // Furniture/decor is intentionally not treated as hard collision.
+        if(meshSize.y<1.2) return;
         if(meshSize.x>45 && meshSize.z>45) return;
+
+        const xWall=meshSize.x>1.4 && meshSize.z<0.8;
+        const zWall=meshSize.z>1.4 && meshSize.x<0.8;
+        if(!xWall && !zWall) return;
+
         houseCollisionBoxes.push(meshBox);
       });
 
@@ -297,8 +321,9 @@ function loadHouse(){
       houseLoaded=true;
       houseFill.position.set(box.min.x,box.max.y,box.min.z);
       houseKey.position.set(box.min.x,box.max.y,box.min.z);
-      objective.textContent="Test pad ready. Press E to enter the house.";
-      eventText.textContent="HOUSE TEST LEVEL READY";
+      houseModel.visible=false;
+      objective.textContent="A strange house is nearby. Find the glowing teleporter.";
+      eventText.textContent="HOUSE TELEPORTER READY";
       eventText.style.opacity="1";
       setTimeout(()=>{eventText.style.opacity="0";},2200);
     },
@@ -331,12 +356,13 @@ function setHouseMode(enabled){
   houseExitPortalLight.visible=houseMode;
 
   if(houseModel) houseModel.visible=houseMode;
-  houseDebugBounds.visible=houseMode;
+  houseDebugBounds.visible=false;
 
-  houseFill.intensity=houseMode?1.35:0;
-  houseKey.intensity=houseMode?1.6:0;
+  houseFill.intensity=houseMode?1.15:0;
+  houseKey.intensity=houseMode?1.0:0;
 
   player.ignoreWorldCollision=houseMode;
+  player.extraCollisionBoxes=houseMode ? houseCollisionBoxes : [];
 
   figure.visible=false;
   figureLife=0;
@@ -345,22 +371,26 @@ function setHouseMode(enabled){
     player.pos.set(houseSpawn.x,houseSpawn.y-EYE,houseSpawn.z);
     player.jumpY=0;
     player.jumpVelocity=0;
-    houseExitPortal.position.set(houseSpawn.x,houseSpawn.y-0.7,houseSpawn.z);
-    houseExitPortalLight.position.set(houseSpawn.x,houseSpawn.y+0.2,houseSpawn.z-0.4);
-    objective.textContent="Explore the house. Press E at the glowing test pad to return.";
-    eventText.textContent="HOUSE TEST LEVEL";
+    player.vel.set(0,0,0);
+
+    // Return pad is placed exactly where the player enters.
+    houseExitPortal.position.set(houseSpawn.x,houseSpawn.y-0.8,houseSpawn.z);
+    houseExitPortalLight.position.set(houseSpawn.x,houseSpawn.y+0.3,houseSpawn.z-0.4);
+
+    objective.textContent="Explore the house. Press E at the glowing return pad.";
+    eventText.textContent="HOUSE LEVEL";
     eventText.style.opacity="1";
-    setTimeout(()=>{eventText.style.opacity="0";},1600);
+    setTimeout(()=>{eventText.style.opacity="0";},1500);
   }else{
-    player.pos.set(32, EYE, 32);
+    player.pos.set(32,EYE,32);
     player.jumpY=0;
     player.jumpVelocity=0;
+    player.vel.set(0,0,0);
     houseExitPortal.visible=false;
     houseExitPortalLight.visible=false;
     objective.textContent=STORY[storyStage].objective;
   }
 }
-
 function tryHouseTeleport(){
   if(!houseLoaded){
     eventText.textContent="HOUSE STILL LOADING...";
