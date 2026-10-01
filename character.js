@@ -185,48 +185,70 @@ export function attachFlashlight(model){
   return flashlight;
 }
 
+function animationMotionScore(clip){
+  let total=0;
+  let samples=0;
+
+  for(const track of clip.tracks || []){
+    const values=track.values;
+    if(!values || values.length<2) continue;
+
+    const itemSize=track.getValueSize();
+    for(let i=itemSize;i<values.length;i+=itemSize){
+      let delta=0;
+      for(let k=0;k<itemSize;k++){
+        delta += Math.abs(values[i+k]-values[i-itemSize+k]);
+      }
+      total += delta / itemSize;
+      samples++;
+    }
+  }
+
+  return samples ? total / samples : Infinity;
+}
+
 function pickIdleAnimation(clips){
   if(!clips || !clips.length) return null;
 
-  const ranked = clips.map((clip, index)=>{
-    const name = (clip.name || "").toLowerCase().replace(/[\\s_-]+/g, "");
+  const ranked=clips.map((clip,index)=>{
+    const name=(clip.name || "").toLowerCase();
 
-    let score = 0;
+    let score=0;
 
-    // Prefer an explicitly named idle/standing animation.
-    if(/idle|standing|stand|rest|neutral|breath/.test(name)) score += 100;
+    // Explicit naming always wins.
+    if(/idle|standing|stand|rest|neutral|breath/.test(name)) score+=10000;
 
-    // Strongly avoid movement/action clips for the default pose.
-    if(/run|running|sprint|walk|walking|jog|move|locomot/.test(name)) score -= 120;
-    if(/jump|fall|attack|hit|death|crouch|roll|slide/.test(name)) score -= 100;
+    // Never deliberately choose locomotion/action clips for the idle pose.
+    if(/run|running|sprint|walk|walking|jog|move|locomot|crawl|charge/.test(name)) score-=10000;
+    if(/jump|fall|attack|hit|death|crouch|roll|slide/.test(name)) score-=8000;
 
-    // When names are generic (common with exported GLBs), prefer a
-    // reasonably sized clip over a tiny one-shot clip.
-    if(clip.duration >= 1.5 && clip.duration <= 6.0) score += 10;
-    if(clip.duration < 0.75) score -= 20;
+    // Idle clips are commonly longer and have much less frame-to-frame motion.
+    if(clip.duration>=1.5) score+=100;
+    if(clip.duration>=2.5) score+=50;
 
-    // Keep original order as a final tiebreaker.
+    const motion=animationMotionScore(clip);
+    if(Number.isFinite(motion)){
+      score += 250 / (1 + motion * 20);
+    }
+
     score -= index * 0.01;
 
-    return {clip, score};
+    return {clip,score,motion};
   });
 
   ranked.sort((a,b)=>b.score-a.score);
 
-  if(ranked[0].score >= 50) return ranked[0].clip;
+  console.log(
+    "[DeepSeeker] hazmat animations:",
+    ranked.map(item=>({
+      name:item.clip.name || "(unnamed)",
+      duration:Number(item.clip.duration.toFixed(2)),
+      motion:Number.isFinite(item.motion) ? Number(item.motion.toFixed(5)) : null,
+      score:Number(item.score.toFixed(2))
+    }))
+  );
 
-  // Some Sketchfab/GLTF exports use generic names for all clips.
-  // In that case, never leave the character in a T-pose: take the first
-  // clip that is not obviously locomotion/action.
-  const safe = ranked.find(({clip})=>{
-    const name = (clip.name || "").toLowerCase();
-    return !/run|running|sprint|walk|walking|jog|jump|fall|attack|hit|death|crouch|roll|slide|move|locomot/.test(name);
-  });
-
-  if(safe) return safe.clip;
-
-  // Last-resort fallback for files with completely generic clip names.
-  return clips[1] || clips[0];
+  return ranked[0]?.clip || clips[0];
 }
 
 export async function createHazmatCharacter(){
