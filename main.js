@@ -192,6 +192,7 @@ function applySavedGame(data){
 
   battery=Number.isFinite(data.battery)?THREE.MathUtils.clamp(data.battery,0,100):100;
   flashlightOn=data.flashlightOn!==false;
+  player.setFlashlightVisual(flashlightOn);
 
   const stage=Number.isInteger(data.storyStage)
     ?THREE.MathUtils.clamp(data.storyStage,0,STORY.length-1)
@@ -271,6 +272,7 @@ function resetForNewGame(){
   player.vel.set(0,0,0);
   battery=100;
   flashlightOn=true;
+  player.setFlashlightVisual(true);
   maxStoryDistance=0;
   setHouseMode(false);
   applyStoryStage(0,false);
@@ -1214,6 +1216,7 @@ function updateStoryProgress(){
 
 function toggleFlashlight(){
   flashlightOn=!flashlightOn;
+  player.setFlashlightVisual(flashlightOn);
 }
 function togglePhone(){
   phoneOpen=!phoneOpen;
@@ -1479,7 +1482,10 @@ function animate(){
   }else{
     battery=Math.min(100,battery+dt*2.0);
   }
-  if(battery<=0) flashlightOn=false;
+  if(battery<=0){
+    flashlightOn=false;
+    player.setFlashlightVisual(false);
+  }
 
   const flicker=.78+.22*Math.sin(t*17.1)*Math.sin(t*7.3);
   flashlight.intensity=flashlightOn ? 27.0*flicker : 0;
