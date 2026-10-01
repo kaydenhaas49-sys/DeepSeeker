@@ -41,6 +41,11 @@ export class Multiplayer {
   getServerUrl() {
     const params = new URLSearchParams(location.search);
     let value = params.get("server");
+    const hasRoom = Boolean((params.get("room") || "").trim());
+
+    // Multiplayer is opt-in. A normal solo/new-game URL must not silently
+    // join a shared public room.
+    if (!value && !hasRoom) return null;
 
     if (!value && (location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
       value = "ws://localhost:8787";
@@ -323,12 +328,6 @@ export class Multiplayer {
       this.lastSent = state;
       this.heartbeatTimer = 0;
 
-      if (force) {
-        this.socket.send(JSON.stringify({
-          type: "join",
-          name: this.getPlayerName(),
-        }));
-      }
     } catch {
       // Socket may have closed between the readyState check and send().
     }
