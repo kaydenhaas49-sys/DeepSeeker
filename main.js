@@ -78,7 +78,7 @@ player.hands.visible=true;
 // become a real level later without rewriting the current map.
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
 const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
-const HOUSE_TARGET_HEIGHT=32.0;
+const HOUSE_MODEL_SCALE=3.0;
 const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
 let houseModel=null;
 let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
@@ -136,13 +136,6 @@ houseKey.castShadow=false;
 houseKey.shadow.mapSize.set(1024,1024);
 houseKey.position.set(20,18,10);
 scene.add(houseKey);
-
-const houseDebugBounds=new THREE.Box3Helper(
-  new THREE.Box3(),
-  0xffd36a
-);
-houseDebugBounds.visible=false;
-scene.add(houseDebugBounds);
 
 const houseLights=[];
 const houseLightOffsets=[
@@ -257,17 +250,16 @@ function loadHouse(){
         throw new Error("House GLB loaded but contained no renderable meshes.");
       }
 
-      let box=new THREE.Box3().setFromObject(houseModel);
-      const size=box.getSize(new THREE.Vector3());
-      const scale=HOUSE_TARGET_HEIGHT/Math.max(size.y,0.001);
-      houseModel.scale.setScalar(scale);
+      // Only transform the imported GLB. The test room, portal, camera,
+      // and procedural world stay completely unchanged.
+      houseModel.scale.setScalar(HOUSE_MODEL_SCALE);
       houseModel.updateMatrixWorld(true);
 
-      box=new THREE.Box3().setFromObject(houseModel);
+      let box=new THREE.Box3().setFromObject(houseModel);
       const center=box.getCenter(new THREE.Vector3());
-      houseModel.position.x+=HOUSE_ORIGIN.x-center.x;
-      houseModel.position.z+=HOUSE_ORIGIN.z-center.z;
-      houseModel.position.y+=HOUSE_ORIGIN.y-box.min.y;
+      houseModel.position.x=HOUSE_ORIGIN.x-center.x;
+      houseModel.position.z=HOUSE_ORIGIN.z-center.z;
+      houseModel.position.y=HOUSE_ORIGIN.y-box.min.y;
       houseModel.updateMatrixWorld(true);
 
       box=new THREE.Box3().setFromObject(houseModel);
@@ -275,9 +267,6 @@ function loadHouse(){
       if(!Number.isFinite(box.min.x) || box.isEmpty()){
         throw new Error("House GLB produced an empty/invalid bounding box.");
       }
-
-      houseDebugBounds.box.copy(box);
-      houseDebugBounds.visible=true;
 
       // Keep imported materials visible even in the very dark horror scene.
       // The original textures/colors are retained; this is an exposure safeguard.
@@ -368,8 +357,6 @@ function setHouseMode(enabled){
   houseExitPortalLight.visible=houseMode;
 
   if(houseModel) houseModel.visible=houseMode;
-  houseDebugBounds.visible=houseMode;
-
   houseFill.intensity=houseMode?1.35:0;
   houseKey.intensity=houseMode?1.6:0;
   for(const item of houseLights) item.light.intensity=houseMode?1.2:0;
