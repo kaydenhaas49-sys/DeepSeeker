@@ -198,12 +198,75 @@ function findBone(root, patterns){
   return found;
 }
 
-function applyNeutralMixamoPose(model){
-  const left=findBone(model,[/mixamorigleftarm$/,/leftupperarm$/,/leftarm$/]);
-  const right=findBone(model,[/mixamorigrightarm$/,/rightupperarm$/,/rightarm$/]);
+function findDescendantBone(root, patterns){
+  return findBone(root, patterns);
+}
 
-  if(left) left.rotation.z += Math.PI/2;
-  if(right) right.rotation.z -= Math.PI/2;
+function getBoneChild(bone){
+  if(!bone) return null;
+  for(const child of bone.children){
+    if(child.isBone) return child;
+  }
+  return null;
+}
+
+function aimBoneAtWorldDirection(bone, worldDirection){
+  const child=getBoneChild(bone);
+  if(!bone || !child) return false;
+
+  const current=child.getWorldPosition(new THREE.Vector3())
+    .sub(bone.getWorldPosition(new THREE.Vector3()))
+    .normalize();
+
+  const target=worldDirection.clone().normalize();
+  if(current.lengthSq() < 1e-8 || target.lengthSq() < 1e-8) return false;
+
+  const delta=new THREE.Quaternion().setFromUnitVectors(current,target);
+  const worldQ=bone.getWorldQuaternion(new THREE.Quaternion());
+  worldQ.premultiply(delta);
+
+  if(bone.parent){
+    const parentQ=bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+    bone.quaternion.copy(parentQ.multiply(worldQ));
+  }else{
+    bone.quaternion.copy(worldQ);
+  }
+
+  return true;
+}
+
+function applyNeutralMixamoPose(model){
+  model.updateMatrixWorld(true);
+
+  const leftUpper=findBone(model,[
+    /mixamorigleftarm$/,/mixamorigleftupperarm$/,/leftupperarm$/,/leftarm$/
+  ]);
+  const rightUpper=findBone(model,[
+    /mixamorigrightarm$/,/mixamorigrightupperarm$/,/rightupperarm$/,/rightarm$/
+  ]);
+
+  const leftForearm=findBone(model,[
+    /mixamorigleftforearm$/,/leftforearm$/,/leftlowerarm$/,/leftelbow/
+  ]);
+  const rightForearm=findBone(model,[
+    /mixamorigrightforearm$/,/rightforearm$/,/rightlowerarm$/,/rightelbow/
+  ]);
+
+  // Do not assume a particular Mixamo Euler axis. Instead, aim each
+  // arm segment from its actual current bind-pose direction into a
+  // natural relaxed/downward pose.
+  const leftDown=new THREE.Vector3(-0.08,-0.98,-0.12).normalize();
+  const rightDown=new THREE.Vector3(0.08,-0.98,-0.12).normalize();
+  const leftHandDir=new THREE.Vector3(-0.12,-0.96,-0.22).normalize();
+  const rightHandDir=new THREE.Vector3(0.12,-0.96,-0.22).normalize();
+
+  aimBoneAtWorldDirection(leftUpper,leftDown);
+  aimBoneAtWorldDirection(rightUpper,rightDown);
+
+  model.updateMatrixWorld(true);
+
+  aimBoneAtWorldDirection(leftForearm,leftHandDir);
+  aimBoneAtWorldDirection(rightForearm,rightHandDir);
 
   model.updateMatrixWorld(true);
 }
