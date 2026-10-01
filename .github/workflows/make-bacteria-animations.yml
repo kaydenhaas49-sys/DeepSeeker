@@ -20,7 +20,7 @@ jobs:
       - name: Install Blender and Python dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender python3-numpy
+          sudo apt-get install -y blender python3-numpy python3-numpy
 
       - name: Generate animations
         env:
