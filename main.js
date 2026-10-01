@@ -83,6 +83,7 @@ let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
+let houseLoadFailed=false;
 
 const houseDoors=[];
 const houseDoorPattern=/door|doors|porte|puerta|pintu/i;
@@ -406,8 +407,10 @@ function loadHouse(){
       houseSpawn.set(0,EYE,0);
 
       houseLoaded=true;
+      houseLoadFailed=false;
       houseRoot.visible=false;
 
+      prompt.textContent="CLICK TO ENTER";
       objective.textContent="Find the glowing teleporter to the house.";
       eventText.textContent="HOUSE READY";
       eventText.style.opacity="1";
@@ -417,13 +420,17 @@ function loadHouse(){
       if(xhr.total){
         const percent=Math.round(xhr.loaded/xhr.total*100);
         objective.textContent="Loading house… "+percent+"%";
+        prompt.textContent="LOADING HOUSE… "+percent+"%";
       }else{
         objective.textContent="Loading house…";
+        prompt.textContent="LOADING HOUSE…";
       }
     },
     error=>{
       console.error("Failed to load house:",houseUrl,error);
       houseLoaded=false;
+      houseLoadFailed=true;
+      prompt.textContent="HOUSE FAILED TO LOAD";
       eventText.textContent="HOUSE FAILED TO LOAD";
       objective.textContent="House asset failed to load. Check the browser console.";
       eventText.style.opacity="1";
@@ -842,14 +849,24 @@ function newSeed(){
 }
 
 player.attach();
+prompt.textContent="LOADING HOUSE…";
 applyStoryStage(0,false);
 
 overlay.addEventListener("click",()=>{
+  if(!houseLoaded){
+    if(houseLoadFailed){
+      prompt.textContent="HOUSE FAILED TO LOAD";
+    }else{
+      prompt.textContent="PLEASE WAIT — HOUSE LOADING";
+    }
+    return;
+  }
   audio.start();
   player.lock();
 });
 
 renderer.domElement.addEventListener("click",()=>{
+  if(!houseLoaded) return;
   if(!phoneOpen && !controlsOpen && document.pointerLockElement!==renderer.domElement){
     audio.start();
     player.lock();
