@@ -163,63 +163,79 @@ export class Player {
     const left = makeArm(-1);
     const right = makeArm(1);
 
-    // Handheld flashlight viewmodel. This is visual-only; the real beam is
-    // still the camera SpotLight, so this adds almost no scene-light cost.
+    // Handheld flashlight viewmodel. The shape is deliberately long and
+    // unmistakably flashlight-like rather than weapon-like.
     const flashlight=new THREE.Group();
     flashlight.name="HeldFlashlight";
-    flashlight.position.set(0.57,-0.77,-1.09);
+    flashlight.position.set(0.50,-0.72,-1.12);
     flashlight.rotation.set(
-      THREE.MathUtils.degToRad(-12),
-      THREE.MathUtils.degToRad(2),
-      THREE.MathUtils.degToRad(3)
+      THREE.MathUtils.degToRad(-8),
+      THREE.MathUtils.degToRad(1),
+      THREE.MathUtils.degToRad(4)
     );
 
     const body=new THREE.Mesh(
-      new THREE.CylinderGeometry(0.055,0.075,0.34,10),
+      new THREE.CylinderGeometry(0.062,0.072,0.52,12),
       flashlightBodyMaterial
     );
     body.rotation.x=Math.PI/2;
-    body.position.z=-0.015;
+    body.position.z=0;
     body.renderOrder=1001;
     body.frustumCulled=false;
 
-    const grip=new THREE.Mesh(
-      new THREE.CylinderGeometry(0.068,0.068,0.15,10),
-      flashlightRingMaterial
+    const head=new THREE.Mesh(
+      new THREE.CylinderGeometry(0.095,0.066,0.16,12),
+      flashlightBodyMaterial
     );
-    grip.rotation.x=Math.PI/2;
-    grip.position.z=0.08;
-    grip.renderOrder=1001;
-    grip.frustumCulled=false;
+    head.rotation.x=Math.PI/2;
+    head.position.z=-0.31;
+    head.renderOrder=1001;
+    head.frustumCulled=false;
 
-    const ring=new THREE.Mesh(
-      new THREE.TorusGeometry(0.071,0.012,6,14),
+    const bezel=new THREE.Mesh(
+      new THREE.TorusGeometry(0.097,0.014,7,16),
       flashlightRingMaterial
     );
-    ring.rotation.y=Math.PI/2;
-    ring.position.z=-0.155;
-    ring.renderOrder=1001;
-    ring.frustumCulled=false;
+    bezel.rotation.x=Math.PI/2;
+    bezel.position.z=-0.39;
+    bezel.renderOrder=1002;
+    bezel.frustumCulled=false;
 
     const lens=new THREE.Mesh(
-      new THREE.CylinderGeometry(0.047,0.047,0.018,12),
+      new THREE.CylinderGeometry(0.075,0.075,0.024,14),
       flashlightLensMaterial
     );
     lens.rotation.x=Math.PI/2;
-    lens.position.z=-0.17;
-    lens.renderOrder=1002;
+    lens.position.z=-0.405;
+    lens.renderOrder=1003;
     lens.frustumCulled=false;
 
-    flashlight.add(body,grip,ring,lens);
+    const tailCap=new THREE.Mesh(
+      new THREE.CylinderGeometry(0.068,0.068,0.05,12),
+      flashlightRingMaterial
+    );
+    tailCap.rotation.x=Math.PI/2;
+    tailCap.position.z=0.285;
+    tailCap.renderOrder=1001;
+    tailCap.frustumCulled=false;
+
+    const switchBase=new THREE.Mesh(
+      new THREE.BoxGeometry(0.045,0.028,0.075),
+      flashlightRingMaterial
+    );
+    switchBase.position.set(0,0.078,0.02);
+    switchBase.renderOrder=1002;
+    switchBase.frustumCulled=false;
+
+    flashlight.add(body,head,bezel,lens,tailCap,switchBase);
     this.hands.add(flashlight);
 
     this.viewmodelFlashlight=flashlight;
     this.viewmodelFlashlightLens=lens;
 
-    // The non-flashlight hand sits slightly farther back so both hands feel
-    // attached to the body instead of floating in front of the camera.
-    left.group.position.x=-0.015;
-    right.group.position.x=0.015;
+    // Keep the left hand clearly separate from the flashlight.
+    left.group.position.set(-0.13,0.02,0.05);
+    right.group.position.set(0.02,0.02,0.02);
 
     this.setFlashlightVisual(true);
   }
@@ -409,10 +425,10 @@ export class Player {
 
       if(this.viewmodelFlashlight){
         const flashlightSway=sway*0.65;
-        this.viewmodelFlashlight.position.x=0.57+flashlightSway;
-        this.viewmodelFlashlight.position.y=-0.77+lift*0.7;
-        this.viewmodelFlashlight.position.z=-1.09;
-        this.viewmodelFlashlight.rotation.z=THREE.MathUtils.degToRad(3)+sway*1.8;
+        this.viewmodelFlashlight.position.x=0.50+flashlightSway;
+        this.viewmodelFlashlight.position.y=-0.72+lift*0.7;
+        this.viewmodelFlashlight.position.z=-1.12;
+        this.viewmodelFlashlight.rotation.z=THREE.MathUtils.degToRad(4)+sway*1.8;
       }
     }
   }
