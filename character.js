@@ -184,16 +184,42 @@ export function attachFlashlight(model){
   return flashlight;
 }
 
+function pickIdleAnimation(clips){
+  if(!clips || !clips.length) return null;
+
+  const ranked = clips.map((clip, index)=>{
+    const name = (clip.name || "").toLowerCase().replace(/[\s_-]+/g, "");
+
+    let score = 0;
+
+    if(/idle|standing|stand|rest|neutral|breath/.test(name)) score += 100;
+    if(/run|running|sprint|walk|walking|jog/.test(name)) score -= 80;
+    if(/jump|fall|attack|hit|death|crouch/.test(name)) score -= 60;
+    score -= index * 0.01;
+
+    return {clip, score};
+  });
+
+  ranked.sort((a,b)=>b.score-a.score);
+
+  // If the file has a clearly named idle/standing clip, use it.
+  if(ranked[0].score >= 50) return ranked[0].clip;
+
+  // Otherwise keep the character in its bind/rest pose instead of blindly
+  // playing whatever animation happened to be exported first.
+  return null;
+}
+
 export async function createHazmatCharacter(){
   const template = await loadHazmatCharacter();
   const model = cloneSkeleton(template.scene);
   const mixer = new THREE.AnimationMixer(model);
 
+  const idleClip = pickIdleAnimation(template.animations);
   let action = null;
-  const clip = template.animations[0];
 
-  if(clip){
-    action = mixer.clipAction(clip);
+  if(idleClip){
+    action = mixer.clipAction(idleClip);
     action.setLoop(THREE.LoopRepeat, Infinity);
     action.play();
   }
@@ -205,6 +231,7 @@ export async function createHazmatCharacter(){
     mixer,
     action,
     flashlight,
-    animations: template.animations
+    animations: template.animations,
+    idleClip
   };
 }
