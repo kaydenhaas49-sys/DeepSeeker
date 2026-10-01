@@ -472,9 +472,9 @@ function animate(){
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
 
   if(flashlightOn && battery>0){
-    battery=Math.max(0,battery-dt*.72);
+    battery=Math.max(0,battery-dt*.45);
   }else{
-    battery=Math.min(100,battery+dt*.38);
+    battery=Math.min(100,battery+dt*.80);
   }
   if(battery<=0) flashlightOn=false;
 
