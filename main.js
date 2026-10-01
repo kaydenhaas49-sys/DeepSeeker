@@ -58,7 +58,7 @@ scene.add(ambient);
 const playerLight=new THREE.PointLight(0xb59b68,2.0,24,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xf0dfad,27,60,Math.PI/6,.82,1.5);
+const flashlight=new THREE.SpotLight(0xf0dfad,30,60,Math.PI/5.5,.88,1.5);
 flashlight.castShadow=true;
 flashlight.shadow.mapSize.set(512,512);
 flashlight.target.position.set(0,0,-60);
@@ -90,6 +90,16 @@ const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
 houseRoot.visible=false;
 scene.add(houseRoot);
+
+// Warm interior illumination so the house is readable without killing the horror mood.
+const houseLights=new THREE.Group();
+houseLights.name="HouseLighting";
+houseRoot.add(houseLights);
+const houseAmbient=new THREE.HemisphereLight(0xffe6b0,0x3c2818,0.48);
+houseLights.add(houseAmbient);
+const houseFill=new THREE.PointLight(0xffdca0,2.2,18,1.7);
+houseFill.position.set(0,2.8,0);
+houseLights.add(houseFill);
 
 // Backrooms-side teleporter. The house level itself contains only the GLB.
 const housePortalGroup=new THREE.Group();
@@ -239,6 +249,29 @@ function loadHouse(){
         -center.z
       );
       houseModel.updateMatrixWorld(true);
+
+      // Add a few interior lights based on the normalized house bounds.
+      houseLights.clear();
+      houseLights.add(houseAmbient);
+      houseLights.add(houseFill);
+
+      const houseBox=new THREE.Box3().setFromObject(houseModel);
+      const houseSize=houseBox.getSize(new THREE.Vector3());
+      const min=houseBox.min;
+      const max=houseBox.max;
+
+      const lightPositions=[
+        new THREE.Vector3((min.x+max.x)*.5,Math.min(max.y-1.0,2.8),(min.z+max.z)*.5),
+        new THREE.Vector3(min.x+houseSize.x*.22,Math.min(max.y-1.2,2.4),min.z+houseSize.z*.28),
+        new THREE.Vector3(max.x-houseSize.x*.22,Math.min(max.y-1.2,2.4),min.z+houseSize.z*.72),
+        new THREE.Vector3(min.x+houseSize.x*.74,Math.min(max.y-1.2,2.4),max.z-houseSize.z*.24)
+      ];
+
+      for(const position of lightPositions){
+        const light=new THREE.PointLight(0xffd7a1,1.35,11,1.8);
+        light.position.copy(position);
+        houseLights.add(light);
+      }
 
       setupHouseDoors(houseModel);
 
@@ -767,6 +800,9 @@ function animate(){
 
   player.update(dt);
   if(houseMode) updateHouseDoors(dt);
+
+  // Keep the flashlight cone exactly centered on the camera/crosshair.
+  flashlight.target.position.set(0,0,-80);
   if(!houseMode) updateStoryProgress();
   world.update(player.pos.x,player.pos.z);
   world.updateFlicker(t);
