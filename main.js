@@ -3,6 +3,8 @@ import { World, EYE } from "./world.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -26,6 +28,12 @@ const phoneStory=document.getElementById("phoneStory");
 const deepseekerIcon=document.getElementById("deepseekerIcon");
 const phoneHome=document.getElementById("phoneHome");
 
+
+const gltfLoader=new GLTFLoader();
+const dracoLoader=new DRACOLoader();
+dracoLoader.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/libs/draco/gltf/");
+gltfLoader.setDRACOLoader(dracoLoader);
+gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setSize(innerWidth,innerHeight);
@@ -157,9 +165,9 @@ function findHouseSpawn(bounds){
 }
 
 function loadHouse(){
-  const loader=new GLTFLoader();
-  loader.load(
-    HOUSE_MODEL_PATH,
+  const houseUrl=new URL(HOUSE_MODEL_PATH,import.meta.url).href;
+  gltfLoader.load(
+    houseUrl,
     (gltf)=>{
       houseModel=gltf.scene;
       houseModel.name="DeepSeekerHouse";
@@ -205,12 +213,20 @@ function loadHouse(){
       eventText.style.opacity="1";
       setTimeout(()=>{eventText.style.opacity="0";},2200);
     },
-    undefined,
+    xhr=>{
+      if(xhr.total){
+        const percent=Math.round(xhr.loaded/xhr.total*100);
+        objective.textContent="Loading house asset… "+percent+"%";
+      }else{
+        objective.textContent="Loading house asset…";
+      }
+    },
     (error)=>{
-      console.error("Failed to load house:",error);
+      console.error("Failed to load house:",houseUrl,error);
       eventText.textContent="HOUSE MODEL FAILED TO LOAD";
-      objective.textContent="House asset could not be loaded. Check the browser console.";
+      objective.textContent="House asset failed to load. The loader error is in the browser console.";
       eventText.style.opacity="1";
+      houseLoaded=false;
     }
   );
 }
