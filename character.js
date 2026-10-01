@@ -185,17 +185,53 @@ export function attachFlashlight(model){
   return flashlight;
 }
 
+function normalizeBoneName(name){
+  return (name||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+}
+
 function findBone(root, patterns){
   const list=Array.isArray(patterns)?patterns:[patterns];
   let found=null;
+  let bestScore=-1;
 
   root.traverse(obj=>{
-    if(found || !obj.isBone) return;
-    const n=(obj.name||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-    if(list.some(rx=>rx.test(n))) found=obj;
+    if(!obj.isBone) return;
+
+    const n=normalizeBoneName(obj.name);
+    for(const pattern of list){
+      let score=-1;
+
+      if(pattern instanceof RegExp){
+        if(pattern.test(n)) score=pattern.source.length;
+      }else{
+        const token=normalizeBoneName(pattern);
+        if(token && n.includes(token)) score=token.length;
+      }
+
+      if(score>bestScore){
+        bestScore=score;
+        found=obj;
+      }
+    }
   });
 
   return found;
+}
+
+function findBoneByNameParts(root, parts){
+  const candidates=[];
+  root.traverse(obj=>{
+    if(!obj.isBone) return;
+    const n=normalizeBoneName(obj.name);
+    const score=parts.reduce((total,part)=>{
+      const token=normalizeBoneName(part);
+      return total + (n.includes(token) ? token.length : 0);
+    },0);
+    if(score>0) candidates.push({bone:obj,score});
+  });
+
+  candidates.sort((a,b)=>b.score-a.score);
+  return candidates[0]?.bone || null;
 }
 
 function findDescendantBone(root, patterns){
@@ -238,18 +274,18 @@ function aimBoneAtWorldDirection(bone, worldDirection){
 function applyNeutralMixamoPose(model){
   model.updateMatrixWorld(true);
 
-  const leftUpper=findBone(model,[
-    /mixamorigleftarm$/,/mixamorigleftupperarm$/,/leftupperarm$/,/leftarm$/
+  const leftUpper=findBoneByNameParts(model,[
+    "mixamorigleftarm","mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"
   ]);
-  const rightUpper=findBone(model,[
-    /mixamorigrightarm$/,/mixamorigrightupperarm$/,/rightupperarm$/,/rightarm$/
+  const rightUpper=findBoneByNameParts(model,[
+    "mixamorigrightarm","mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"
   ]);
 
-  const leftForearm=findBone(model,[
-    /mixamorigleftforearm$/,/leftforearm$/,/leftlowerarm$/,/leftelbow/
+  const leftForearm=findBoneByNameParts(model,[
+    "mixamorigleftforearm","leftforearm","leftlowerarm","leftelbow","forearml"
   ]);
-  const rightForearm=findBone(model,[
-    /mixamorigrightforearm$/,/rightforearm$/,/rightlowerarm$/,/rightelbow/
+  const rightForearm=findBoneByNameParts(model,[
+    "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
   ]);
 
   // Do not assume a particular Mixamo Euler axis. Instead, aim each
