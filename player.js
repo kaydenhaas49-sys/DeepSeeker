@@ -79,27 +79,56 @@ export class Player {
 
   setupHands() {
     this.hands = new THREE.Group();
-    this.hands.name = "FirstPersonSimpleArms";
+    this.hands.name = "FirstPersonViewmodel";
     this.hands.renderOrder = 1000;
     this.hands.visible = true;
     this.camera.add(this.hands);
 
     this.handMixers = [];
     this.handModels = [];
+    this.viewmodelFlashlight = null;
+    this.viewmodelFlashlightLens = null;
 
-    const armMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd6b08a,
+    const skinMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc58f6d,
       roughness: 0.9,
       metalness: 0,
     });
 
+    const sleeveMaterial = new THREE.MeshStandardMaterial({
+      color: 0x353630,
+      roughness: 1,
+      metalness: 0,
+    });
+
+    const flashlightBodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x171917,
+      roughness: 0.55,
+      metalness: 0.55,
+    });
+
+    const flashlightRingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4c4d43,
+      roughness: 0.42,
+      metalness: 0.7,
+    });
+
+    const flashlightLensMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf1e5b7,
+      emissive: 0xd8bd72,
+      emissiveIntensity: 2.2,
+      roughness: 0.3,
+      metalness: 0.05,
+    });
+
     const makeArm = (side) => {
       const arm = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.78, 0.16),
-        armMaterial
+        new THREE.CapsuleGeometry(0.095, 0.62, 5, 8),
+        sleeveMaterial
       );
-      arm.name = side < 0 ? "LeftArm" : "RightArm";
-      arm.position.set(side * 0.58, -0.47, -0.92);
+
+      arm.name = side < 0 ? "LeftSleeve" : "RightSleeve";
+      arm.position.set(side * 0.54, -0.43, -0.84);
       arm.rotation.set(
         THREE.MathUtils.degToRad(-22),
         THREE.MathUtils.degToRad(side * 7),
@@ -107,12 +136,100 @@ export class Player {
       );
       arm.renderOrder = 1000;
       arm.frustumCulled = false;
-      this.handModels.push(arm);
-      this.hands.add(arm);
+
+      const hand = new THREE.Mesh(
+        new THREE.SphereGeometry(0.115, 10, 8),
+        skinMaterial
+      );
+
+      hand.name = side < 0 ? "LeftHand" : "RightHand";
+      hand.position.set(side * 0.54, -0.77, -1.055);
+      hand.scale.set(1, 1.15, 0.88);
+      hand.renderOrder = 1000;
+      hand.frustumCulled = false;
+
+      const group = new THREE.Group();
+      group.name = side < 0 ? "LeftArmViewmodel" : "RightArmViewmodel";
+      group.add(arm, hand);
+      group.renderOrder = 1000;
+      group.frustumCulled = false;
+
+      this.handModels.push(group);
+      this.hands.add(group);
+
+      return {group, hand};
     };
 
-    makeArm(-1);
-    makeArm(1);
+    const left = makeArm(-1);
+    const right = makeArm(1);
+
+    // Handheld flashlight viewmodel. This is visual-only; the real beam is
+    // still the camera SpotLight, so this adds almost no scene-light cost.
+    const flashlight=new THREE.Group();
+    flashlight.name="HeldFlashlight";
+    flashlight.position.set(0.57,-0.77,-1.09);
+    flashlight.rotation.set(
+      THREE.MathUtils.degToRad(-12),
+      THREE.MathUtils.degToRad(2),
+      THREE.MathUtils.degToRad(3)
+    );
+
+    const body=new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055,0.075,0.34,10),
+      flashlightBodyMaterial
+    );
+    body.rotation.x=Math.PI/2;
+    body.position.z=-0.015;
+    body.renderOrder=1001;
+    body.frustumCulled=false;
+
+    const grip=new THREE.Mesh(
+      new THREE.CylinderGeometry(0.068,0.068,0.15,10),
+      flashlightRingMaterial
+    );
+    grip.rotation.x=Math.PI/2;
+    grip.position.z=0.08;
+    grip.renderOrder=1001;
+    grip.frustumCulled=false;
+
+    const ring=new THREE.Mesh(
+      new THREE.TorusGeometry(0.071,0.012,6,14),
+      flashlightRingMaterial
+    );
+    ring.rotation.y=Math.PI/2;
+    ring.position.z=-0.155;
+    ring.renderOrder=1001;
+    ring.frustumCulled=false;
+
+    const lens=new THREE.Mesh(
+      new THREE.CylinderGeometry(0.047,0.047,0.018,12),
+      flashlightLensMaterial
+    );
+    lens.rotation.x=Math.PI/2;
+    lens.position.z=-0.17;
+    lens.renderOrder=1002;
+    lens.frustumCulled=false;
+
+    flashlight.add(body,grip,ring,lens);
+    this.hands.add(flashlight);
+
+    this.viewmodelFlashlight=flashlight;
+    this.viewmodelFlashlightLens=lens;
+
+    // The non-flashlight hand sits slightly farther back so both hands feel
+    // attached to the body instead of floating in front of the camera.
+    left.group.position.x=-0.015;
+    right.group.position.x=0.015;
+
+    this.setFlashlightVisual(true);
+  }
+
+  setFlashlightVisual(on){
+    if(!this.viewmodelFlashlight || !this.viewmodelFlashlightLens) return;
+
+    this.viewmodelFlashlight.visible=true;
+    this.viewmodelFlashlightLens.material.emissiveIntensity=on ? 2.4 : 0.18;
+    this.viewmodelFlashlightLens.material.color.set(on ? 0xf1e5b7 : 0x555448);
   }
 
   attach() {
@@ -283,11 +400,19 @@ export class Player {
       for (let i = 0; i < this.handModels.length; i++) {
         const side = i === 0 ? -1 : 1;
         const pivot = this.handModels[i];
-        pivot.position.y = -0.43 + lift - (this.crouched ? 0.08 : 0);
-        pivot.position.x = side * 0.49 + sway * side * 0.35;
-        pivot.position.z += (armDepthTarget - pivot.position.z) * (1 - Math.exp(-18 * dt));
+        pivot.position.y = lift - (this.crouched ? 0.08 : 0);
+        pivot.position.x = sway * side * 0.35;
+        pivot.position.z += (armDepthTarget + 0.92 - pivot.position.z) * (1 - Math.exp(-18 * dt));
         pivot.rotation.z =
           THREE.MathUtils.degToRad(side * 4) + sway * side;
+      }
+
+      if(this.viewmodelFlashlight){
+        const flashlightSway=sway*0.65;
+        this.viewmodelFlashlight.position.x=0.57+flashlightSway;
+        this.viewmodelFlashlight.position.y=-0.77+lift*0.7;
+        this.viewmodelFlashlight.position.z=-1.09;
+        this.viewmodelFlashlight.rotation.z=THREE.MathUtils.degToRad(3)+sway*1.8;
       }
     }
   }
