@@ -5,6 +5,7 @@ import { HorrorAudio } from "./audio.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { Octree } from "three/addons/math/Octree.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -86,6 +87,7 @@ let houseSpawn=new THREE.Vector3(0,EYE,0);
 const houseDoors=[];
 const houseDoorPattern=/door|doors|porte|puerta|pintu/i;
 let houseStaticCollisionBoxes=[];
+const houseOctree=new Octree();
 
 const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
@@ -250,6 +252,29 @@ function buildHouseStaticCollisions(root){
   return unique;
 }
 
+function buildHouseOctree(root){
+  const detached=[];
+
+  // Door meshes are animated separately. Keep them out of the static
+  // triangle collision tree so open doors can actually be walked through.
+  for(const door of houseDoors){
+    const parent=door.pivot.parent;
+    if(!parent) continue;
+    detached.push({pivot:door.pivot,parent});
+    parent.remove(door.pivot);
+  }
+
+  houseOctree.clear();
+  houseOctree.fromGraphNode(root);
+
+  for(const item of detached){
+    item.parent.add(item.pivot);
+  }
+
+  root.updateMatrixWorld(true);
+  console.log("[DeepSeeker] house octree built");
+}
+
 function updateHouseDoorCollisions(){
   const boxes=houseStaticCollisionBoxes.slice();
 
@@ -384,8 +409,9 @@ function loadHouse(){
         houseLights.add(light);
       }
 
-      houseStaticCollisionBoxes=buildHouseStaticCollisions(houseModel);
       setupHouseDoors(houseModel);
+      houseStaticCollisionBoxes=buildHouseStaticCollisions(houseModel);
+      buildHouseOctree(houseModel);
 
       // Spawn at the model's normalized center.
       houseSpawn.set(0,EYE,0);
@@ -430,6 +456,7 @@ function setHouseMode(enabled){
   houseReturnGroup.visible=houseMode;
 
   player.ignoreWorldCollision=houseMode;
+  player.houseOctree=houseMode ? houseOctree : null;
   player.extraCollisionBoxes=[];
 
   figure.visible=false;
@@ -914,6 +941,7 @@ function animate(){
     updateHouseDoors(dt);
     updateHouseDoorCollisions();
   }else{
+    player.houseOctree=null;
     player.extraCollisionBoxes=[];
   }
 
