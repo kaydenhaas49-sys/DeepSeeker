@@ -40,7 +40,9 @@ export class Multiplayer {
       value = "ws://localhost:8787";
     }
 
-    if (!value) return null;
+    if (!value) {
+      value = "wss://deepseeker-server.deepseeker-server.workers.dev";
+    }
 
     value = value.trim().replace(/\/$/, "");
 
