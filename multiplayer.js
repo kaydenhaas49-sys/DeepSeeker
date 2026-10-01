@@ -1,14 +1,15 @@
 import * as THREE from "three";
-import { createHazmatCharacter } from "./character.js";
+import { createHazmatCharacter, setRemoteFlashlightVisible } from "./character.js";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
 
 export class Multiplayer {
-  constructor({ scene, player, getLevel, onStatus, onCount, onRoster, onGameStart }) {
+  constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart }) {
     this.scene = scene;
     this.player = player;
     this.getLevel = getLevel;
+    this.getFlashlightOn = getFlashlightOn || (() => true);
     this.onStatus = onStatus || (() => {});
     this.onCount = onCount || (() => {});
     this.onRoster = onRoster || (() => {});
@@ -238,6 +239,7 @@ export class Multiplayer {
       yaw: Number.isFinite(yaw) ? yaw : 0,
       level: state?.level === "house" ? "house" : "backrooms",
       crouched: Boolean(state?.crouched),
+      flashlight: state?.flashlight !== false,
     };
   }
 
@@ -356,6 +358,7 @@ export class Multiplayer {
       remote.current.yaw = remote.target.yaw;
       remote.current.level = remote.target.level;
       remote.current.crouched = remote.target.crouched;
+      remote.current.flashlight = remote.target.flashlight;
 
       remote.group.position.set(
         remote.current.x,
@@ -373,6 +376,11 @@ export class Multiplayer {
       if(remote.mixer){
         remote.mixer.update(dt);
       }
+
+      setRemoteFlashlightVisible(
+        remote.flashlight,
+        remote.current.flashlight
+      );
 
       remote.group.position.y = remote.current.crouched ? -0.05 : 0;
     }
