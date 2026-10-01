@@ -17,6 +17,8 @@ export class Multiplayer {
     this.playerId = null;
     this.players = new Map();
     this.sendTimer = 0;
+    this.heartbeatTimer = 0;
+    this.lastSent = null;
     this.reconnectTimer = 0;
     this.closedManually = false;
     this.lastStatus = "";
@@ -292,13 +294,27 @@ export class Multiplayer {
     const state = {
       x: Number(this.player.pos.x.toFixed(3)),
       z: Number(this.player.pos.z.toFixed(3)),
-      yaw: Number(this.player.yaw.toFixed(3)),
+      yaw: Number(this.player.yaw.toFixed(2)),
       level: this.getLevel() ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
     };
 
+    const changed =
+      !this.lastSent ||
+      Math.abs(state.x - this.lastSent.x) > 0.03 ||
+      Math.abs(state.z - this.lastSent.z) > 0.03 ||
+      Math.abs(state.yaw - this.lastSent.yaw) > 0.03 ||
+      state.level !== this.lastSent.level ||
+      state.crouched !== this.lastSent.crouched;
+
+    const heartbeat = this.heartbeatTimer >= 1.0;
+
+    if (!force && !changed && !heartbeat) return;
+
     try {
       this.socket.send(JSON.stringify({ type: "state", state }));
+      this.lastSent = state;
+      this.heartbeatTimer = 0;
 
       if (force) {
         this.socket.send(JSON.stringify({
@@ -313,6 +329,7 @@ export class Multiplayer {
 
   update(dt) {
     this.sendTimer += dt;
+    this.heartbeatTimer += dt;
 
     if (this.sendTimer >= SEND_INTERVAL) {
       this.sendTimer = 0;
