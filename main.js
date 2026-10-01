@@ -78,19 +78,28 @@ let houseMode=false;
 let houseLoaded=false;
 const houseCollisionBoxes=[];
 
+const housePortalGroup=new THREE.Group();
+housePortalGroup.name="HouseTestTeleport";
 const housePortal=new THREE.Mesh(
-  new THREE.BoxGeometry(0.9,1.8,0.25),
+  new THREE.BoxGeometry(1.15,2.2,0.32),
   new THREE.MeshStandardMaterial({
-    color:0x8e7740,
-    emissive:0x5c4718,
-    emissiveIntensity:2.2,
-    roughness:.55,
-    metalness:.15
+    color:0xd7b85f,
+    emissive:0x8f6916,
+    emissiveIntensity:4.0,
+    roughness:.4,
+    metalness:.1
   })
 );
-housePortal.name="HouseTestTeleport";
-housePortal.position.copy(HOUSE_TEST_PORTAL_POSITION);
-scene.add(housePortal);
+const housePortalRing=new THREE.Mesh(
+  new THREE.TorusGeometry(.9,.07,10,32),
+  new THREE.MeshBasicMaterial({color:0xffdc70})
+);
+housePortalRing.rotation.x=Math.PI/2;
+housePortalRing.position.y=-.84;
+housePortalGroup.add(housePortal,housePortalRing);
+
+housePortalGroup.position.copy(HOUSE_TEST_PORTAL_POSITION);
+scene.add(housePortalGroup);
 
 const housePortalLight=new THREE.PointLight(0xc6a85c,3.5,8,2);
 housePortalLight.position.set(
@@ -191,6 +200,7 @@ function loadHouse(){
       houseSpawn=findHouseSpawn(box);
       player.extraCollisionBoxes=houseCollisionBoxes;
       houseLoaded=true;
+      objective.textContent="Test pad ready. Press E to enter the house.";
       eventText.textContent="HOUSE TEST LEVEL READY";
       eventText.style.opacity="1";
       setTimeout(()=>{eventText.style.opacity="0";},2200);
@@ -199,6 +209,7 @@ function loadHouse(){
     (error)=>{
       console.error("Failed to load house:",error);
       eventText.textContent="HOUSE MODEL FAILED TO LOAD";
+      objective.textContent="House asset could not be loaded. Check the browser console.";
       eventText.style.opacity="1";
     }
   );
@@ -209,7 +220,7 @@ function setHouseMode(enabled){
   houseMode=enabled;
 
   world.root.visible=!houseMode;
-  housePortal.visible=!houseMode;
+  housePortalGroup.visible=!houseMode;
   housePortalLight.visible=!houseMode;
   houseExitPortal.visible=houseMode;
   houseExitPortalLight.visible=houseMode;
@@ -242,7 +253,12 @@ function setHouseMode(enabled){
 }
 
 function tryHouseTeleport(){
-  if(!houseLoaded) return;
+  if(!houseLoaded){
+    eventText.textContent="HOUSE STILL LOADING...";
+    eventText.style.opacity="1";
+    setTimeout(()=>{eventText.style.opacity="0";},1200);
+    return;
+  }
 
   if(houseMode){
     const d=Math.hypot(
@@ -257,7 +273,7 @@ function tryHouseTeleport(){
     player.pos.x-HOUSE_TEST_PORTAL_POSITION.x,
     player.pos.z-HOUSE_TEST_PORTAL_POSITION.z
   );
-  if(d<2.6) setHouseMode(true);
+  if(d<3.0) setHouseMode(true);
 }
 
 loadHouse();
