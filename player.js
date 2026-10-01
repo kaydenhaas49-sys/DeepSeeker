@@ -1,6 +1,6 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
-import { EYE } from "./world.js";
+import { EYE, WALL_H } from "./world.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -227,14 +227,25 @@ export class Player {
     }
 
     // --- camera ---
+    const targetEye = this.crouched ? 1.12 : EYE;
+    const roofClearance = 0.25;
+    const maxJumpY = Math.max(0, WALL_H - roofClearance - targetEye);
+
     this.jumpVelocity -= 18 * dt;
     this.jumpY += this.jumpVelocity * dt;
+
+    // Never let the camera enter the ceiling, while preserving the normal
+    // jump height whenever there is plenty of room above the player.
+    if (this.jumpY > maxJumpY) {
+      this.jumpY = maxJumpY;
+      this.jumpVelocity = 0;
+    }
+
     if(this.jumpY <= 0){
       this.jumpY = 0;
       this.jumpVelocity = 0;
     }
 
-    const targetEye = this.crouched ? 1.12 : EYE;
     const currentEye = this.camera.position.y - this.bobOffset;
     const eye = currentEye + (targetEye - currentEye) * (1 - Math.exp(-12 * dt));
     this.camera.position.set(this.pos.x, eye + this.bobOffset + this.jumpY, this.pos.z);
