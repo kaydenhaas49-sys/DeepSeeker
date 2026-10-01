@@ -1273,9 +1273,13 @@ joinLobbyButton.addEventListener("click",()=>{
 
 startLobbyButton.addEventListener("click",()=>{
   const params=new URLSearchParams(location.search);
-  if(params.get("host")==="1"){
-    multiplayer.startGameRoom();
-  }
+  if(params.get("host")!=="1") return;
+
+  // Start the host immediately so the button can never appear dead.
+  startGame();
+
+  // Then tell everyone else in the room to start too.
+  multiplayer.startGameRoom();
 });
 
 copyLobbyButton.addEventListener("click",async()=>{
