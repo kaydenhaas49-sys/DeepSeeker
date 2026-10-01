@@ -85,6 +85,7 @@ let houseSpawn=new THREE.Vector3(0,EYE,0);
 
 const houseDoors=[];
 const houseDoorPattern=/door|doors|porte|puerta|pintu/i;
+let houseStaticCollisionBoxes=[];
 
 const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
@@ -203,8 +204,53 @@ function updateHouseDoors(dt){
   }
 }
 
-function updateHouseDoorCollisions(){
+function buildHouseStaticCollisions(root){
   const boxes=[];
+  const worldBox=new THREE.Box3();
+  const size=new THREE.Vector3();
+
+  root.updateMatrixWorld(true);
+
+  root.traverse((obj)=>{
+    if(!obj.isMesh || !obj.geometry) return;
+
+    worldBox.setFromObject(obj);
+    worldBox.getSize(size);
+
+    // Keep vertical structural pieces: walls/partitions and tall fixed geometry.
+    // Ignore floors/ceilings (very thin in Y) and tiny props.
+    const vertical=size.y>=1.2;
+    const horizontalThin=Math.min(size.x,size.z)<=1.25;
+    const reasonable=size.x<=18 && size.z<=18;
+
+    if(vertical && horizontalThin && reasonable){
+      boxes.push({
+        minX:worldBox.min.x-.06,
+        maxX:worldBox.max.x+.06,
+        minZ:worldBox.min.z-.06,
+        maxZ:worldBox.max.z+.06
+      });
+    }
+  });
+
+  // Deduplicate near-identical boxes.
+  const unique=[];
+  for(const box of boxes){
+    const duplicate=unique.some(other=>
+      Math.abs(other.minX-box.minX)<.03 &&
+      Math.abs(other.maxX-box.maxX)<.03 &&
+      Math.abs(other.minZ-box.minZ)<.03 &&
+      Math.abs(other.maxZ-box.maxZ)<.03
+    );
+    if(!duplicate) unique.push(box);
+  }
+
+  console.log("[DeepSeeker] house wall colliders:",unique.length);
+  return unique;
+}
+
+function updateHouseDoorCollisions(){
+  const boxes=houseStaticCollisionBoxes.slice();
 
   for(const door of houseDoors){
     const open=door.pivot.userData.openProgress||0;
@@ -337,6 +383,7 @@ function loadHouse(){
         houseLights.add(light);
       }
 
+      houseStaticCollisionBoxes=buildHouseStaticCollisions(houseModel);
       setupHouseDoors(houseModel);
 
       // Spawn at the model's normalized center.
