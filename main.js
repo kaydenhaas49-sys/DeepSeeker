@@ -7,6 +7,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { Octree } from "three/addons/math/Octree.js";
+import { flashlightFlicker } from "./character.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -1518,7 +1519,7 @@ function animate(){
     player.setFlashlightVisual(false);
   }
 
-  const flicker=.78+.22*Math.sin(t*17.1)*Math.sin(t*7.3);
+  const flicker=flashlightFlicker(t);
   flashlight.intensity=flashlightOn ? 27.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
