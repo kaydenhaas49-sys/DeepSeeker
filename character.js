@@ -81,6 +81,109 @@ export function loadHazmatCharacter(){
   return templatePromise;
 }
 
+function findRightHandBone(root){
+  let best = null;
+
+  root.traverse(obj=>{
+    if(!obj.isBone) return;
+    const n = (obj.name || "").toLowerCase();
+
+    if(
+      /righthand|hand_r|hand\.r|right_hand|mixamorig.*righthand|rightwrist/.test(n)
+    ){
+      best = best || obj;
+    }
+  });
+
+  if(best) return best;
+
+  root.traverse(obj=>{
+    if(!obj.isBone || best) return;
+    const n = (obj.name || "").toLowerCase();
+    if(/hand|wrist/.test(n)) best = obj;
+  });
+
+  return best;
+}
+
+export function attachFlashlight(model){
+  const hand = findRightHandBone(model);
+  if(!hand) return null;
+
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color:0x171917,
+    roughness:.6,
+    metalness:.35
+  });
+
+  const ringMat = new THREE.MeshStandardMaterial({
+    color:0x55564c,
+    roughness:.38,
+    metalness:.7
+  });
+
+  const lensMat = new THREE.MeshStandardMaterial({
+    color:0xf4e8be,
+    emissive:0xd8bd72,
+    emissiveIntensity:2.4,
+    roughness:.28,
+    metalness:.04
+  });
+
+  const flashlight = new THREE.Group();
+  flashlight.name = "HeldFlashlight";
+  flashlight.position.set(.055,-.07,-.13);
+  flashlight.rotation.set(
+    THREE.MathUtils.degToRad(-8),
+    THREE.MathUtils.degToRad(-2),
+    THREE.MathUtils.degToRad(2)
+  );
+
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(.055,.066,.50,10),
+    bodyMat
+  );
+  body.rotation.x=Math.PI/2;
+
+  const head = new THREE.Mesh(
+    new THREE.CylinderGeometry(.092,.067,.15,10),
+    bodyMat
+  );
+  head.rotation.x=Math.PI/2;
+  head.position.z=-.30;
+
+  const bezel = new THREE.Mesh(
+    new THREE.TorusGeometry(.094,.011,6,14),
+    ringMat
+  );
+  bezel.rotation.x=Math.PI/2;
+  bezel.position.z=-.375;
+
+  const lens = new THREE.Mesh(
+    new THREE.CylinderGeometry(.073,.073,.022,12),
+    lensMat
+  );
+  lens.rotation.x=Math.PI/2;
+  lens.position.z=-.388;
+
+  const rear = new THREE.Mesh(
+    new THREE.CylinderGeometry(.064,.064,.04,10),
+    ringMat
+  );
+  rear.rotation.x=Math.PI/2;
+  rear.position.z=.278;
+
+  flashlight.add(body,head,bezel,lens,rear);
+  flashlight.traverse(obj=>{
+    obj.renderOrder=1100;
+    if(obj.isMesh) obj.frustumCulled=false;
+  });
+
+  hand.add(flashlight);
+
+  return flashlight;
+}
+
 export async function createHazmatCharacter(){
   const template = await loadHazmatCharacter();
   const model = cloneSkeleton(template.scene);
@@ -95,10 +198,13 @@ export async function createHazmatCharacter(){
     action.play();
   }
 
+  const flashlight = attachFlashlight(model);
+
   return {
     model,
     mixer,
     action,
+    flashlight,
     animations: template.animations
   };
 }
