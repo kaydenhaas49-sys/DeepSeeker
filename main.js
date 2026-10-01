@@ -919,6 +919,11 @@ function tryHouseTeleport(){
   if(d<3) setHouseMode(true);
 }
 
+const initialParams=new URLSearchParams(location.search);
+if(initialParams.get("save")==="1"){
+  pendingSaveLoad=getSavedGame();
+}
+
 if(new URLSearchParams(location.search).get("lobby")==="1"){
   showLobbyScreen();
 }else{
