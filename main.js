@@ -72,7 +72,7 @@ const audio=new HorrorAudio();
 player.hands.visible=true;
 
 // ---------------------------------------------------------------------------
-// House level — the imported house IS the level.
+// House level — the GLB itself is the level.
 // ---------------------------------------------------------------------------
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
 const HOUSE_TARGET_HEIGHT=7.2;
@@ -82,17 +82,13 @@ let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
-const houseCollisionBoxes=[];
-let houseMeshes=[];
-const houseRaycaster=new THREE.Raycaster();
 
-// Exactly like the procedural Backrooms root: one root owns the level.
 const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
 houseRoot.visible=false;
 scene.add(houseRoot);
 
-// This portal belongs to the Backrooms side and is not part of the house.
+// Backrooms-side teleporter. The house level itself contains only the GLB.
 const housePortalGroup=new THREE.Group();
 housePortalGroup.name="HouseTeleport";
 
@@ -125,91 +121,15 @@ housePortalLight.position.set(
 );
 scene.add(housePortalLight);
 
-// Return pad is the only helper object inside the house level.
-const houseExitPortal=housePortal.clone();
-houseExitPortal.name="HouseReturnPad";
-houseExitPortal.visible=false;
-houseRoot.add(houseExitPortal);
+// Return pad lives outside the model so the GLB remains the only level asset.
+const houseReturnGroup=new THREE.Group();
+houseReturnGroup.name="HouseReturnPad";
+houseReturnGroup.visible=false;
 
-const houseExitPortalLight=housePortalLight.clone();
-houseExitPortalLight.visible=false;
-houseRoot.add(houseExitPortalLight);
-
-function houseBoxBlocked(box,x,z,r=.42){
-  const nx=Math.max(box.min.x,Math.min(x,box.max.x));
-  const nz=Math.max(box.min.z,Math.min(z,box.max.z));
-  const dx=x-nx;
-  const dz=z-nz;
-  return dx*dx+dz*dz<r*r;
-}
-
-function getHouseFloorAt(x,z,bounds){
-  houseRaycaster.set(
-    new THREE.Vector3(x,bounds.max.y+2,z),
-    new THREE.Vector3(0,-1,0)
-  );
-
-  const hits=houseRaycaster.intersectObjects(houseMeshes,false);
-  for(const hit of hits){
-    if(hit.point.y<bounds.min.y-.05) continue;
-    if(hit.point.y>bounds.min.y+3.8) continue;
-    return hit.point.y;
-  }
-
-  return null;
-}
-
-function findHouseSpawn(bounds){
-  const center=bounds.getCenter(new THREE.Vector3());
-  const size=bounds.getSize(new THREE.Vector3());
-
-  // Search the imported model itself for a floor point that is not inside a
-  // wall collider. No external room/floor/spawn geometry is created.
-  const spanX=Math.max(3,size.x*.28);
-  const spanZ=Math.max(3,size.z*.28);
-
-  let best=null;
-  let bestScore=-Infinity;
-
-  for(let z=-spanZ;z<=spanZ;z+=1){
-    for(let x=-spanX;x<=spanX;x+=1){
-      const px=center.x+x;
-      const pz=center.z+z;
-      const floorY=getHouseFloorAt(px,pz,bounds);
-      if(floorY===null) continue;
-
-      let nearestWall=Infinity;
-      let blocked=false;
-
-      for(const wall of houseCollisionBoxes){
-        const nx=Math.max(wall.min.x,Math.min(px,wall.max.x));
-        const nz=Math.max(wall.min.z,Math.min(pz,wall.max.z));
-        nearestWall=Math.min(nearestWall,Math.hypot(px-nx,pz-nz));
-
-        if(houseBoxBlocked(wall,px,pz,.7)){
-          blocked=true;
-          break;
-        }
-      }
-
-      if(blocked) continue;
-
-      const centerDistance=Math.hypot(px-center.x,pz-center.z);
-      const score=Math.min(nearestWall,8)-centerDistance*.02;
-
-      if(score>bestScore){
-        bestScore=score;
-        best=new THREE.Vector3(px,floorY+EYE,pz);
-      }
-    }
-  }
-
-  return best || new THREE.Vector3(
-    center.x,
-    bounds.min.y+EYE,
-    center.z
-  );
-}
+const houseReturn=housePortal.clone();
+const houseReturnLight=housePortalLight.clone();
+houseReturnGroup.add(houseReturn,houseReturnLight);
+scene.add(houseReturnGroup);
 
 function loadHouse(){
   const houseUrl=new URL(HOUSE_MODEL_PATH,import.meta.url).href;
@@ -219,12 +139,14 @@ function loadHouse(){
     (gltf)=>{
       houseModel=gltf.scene;
       houseModel.name="DeepSeekerHouse";
+
+      // The imported model is the entire house level.
       houseRoot.add(houseModel);
 
-      houseMeshes=[];
+      let meshCount=0;
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
-        houseMeshes.push(obj);
+        meshCount++;
 
         obj.castShadow=false;
         obj.receiveShadow=false;
@@ -241,11 +163,12 @@ function loadHouse(){
         }
       });
 
-      if(!houseMeshes.length){
+      if(meshCount===0){
         throw new Error("House GLB contains no meshes.");
       }
 
-      // Normalize only the imported model. No extra geometry is created.
+      // Normalize the actual model only:
+      // centered on X/Z and sitting directly on Y=0.
       let box=new THREE.Box3().setFromObject(houseModel);
       const size=box.getSize(new THREE.Vector3());
       const scale=HOUSE_TARGET_HEIGHT/Math.max(size.y,.001);
@@ -256,34 +179,18 @@ function loadHouse(){
       box=new THREE.Box3().setFromObject(houseModel);
       const center=box.getCenter(new THREE.Vector3());
 
-      houseModel.position.x-=center.x;
-      houseModel.position.y-=box.min.y;
-      houseModel.position.z-=center.z;
+      houseModel.position.set(
+        -center.x,
+        -box.min.y,
+        -center.z
+      );
       houseModel.updateMatrixWorld(true);
 
-      box=new THREE.Box3().setFromObject(houseModel);
+      // Spawn at the model's normalized center.
+      houseSpawn.set(0,EYE,0);
 
-      // Only thin, vertical imported meshes become wall collision.
-      houseCollisionBoxes.length=0;
-      for(const obj of houseMeshes){
-        const meshBox=new THREE.Box3().setFromObject(obj);
-        const meshSize=meshBox.getSize(new THREE.Vector3());
-
-        if(meshSize.y<1.0) continue;
-
-        const xWall=meshSize.x>1.2 && meshSize.z<.8;
-        const zWall=meshSize.z>1.2 && meshSize.x<.8;
-
-        if(xWall||zWall){
-          houseCollisionBoxes.push(meshBox);
-        }
-      }
-
-      houseSpawn=findHouseSpawn(box);
       houseLoaded=true;
-
-      houseExitPortal.visible=false;
-      houseExitPortalLight.visible=false;
+      houseRoot.visible=false;
 
       objective.textContent="Find the glowing teleporter to the house.";
       eventText.textContent="HOUSE READY";
@@ -302,7 +209,7 @@ function loadHouse(){
       console.error("Failed to load house:",houseUrl,error);
       houseLoaded=false;
       eventText.textContent="HOUSE FAILED TO LOAD";
-      objective.textContent="House asset failed to load.";
+      objective.textContent="House asset failed to load. Check the browser console.";
       eventText.style.opacity="1";
     }
   );
@@ -313,15 +220,16 @@ function setHouseMode(enabled){
 
   houseMode=enabled;
 
-  // These are the only level roots that switch visibility.
+  // Only switch the two level roots. The procedural Backrooms is otherwise untouched.
   world.root.visible=!houseMode;
   houseRoot.visible=houseMode;
 
   housePortalGroup.visible=!houseMode;
   housePortalLight.visible=!houseMode;
+  houseReturnGroup.visible=houseMode;
 
   player.ignoreWorldCollision=houseMode;
-  player.extraCollisionBoxes=houseMode ? houseCollisionBoxes : [];
+  player.extraCollisionBoxes=[];
 
   figure.visible=false;
   figureLife=0;
@@ -332,19 +240,7 @@ function setHouseMode(enabled){
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    houseExitPortal.position.set(
-      houseSpawn.x,
-      houseSpawn.y-.9,
-      houseSpawn.z
-    );
-    houseExitPortalLight.position.set(
-      houseSpawn.x,
-      houseSpawn.y+.5,
-      houseSpawn.z-.4
-    );
-
-    houseExitPortal.visible=true;
-    houseExitPortalLight.visible=true;
+    houseReturnGroup.position.set(0,0,0);
 
     objective.textContent="Explore the house. Press E at the return pad.";
     eventText.textContent="HOUSE LEVEL";
@@ -356,9 +252,7 @@ function setHouseMode(enabled){
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    houseExitPortal.visible=false;
-    houseExitPortalLight.visible=false;
-
+    houseReturnGroup.visible=false;
     objective.textContent=STORY[storyStage].objective;
   }
 }
@@ -372,11 +266,7 @@ function tryHouseTeleport(){
   }
 
   if(houseMode){
-    const d=Math.hypot(
-      player.pos.x-houseSpawn.x,
-      player.pos.z-houseSpawn.z
-    );
-
+    const d=Math.hypot(player.pos.x,player.pos.z);
     if(d<2.6) setHouseMode(false);
     return;
   }
@@ -388,6 +278,7 @@ function tryHouseTeleport(){
 
   if(d<3) setHouseMode(true);
 }
+
 loadHouse();
 
 player.hands.visible=true;
