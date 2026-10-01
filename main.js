@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { World, EYE } from "./world.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
+import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -84,6 +85,28 @@ let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
 let houseLoadFailed=false;
+
+const multiplayer=new Multiplayer({
+  scene,
+  player,
+  getLevel:()=>houseMode,
+  onStatus:(message)=>{
+    if(!message){
+      eventText.style.opacity="0";
+      return;
+    }
+    eventText.textContent=message;
+    eventText.style.opacity="1";
+    if(
+      message==="MULTIPLAYER CONNECTED" ||
+      message==="MULTIPLAYER OFFLINE"
+    ){
+      setTimeout(()=>{
+        if(eventText.textContent===message) eventText.style.opacity="0";
+      },1800);
+    }
+  }
+});
 
 const houseDoors=[];
 const houseDoorPattern=/door|doors|porte|puerta|pintu/i;
@@ -952,6 +975,7 @@ function animate(){
   }
 
   player.update(dt);
+  multiplayer.update(dt);
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
   flashlight.target.position.set(0,0,-80);
