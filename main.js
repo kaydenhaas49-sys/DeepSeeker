@@ -79,87 +79,13 @@ fallbackFigure.visible=false;
 figure.add(fallbackFigure);
 
 let bacteriaLoaded=false;
-let bacteriaAnimState="";
-const bacteriaRigs=new Map();
+let bacteriaMixer=null;
+let bacteriaAction=null;
 const debugSpawnBacteria=true;
-
-function playBacteriaState(state){
-  let rig=bacteriaRigs.get(state);
-  if(!rig) rig=bacteriaRigs.get("idle")||bacteriaRigs.get("stalk")||bacteriaRigs.get("chase");
-  if(!rig) return;
-
-  if(bacteriaAnimState===state && rig.model.visible) return;
-  bacteriaAnimState=state;
-
-  for(const candidate of bacteriaRigs.values()){
-    candidate.model.visible=candidate===rig;
-  }
-
-  rig.action.reset();
-  rig.action.setLoop(THREE.LoopRepeat,Infinity);
-  rig.action.clampWhenFinished=false;
-  rig.action.timeScale=1;
-  rig.action.play();
-}
-
-function updateBacteriaAnimation(dt,state){
-  const rig=bacteriaRigs.get(bacteriaAnimState);
-  if(rig) rig.mixer.update(dt);
-  if(bacteriaAnimState!==state) playBacteriaState(state);
-}
-
-function loadBacteriaRig(path,state,targetCenter,targetHeight,onReady){
-  bacteriaLoader.load(
-    path,
-    (gltf)=>{
-      const model=gltf.scene;
-      model.name=`BacteriaModel_${state}`;
-      model.position.set(0,0,0);
-      model.scale.setScalar(1);
-      model.traverse((obj)=>{
-        if(!obj.isMesh) return;
-        obj.frustumCulled=false;
-        obj.castShadow=true;
-        obj.receiveShadow=true;
-      });
-
-      const box=new THREE.Box3().setFromObject(model);
-      const size=box.getSize(new THREE.Vector3());
-      const scale=targetHeight/Math.max(size.y,0.001);
-      model.scale.setScalar(scale);
-      model.updateMatrixWorld(true);
-
-      const fittedBox=new THREE.Box3().setFromObject(model);
-      const fittedCenter=fittedBox.getCenter(new THREE.Vector3());
-      model.position.set(
-        targetCenter.x-fittedCenter.x,
-        targetCenter.y-fittedCenter.y,
-        targetCenter.z-fittedCenter.z
-      );
-
-      model.visible=false;
-      figure.add(model);
-
-      const mixer=new THREE.AnimationMixer(model);
-      const clip=gltf.animations?.[0];
-      if(!clip){
-        console.warn(`Bacteria ${state} GLB has no animation clip`);
-        figure.remove(model);
-        return;
-      }
-
-      const action=mixer.clipAction(clip);
-      bacteriaRigs.set(state,{model,mixer,action});
-      onReady?.();
-    },
-    undefined,
-    (error)=>console.warn(`Bacteria ${state} animation failed to load`,error)
-  );
-}
 
 const bacteriaLoader=new GLTFLoader();
 bacteriaLoader.load(
-  "./assets/backrooms_bacteria_rigged_3d_model_unofficial.glb",
+  "./assets/bacteria/bacteria_stalk.glb",
   (gltf)=>{
     const model=gltf.scene;
     model.name="BacteriaModel";
@@ -170,6 +96,8 @@ bacteriaLoader.load(
       obj.receiveShadow=true;
     });
 
+    // Match the working entity's established visual height without changing
+    // the figure group's existing position/rotation/spawn behavior.
     const box=new THREE.Box3().setFromObject(model);
     const size=box.getSize(new THREE.Vector3());
     const center=box.getCenter(new THREE.Vector3());
@@ -182,30 +110,21 @@ bacteriaLoader.load(
       -center.z*scale
     );
     model.scale.set(scale*1.65,scale,scale*1.65);
-    model.updateMatrixWorld(true);
-
-    const targetBox=new THREE.Box3().setFromObject(model);
-    const targetCenter=targetBox.getCenter(new THREE.Vector3());
-    const targetHeightWorld=targetBox.getSize(new THREE.Vector3()).y;
 
     figure.add(model);
     bacteriaLoaded=true;
 
-    let readyCount=0;
-    const onRigReady=()=>{
-      readyCount++;
-      if(readyCount>=3){
-        model.visible=false;
-        playBacteriaState("idle");
-        eventText.textContent="BACTERIA ANIMATIONS READY";
-        eventText.style.opacity="1";
-        setTimeout(()=>{eventText.style.opacity="0";},2200);
-      }
-    };
-
-    loadBacteriaRig("./assets/bacteria/bacteria_idle.glb","idle",targetCenter,targetHeightWorld,onRigReady);
-    loadBacteriaRig("./assets/bacteria/bacteria_stalk.glb","stalk",targetCenter,targetHeightWorld,onRigReady);
-    loadBacteriaRig("./assets/bacteria/bacteria_chase.glb","chase",targetCenter,targetHeightWorld,onRigReady);
+    const clip=gltf.animations?.[0];
+    if(clip){
+      bacteriaMixer=new THREE.AnimationMixer(model);
+      bacteriaAction=bacteriaMixer.clipAction(clip);
+      bacteriaAction.reset();
+      bacteriaAction.setLoop(THREE.LoopRepeat,Infinity);
+      bacteriaAction.play();
+      eventText.textContent="BACTERIA ANIMATION READY";
+    }else{
+      eventText.textContent="BACTERIA ANIMATION CLIP MISSING";
+    }
 
     if(debugSpawnBacteria){
       const dx=-Math.sin(player.yaw);
@@ -218,25 +137,67 @@ bacteriaLoader.load(
       figure.rotation.y=player.yaw+Math.PI;
       figureLife=Infinity;
       figure.visible=true;
-      eventText.textContent="BACTERIA LOADED";
-      eventText.style.opacity="1";
     }
+
+    eventText.style.opacity="1";
+    setTimeout(()=>{eventText.style.opacity="0";},2600);
   },
   undefined,
   ()=>{
-    fallbackFigure.visible=true;
-    const dx=-Math.sin(player.yaw);
-    const dz=-Math.cos(player.yaw);
-    figure.position.set(
-      player.pos.x+dx*5,
-      0,
-      player.pos.z+dz*5
+    // Preserve the original working Bacteria if the animated asset fails.
+    bacteriaLoader.load(
+      "./assets/backrooms_bacteria_rigged_3d_model_unofficial.glb",
+      (gltf)=>{
+        const model=gltf.scene;
+        model.name="BacteriaModelFallback";
+        model.traverse((obj)=>{
+          if(!obj.isMesh) return;
+          obj.frustumCulled=false;
+          obj.castShadow=true;
+          obj.receiveShadow=true;
+        });
+
+        const box=new THREE.Box3().setFromObject(model);
+        const size=box.getSize(new THREE.Vector3());
+        const center=box.getCenter(new THREE.Vector3());
+        const targetHeight=6.2;
+        const scale=targetHeight/Math.max(size.y,0.001);
+
+        model.position.set(
+          -center.x*scale,
+          -box.min.y*scale,
+          -center.z*scale
+        );
+        model.scale.set(scale*1.65,scale,scale*1.65);
+        figure.add(model);
+        bacteriaLoaded=true;
+
+        if(debugSpawnBacteria){
+          const dx=-Math.sin(player.yaw);
+          const dz=-Math.cos(player.yaw);
+          figure.position.set(player.pos.x+dx*5,0,player.pos.z+dz*5);
+          figure.rotation.y=player.yaw+Math.PI;
+          figureLife=Infinity;
+          figure.visible=true;
+        }
+
+        eventText.textContent="BACTERIA STATIC FALLBACK";
+        eventText.style.opacity="1";
+        setTimeout(()=>{eventText.style.opacity="0";},2200);
+      },
+      undefined,
+      ()=>{
+        fallbackFigure.visible=true;
+        const dx=-Math.sin(player.yaw);
+        const dz=-Math.cos(player.yaw);
+        figure.position.set(player.pos.x+dx*5,0,player.pos.z+dz*5);
+        figure.rotation.y=player.yaw+Math.PI;
+        figureLife=Infinity;
+        figure.visible=true;
+        eventText.textContent="BACTERIA LOAD FAILED";
+        eventText.style.opacity="1";
+      }
     );
-    figure.rotation.y=player.yaw+Math.PI;
-    figureLife=Infinity;
-    figure.visible=true;
-    eventText.textContent="BACTERIA GLB FAILED TO LOAD";
-    eventText.style.opacity="1";
   }
 );
 let figureLife=0;
@@ -492,13 +453,7 @@ function animate(){
   flashlight.intensity=flashlightOn ? 13.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
-  if(bacteriaRigs.size){
-    const d=Math.hypot(player.pos.x-figure.position.x,player.pos.z-figure.position.z);
-    const state=Number.isFinite(figureLife)
-      ? (figureLife<.72 ? "chase" : "stalk")
-      : (d<8 ? "chase" : d<18 ? "stalk" : "idle");
-    updateBacteriaAnimation(dt,state);
-  }
+  if(bacteriaMixer) bacteriaMixer.update(dt);
 
   if(figureLife>0){
     if (Number.isFinite(figureLife)) figureLife=Math.max(0,figureLife-dt);
