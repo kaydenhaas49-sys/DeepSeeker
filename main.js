@@ -38,9 +38,11 @@ gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 // Automatically switch to a cheaper render path on low-end Chromebooks.
 // ?quality=low can force the cheap path for testing.
 const qualityParam=new URLSearchParams(location.search).get("quality");
+const chromeOS=/CrOS/i.test(navigator.userAgent);
 const lowEndDevice=
   qualityParam==="low" ||
-  ((navigator.deviceMemory||8)<=4 && (navigator.hardwareConcurrency||8)<=6) ||
+  (qualityParam!=="high" && chromeOS) ||
+  ((navigator.deviceMemory||8)<=4) ||
   (navigator.hardwareConcurrency||8)<=4;
 const pixelRatio=lowEndDevice
   ? Math.min(devicePixelRatio,1.0)
