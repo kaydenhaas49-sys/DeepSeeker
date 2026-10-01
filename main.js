@@ -80,7 +80,24 @@ figure.add(fallbackFigure);
 
 let bacteriaMixer=null;
 let bacteriaLoaded=false;
+let bacteriaActions={};
+let bacteriaAnimState="";
 const debugSpawnBacteria=true;
+
+function setBacteriaAnimation(state){
+  if(!bacteriaMixer || !bacteriaActions[state] || bacteriaAnimState===state) return;
+  bacteriaAnimState=state;
+
+  for(const [name,action] of Object.entries(bacteriaActions)){
+    if(name===state) continue;
+    action.fadeOut(.15);
+  }
+
+  const action=bacteriaActions[state];
+  action.reset().fadeIn(.15);
+  action.setLoop(THREE.LoopRepeat,Infinity);
+  action.play();
+}
 
 const bacteriaLoader=new GLTFLoader();
 bacteriaLoader.load(
@@ -109,6 +126,28 @@ bacteriaLoader.load(
     model.scale.set(scale * 1.65, scale, scale * 1.65);
     figure.add(model);
     bacteriaLoaded=true;
+
+    // Keep the original Bacteria mesh, scale, position, and spawn untouched.
+    // Only borrow the UniMate animation clips from their matching rigs.
+    bacteriaMixer=new THREE.AnimationMixer(model);
+
+    Promise.all([
+      new Promise((resolve,reject)=>bacteriaLoader.load("./assets/bacteria/bacteria_idle.glb",resolve,undefined,reject)),
+      new Promise((resolve,reject)=>bacteriaLoader.load("./assets/bacteria/bacteria_stalk.glb",resolve,undefined,reject)),
+      new Promise((resolve,reject)=>bacteriaLoader.load("./assets/bacteria/bacteria_chase.glb",resolve,undefined,reject))
+    ]).then(([idleGltf,stalkGltf,chaseGltf])=>{
+      bacteriaActions={
+        idle:bacteriaMixer.clipAction(idleGltf.animations[0]),
+        stalk:bacteriaMixer.clipAction(stalkGltf.animations[0]),
+        chase:bacteriaMixer.clipAction(chaseGltf.animations[0])
+      };
+      setBacteriaAnimation("idle");
+      eventText.textContent="BACTERIA ANIMATIONS READY";
+      eventText.style.opacity="1";
+      setTimeout(()=>{eventText.style.opacity="0";},2200);
+    }).catch(error=>{
+      console.warn("Bacteria animations failed to load; entity remains unchanged.",error);
+    });
 
     if (debugSpawnBacteria) {
       const dx = -Math.sin(player.yaw);
@@ -399,7 +438,14 @@ function animate(){
   flashlight.intensity=flashlightOn ? 13.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
-  if(bacteriaMixer) bacteriaMixer.update(dt);
+  if(bacteriaMixer){
+    const d=Math.hypot(player.pos.x-figure.position.x,player.pos.z-figure.position.z);
+    const state=Number.isFinite(figureLife)
+      ? (figureLife<.72 ? "chase" : "stalk")
+      : (d<8 ? "chase" : d<18 ? "stalk" : "idle");
+    setBacteriaAnimation(state);
+    bacteriaMixer.update(dt);
+  }
 
   if(figureLife>0){
     if (Number.isFinite(figureLife)) figureLife=Math.max(0,figureLife-dt);
