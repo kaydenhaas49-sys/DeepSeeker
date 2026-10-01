@@ -107,6 +107,7 @@ let houseCollisionReady=false;
 let houseCollisionBuildStarted=false;
 const houseCollisionBoxes=[];
 const houseRenderMeshes=[];
+let houseCullTimer=0;
 let gameStarted=false;
 let lastAutoSave=0;
 let pendingSaveLoad=null;
@@ -579,7 +580,18 @@ function updateHouseRenderCulling(x,z){
 }
 
 function updateHouseDoorCollisions(){
-  const boxes=houseCollisionBoxes.slice();
+  const px=player.pos.x;
+  const pz=player.pos.z;
+  const range=4.5;
+  const rangeSq=range*range;
+
+  const boxes=houseCollisionBoxes.filter(box=>{
+    const cx=(box.minX+box.maxX)*.5;
+    const cz=(box.minZ+box.maxZ)*.5;
+    const dx=cx-px;
+    const dz=cz-pz;
+    return dx*dx+dz*dz<=rangeSq;
+  });
 
   for(const door of houseDoors){
     const open=door.pivot.userData.openProgress||0;
@@ -1396,8 +1408,14 @@ function animate(){
   if(houseMode){
     updateHouseDoors(dt);
     updateHouseDoorCollisions();
-    updateHouseRenderCulling(player.pos.x,player.pos.z);
+
+    houseCullTimer+=dt;
+    if(houseCullTimer>=0.25){
+      houseCullTimer=0;
+      updateHouseRenderCulling(player.pos.x,player.pos.z);
+    }
   }else{
+    houseCullTimer=0;
     player.houseOctree=null;
     player.extraCollisionBoxes=[];
   }
