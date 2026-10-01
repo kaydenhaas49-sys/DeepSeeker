@@ -331,6 +331,18 @@ function loadHouse(){
       houseFloorY=findHouseFloorY(box);
       houseSpawn=findHouseSpawn(box);
 
+      // Keep the interior lighting attached to the house dimension.
+      houseFill.position.set(
+        HOUSE_DIMENSION_ORIGIN.x,
+        houseFloorY+4,
+        HOUSE_DIMENSION_ORIGIN.z
+      );
+      houseKey.position.set(
+        HOUSE_DIMENSION_ORIGIN.x-6,
+        houseFloorY+8,
+        HOUSE_DIMENSION_ORIGIN.z+4
+      );
+
       // Safety fallback keeps the spawn inside the house's vertical range.
       houseSpawn.y=Math.max(
         houseSpawn.y,
