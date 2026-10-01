@@ -334,17 +334,14 @@ export async function createHazmatCharacter(){
   const template=await loadHazmatCharacter();
   const model=cloneSkeleton(template.scene);
 
-  const idleClip=pickIdleAnimation(template.animations);
-  const mixer=idleClip ? new THREE.AnimationMixer(model) : null;
-  let action=null;
+  // The supplied rig has a bind-pose/animation combination that can
+  // snap back to a T-pose. Use a deterministic relaxed pose instead
+  // until a verified humanoid idle clip is available.
+  const idleClip=null;
+  const mixer=null;
+  const action=null;
 
-  if(mixer && idleClip){
-    action=mixer.clipAction(idleClip);
-    action.setLoop(THREE.LoopRepeat,Infinity);
-    action.play();
-  }else{
-    applyNeutralMixamoPose(model);
-  }
+  applyNeutralMixamoPose(model);
 
   const flashlight=attachFlashlight(model);
 
