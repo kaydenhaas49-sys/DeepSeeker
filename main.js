@@ -517,9 +517,12 @@ function updateHouseDoors(dt){
 function buildHouseCollisionProxies(root){
   houseCollisionBoxes.length=0;
 
+  // The exported house GLB uses generic FrontSide/BackSide mesh names, so
+  // name-based wall detection misses most of the actual architecture.
+  // Build lightweight AABB collision proxies directly from the normalized
+  // world-space mesh bounds instead. The model is only ~126 meshes, so this
+  // stays cheap while covering walls/partitions/frames reliably.
   root.updateMatrixWorld(true);
-
-  const wallName=/wall|partition|panel|barrier|room|door|window|frame|column|pillar/i;
 
   root.traverse((obj)=>{
     if(!obj.isMesh || !obj.geometry) return;
@@ -527,24 +530,34 @@ function buildHouseCollisionProxies(root){
 
     const box=new THREE.Box3().setFromObject(obj);
     const size=box.getSize(new THREE.Vector3());
-    const vertical=size.y>1.15;
-    const thin=Math.min(size.x,size.z)<0.7;
-    const named=obj.name && wallName.test(obj.name);
 
-    if(named || (vertical && thin && Math.max(size.x,size.z)>0.9)){
-      houseCollisionBoxes.push({
-        minX:box.min.x,
-        maxX:box.max.x,
-        minZ:box.min.z,
-        maxZ:box.max.z
-      });
-    }
+    const horizontal=Math.max(size.x,size.z);
+    const vertical=size.y;
+
+    // Ignore tiny decorative geometry. Keep anything tall enough to be a
+    // wall/partition/door/furniture obstacle and anything substantial that
+    // intersects the player's normal standing range.
+    const tallObstacle =
+      vertical >= 1.0 &&
+      horizontal >= 0.45 &&
+      box.max.y >= 0.45 &&
+      box.min.y <= EYE + 0.25;
+
+    const lowObstacle =
+      vertical >= 0.35 &&
+      horizontal >= 0.9 &&
+      box.max.y >= 0.45 &&
+      box.min.y <= 1.35;
+
+    if(!tallObstacle && !lowObstacle) return;
+
+    houseCollisionBoxes.push({
+      minX:box.min.x,
+      maxX:box.max.x,
+      minZ:box.min.z,
+      maxZ:box.max.z
+    });
   });
-
-  // Keep collision cheap even if the source GLB has hundreds of tiny wall pieces.
-  if(houseCollisionBoxes.length>800){
-    houseCollisionBoxes.splice(800);
-  }
 
   console.log("[DeepSeeker] house collision proxies:",houseCollisionBoxes.length);
 }
@@ -596,7 +609,7 @@ function updateHouseRenderCulling(x,z){
 function updateHouseDoorCollisions(){
   const px=player.pos.x;
   const pz=player.pos.z;
-  const range=4.5;
+  const range=6.0;
   const rangeSq=range*range;
 
   const boxes=houseCollisionBoxes.filter(box=>{
