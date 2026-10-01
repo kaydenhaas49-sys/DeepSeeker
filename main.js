@@ -362,6 +362,7 @@ function setHouseMode(enabled){
   for(const item of houseLights) item.light.intensity=houseMode?1.2:0;
 
   player.ignoreWorldCollision=houseMode;
+  player.extraCollisionBoxes=houseMode ? houseCollisionBoxes : [];
 
   figure.visible=false;
   figureLife=0;
