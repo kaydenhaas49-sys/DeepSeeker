@@ -4,13 +4,14 @@ const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
 
 export class Multiplayer {
-  constructor({ scene, player, getLevel, onStatus, onCount, onRoster }) {
+  constructor({ scene, player, getLevel, onStatus, onCount, onRoster, onGameStart }) {
     this.scene = scene;
     this.player = player;
     this.getLevel = getLevel;
     this.onStatus = onStatus || (() => {});
     this.onCount = onCount || (() => {});
     this.onRoster = onRoster || (() => {});
+    this.onGameStart = onGameStart || (() => {});
 
     this.socket = null;
     this.room = this.getRoomName();
@@ -200,6 +201,11 @@ export class Multiplayer {
         this.updateCount();
         break;
       }
+
+      case "game_start": {
+        this.onGameStart();
+        break;
+      }
     }
   }
 
@@ -294,6 +300,17 @@ export class Multiplayer {
         remote.current = { ...remote.target };
         remote.hasInitialState = true;
       }
+    }
+  }
+
+  startGameRoom() {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
+
+    try {
+      this.socket.send(JSON.stringify({ type: "start" }));
+      return true;
+    } catch {
+      return false;
     }
   }
 
