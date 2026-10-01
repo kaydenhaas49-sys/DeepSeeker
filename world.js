@@ -165,11 +165,8 @@ export function generateChunk(cx, cz, seed) {
 // ---------------------------------------------------------------------------
 
 const QUALITY_PARAM=new URLSearchParams(location.search).get("quality");
-const LOW_END_DEVICE=
-  QUALITY_PARAM==="low" ||
-  (QUALITY_PARAM!=="high" && /CrOS/i.test(navigator.userAgent)) ||
-  (navigator.deviceMemory||8)<=4 ||
-  (navigator.hardwareConcurrency||8)<=4;
+// Lightweight world streaming is the default. ?quality=high opts into the heavier path.
+const LOW_END_DEVICE=QUALITY_PARAM!=="high";
 const R_GENERATE = LOW_END_DEVICE ? 1 : 2;
 const R_DISPOSE = LOW_END_DEVICE ? 1 : 3;
 const PANEL_W = 2.2; // light fixture size (m)
