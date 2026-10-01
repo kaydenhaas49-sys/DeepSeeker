@@ -362,7 +362,7 @@ export class Multiplayer {
         0,
         remote.current.z
       );
-      remote.group.rotation.y = remote.current.yaw;
+      remote.group.rotation.y = remote.current.yaw + Math.PI;
 
       const sameLevel = remote.current.level === (this.getLevel() ? "house" : "backrooms");
       const dx = remote.current.x - this.player.pos.x;
