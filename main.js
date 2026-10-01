@@ -24,6 +24,7 @@ const phoneDepth=document.getElementById("phoneDepth");
 const phoneCardText=document.getElementById("phoneCardText");
 const phoneStory=document.getElementById("phoneStory");
 const deepseekerIcon=document.getElementById("deepseekerIcon");
+const phoneHome=document.getElementById("phoneHome");
 
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
@@ -380,6 +381,11 @@ function openDeepSeekerApp(){
 }
 
 deepseekerIcon.addEventListener("click",openDeepSeekerApp);
+phoneHome.addEventListener("click",()=>{
+  if(!phoneOpen) return;
+  deepseekerAppOpen=false;
+  phone.classList.remove("app-open");
+});
 
 
 function showControls(){
