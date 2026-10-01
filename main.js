@@ -296,6 +296,7 @@ const multiplayer=new Multiplayer({
   scene,
   player,
   getLevel:()=>houseMode,
+  getFlashlightOn:()=>flashlightOn,
   onStatus:(message)=>{
     if(!message) return;
     eventText.textContent=message;
