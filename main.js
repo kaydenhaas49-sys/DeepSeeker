@@ -25,6 +25,8 @@ const saveInfo=document.getElementById("saveInfo");
 const lobbyModeTitle=document.getElementById("lobbyModeTitle");
 const roomCode=document.getElementById("roomCode");
 const lobbyPlayers=document.getElementById("lobbyPlayers");
+const lobbySlots=document.getElementById("lobbySlots");
+const lobbyHostBadge=document.getElementById("lobbyHostBadge");
 const startLobbyButton=document.getElementById("startLobbyButton");
 const copyLobbyButton=document.getElementById("copyLobbyButton");
 const leaveLobbyButton=document.getElementById("leaveLobbyButton");
@@ -285,6 +287,38 @@ const multiplayer=new Multiplayer({
     if(params.get("lobby")==="1"){
       lobbyPlayers.textContent="PLAYERS "+count+"/"+max;
     }
+  },
+  onRoster:(players)=>{
+    const params=new URLSearchParams(location.search);
+    if(params.get("lobby")!=="1") return;
+
+    const host=params.get("host")==="1";
+    lobbyHostBadge.textContent=host ? "HOST" : "GUEST";
+    startLobbyButton.textContent=host ? "START GAME" : "WAITING FOR HOST";
+    startLobbyButton.disabled=!host;
+    startLobbyButton.style.opacity=host ? "1" : ".45";
+
+    const slots=[];
+    for(let i=0;i<4;i++){
+      const p=players[i];
+      if(p){
+        slots.push(`
+          <div class="lobbySlot">
+            <div class="lobbySlotTop">
+              <div class="lobbySlotName">${p.self ? "YOU — " : ""}${String(p.name).replace(/[<>&"]/g,"").slice(0,20)}</div>
+              <div class="lobbySlotStatus">${i===0 ? "HOST" : "READY"}</div>
+            </div>
+          </div>
+        `);
+      }else{
+        slots.push(`
+          <div class="lobbySlot empty">
+            <div class="lobbySlotEmpty">WAITING FOR PLAYER…</div>
+          </div>
+        `);
+      }
+    }
+    lobbySlots.innerHTML=slots.join("");
   }
 });
 
