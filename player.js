@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
 import { Capsule } from "three/addons/math/Capsule.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -42,6 +43,12 @@ export class Player {
     );
     this.ignoreWorldCollision = false;
 
+    this.characterModel = null;
+    this.characterMixer = null;
+    this.characterFlashlight = null;
+    this.characterFlashlightLens = null;
+    this.characterLoaded = false;
+
     camera.rotation.order = "YXZ";
     this.setupHands();
 
@@ -79,175 +86,205 @@ export class Player {
 
   setupHands() {
     this.hands = new THREE.Group();
-    this.hands.name = "FirstPersonViewmodel";
+    this.hands.name = "FirstPersonHazmatViewmodel";
     this.hands.renderOrder = 1000;
     this.hands.visible = true;
     this.camera.add(this.hands);
 
-    this.handMixers = [];
+    this.characterRoot = new THREE.Group();
+    this.characterRoot.name = "BackroomsHazmatCharacter";
+    this.characterRoot.position.set(0,-1.58,-0.08);
+    this.characterRoot.scale.setScalar(0.94);
+    this.characterRoot.renderOrder = 1000;
+    this.hands.add(this.characterRoot);
+
     this.handModels = [];
-    this.viewmodelFlashlight = null;
-    this.viewmodelFlashlightLens = null;
+    this.loadCharacterModel();
+  }
 
-    const skinMaterial = new THREE.MeshStandardMaterial({
-      color: 0xc58f6d,
-      roughness: 0.92,
-      metalness: 0,
+  loadCharacterModel() {
+    const loader = new GLTFLoader();
+
+    loader.load(
+      "./assets/backrooms_rigged_hazmat.glb",
+      (gltf)=>{
+        const model=gltf.scene;
+        model.name="Loco_BackroomsRiggedHazmat";
+        model.traverse((obj)=>{
+          if(!obj.isMesh) return;
+          obj.frustumCulled=false;
+          obj.renderOrder=1000;
+          obj.castShadow=false;
+          obj.receiveShadow=false;
+
+          const mats=Array.isArray(obj.material)?obj.material:[obj.material];
+          for(const mat of mats){
+            if(!mat) continue;
+            mat.toneMapped=true;
+          }
+
+          // Keep the camera out of the head/face geometry in first person.
+          if(obj.name && /head|face|gasmask|mask/i.test(obj.name)){
+            obj.visible=false;
+          }
+        });
+
+        const box=new THREE.Box3().setFromObject(model);
+        const size=box.getSize(new THREE.Vector3());
+        const height=Math.max(size.y,0.001);
+        const scale=1.78/height;
+
+        model.scale.multiplyScalar(scale);
+
+        const scaledBox=new THREE.Box3().setFromObject(model);
+        const scaledCenter=scaledBox.getCenter(new THREE.Vector3());
+        model.position.set(
+          -scaledCenter.x,
+          -scaledBox.min.y,
+          -scaledCenter.z
+        );
+
+        this.characterRoot.add(model);
+        this.characterModel=model;
+        this.characterLoaded=true;
+
+        const clip=gltf.animations?.[0];
+        if(clip){
+          this.characterMixer=new THREE.AnimationMixer(model);
+          const action=this.characterMixer.clipAction(clip);
+          action.setLoop(THREE.LoopRepeat,Infinity);
+          action.play();
+          this.characterMixer._deepseekerAction=action;
+        }
+
+        const hand=this.findRightHandBone(model);
+        const flashlight=this.buildHeldFlashlight();
+        hand.add(flashlight);
+
+        this.characterFlashlight=flashlight;
+
+        console.log(
+          "[DeepSeeker] hazmat model ready",
+          "animation:",clip?.name||"none",
+          "hand:",hand.name
+        );
+      },
+      undefined,
+      (error)=>{
+        console.error("[DeepSeeker] hazmat model failed to load:",error);
+      }
+    );
+  }
+
+  findRightHandBone(root){
+    let best=null;
+    root.traverse((obj)=>{
+      if(!obj.isBone) return;
+      const n=(obj.name||"").toLowerCase();
+
+      if(
+        /righthand|hand_r|hand.r|right_hand|mixamorig.*righthand|rightwrist/.test(n)
+      ){
+        best=best||obj;
+      }
     });
 
-    const sleeveMaterial = new THREE.MeshStandardMaterial({
-      color: 0x30332e,
-      roughness: 1,
-      metalness: 0,
+    if(best) return best;
+
+    root.traverse((obj)=>{
+      if(!obj.isBone || best) return;
+      const n=(obj.name||"").toLowerCase();
+      if(/hand|wrist/.test(n)) best=obj;
     });
 
-    const flashlightBodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0x161816,
-      roughness: 0.62,
-      metalness: 0.35,
+    return best||root;
+  }
+
+  buildHeldFlashlight(){
+    const bodyMat=new THREE.MeshStandardMaterial({
+      color:0x171917,
+      roughness:.6,
+      metalness:.35
     });
 
-    const flashlightRingMaterial = new THREE.MeshStandardMaterial({
-      color: 0x56574d,
-      roughness: 0.38,
-      metalness: 0.7,
+    const ringMat=new THREE.MeshStandardMaterial({
+      color:0x55564c,
+      roughness:.38,
+      metalness:.7
     });
 
-    const flashlightLensMaterial = new THREE.MeshStandardMaterial({
-      color: 0xf4e8be,
-      emissive: 0xd8bd72,
-      emissiveIntensity: 2.4,
-      roughness: 0.28,
-      metalness: 0.04,
+    const lensMat=new THREE.MeshStandardMaterial({
+      color:0xf4e8be,
+      emissive:0xd8bd72,
+      emissiveIntensity:2.4,
+      roughness:.28,
+      metalness:.04
     });
 
-    const makeArm = (side) => {
-      const group = new THREE.Group();
-      group.name = side < 0 ? "LeftViewmodelArm" : "RightViewmodelArm";
-      group.renderOrder = 1000;
-      group.frustumCulled = false;
-
-      // A broad forearm reads as an arm instead of a weapon barrel.
-      const sleeve = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.12, 0.58, 5, 8),
-        sleeveMaterial
-      );
-      sleeve.name = side < 0 ? "LeftSleeve" : "RightSleeve";
-      sleeve.rotation.z = THREE.MathUtils.degToRad(side * 7);
-      sleeve.rotation.x = THREE.MathUtils.degToRad(-18);
-      sleeve.renderOrder = 1000;
-      sleeve.frustumCulled = false;
-
-      const hand = new THREE.Mesh(
-        new THREE.SphereGeometry(0.13, 10, 8),
-        skinMaterial
-      );
-      hand.name = side < 0 ? "LeftHand" : "RightHand";
-      hand.scale.set(0.92, 1.08, 0.88);
-      hand.renderOrder = 1001;
-      hand.frustumCulled = false;
-
-      group.add(sleeve, hand);
-      this.handModels.push(group);
-      this.hands.add(group);
-
-      return {group, hand};
-    };
-
-    const left = makeArm(-1);
-    const right = makeArm(1);
-
-    // One flashlight, parented directly to the right-hand viewmodel so it
-    // cannot visually separate from the hand.
-    const flashlight = new THREE.Group();
-    flashlight.name = "HeldFlashlight";
-    flashlight.position.set(0, -0.20, -0.28);
+    const flashlight=new THREE.Group();
+    flashlight.name="HeldFlashlight";
+    flashlight.position.set(0.055,-0.07,-0.13);
     flashlight.rotation.set(
-      THREE.MathUtils.degToRad(-3),
-      0,
-      THREE.MathUtils.degToRad(-2)
+      THREE.MathUtils.degToRad(-8),
+      THREE.MathUtils.degToRad(-2),
+      THREE.MathUtils.degToRad(2)
     );
 
-    const body = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.058, 0.07, 0.58, 12),
-      flashlightBodyMaterial
+    const body=new THREE.Mesh(
+      new THREE.CylinderGeometry(.055,.066,.50,10),
+      bodyMat
     );
-    body.rotation.x = Math.PI / 2;
-    body.position.z = 0.02;
-    body.renderOrder = 1002;
-    body.frustumCulled = false;
+    body.rotation.x=Math.PI/2;
 
-    const head = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.095, 0.068, 0.17, 12),
-      flashlightBodyMaterial
+    const head=new THREE.Mesh(
+      new THREE.CylinderGeometry(.092,.067,.15,10),
+      bodyMat
     );
-    head.rotation.x = Math.PI / 2;
-    head.position.z = -0.34;
-    head.renderOrder = 1002;
-    head.frustumCulled = false;
+    head.rotation.x=Math.PI/2;
+    head.position.z=-.30;
 
-    const bezel = new THREE.Mesh(
-      new THREE.TorusGeometry(0.098, 0.012, 6, 16),
-      flashlightRingMaterial
+    const bezel=new THREE.Mesh(
+      new THREE.TorusGeometry(.094,.011,6,14),
+      ringMat
     );
-    bezel.rotation.x = Math.PI / 2;
-    bezel.position.z = -0.43;
-    bezel.renderOrder = 1003;
-    bezel.frustumCulled = false;
+    bezel.rotation.x=Math.PI/2;
+    bezel.position.z=-.375;
 
-    const lens = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.076, 0.076, 0.022, 14),
-      flashlightLensMaterial
+    const lens=new THREE.Mesh(
+      new THREE.CylinderGeometry(.073,.073,.022,12),
+      lensMat
     );
-    lens.rotation.x = Math.PI / 2;
-    lens.position.z = -0.445;
-    lens.renderOrder = 1004;
-    lens.frustumCulled = false;
+    lens.rotation.x=Math.PI/2;
+    lens.position.z=-.388;
 
-    const rearCap = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.068, 0.068, 0.05, 12),
-      flashlightRingMaterial
+    const rear=new THREE.Mesh(
+      new THREE.CylinderGeometry(.064,.064,.04,10),
+      ringMat
     );
-    rearCap.rotation.x = Math.PI / 2;
-    rearCap.position.z = 0.32;
-    rearCap.renderOrder = 1002;
-    rearCap.frustumCulled = false;
+    rear.rotation.x=Math.PI/2;
+    rear.position.z=.278;
 
-    flashlight.add(body, head, bezel, lens, rearCap);
-    right.group.add(flashlight);
+    flashlight.add(body,head,bezel,lens,rear);
 
-    // Put the two arms low enough that they frame the view instead of reading
-    // as two separate objects in the center of the screen.
-    left.group.position.set(-0.42, -0.62, -0.95);
-    right.group.position.set(0.45, -0.62, -0.94);
+    flashlight.traverse(obj=>{
+      obj.renderOrder=1100;
+      if(obj.isMesh) obj.frustumCulled=false;
+    });
 
-    left.group.rotation.set(
-      THREE.MathUtils.degToRad(7),
-      0,
-      THREE.MathUtils.degToRad(-5)
-    );
-    right.group.rotation.set(
-      THREE.MathUtils.degToRad(4),
-      0,
-      THREE.MathUtils.degToRad(5)
-    );
-
-    // The flashlight is now physically attached to the right hand.
-    right.hand.position.set(0, -0.34, -0.19);
-    right.hand.scale.set(1.0, 1.15, 0.88);
-    left.hand.position.set(0, -0.34, -0.18);
-
-    this.viewmodelFlashlight = flashlight;
-    this.viewmodelFlashlightLens = lens;
-
+    this.characterFlashlightLens=lens;
     this.setFlashlightVisual(true);
+    return flashlight;
   }
   setFlashlightVisual(on){
-    if(!this.viewmodelFlashlight || !this.viewmodelFlashlightLens) return;
+    const lens=this.characterFlashlightLens;
+    if(!lens) return;
 
-    this.viewmodelFlashlight.visible=true;
-    this.viewmodelFlashlightLens.material.emissiveIntensity=on ? 2.4 : 0.18;
-    this.viewmodelFlashlightLens.material.color.set(on ? 0xf1e5b7 : 0x555448);
+    lens.material.emissiveIntensity=on ? 2.4 : 0.18;
+    lens.material.color.set(on ? 0xf1e5b7 : 0x555448);
+
+    if(this.characterFlashlight){
+      this.characterFlashlight.visible=true;
+    }
   }
 
   attach() {
@@ -394,44 +431,63 @@ export class Player {
     this.camera.position.set(this.pos.x, eye + this.bobOffset + this.jumpY, this.pos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0);
 
+    if(this.characterMixer) {
+      this.characterMixer.update(dt);
+    }
+
+    if(this.characterLoaded && this.characterRoot){
+      const walkAmount=Math.min(1,hSpeed/WALK_SPEED);
+      const viewBob=Math.sin(this.bobPhase)*0.018*walkAmount;
+      const sway=Math.cos(this.bobPhase)*0.012*walkAmount;
+
+      this.characterRoot.position.y=-1.58 + this.bobOffset*0.65 + viewBob;
+      this.characterRoot.position.x=sway;
+      this.characterRoot.rotation.z=sway*0.15;
+
+      if(this.characterFlashlight){
+        this.characterFlashlight.rotation.z=
+          THREE.MathUtils.degToRad(2)+sway*1.8;
+      }
+    }
+
     // --- first-person hands ---
-    if (this.hands && this.hands.visible) {
+    if (this.hands && this.hands.visible && !this.characterLoaded) {
       // Viewmodel arms should never visibly pass through walls. When the
       // player gets close to a wall, retract the simple arm rectangles toward
       // the camera until they are safely on the player's side.
       let nearestWall = Infinity;
       for (const wall of this.world.getNearbyWallBounds(this.pos.x, this.pos.z, 1.2)) {
-        const nx = Math.max(wall.minX, Math.min(this.pos.x, wall.maxX));
-        const nz = Math.max(wall.minZ, Math.min(this.pos.z, wall.maxZ));
-        nearestWall = Math.min(
-          nearestWall,
-          Math.hypot(this.pos.x - nx, this.pos.z - nz)
-        );
+      const nx = Math.max(wall.minX, Math.min(this.pos.x, wall.maxX));
+      const nz = Math.max(wall.minZ, Math.min(this.pos.z, wall.maxZ));
+      nearestWall = Math.min(
+      nearestWall,
+      Math.hypot(this.pos.x - nx, this.pos.z - nz)
+      );
       }
       const wallNear = nearestWall < 0.9;
       const armDepthTarget = wallNear ? -0.30 : -0.92;
-
+      
       const moving = hSpeed > 0.5 ? Math.min(1, hSpeed / RUN_SPEED) : 0;
       const sway = moving ? Math.sin(this.bobPhase) * 0.018 : Math.sin(this.bobPhase * 0.35) * 0.004;
       const lift = moving ? Math.abs(Math.cos(this.bobPhase)) * 0.012 : 0;
-
+      
       for (let i = 0; i < this.handModels.length; i++) {
-        const side = i === 0 ? -1 : 1;
-        const pivot = this.handModels[i];
-        const baseX = side < 0 ? -0.42 : 0.45;
-        const baseY = -0.62 - (this.crouched ? 0.08 : 0);
-        const baseZ = -0.95;
-
-        pivot.position.x = baseX + sway * side * 0.22;
-        pivot.position.y = baseY + lift * 0.55;
-        pivot.position.z += (baseZ - pivot.position.z) * (1 - Math.exp(-18 * dt));
-
-        pivot.rotation.z =
-          THREE.MathUtils.degToRad(side * 5) + sway * side * 0.8;
+      const side = i === 0 ? -1 : 1;
+      const pivot = this.handModels[i];
+      const baseX = side < 0 ? -0.42 : 0.45;
+      const baseY = -0.62 - (this.crouched ? 0.08 : 0);
+      const baseZ = -0.95;
+      
+      pivot.position.x = baseX + sway * side * 0.22;
+      pivot.position.y = baseY + lift * 0.55;
+      pivot.position.z += (baseZ - pivot.position.z) * (1 - Math.exp(-18 * dt));
+      
+      pivot.rotation.z =
+      THREE.MathUtils.degToRad(side * 5) + sway * side * 0.8;
       }
-
+      
       if(this.viewmodelFlashlight){
-        this.viewmodelFlashlight.rotation.z=THREE.MathUtils.degToRad(-2)+sway*0.9;
+      this.viewmodelFlashlight.rotation.z=THREE.MathUtils.degToRad(-2)+sway*0.9;
       }
     }
   }
