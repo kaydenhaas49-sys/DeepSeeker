@@ -213,6 +213,7 @@ export class World {
     this.root = new THREE.Group();
     this.lastStreamCX = null;
     this.lastStreamCZ = null;
+    this.streamNeedsWork = true;
     this.wallQueryScratch = [];
     scene.add(this.root);
 
@@ -277,12 +278,17 @@ export class World {
     const pcx = Math.floor(px / CHUNK_SIZE);
     const pcz = Math.floor(pz / CHUNK_SIZE);
 
-    if(pcx===this.lastStreamCX && pcz===this.lastStreamCZ){
-      return;
+    const movedChunk=pcx!==this.lastStreamCX || pcz!==this.lastStreamCZ;
+
+    if(movedChunk){
+      this.lastStreamCX=pcx;
+      this.lastStreamCZ=pcz;
+      this.streamNeedsWork=true;
     }
 
-    this.lastStreamCX=pcx;
-    this.lastStreamCZ=pcz;
+    if(!this.streamNeedsWork){
+      return;
+    }
 
     // Generate missing chunks within radius, nearest first (1–2 per frame).
     const missing = [];
@@ -301,6 +307,8 @@ export class World {
       if (budget-- <= 0) break;
       this.spawnChunk(cx, cz);
     }
+
+    this.streamNeedsWork=missing.length> (LOW_END_DEVICE ? 1 : 2);
 
     // Dispose chunks beyond the dispose radius.
     for (const [key, entry] of this.chunks) {
