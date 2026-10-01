@@ -59,7 +59,7 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 .lobbyHeaderLabel{font-size:9px;letter-spacing:3px;color:#9f987d;margin-bottom:5px}
 .lobbyHeaderValue{font-size:18px;letter-spacing:3px;color:#efe8c5}
 .roomCodeSmall{font-size:22px;letter-spacing:6px;color:#eee6bd}
-.lobbySlots{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.lobbySlots{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;max-height:360px;overflow:auto;padding-right:4px}
 .lobbySlot{min-height:66px;padding:12px;box-sizing:border-box;border:1px solid rgba(229,218,170,.12);border-radius:10px;background:rgba(255,255,255,.055);display:flex;flex-direction:column;justify-content:center;box-shadow:inset 0 1px rgba(255,255,255,.035)}
 .lobbySlot.empty{border-style:dashed;opacity:.65}
 .lobbySlotTop{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -112,7 +112,7 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 #phone.open + #phoneHint{opacity:1}
 
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-@media(max-width:700px){.grid{grid-template-columns:1fr}}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.lobbySlots{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -225,7 +225,7 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
       <div class="lobbyDivider"></div>
 
       <div class="lobbyFooter">
-        <div class="lobbyPlayerCount" id="lobbyPlayers">PLAYERS 1/4</div>
+        <div class="lobbyPlayerCount" id="lobbyPlayers">PLAYERS 1/10</div>
         <div class="lobbyHostBadge" id="lobbyHostBadge">HOST</div>
       </div>
     </div>
