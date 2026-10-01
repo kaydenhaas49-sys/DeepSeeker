@@ -47,7 +47,7 @@ export class Player {
         e.preventDefault();
       }
       if(e.repeat && (e.code === "KeyC" || e.code === "Space")) return;
-      if(e.code === "KeyC") this.crouched = !this.crouched;
+      if(e.code === "KeyC" && this.locked) this.crouched = !this.crouched;
       if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched){
         this.jumpVelocity = 4.8;
         this.stamina = Math.max(0, this.stamina - 8);
