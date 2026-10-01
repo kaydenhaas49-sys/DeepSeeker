@@ -41,12 +41,12 @@ scene.fog=new THREE.Fog(0x030302,14,62);
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
 const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
 
-const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,.08);
+const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,.32);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0x8f815d,.02);
+const ambient=new THREE.AmbientLight(0x8f815d,.12);
 scene.add(ambient);
 
-const playerLight=new THREE.PointLight(0xb59b68,2.0,24,1.9);
+const playerLight=new THREE.PointLight(0xb59b68,7.5,24,1.9);
 scene.add(playerLight);
 
 const flashlight=new THREE.SpotLight(0xf0dfad,27,60,Math.PI/6,.82,1.5);
@@ -496,8 +496,8 @@ function animate(){
     ambient.intensity=.045*(1-pulse*.65);
   }else{
     vignette.style.opacity=".70";
-    hemi.intensity=.08;
-    ambient.intensity=.02;
+    hemi.intensity=.32;
+    ambient.intensity=.12;
   }
 
   const stamina=player.stamina;
