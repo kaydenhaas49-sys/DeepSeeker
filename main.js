@@ -83,6 +83,9 @@ let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
 
+const houseDoors=[];
+const houseDoorPattern=/door|doors|porte|puerta|pintu/i;
+
 const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
 houseRoot.visible=false;
@@ -130,6 +133,57 @@ const houseReturn=housePortal.clone();
 const houseReturnLight=housePortalLight.clone();
 houseReturnGroup.add(houseReturn,houseReturnLight);
 scene.add(houseReturnGroup);
+
+function setupHouseDoors(root){
+  houseDoors.length=0;
+  root.traverse((obj)=>{
+    if(obj===root || !obj.name || !houseDoorPattern.test(obj.name)) return;
+    const pivot=new THREE.Group();
+    pivot.name="DoorPivot_"+obj.name;
+    const parent=obj.parent;
+    if(!parent) return;
+    obj.updateMatrixWorld(true);
+    const world=new THREE.Matrix4().copy(obj.matrixWorld);
+    const wp=new THREE.Vector3().setFromMatrixPosition(world);
+    const invParent=new THREE.Matrix4().copy(parent.matrixWorld).invert();
+    wp.applyMatrix4(invParent);
+    pivot.position.copy(wp);
+    parent.add(pivot);
+    pivot.updateMatrixWorld(true);
+    const local=new THREE.Matrix4().multiplyMatrices(
+      new THREE.Matrix4().copy(pivot.matrixWorld).invert(),
+      world
+    );
+    pivot.add(obj);
+    local.decompose(obj.position,obj.quaternion,obj.scale);
+    houseDoors.push({pivot,target:0,angle:obj.name.length%2?Math.PI/2:-Math.PI/2});
+  });
+  console.log("[DeepSeeker] doors found:",houseDoors.map(d=>d.pivot.name));
+}
+
+function updateHouseDoors(dt){
+  for(const door of houseDoors){
+    door.target += (door.target===1 ? 0 : 0);
+    const current=door.pivot.userData.openProgress||0;
+    const next=THREE.MathUtils.lerp(current,door.pivot.userData.target||0,Math.min(1,dt*6));
+    door.pivot.userData.openProgress=next;
+    door.pivot.rotation.y=door.angle*next;
+  }
+}
+
+function toggleHouseDoor(){
+  let best=null,bestDist=999;
+  const p=player.pos;
+  const wp=new THREE.Vector3();
+  for(const door of houseDoors){
+    door.pivot.getWorldPosition(wp);
+    const d=Math.hypot(wp.x-p.x,wp.z-p.z);
+    if(d<2.7 && d<bestDist){best=door;bestDist=d;}
+  }
+  if(!best) return false;
+  best.pivot.userData.target=(best.pivot.userData.target||0)>0.5?0:1;
+  return true;
+}
 
 function loadHouse(){
   const houseUrl=new URL(HOUSE_MODEL_PATH,import.meta.url).href;
@@ -185,6 +239,8 @@ function loadHouse(){
         -center.z
       );
       houseModel.updateMatrixWorld(true);
+
+      setupHouseDoors(houseModel);
 
       // Spawn at the model's normalized center.
       houseSpawn.set(0,EYE,0);
@@ -266,6 +322,7 @@ function tryHouseTeleport(){
   }
 
   if(houseMode){
+    if(toggleHouseDoor()) return;
     const d=Math.hypot(player.pos.x,player.pos.z);
     if(d<2.6) setHouseMode(false);
     return;
@@ -709,6 +766,7 @@ function animate(){
   const t=clock.elapsedTime;
 
   player.update(dt);
+  if(houseMode) updateHouseDoors(dt);
   if(!houseMode) updateStoryProgress();
   world.update(player.pos.x,player.pos.z);
   world.updateFlicker(t);
