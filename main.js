@@ -131,22 +131,51 @@ bacteriaLoader.load(
     // Only borrow the UniMate animation clips from their matching rigs.
     bacteriaMixer=new THREE.AnimationMixer(model);
 
-    Promise.all([
-      new Promise((resolve,reject)=>bacteriaLoader.load("./assets/bacteria/bacteria_idle.glb",resolve,undefined,reject)),
-      new Promise((resolve,reject)=>bacteriaLoader.load("./assets/bacteria/bacteria_stalk.glb",resolve,undefined,reject)),
-      new Promise((resolve,reject)=>bacteriaLoader.load("./assets/bacteria/bacteria_chase.glb",resolve,undefined,reject))
-    ]).then(([idleGltf,stalkGltf,chaseGltf])=>{
-      bacteriaActions={
-        idle:bacteriaMixer.clipAction(idleGltf.animations[0]),
-        stalk:bacteriaMixer.clipAction(stalkGltf.animations[0]),
-        chase:bacteriaMixer.clipAction(chaseGltf.animations[0])
-      };
-      setBacteriaAnimation("idle");
-      eventText.textContent="BACTERIA ANIMATIONS READY";
-      eventText.style.opacity="1";
-      setTimeout(()=>{eventText.style.opacity="0";},2200);
-    }).catch(error=>{
-      console.warn("Bacteria animations failed to load; entity remains unchanged.",error);
+    const loadAnimationClip=async(path)=>{
+      let lastError=null;
+      for(let attempt=0;attempt<3;attempt++){
+        try{
+          const gltf=await new Promise((resolve,reject)=>{
+            bacteriaLoader.load(
+              path,
+              resolve,
+              undefined,
+              reject
+            );
+          });
+          const clip=gltf.animations?.[0];
+          if(clip) return clip;
+          throw new Error("No animation clip in "+path);
+        }catch(error){
+          lastError=error;
+          await new Promise(resolve=>setTimeout(resolve,120*(attempt+1)));
+        }
+      }
+      throw lastError||new Error("Failed to load "+path);
+    };
+
+    Promise.allSettled([
+      loadAnimationClip("./assets/bacteria/bacteria_idle.glb"),
+      loadAnimationClip("./assets/bacteria/bacteria_stalk.glb"),
+      loadAnimationClip("./assets/bacteria/bacteria_chase.glb")
+    ]).then(results=>{
+      const [idle,stalk,chase]=results.map(result=>result.status==="fulfilled"?result.value:null);
+
+      bacteriaActions={};
+      if(idle) bacteriaActions.idle=bacteriaMixer.clipAction(idle);
+      if(stalk) bacteriaActions.stalk=bacteriaMixer.clipAction(stalk);
+      if(chase) bacteriaActions.chase=bacteriaMixer.clipAction(chase);
+
+      const firstState=bacteriaActions.idle?"idle":bacteriaActions.stalk?"stalk":"chase";
+      if(bacteriaActions[firstState]){
+        setBacteriaAnimation(firstState);
+        eventText.textContent="BACTERIA ANIMATIONS READY";
+        eventText.style.opacity="1";
+        setTimeout(()=>{eventText.style.opacity="0";},2200);
+      }
+
+      const failed=results.filter(result=>result.status==="rejected").length;
+      if(failed) console.warn(`Bacteria animation assets failed: ${failed}/3`);
     });
 
     if (debugSpawnBacteria) {
