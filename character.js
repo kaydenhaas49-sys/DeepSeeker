@@ -188,13 +188,23 @@ function pickIdleAnimation(clips){
   if(!clips || !clips.length) return null;
 
   const ranked = clips.map((clip, index)=>{
-    const name = (clip.name || "").toLowerCase().replace(/[\s_-]+/g, "");
+    const name = (clip.name || "").toLowerCase().replace(/[\\s_-]+/g, "");
 
     let score = 0;
 
+    // Prefer an explicitly named idle/standing animation.
     if(/idle|standing|stand|rest|neutral|breath/.test(name)) score += 100;
-    if(/run|running|sprint|walk|walking|jog/.test(name)) score -= 80;
-    if(/jump|fall|attack|hit|death|crouch/.test(name)) score -= 60;
+
+    // Strongly avoid movement/action clips for the default pose.
+    if(/run|running|sprint|walk|walking|jog|move|locomot/.test(name)) score -= 120;
+    if(/jump|fall|attack|hit|death|crouch|roll|slide/.test(name)) score -= 100;
+
+    // When names are generic (common with exported GLBs), prefer a
+    // reasonably sized clip over a tiny one-shot clip.
+    if(clip.duration >= 1.5 && clip.duration <= 6.0) score += 10;
+    if(clip.duration < 0.75) score -= 20;
+
+    // Keep original order as a final tiebreaker.
     score -= index * 0.01;
 
     return {clip, score};
@@ -202,12 +212,20 @@ function pickIdleAnimation(clips){
 
   ranked.sort((a,b)=>b.score-a.score);
 
-  // If the file has a clearly named idle/standing clip, use it.
   if(ranked[0].score >= 50) return ranked[0].clip;
 
-  // Otherwise keep the character in its bind/rest pose instead of blindly
-  // playing whatever animation happened to be exported first.
-  return null;
+  // Some Sketchfab/GLTF exports use generic names for all clips.
+  // In that case, never leave the character in a T-pose: take the first
+  // clip that is not obviously locomotion/action.
+  const safe = ranked.find(({clip})=>{
+    const name = (clip.name || "").toLowerCase();
+    return !/run|running|sprint|walk|walking|jog|jump|fall|attack|hit|death|crouch|roll|slide|move|locomot/.test(name);
+  });
+
+  if(safe) return safe.clip;
+
+  // Last-resort fallback for files with completely generic clip names.
+  return clips[1] || clips[0];
 }
 
 export async function createHazmatCharacter(){
