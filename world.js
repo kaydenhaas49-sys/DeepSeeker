@@ -164,10 +164,12 @@ export function generateChunk(cx, cz, seed) {
 // Chunk meshes + chunk manager
 // ---------------------------------------------------------------------------
 
+const QUALITY_PARAM=new URLSearchParams(location.search).get("quality");
 const LOW_END_DEVICE=
-  ((navigator.deviceMemory||8)<=4 && (navigator.hardwareConcurrency||8)<=6) ||
-  (navigator.hardwareConcurrency||8)<=4 ||
-  new URLSearchParams(location.search).get("quality")==="low";
+  QUALITY_PARAM==="low" ||
+  (QUALITY_PARAM!=="high" && /CrOS/i.test(navigator.userAgent)) ||
+  (navigator.deviceMemory||8)<=4 ||
+  (navigator.hardwareConcurrency||8)<=4;
 const R_GENERATE = LOW_END_DEVICE ? 1 : 2;
 const R_DISPOSE = LOW_END_DEVICE ? 1 : 3;
 const PANEL_W = 2.2; // light fixture size (m)
