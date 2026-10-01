@@ -13,7 +13,22 @@ const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
 
 const container=document.getElementById("app");
 const overlay=document.getElementById("overlay");
+const loadingScreen=document.getElementById("loadingScreen");
+const homeScreen=document.getElementById("homeScreen");
+const lobbyScreen=document.getElementById("lobbyScreen");
 const prompt=document.getElementById("prompt");
+const newGameButton=document.getElementById("newGameButton");
+const continueButton=document.getElementById("continueButton");
+const createLobbyButton=document.getElementById("createLobbyButton");
+const joinLobbyButton=document.getElementById("joinLobbyButton");
+const saveInfo=document.getElementById("saveInfo");
+const lobbyModeTitle=document.getElementById("lobbyModeTitle");
+const roomCode=document.getElementById("roomCode");
+const lobbyPlayers=document.getElementById("lobbyPlayers");
+const startLobbyButton=document.getElementById("startLobbyButton");
+const copyLobbyButton=document.getElementById("copyLobbyButton");
+const leaveLobbyButton=document.getElementById("leaveLobbyButton");
+const saveGameButton=document.getElementById("saveGameButton");
 const crosshair=document.getElementById("crosshair");
 const controls=document.getElementById("controlsPanel");
 const staminaBar=document.getElementById("staminaBar");
@@ -85,6 +100,164 @@ let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
 let houseLoadFailed=false;
+let gameStarted=false;
+let lastAutoSave=0;
+let pendingSaveLoad=null;
+
+const SAVE_KEY="deepseeker-save-v1";
+
+function getSavedGame(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch{
+    return null;
+  }
+}
+
+function refreshSaveInfo(){
+  const save=getSavedGame();
+  if(!save){
+    saveInfo.textContent="NO SAVE DATA";
+    continueButton.disabled=true;
+    continueButton.style.opacity=".45";
+    return;
+  }
+
+  const when=save.savedAt ? new Date(save.savedAt).toLocaleString() : "UNKNOWN";
+  saveInfo.textContent=`SAVE FOUND · ${when}`;
+  continueButton.disabled=false;
+  continueButton.style.opacity="1";
+}
+
+function saveGame(){
+  const data={
+    version:1,
+    seed:SEED,
+    savedAt:Date.now(),
+    x:player.pos.x,
+    z:player.pos.z,
+    yaw:player.yaw,
+    pitch:player.pitch,
+    storyStage,
+    maxStoryDistance,
+    battery,
+    flashlightOn,
+    houseMode
+  };
+
+  try{
+    localStorage.setItem(SAVE_KEY,JSON.stringify(data));
+    refreshSaveInfo();
+    eventText.textContent="GAME SAVED";
+    eventText.style.opacity="1";
+    setTimeout(()=>{
+      if(eventText.textContent==="GAME SAVED") eventText.style.opacity="0";
+    },1100);
+  }catch(error){
+    console.error("Save failed:",error);
+    eventText.textContent="SAVE FAILED";
+    eventText.style.opacity="1";
+  }
+}
+
+function applySavedGame(data){
+  if(!data) return;
+
+  player.pos.set(
+    Number.isFinite(data.x)?data.x:32,
+    EYE,
+    Number.isFinite(data.z)?data.z:32
+  );
+  player.yaw=Number.isFinite(data.yaw)?data.yaw:0;
+  player.pitch=Number.isFinite(data.pitch)?data.pitch:0;
+  player.vel.set(0,0,0);
+  player.jumpY=0;
+  player.jumpVelocity=0;
+
+  battery=Number.isFinite(data.battery)?THREE.MathUtils.clamp(data.battery,0,100):100;
+  flashlightOn=data.flashlightOn!==false;
+
+  const stage=Number.isInteger(data.storyStage)
+    ?THREE.MathUtils.clamp(data.storyStage,0,STORY.length-1)
+    :0;
+  maxStoryDistance=Number.isFinite(data.maxStoryDistance)?data.maxStoryDistance:0;
+  applyStoryStage(stage,false);
+
+  if(data.houseMode && houseLoaded){
+    setHouseMode(true);
+  }else{
+    setHouseMode(false);
+  }
+}
+
+function showHomeScreen(){
+  loadingScreen.style.display="none";
+  homeScreen.classList.remove("hidden");
+  lobbyScreen.classList.add("hidden");
+  refreshSaveInfo();
+}
+
+function showLobbyScreen(){
+  loadingScreen.style.display="none";
+  homeScreen.classList.add("hidden");
+  lobbyScreen.classList.remove("hidden");
+
+  const params=new URLSearchParams(location.search);
+  const code=(params.get("room")||"").toUpperCase();
+  const host=params.get("host")==="1";
+  roomCode.textContent=code||"------";
+  lobbyModeTitle.textContent=host?"CREATE LOBBY":"JOIN LOBBY";
+  startLobbyButton.textContent=host?"START GAME":"READY / START";
+  startLobbyButton.style.display="block";
+}
+
+function startGame(save=null){
+  gameStarted=true;
+  overlay.classList.add("hidden");
+  audio.start();
+  if(save) applySavedGame(save);
+  player.lock();
+}
+
+function continueGame(){
+  const save=getSavedGame();
+  if(!save) return;
+
+  if(save.seed!==SEED){
+    const params=new URLSearchParams(location.search);
+    params.set("seed",String(save.seed));
+    params.delete("save");
+    location.href=location.pathname+"?"+params.toString()+"&save=1";
+    return;
+  }
+
+  startGame(save);
+}
+
+function resetForNewGame(){
+  player.pos.set(32,EYE,32);
+  player.yaw=0;
+  player.pitch=0;
+  player.vel.set(0,0,0);
+  battery=100;
+  flashlightOn=true;
+  maxStoryDistance=0;
+  setHouseMode(false);
+  applyStoryStage(0,false);
+  startGame();
+}
+
+function enterLobby(code,host){
+  const clean=code.trim().toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);
+  if(!clean){
+    eventText.textContent="INVALID ROOM CODE";
+    eventText.style.opacity="1";
+    return;
+  }
+
+  location.href=location.pathname+`?room=${encodeURIComponent(clean)}&lobby=1&host=${host?1:0}`;
+}
 
 const multiplayerStatus=document.getElementById("multiplayerStatus");
 
@@ -93,9 +266,7 @@ const multiplayer=new Multiplayer({
   player,
   getLevel:()=>houseMode,
   onStatus:(message)=>{
-    if(!message){
-      return;
-    }
+    if(!message) return;
     eventText.textContent=message;
     eventText.style.opacity="1";
     if(
@@ -110,6 +281,10 @@ const multiplayer=new Multiplayer({
   onCount:(count,max)=>{
     multiplayerStatus.textContent="MULTIPLAYER · "+count+"/"+max;
     multiplayerStatus.style.color=count>1 ? "#d8c98a" : "#8d8b76";
+    const params=new URLSearchParams(location.search);
+    if(params.get("lobby")==="1"){
+      lobbyPlayers.textContent="PLAYERS "+count+"/"+max;
+    }
   }
 });
 
@@ -438,11 +613,18 @@ function loadHouse(){
       houseLoadFailed=false;
       houseRoot.visible=false;
 
-      prompt.textContent="CLICK TO ENTER";
+      prompt.textContent="HOUSE READY";
       objective.textContent="Find the glowing teleporter to the house.";
-      eventText.textContent="HOUSE READY";
-      eventText.style.opacity="1";
-      setTimeout(()=>{eventText.style.opacity="0";},1800);
+
+      if(new URLSearchParams(location.search).get("save")==="1"){
+        pendingSaveLoad=getSavedGame();
+      }
+
+      if(new URLSearchParams(location.search).get("lobby")==="1"){
+        showLobbyScreen();
+      }else{
+        showHomeScreen();
+      }
     },
     xhr=>{
       if(xhr.total){
@@ -853,6 +1035,52 @@ function openDeepSeekerApp(){
   phone.classList.add("app-open");
 }
 
+if(saveGameButton){
+  saveGameButton.addEventListener("click",()=>{
+    saveGame();
+  });
+}
+
+newGameButton.addEventListener("click",()=>{
+  resetForNewGame();
+});
+
+continueButton.addEventListener("click",()=>{
+  continueGame();
+});
+
+createLobbyButton.addEventListener("click",()=>{
+  const code=Math.random().toString(36).slice(2,8).toUpperCase();
+  enterLobby(code,true);
+});
+
+joinLobbyButton.addEventListener("click",()=>{
+  const code=window.prompt("Enter the lobby code:");
+  if(code) enterLobby(code,false);
+});
+
+startLobbyButton.addEventListener("click",()=>{
+  startGame();
+});
+
+copyLobbyButton.addEventListener("click",async()=>{
+  const params=new URLSearchParams(location.search);
+  const code=(params.get("room")||"").toUpperCase();
+  const link=location.origin+location.pathname+`?room=${encodeURIComponent(code)}&lobby=1&host=0`;
+
+  try{
+    await navigator.clipboard.writeText(link);
+    copyLobbyButton.textContent="COPIED";
+    setTimeout(()=>copyLobbyButton.textContent="COPY ROOM LINK",1000);
+  }catch{
+    window.prompt("Copy this lobby link:",link);
+  }
+});
+
+leaveLobbyButton.addEventListener("click",()=>{
+  location.href=location.pathname;
+});
+
 deepseekerIcon.addEventListener("click",openDeepSeekerApp);
 phoneHome.addEventListener("click",()=>{
   if(!phoneOpen) return;
@@ -880,17 +1108,17 @@ player.attach();
 prompt.textContent="LOADING HOUSE…";
 applyStoryStage(0,false);
 
-overlay.addEventListener("click",()=>{
+overlay.addEventListener("click",(e)=>{
+  if(e.target!==overlay) return;
   if(!houseLoaded){
-    if(houseLoadFailed){
-      prompt.textContent="HOUSE FAILED TO LOAD";
-    }else{
-      prompt.textContent="PLEASE WAIT — HOUSE LOADING";
-    }
+    prompt.textContent=houseLoadFailed
+      ? "HOUSE FAILED TO LOAD"
+      : "PLEASE WAIT — HOUSE LOADING";
     return;
   }
-  audio.start();
-  player.lock();
+  if(gameStarted){
+    startGame();
+  }
 });
 
 renderer.domElement.addEventListener("click",()=>{
@@ -907,9 +1135,18 @@ controls.addEventListener("click",e=>{
 
 document.addEventListener("pointerlockchange",()=>{
   const locked=document.pointerLockElement===renderer.domElement;
-  if(!controlsOpen && !phoneOpen) overlay.classList.toggle("hidden",locked);
+  if(!controlsOpen && !phoneOpen){
+    if(locked){
+      overlay.classList.add("hidden");
+    }else if(gameStarted){
+      loadingScreen.style.display="flex";
+      homeScreen.classList.add("hidden");
+      lobbyScreen.classList.add("hidden");
+      prompt.textContent="CLICK TO RESUME";
+      overlay.classList.remove("hidden");
+    }
+  }
   crosshair.style.display=locked?"block":"none";
-  prompt.textContent="CLICK TO RESUME";
   if(locked && phoneOpen){
     phoneOpen=false;
     deepseekerAppOpen=false;
@@ -985,6 +1222,14 @@ function animate(){
   // Keep the flashlight cone exactly centered on the camera/crosshair.
   flashlight.target.position.set(0,0,-80);
   if(!houseMode) updateStoryProgress();
+
+  if(gameStarted){
+    if(t-lastAutoSave>20){
+      lastAutoSave=t;
+      saveGame();
+    }
+  }
+
   world.update(player.pos.x,player.pos.z);
   world.updateFlicker(t);
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
@@ -1066,6 +1311,16 @@ function animate(){
   renderer.render(scene,camera);
 }
 animate();
+
+window.addEventListener("beforeunload",()=>{
+  if(gameStarted) saveGame();
+});
+
+if(pendingSaveLoad){
+  const save=pendingSaveLoad;
+  pendingSaveLoad=null;
+  setTimeout(()=>startGame(save),0);
+}
 
 window.__deepseeker={
   player,
