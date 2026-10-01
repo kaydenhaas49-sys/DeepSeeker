@@ -84,6 +84,8 @@ let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
 const houseCollisionBoxes=[];
+let houseMeshes=[];
+const houseRaycaster=new THREE.Raycaster();
 
 const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
@@ -149,34 +151,93 @@ function boxBlocked(box,x,z,r=.42){
   return dx*dx+dz*dz<r*r;
 }
 
+function getHouseFloorAt(x,z,bounds){
+  houseRaycaster.set(
+    new THREE.Vector3(x,bounds.max.y+2,z),
+    new THREE.Vector3(0,-1,0)
+  );
+
+  const hits=houseRaycaster.intersectObjects(houseMeshes,false);
+  if(!hits.length) return null;
+
+  // Prefer a broad lower surface over roof/decorative surfaces.
+  let best=null;
+  for(const hit of hits){
+    if(hit.point.y<bounds.min.y-.1) continue;
+    if(hit.point.y>bounds.min.y+4.5) continue;
+    if(!best || hit.point.y>best.point.y) best=hit;
+  }
+
+  return best ? best.point.y : null;
+}
+
 function findHouseSpawn(bounds){
   const center=bounds.getCenter(new THREE.Vector3());
   const size=bounds.getSize(new THREE.Vector3());
 
-  // Start near the center of the imported model and move in a small grid
-  // until we find a point that is not inside any wall collision box.
-  for(let radius=0;radius<=Math.max(size.x,size.z)*.28;radius+=1){
-    for(let angle=0;angle<Math.PI*2;angle+=Math.PI/8){
-      const x=center.x+Math.cos(angle)*radius;
-      const z=center.z+Math.sin(angle)*radius;
+  let best=null;
+  let bestScore=-Infinity;
+
+  // Search actual model space for a floor surrounded by interior walls.
+  const spanX=Math.max(4,size.x*.34);
+  const spanZ=Math.max(4,size.z*.34);
+
+  for(let z=-spanZ;z<=spanZ;z+=1){
+    for(let x=-spanX;x<=spanX;x+=1){
+      const px=center.x+x;
+      const pz=center.z+z;
+      const floorY=getHouseFloorAt(px,pz,bounds);
+      if(floorY===null) continue;
+
+      const py=floorY+1.15;
+      let wallHits=0;
+      let nearest=Infinity;
+
+      const directions=[
+        [1,0],[-1,0],[0,1],[0,-1],
+        [.707,.707],[-.707,.707],[.707,-.707],[-.707,-.707]
+      ];
+
+      for(const [dx,dz] of directions){
+        houseRaycaster.set(
+          new THREE.Vector3(px,py,pz),
+          new THREE.Vector3(dx,0,dz)
+        );
+        const hits=houseRaycaster.intersectObjects(houseMeshes,false);
+
+        if(hits.length){
+          const d=hits[0].distance;
+          if(d>.65 && d<8){
+            wallHits++;
+            nearest=Math.min(nearest,d);
+          }
+        }
+      }
+
+      // An exterior point normally won't have walls surrounding it.
+      if(wallHits<3 || nearest===Infinity) continue;
 
       let blocked=false;
       for(const box of houseCollisionBoxes){
-        if(boxBlocked(box,x,z,.7)){
+        if(boxBlocked(box,px,pz,.65)){
           blocked=true;
           break;
         }
       }
+      if(blocked) continue;
 
-      if(!blocked){
-        return new THREE.Vector3(x,HOUSE_ORIGIN.y+EYE,z);
+      const centerDistance=Math.hypot(px-center.x,pz-center.z);
+      const score=wallHits*4+Math.min(nearest,5)-centerDistance*.025;
+
+      if(score>bestScore){
+        bestScore=score;
+        best=new THREE.Vector3(px,floorY+EYE,pz);
       }
     }
   }
 
-  return new THREE.Vector3(center.x,HOUSE_ORIGIN.y+EYE,center.z);
+  return best || new THREE.Vector3(center.x,HOUSE_ORIGIN.y+EYE,center.z);
 }
-
 function loadHouse(){
   const houseUrl=new URL(HOUSE_MODEL_PATH,import.meta.url).href;
 
@@ -188,9 +249,11 @@ function loadHouse(){
       houseRoot.add(houseModel);
 
       let meshCount=0;
+      houseMeshes=[];
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
         meshCount++;
+        houseMeshes.push(obj);
 
         obj.castShadow=false;
         obj.receiveShadow=false;
@@ -229,21 +292,17 @@ function loadHouse(){
 
       box=new THREE.Box3().setFromObject(houseModel);
 
-      // Collision is derived from the imported house meshes only.
+      // Collision comes only from the imported house meshes.
+      // Floors/ceilings stay passable; vertical geometry becomes solid.
       houseCollisionBoxes.length=0;
-      houseModel.traverse((obj)=>{
-        if(!obj.isMesh) return;
-
+      for(const obj of houseMeshes){
         const meshBox=new THREE.Box3().setFromObject(obj);
         const meshSize=meshBox.getSize(new THREE.Vector3());
 
-        if(meshSize.y<1.0) return;
-        if(meshSize.x>45 && meshSize.z>45) return;
+        if(meshSize.y<.75) continue;
+        if(meshSize.x>45 && meshSize.z>45) continue;
 
-        const xWall=meshSize.x>1.4 && meshSize.z<.8;
-        const zWall=meshSize.z>1.4 && meshSize.x<.8;
-
-        if(xWall||zWall) houseCollisionBoxes.push(meshBox);
+        houseCollisionBoxes.push(meshBox);
       });
 
       houseSpawn=findHouseSpawn(box);
