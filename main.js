@@ -43,13 +43,13 @@ const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
 
 const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,.32);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0x8f815d,.12);
+const ambient=new THREE.AmbientLight(0x8f815d,.055);
 scene.add(ambient);
 
-const playerLight=new THREE.PointLight(0xb59b68,7.5,24,1.9);
+const playerLight=new THREE.PointLight(0xb59b68,4.5,24,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xf0dfad,13.5,36,Math.PI/6,.82,1.5);
+const flashlight=new THREE.SpotLight(0xf0dfad,27,36,Math.PI/6,.82,1.5);
 flashlight.castShadow=true;
 flashlight.shadow.mapSize.set(512,512);
 flashlight.target.position.set(0,0,-1);
@@ -450,7 +450,7 @@ function animate(){
   if(battery<=0) flashlightOn=false;
 
   const flicker=.78+.22*Math.sin(t*17.1)*Math.sin(t*7.3);
-  flashlight.intensity=flashlightOn ? 13.0*flicker : 0;
+  flashlight.intensity=flashlightOn ? 27.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
   if(bacteriaMixer) bacteriaMixer.update(dt);
@@ -496,8 +496,8 @@ function animate(){
     ambient.intensity=.045*(1-pulse*.65);
   }else{
     vignette.style.opacity=".70";
-    hemi.intensity=.32;
-    ambient.intensity=.12;
+    hemi.intensity=.16;
+    ambient.intensity=.055;
   }
 
   const stamina=player.stamina;
