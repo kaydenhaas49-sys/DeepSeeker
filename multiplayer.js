@@ -1,5 +1,10 @@
 import * as THREE from "three";
-import { createHazmatCharacter, setRemoteFlashlightVisible } from "./character.js";
+import {
+  createHazmatCharacter,
+  createRemoteFlashlight,
+  updateRemoteFlashlight,
+  disposeRemoteFlashlight
+} from "./character.js";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
@@ -102,6 +107,7 @@ export class Multiplayer {
 
       for (const remote of this.players.values()) {
         this.scene.remove(remote.group);
+        disposeRemoteFlashlight(this.scene, remote.remoteLight);
       }
       this.players.clear();
       this.playerId = null;
@@ -237,6 +243,7 @@ export class Multiplayer {
       x: Number.isFinite(x) ? x : 0,
       z: Number.isFinite(z) ? z : 0,
       yaw: Number.isFinite(yaw) ? yaw : 0,
+      pitch: Number.isFinite(Number(state?.pitch)) ? Number(state.pitch) : 0,
       level: state?.level === "house" ? "house" : "backrooms",
       crouched: Boolean(state?.crouched),
       flashlight: state?.flashlight !== false,
@@ -260,6 +267,7 @@ export class Multiplayer {
         model: null,
         mixer: null,
         flashlight: null,
+        remoteLight: createRemoteFlashlight(this.scene),
         target: this.normalizeState(player.state || {}),
         current: this.normalizeState(player.state || {}),
       };
@@ -319,6 +327,7 @@ export class Multiplayer {
       Math.abs(state.x - this.lastSent.x) > 0.03 ||
       Math.abs(state.z - this.lastSent.z) > 0.03 ||
       Math.abs(state.yaw - this.lastSent.yaw) > 0.03 ||
+      Math.abs(state.pitch - this.lastSent.pitch) > 0.03 ||
       state.level !== this.lastSent.level ||
       state.crouched !== this.lastSent.crouched ||
       state.flashlight !== this.lastSent.flashlight;
@@ -358,6 +367,7 @@ export class Multiplayer {
         1 - Math.exp(-REMOTE_LERP * dt)
       );
       remote.current.yaw = remote.target.yaw;
+      remote.current.pitch = remote.target.pitch;
       remote.current.level = remote.target.level;
       remote.current.crouched = remote.target.crouched;
       remote.current.flashlight = remote.target.flashlight;
@@ -379,10 +389,16 @@ export class Multiplayer {
         remote.mixer.update(dt);
       }
 
-      setRemoteFlashlightVisible(
-        remote.flashlight,
-        remote.current.flashlight
-      );
+      if(remote.remoteLight && remote.flashlight){
+        remote.flashlight.getWorldPosition(remote.remoteLight.origin);
+        updateRemoteFlashlight(
+          remote.remoteLight,
+          remote.remoteLight.origin,
+          remote.current.yaw,
+          remote.current.pitch,
+          remote.current.flashlight && sameLevel && nearby
+        );
+      }
 
       remote.group.position.y = remote.current.crouched ? -0.05 : 0;
     }
