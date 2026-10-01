@@ -1,86 +1,10 @@
-name: Inspect house GLB
+name: House inspection helper
 
 on:
-  push:
-    paths:
-      - "assets/house_interior.glb"
-      - ".github/workflows/analyze-house.yml"
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
-  inspect:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Analyze GLB
-        run: |
-          python3 - <<'PY'
-          import json, struct, math
-          from pathlib import Path
-
-          p = Path("assets/house_interior.glb")
-          b = p.read_bytes()
-          magic, version, length = struct.unpack_from("<4sII", b, 0)
-          assert magic == b"glTF"
-          pos = 12
-          gltf = None
-          bin_chunk = b""
-          while pos < length:
-              n, typ = struct.unpack_from("<I4s", b, pos)
-              pos += 8
-              chunk = b[pos:pos+n]
-              pos += n
-              if typ == b"JSON":
-                  gltf = json.loads(chunk.decode("utf-8"))
-              elif typ == b"BIN\x00":
-                  bin_chunk = chunk
-
-          nodes = gltf.get("nodes", [])
-          meshes = gltf.get("meshes", [])
-          scenes = gltf.get("scenes", [])
-
-          lines = []
-          lines.append(f"file={p}")
-          lines.append(f"nodes={len(nodes)} meshes={len(meshes)} scenes={len(scenes)}")
-          lines.append("")
-          lines.append("DOOR-LIKE NODES:")
-          for i, n in enumerate(nodes):
-              name = n.get("name", "")
-              low = name.lower()
-              if any(k in low for k in ("door","porte","pintu","puerta","entry","entrance","gate")):
-                  lines.append(json.dumps({
-                      "index": i,
-                      "name": name,
-                      "mesh": n.get("mesh"),
-                      "skin": n.get("skin"),
-                      "children": n.get("children", []),
-                      "translation": n.get("translation", [0,0,0]),
-                      "rotation": n.get("rotation", [0,0,0,1]),
-                      "scale": n.get("scale", [1,1,1])
-                  }, ensure_ascii=False))
-          lines.append("")
-          lines.append("ALL NODES:")
-          for i, n in enumerate(nodes):
-              lines.append(json.dumps({
-                  "index": i,
-                  "name": n.get("name", ""),
-                  "mesh": n.get("mesh"),
-                  "children": n.get("children", []),
-                  "translation": n.get("translation", [0,0,0]),
-                  "rotation": n.get("rotation", [0,0,0,1]),
-                  "scale": n.get("scale", [1,1,1])
-              }, ensure_ascii=False))
-
-          Path("house_glb_analysis.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-          PY
-
-      - name: Commit analysis
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add house_glb_analysis.txt
-          git commit -m "Temporary house GLB analysis" || exit 0
-          git push
+      - run: echo "disabled"
