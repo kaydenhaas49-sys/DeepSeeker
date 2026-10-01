@@ -263,6 +263,10 @@ export function disposeRemoteFlashlight(scene, remoteLight){
   scene.remove(remoteLight.target);
 }
 
+export function flashlightFlicker(time){
+  return .78 + .22 * Math.sin(time * 17.1) * Math.sin(time * 7.3);
+}
+
 export async function createHazmatCharacter(){
   const template=await loadHazmatCharacter();
   const model=cloneSkeleton(template.scene);
