@@ -74,109 +74,68 @@ player.hands.visible=true;
 // ---------------------------------------------------------------------------
 // Test house level
 // ---------------------------------------------------------------------------
-// The uploaded house is kept separate from the procedural world so it can
-// become a real level later without rewriting the current map.
+// The imported house is a separate playable test level. The procedural world
+// remains untouched; entering the house swaps the visible level cleanly.
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
-const HOUSE_ORIGIN=new THREE.Vector3(32,0,8);
-const HOUSE_MODEL_SCALE=3.0;
-const HOUSE_PORTAL_LOCAL_OFFSET=new THREE.Vector3(0,1.0,2.2);
+const HOUSE_MODEL_SCALE=4.0;
+const HOUSE_LEVEL_ORIGIN=new THREE.Vector3(32,0,0);
+const HOUSE_ENTRY_PAD=new THREE.Vector3(32,1.0,27);
+
 let houseModel=null;
-let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
-let houseExteriorSpawn=new THREE.Vector3(32,EYE,32);
-let houseMode=false;
 let houseLoaded=false;
+let houseMode=false;
+let houseSpawn=new THREE.Vector3(HOUSE_LEVEL_ORIGIN.x,EYE,HOUSE_LEVEL_ORIGIN.z);
 const houseCollisionBoxes=[];
 
-const housePortalGroup=new THREE.Group();
-housePortalGroup.name="HouseTestTeleport";
-const housePortal=new THREE.Mesh(
-  new THREE.BoxGeometry(1.15,2.2,0.32),
+const houseReturnPortal=new THREE.Group();
+houseReturnPortal.name="HouseReturnPortal";
+const portalBody=new THREE.Mesh(
+  new THREE.BoxGeometry(1.1,2.0,.28),
   new THREE.MeshStandardMaterial({
     color:0xd7b85f,
     emissive:0x8f6916,
-    emissiveIntensity:4.0,
-    roughness:.4,
-    metalness:.1
+    emissiveIntensity:3.5,
+    roughness:.45
   })
 );
-const housePortalRing=new THREE.Mesh(
-  new THREE.TorusGeometry(.9,.07,10,32),
+const portalRing=new THREE.Mesh(
+  new THREE.TorusGeometry(.82,.065,10,32),
   new THREE.MeshBasicMaterial({color:0xffdc70})
 );
-housePortalRing.rotation.x=Math.PI/2;
-housePortalRing.position.y=-.84;
-housePortalGroup.add(housePortal,housePortalRing);
+portalRing.rotation.x=Math.PI/2;
+portalRing.position.y=-.78;
+houseReturnPortal.add(portalBody,portalRing);
+houseReturnPortal.visible=false;
+scene.add(houseReturnPortal);
 
-housePortalGroup.position.copy(HOUSE_TEST_PORTAL_POSITION);
-scene.add(housePortalGroup);
+const houseEntryPortal=new THREE.Group();
+houseEntryPortal.name="HouseEntryPortal";
+houseEntryPortal.add(portalBody.clone(),portalRing.clone());
+houseEntryPortal.position.copy(HOUSE_ENTRY_PAD);
+scene.add(houseEntryPortal);
 
-const housePortalLight=new THREE.PointLight(0xc6a85c,3.5,8,2);
-housePortalLight.position.set(
-  HOUSE_TEST_PORTAL_POSITION.x,
-  HOUSE_TEST_PORTAL_POSITION.y+0.5,
-  HOUSE_TEST_PORTAL_POSITION.z-0.4
-);
-scene.add(housePortalLight);
+const entryLight=new THREE.PointLight(0xc6a85c,3.5,7,2);
+entryLight.position.set(HOUSE_ENTRY_PAD.x,HOUSE_ENTRY_PAD.y+.5,HOUSE_ENTRY_PAD.z-.4);
+scene.add(entryLight);
 
-const houseExitPortal=housePortal.clone();
-houseExitPortal.name="HouseTestReturnPad";
-houseExitPortal.visible=false;
-scene.add(houseExitPortal);
-
-const houseExitPortalLight=housePortalLight.clone();
-houseExitPortalLight.visible=false;
-scene.add(houseExitPortalLight);
-
-const houseFill=new THREE.HemisphereLight(0xffe9c5,0x3b342b,0);
-houseFill.name="HouseInteriorFill";
+const houseFill=new THREE.HemisphereLight(0xffe9c5,0x3b342b,1.25);
+houseFill.visible=false;
 scene.add(houseFill);
 
-const houseKey=new THREE.DirectionalLight(0xfff1d2,0);
-houseKey.name="HouseInteriorKey";
-houseKey.castShadow=false;
-houseKey.shadow.mapSize.set(1024,1024);
-houseKey.position.set(20,18,10);
-scene.add(houseKey);
+const houseLamp=new THREE.PointLight(0xffe6b0,1.4,18,1.8);
+houseLamp.visible=false;
+scene.add(houseLamp);
 
-const houseTestFloor=new THREE.Mesh(
-  new THREE.PlaneGeometry(48,48),
-  new THREE.MeshStandardMaterial({
-    color:0x11100d,
-    roughness:1
-  })
+const houseFloor=new THREE.Mesh(
+  new THREE.PlaneGeometry(36,36),
+  new THREE.MeshStandardMaterial({color:0x11100d,roughness:1})
 );
-houseTestFloor.rotation.x=-Math.PI/2;
-houseTestFloor.position.set(HOUSE_ORIGIN.x,-0.02,HOUSE_ORIGIN.z);
-houseTestFloor.visible=false;
-scene.add(houseTestFloor);
+houseFloor.rotation.x=-Math.PI/2;
+houseFloor.position.set(HOUSE_LEVEL_ORIGIN.x,-.02,HOUSE_LEVEL_ORIGIN.z);
+houseFloor.visible=false;
+scene.add(houseFloor);
 
-const houseTestCeiling=new THREE.Mesh(
-  new THREE.PlaneGeometry(90,90),
-  new THREE.MeshStandardMaterial({
-    color:0x090909,
-    roughness:1
-  })
-);
-houseTestCeiling.rotation.x=Math.PI/2;
-houseTestCeiling.position.set(HOUSE_ORIGIN.x,8.5,HOUSE_ORIGIN.z);
-houseTestCeiling.visible=false;
-scene.add(houseTestCeiling);
-
-const houseLights=[];
-const houseLightOffsets=[
-  [-0.35,0.82,-0.25],
-  [ 0.20,0.88,-0.18],
-  [-0.18,0.86, 0.24],
-  [ 0.32,0.80, 0.30]
-];
-for(const [x,y,z] of houseLightOffsets){
-  const light=new THREE.PointLight(0xffe7b0,0,16,1.8);
-  light.castShadow=false;
-  scene.add(light);
-  houseLights.push({light,phase:Math.random()*Math.PI*2,x,y,z});
-}
-
-function boxContainsPlayer(box,x,z,r=0.42){
+function boxContainsPlayer(box,x,z,r=.42){
   const nx=Math.max(box.min.x,Math.min(x,box.max.x));
   const nz=Math.max(box.min.z,Math.min(z,box.max.z));
   const dx=x-nx;
@@ -185,65 +144,36 @@ function boxContainsPlayer(box,x,z,r=0.42){
 }
 
 function estimateHouseFloorY(x,z,bounds){
-  const candidates=[];
-
+  const floors=[];
   houseModel.traverse((obj)=>{
     if(!obj.isMesh) return;
-    const box=new THREE.Box3().setFromObject(obj);
-    const size=box.getSize(new THREE.Vector3());
-
-    // Floors are generally broad, very thin horizontal meshes. Ignore walls,
-    // ceilings, furniture and tiny decorative pieces.
-    if(size.y>0.5) return;
-    if(size.x<2.5 && size.z<2.5) return;
-    if(x<box.min.x-0.25 || x>box.max.x+0.25 || z<box.min.z-0.25 || z>box.max.z+0.25) return;
-
-    candidates.push(box.max.y);
+    const b=new THREE.Box3().setFromObject(obj);
+    const size=b.getSize(new THREE.Vector3());
+    if(size.y>.5) return;
+    if(size.x<2.5 || size.z<2.5) return;
+    if(x<b.min.x-.25 || x>b.max.x+.25 || z<b.min.z-.25 || z>b.max.z+.25) return;
+    floors.push(b.max.y);
   });
-
-  if(candidates.length){
-    // The lowest broad horizontal surface is the safest main-floor estimate.
-    return Math.min(...candidates);
-  }
-
-  // Fallback: keep the player inside the vertical range of the imported model.
-  return bounds.min.y;
+  return floors.length ? Math.min(...floors) : bounds.min.y;
 }
 
 function findHouseSpawn(bounds){
   const center=bounds.getCenter(new THREE.Vector3());
-  const size=bounds.getSize(new THREE.Vector3());
-  const floorY=estimateHouseFloorY(center.x,center.z,bounds);
-  const maxX=size.x*0.28;
-  const maxZ=size.z*0.28;
 
-  const candidates=[];
-  for(let z=-maxZ;z<=maxZ;z+=1.5){
-    for(let x=-maxX;x<=maxX;x+=1.5){
-      candidates.push(new THREE.Vector3(center.x+x,0,center.z+z));
-    }
-  }
-  candidates.sort((a,b)=>Math.hypot(a.x-center.x,a.z-center.z)-Math.hypot(b.x-center.x,b.z-center.z));
-
-  for(const candidate of candidates){
-    let blocked=false;
-    for(const box of houseCollisionBoxes){
-      if(boxContainsPlayer(box,candidate.x,candidate.z)) {
-        blocked=true;
-        break;
+  for(let radius=1;radius<12;radius+=1.5){
+    for(let angle=0;angle<Math.PI*2;angle+=Math.PI/6){
+      const x=center.x+Math.cos(angle)*radius;
+      const z=center.z+Math.sin(angle)*radius;
+      const y=estimateHouseFloorY(x,z,bounds)+EYE;
+      let blocked=false;
+      for(const box of houseCollisionBoxes){
+        if(boxContainsPlayer(box,x,z)) { blocked=true; break; }
       }
-    }
-    if(!blocked) {
-      const localFloorY=estimateHouseFloorY(candidate.x,candidate.z,bounds);
-      return new THREE.Vector3(
-        candidate.x,
-        (Number.isFinite(localFloorY) ? localFloorY : floorY) + EYE,
-        candidate.z
-      );
+      if(!blocked && Number.isFinite(y)) return new THREE.Vector3(x,y,z);
     }
   }
 
-  return new THREE.Vector3(center.x,floorY+EYE,center.z);
+  return new THREE.Vector3(center.x,estimateHouseFloorY(center.x,center.z,bounds)+EYE,center.z);
 }
 
 function loadHouse(){
@@ -253,144 +183,83 @@ function loadHouse(){
     (gltf)=>{
       houseModel=gltf.scene;
       houseModel.name="DeepSeekerHouse";
+      houseModel.scale.setScalar(HOUSE_MODEL_SCALE);
       houseModel.visible=false;
       scene.add(houseModel);
-      let houseMeshCount=0;
+
+      let meshCount=0;
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
-        houseMeshCount++;
+        meshCount++;
         obj.castShadow=false;
         obj.receiveShadow=false;
         obj.frustumCulled=true;
-
-        const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
+        const materials=Array.isArray(obj.material)?obj.material:[obj.material];
         for(const material of materials){
-          if(!material) continue;
-          material.side=THREE.FrontSide;
-          material.toneMapped=true;
+          if(material){
+            material.side=THREE.DoubleSide;
+            material.toneMapped=true;
+          }
         }
       });
 
-      if(houseMeshCount===0){
-        throw new Error("House GLB loaded but contained no renderable meshes.");
-      }
+      if(!meshCount) throw new Error("House GLB contains no meshes.");
 
-      // Only transform the imported GLB. The test room, portal, camera,
-      // and procedural world stay completely unchanged.
-      houseModel.scale.setScalar(HOUSE_MODEL_SCALE);
       houseModel.updateMatrixWorld(true);
+      let bounds=new THREE.Box3().setFromObject(houseModel);
+      const center=bounds.getCenter(new THREE.Vector3());
 
-      let box=new THREE.Box3().setFromObject(houseModel);
-      const center=box.getCenter(new THREE.Vector3());
-      houseModel.position.x=HOUSE_ORIGIN.x-center.x;
-      houseModel.position.z=HOUSE_ORIGIN.z-center.z;
-      houseModel.position.y=HOUSE_ORIGIN.y-box.min.y;
+      // Only the imported GLB is scaled/translated here.
+      houseModel.position.x=HOUSE_LEVEL_ORIGIN.x-center.x;
+      houseModel.position.z=HOUSE_LEVEL_ORIGIN.z-center.z;
+      houseModel.position.y=-bounds.min.y;
       houseModel.updateMatrixWorld(true);
+      bounds=new THREE.Box3().setFromObject(houseModel);
 
-      box=new THREE.Box3().setFromObject(houseModel);
-
-      if(!Number.isFinite(box.min.x) || box.isEmpty()){
-        throw new Error("House GLB produced an empty/invalid bounding box.");
-      }
-
-      // Keep imported materials visible even in the very dark horror scene.
-      // The original textures/colors are retained; this is an exposure safeguard.
+      const candidates=[];
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
-        const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
-        for(const material of materials){
-          if(!material) continue;
-          if("envMapIntensity" in material) material.envMapIntensity=1;
-        }
+        const b=new THREE.Box3().setFromObject(obj);
+        const size=b.getSize(new THREE.Vector3());
+        if(size.y<.18 || size.x<.25 || size.z<.25) return;
+        if(size.x>45 && size.z>45) return;
+        candidates.push({box:b,volume:size.x*size.y*size.z});
       });
-
-      // Build a compact collision list. Testing every decorative mesh every
-      // movement frame makes imported furnished models unnecessarily expensive.
-      const collisionCandidates=[];
-      houseModel.traverse((obj)=>{
-        if(!obj.isMesh) return;
-        const meshBox=new THREE.Box3().setFromObject(obj);
-        const meshSize=meshBox.getSize(new THREE.Vector3());
-        if(meshSize.y<0.18) return;
-        if(meshSize.x<0.35 || meshSize.z<0.35) return;
-        if(meshSize.x>45 && meshSize.z>45) return;
-        collisionCandidates.push({box:meshBox,size:meshSize});
-      });
-
-      collisionCandidates.sort((a,b)=>
-        (b.size.x*b.size.y*b.size.z)-(a.size.x*a.size.y*a.size.z)
-      );
-
+      candidates.sort((a,b)=>b.volume-a.volume);
       houseCollisionBoxes.length=0;
-      // Keep the largest structural/furniture volumes; tiny decorations don't
-      // need physical collision and would make movement sluggish.
-      const maxHouseHitboxes=Math.min(80,collisionCandidates.length);
-      for(let i=0;i<maxHouseHitboxes;i++){
-        houseCollisionBoxes.push(collisionCandidates[i].box);
-      }
+      for(let i=0;i<Math.min(70,candidates.length);i++) houseCollisionBoxes.push(candidates[i].box);
 
-      houseSpawn=findHouseSpawn(box);
-      const houseSize=box.getSize(new THREE.Vector3());
-      // Return point sits just outside the front/nearest edge of the house.
-      houseExteriorSpawn.set(
-        HOUSE_ORIGIN.x,
-        EYE,
-        box.max.z + 3.0
-      );
-      player.extraCollisionBoxes=houseCollisionBoxes;
+      houseSpawn=findHouseSpawn(bounds);
 
-      // Keep the entry portal physically attached to the imported house.
-      // This means it appears in the house itself instead of floating in the void.
-      const portalPosition=houseSpawn.clone().add(HOUSE_PORTAL_LOCAL_OFFSET);
-      portalPosition.y=houseSpawn.y-0.85;
-      housePortalGroup.position.copy(portalPosition);
-      housePortalLight.position.set(
-        portalPosition.x,
-        portalPosition.y+0.5,
-        portalPosition.z-0.4
+      // The return portal lives inside the imported house.
+      houseReturnPortal.position.set(
+        houseSpawn.x,
+        houseSpawn.y-EYE+.05,
+        houseSpawn.z+2.3
       );
 
-      houseTestFloor.position.set(HOUSE_ORIGIN.x,box.min.y-0.02,HOUSE_ORIGIN.z);
-      houseTestCeiling.position.set(HOUSE_ORIGIN.x,box.max.y+0.02,HOUSE_ORIGIN.z);
-
-      // Never start below the house. This model contains a pool and other
-      // lower geometry, so the GLB's absolute minimum Y is not the floor.
-      houseSpawn.y=Math.max(houseSpawn.y,box.min.y+EYE+0.25);
+      houseLamp.position.set(
+        houseSpawn.x,
+        houseSpawn.y+2.4,
+        houseSpawn.z
+      );
 
       houseLoaded=true;
-      // Show the imported house in the test world so the entry portal has a
-      // visible physical location before the player enters the level.
-      houseModel.visible=true;
-      houseFill.position.set(box.min.x,box.max.y,box.min.z);
-      houseKey.position.set(box.min.x,box.max.y,box.min.z);
-
-      for(const item of houseLights){
-        item.light.position.set(
-          box.min.x + box.getSize(new THREE.Vector3()).x * (item.x + 0.5),
-          box.min.y + box.getSize(new THREE.Vector3()).y * item.y,
-          box.min.z + box.getSize(new THREE.Vector3()).z * (item.z + 0.5)
-        );
-      }
-
-      objective.textContent="Test pad ready. Press E to enter the house.";
+      objective.textContent="House ready. Walk to the yellow portal and press E.";
       eventText.textContent="HOUSE TEST LEVEL READY";
       eventText.style.opacity="1";
-      setTimeout(()=>{eventText.style.opacity="0";},2200);
+      setTimeout(()=>eventText.style.opacity="0",1800);
     },
     xhr=>{
-      if(xhr.total){
-        const percent=Math.round(xhr.loaded/xhr.total*100);
-        objective.textContent="Loading house asset… "+percent+"%";
-      }else{
-        objective.textContent="Loading house asset…";
-      }
+      objective.textContent=xhr.total
+        ? "Loading house asset… "+Math.round(xhr.loaded/xhr.total*100)+"%"
+        : "Loading house asset…";
     },
-    (error)=>{
+    error=>{
       console.error("Failed to load house:",houseUrl,error);
-      eventText.textContent="HOUSE MODEL FAILED TO LOAD";
-      objective.textContent="House asset failed to load. The loader error is in the browser console.";
+      objective.textContent="House failed to load — check the browser console.";
+      eventText.textContent="HOUSE LOAD FAILED";
       eventText.style.opacity="1";
-      houseLoaded=false;
     }
   );
 }
@@ -400,42 +269,37 @@ function setHouseMode(enabled){
   houseMode=enabled;
 
   world.root.visible=!houseMode;
-  housePortalGroup.visible=!houseMode;
-  housePortalLight.visible=!houseMode;
-  houseExitPortal.visible=houseMode;
-  houseExitPortalLight.visible=houseMode;
-  houseTestFloor.visible=houseMode;
-  houseTestCeiling.visible=houseMode;
+  houseEntryPortal.visible=!houseMode;
+  entryLight.visible=!houseMode;
 
-  if(houseModel) houseModel.visible=true;
-  houseFill.intensity=houseMode?1.35:0;
-  houseKey.intensity=houseMode?1.6:0;
-  for(const item of houseLights) item.light.intensity=houseMode?1.2:0;
+  if(houseModel) houseModel.visible=houseMode;
+  houseReturnPortal.visible=houseMode;
+  houseFloor.visible=houseMode;
+  houseFill.visible=houseMode;
+  houseLamp.visible=houseMode;
 
-  // The house is a real physical object in the test world. Keep its
-  // collision active both before and after teleporting into it.
   player.ignoreWorldCollision=houseMode;
-  player.extraCollisionBoxes=houseCollisionBoxes;
+  player.extraCollisionBoxes=houseMode ? houseCollisionBoxes : [];
 
   figure.visible=false;
   figureLife=0;
 
   if(houseMode){
     player.pos.set(houseSpawn.x,houseSpawn.y-EYE,houseSpawn.z);
+    player.vel.x=0;
+    player.vel.z=0;
     player.jumpY=0;
     player.jumpVelocity=0;
-    houseExitPortal.position.set(houseSpawn.x,houseSpawn.y-0.7,houseSpawn.z);
-    houseExitPortalLight.position.set(houseSpawn.x,houseSpawn.y+0.2,houseSpawn.z-0.4);
-    objective.textContent="Explore the house. Press E at the glowing test pad to return.";
-    eventText.textContent="HOUSE TEST LEVEL";
+    objective.textContent="Explore the house. Press E at the glowing portal to return.";
+    eventText.textContent="HOUSE";
     eventText.style.opacity="1";
-    setTimeout(()=>{eventText.style.opacity="0";},1600);
+    setTimeout(()=>eventText.style.opacity="0",1200);
   }else{
-    player.pos.copy(houseExteriorSpawn);
+    player.pos.set(32,EYE,32);
+    player.vel.x=0;
+    player.vel.z=0;
     player.jumpY=0;
     player.jumpVelocity=0;
-    houseExitPortal.visible=false;
-    houseExitPortalLight.visible=false;
     objective.textContent=STORY[storyStage].objective;
   }
 }
@@ -444,30 +308,27 @@ function tryHouseTeleport(){
   if(!houseLoaded){
     eventText.textContent="HOUSE STILL LOADING...";
     eventText.style.opacity="1";
-    setTimeout(()=>{eventText.style.opacity="0";},1200);
+    setTimeout(()=>eventText.style.opacity="0",900);
     return;
   }
 
   if(houseMode){
     const d=Math.hypot(
-      player.pos.x-houseSpawn.x,
-      player.pos.z-houseSpawn.z
+      player.pos.x-houseReturnPortal.position.x,
+      player.pos.z-houseReturnPortal.position.z
     );
-    if(d<2.6) setHouseMode(false);
+    if(d<2.8) setHouseMode(false);
     return;
   }
 
   const d=Math.hypot(
-    player.pos.x-housePortalGroup.position.x,
-    player.pos.z-housePortalGroup.position.z
+    player.pos.x-houseEntryPortal.position.x,
+    player.pos.z-houseEntryPortal.position.z
   );
   if(d<3.0) setHouseMode(true);
 }
 
 loadHouse();
-
-player.hands.visible=true;
-
 
 const figure=new THREE.Group();
 figure.name="BackroomsBacteriaEntity";
