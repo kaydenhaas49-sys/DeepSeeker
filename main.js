@@ -78,7 +78,7 @@ player.hands.visible=true;
 // become a real level later without rewriting the current map.
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
 const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
-const HOUSE_TARGET_HEIGHT=11.5;
+const HOUSE_TARGET_HEIGHT=8.5;
 const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
 let houseModel=null;
 let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
@@ -132,7 +132,7 @@ scene.add(houseFill);
 
 const houseKey=new THREE.DirectionalLight(0xfff1d2,0);
 houseKey.name="HouseInteriorKey";
-houseKey.castShadow=true;
+houseKey.castShadow=false;
 houseKey.shadow.mapSize.set(1024,1024);
 houseKey.position.set(20,18,10);
 scene.add(houseKey);
@@ -241,14 +241,14 @@ function loadHouse(){
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
         houseMeshCount++;
-        obj.castShadow=true;
-        obj.receiveShadow=true;
-        obj.frustumCulled=false;
+        obj.castShadow=false;
+        obj.receiveShadow=false;
+        obj.frustumCulled=true;
 
         const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
         for(const material of materials){
           if(!material) continue;
-          material.side=THREE.DoubleSide;
+          material.side=THREE.FrontSide;
           material.toneMapped=true;
         }
       });
@@ -290,17 +290,30 @@ function loadHouse(){
         }
       });
 
-      houseCollisionBoxes.length=0;
+      // Build a compact collision list. Testing every decorative mesh every
+      // movement frame makes imported furnished models unnecessarily expensive.
+      const collisionCandidates=[];
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
         const meshBox=new THREE.Box3().setFromObject(obj);
         const meshSize=meshBox.getSize(new THREE.Vector3());
-        // Skip paper-thin floors/ceilings and tiny decorations.
         if(meshSize.y<0.18) return;
-        if(meshSize.x<0.15 || meshSize.z<0.15) return;
+        if(meshSize.x<0.35 || meshSize.z<0.35) return;
         if(meshSize.x>45 && meshSize.z>45) return;
-        houseCollisionBoxes.push(meshBox);
+        collisionCandidates.push({box:meshBox,size:meshSize});
       });
+
+      collisionCandidates.sort((a,b)=>
+        (b.size.x*b.size.y*b.size.z)-(a.size.x*a.size.y*a.size.z)
+      );
+
+      houseCollisionBoxes.length=0;
+      // Keep the largest structural/furniture volumes; tiny decorations don't
+      // need physical collision and would make movement sluggish.
+      const maxHouseHitboxes=Math.min(80,collisionCandidates.length);
+      for(let i=0;i<maxHouseHitboxes;i++){
+        houseCollisionBoxes.push(collisionCandidates[i].box);
+      }
 
       houseSpawn=findHouseSpawn(box);
       player.extraCollisionBoxes=houseCollisionBoxes;
