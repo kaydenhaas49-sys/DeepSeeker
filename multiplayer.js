@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createHazmatCharacter } from "./character.js";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
@@ -241,64 +242,44 @@ export class Multiplayer {
     let remote = this.players.get(player.id);
 
     if (!remote) {
-      const material = new THREE.MeshStandardMaterial({
-        color: 0x8f8a6c,
-        emissive: 0x3f3b2d,
-        emissiveIntensity: 1.35,
-        roughness: 0.95,
-        metalness: 0,
-        transparent: true,
-        opacity: 0.95,
-      });
-
-      const headMaterial = new THREE.MeshStandardMaterial({
-        color: 0xd1c79b,
-        emissive: 0x514b35,
-        emissiveIntensity: 1.7,
-        roughness: 0.9,
-        metalness: 0,
-        transparent: true,
-        opacity: 0.98,
-      });
-
       const group = new THREE.Group();
-      group.name = "RemotePlayer_" + player.id;
-
-      const body = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.28, 0.92, 5, 8),
-        material
-      );
-      body.position.y = 1.0;
-
-      const head = new THREE.Mesh(
-        new THREE.SphereGeometry(0.25, 12, 10),
-        headMaterial
-      );
-      head.position.y = 1.86;
-
-      group.add(body, head);
+      group.name = "RemoteHazmatPlayer_" + player.id;
       this.scene.add(group);
 
       remote = {
         id: player.id,
         name: player.name || "Player",
         group,
-        body,
-        head,
+        model: null,
+        mixer: null,
+        flashlight: null,
         target: this.normalizeState(player.state || {}),
         current: this.normalizeState(player.state || {}),
       };
 
       this.players.set(player.id, remote);
-    } else if (player.name) {
-      remote.name = String(player.name).slice(0, 20);
+
+      createHazmatCharacter()
+        .then(character=>{
+          if(!this.players.has(player.id)) return;
+
+          remote.model = character.model;
+          remote.mixer = character.mixer;
+          remote.flashlight = character.flashlight;
+          remote.group.add(character.model);
+        })
+        .catch(error=>{
+          console.error("[DeepSeeker] remote hazmat failed:",error);
+        });
+    }else if(player.name){
+      remote.name = String(player.name).slice(0,20);
     }
 
-    if (player.state) {
+    if(player.state){
       remote.target = this.normalizeState(player.state);
-      if (!remote.hasInitialState) {
-        remote.current = { ...remote.target };
-        remote.hasInitialState = true;
+      if(!remote.hasInitialState){
+        remote.current={...remote.target};
+        remote.hasInitialState=true;
       }
     }
   }
@@ -390,9 +371,11 @@ export class Multiplayer {
       const nearby = dx * dx + dz * dz < 60 * 60;
       remote.group.visible = sameLevel && nearby;
 
-      const targetBodyY = remote.current.crouched ? 0.72 : 1.0;
-      remote.body.position.y += (targetBodyY - remote.body.position.y) * (1 - Math.exp(-12 * dt));
-      remote.head.position.y = remote.current.crouched ? 1.43 : 1.86;
+      if(remote.mixer){
+        remote.mixer.update(dt);
+      }
+
+      remote.group.position.y = remote.current.crouched ? -0.05 : 0;
     }
   }
 
