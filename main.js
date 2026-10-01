@@ -306,7 +306,7 @@ const multiplayer=new Multiplayer({
           <div class="lobbySlot">
             <div class="lobbySlotTop">
               <div class="lobbySlotName">${p.self ? "YOU — " : ""}${String(p.name).replace(/[<>&"]/g,"").slice(0,20)}</div>
-              <div class="lobbySlotStatus">${i===0 ? "HOST" : "READY"}</div>
+              <div class="lobbySlotStatus">${(host && i===0) ? "HOST" : (p.self ? "YOU" : "PLAYER")}</div>
             </div>
           </div>
         `);
