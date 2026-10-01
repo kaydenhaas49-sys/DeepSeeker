@@ -1,0 +1,356 @@
+import * as THREE from "three";
+
+const SEND_INTERVAL = 0.05;
+const REMOTE_LERP = 14;
+
+export class Multiplayer {
+  constructor({ scene, player, getLevel, onStatus }) {
+    this.scene = scene;
+    this.player = player;
+    this.getLevel = getLevel;
+    this.onStatus = onStatus || (() => {});
+
+    this.socket = null;
+    this.room = this.getRoomName();
+    this.server = this.getServerUrl();
+    this.playerId = null;
+    this.players = new Map();
+    this.sendTimer = 0;
+    this.reconnectTimer = 0;
+    this.closedManually = false;
+    this.lastStatus = "";
+
+    this.connect();
+  }
+
+  getRoomName() {
+    const params = new URLSearchParams(location.search);
+    return (params.get("room") || "main")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "")
+      .slice(0, 32) || "main";
+  }
+
+  getServerUrl() {
+    const params = new URLSearchParams(location.search);
+    let value = params.get("server");
+
+    if (!value && (location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+      value = "ws://localhost:8787";
+    }
+
+    if (!value) return null;
+
+    value = value.trim().replace(/\/$/, "");
+
+    if (value.startsWith("http://")) {
+      value = "ws://" + value.slice("http://".length);
+    } else if (value.startsWith("https://")) {
+      value = "wss://" + value.slice("https://".length);
+    }
+
+    return value;
+  }
+
+  connect() {
+    if (!this.server || this.closedManually) {
+      this.setStatus("MULTIPLAYER OFFLINE");
+      return;
+    }
+
+    this.setStatus("CONNECTING TO MULTIPLAYER...");
+
+    try {
+      this.socket = new WebSocket(
+        `${this.server}/room/${encodeURIComponent(this.room)}`
+      );
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
+
+    this.socket.addEventListener("open", () => {
+      this.setStatus("MULTIPLAYER CONNECTED");
+      this.socket.send(JSON.stringify({
+        type: "join",
+        name: this.getPlayerName(),
+      }));
+      this.sendState(true);
+    });
+
+    this.socket.addEventListener("message", (event) => {
+      this.handleMessage(event.data);
+    });
+
+    this.socket.addEventListener("close", () => {
+      this.socket = null;
+
+      for (const remote of this.players.values()) {
+        this.scene.remove(remote.group);
+      }
+      this.players.clear();
+      this.playerId = null;
+
+      if (!this.closedManually) {
+        this.setStatus("MULTIPLAYER RECONNECTING...");
+        this.scheduleReconnect();
+      }
+    });
+
+    this.socket.addEventListener("error", () => {
+      this.setStatus("MULTIPLAYER CONNECTION ERROR");
+    });
+  }
+
+  scheduleReconnect() {
+    if (this.reconnectTimer || this.closedManually) return;
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = 0;
+      this.connect();
+    }, 2000);
+  }
+
+  getPlayerName() {
+    const key = "deepseeker-player-name";
+    let name = localStorage.getItem(key);
+
+    if (!name) {
+      name = "Player-" + Math.floor(1000 + Math.random() * 9000);
+      localStorage.setItem(key, name);
+    }
+
+    return name;
+  }
+
+  setStatus(message) {
+    if (this.lastStatus === message) return;
+    this.lastStatus = message;
+
+    this.onStatus(message);
+
+    if (message === "MULTIPLAYER CONNECTED") {
+      setTimeout(() => {
+        if (this.lastStatus === message) {
+          this.onStatus("");
+        }
+      }, 1800);
+    }
+  }
+
+  handleMessage(raw) {
+    let data;
+
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    switch (data?.type) {
+      case "welcome":
+        this.playerId = data.id ?? null;
+
+        for (const player of data.players || []) {
+          if (!player?.id || player.id === this.playerId) continue;
+          this.addOrUpdatePlayer(player);
+        }
+        break;
+
+      case "player_joined":
+      case "player_updated":
+        if (data.player?.id && data.player.id !== this.playerId) {
+          this.addOrUpdatePlayer(data.player);
+        }
+        break;
+
+      case "state": {
+        if (!data.id || data.id === this.playerId) return;
+
+        const remote = this.players.get(data.id);
+        if (!remote) {
+          this.addOrUpdatePlayer({
+            id: data.id,
+            name: "Player",
+            state: data.state || {},
+          });
+        } else {
+          remote.target = this.normalizeState(data.state);
+        }
+        break;
+      }
+
+      case "player_left": {
+        if (!data.id) return;
+        const remote = this.players.get(data.id);
+        if (!remote) return;
+
+        this.scene.remove(remote.group);
+        this.players.delete(data.id);
+        break;
+      }
+    }
+  }
+
+  normalizeState(state) {
+    const x = Number(state?.x);
+    const z = Number(state?.z);
+    const yaw = Number(state?.yaw);
+
+    return {
+      x: Number.isFinite(x) ? x : 0,
+      z: Number.isFinite(z) ? z : 0,
+      yaw: Number.isFinite(yaw) ? yaw : 0,
+      level: state?.level === "house" ? "house" : "backrooms",
+      crouched: Boolean(state?.crouched),
+    };
+  }
+
+  addOrUpdatePlayer(player) {
+    if (!player?.id || player.id === this.playerId) return;
+
+    let remote = this.players.get(player.id);
+
+    if (!remote) {
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x111111,
+        roughness: 1,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.88,
+      });
+
+      const headMaterial = new THREE.MeshStandardMaterial({
+        color: 0x020202,
+        roughness: 1,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.92,
+      });
+
+      const group = new THREE.Group();
+      group.name = "RemotePlayer_" + player.id;
+
+      const body = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.28, 0.92, 5, 8),
+        material
+      );
+      body.position.y = 1.0;
+
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.25, 12, 10),
+        headMaterial
+      );
+      head.position.y = 1.86;
+
+      group.add(body, head);
+      this.scene.add(group);
+
+      remote = {
+        id: player.id,
+        name: player.name || "Player",
+        group,
+        body,
+        head,
+        target: this.normalizeState(player.state || {}),
+        current: this.normalizeState(player.state || {}),
+      };
+
+      this.players.set(player.id, remote);
+    } else if (player.name) {
+      remote.name = String(player.name).slice(0, 20);
+    }
+
+    if (player.state) {
+      remote.target = this.normalizeState(player.state);
+      if (!remote.hasInitialState) {
+        remote.current = { ...remote.target };
+        remote.hasInitialState = true;
+      }
+    }
+  }
+
+  sendState(force = false) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+
+    const state = {
+      x: Number(this.player.pos.x.toFixed(3)),
+      z: Number(this.player.pos.z.toFixed(3)),
+      yaw: Number(this.player.yaw.toFixed(3)),
+      level: this.getLevel() ? "house" : "backrooms",
+      crouched: Boolean(this.player.crouched),
+    };
+
+    try {
+      this.socket.send(JSON.stringify({ type: "state", state }));
+
+      if (force) {
+        this.socket.send(JSON.stringify({
+          type: "join",
+          name: this.getPlayerName(),
+        }));
+      }
+    } catch {
+      // Socket may have closed between the readyState check and send().
+    }
+  }
+
+  update(dt) {
+    this.sendTimer += dt;
+
+    if (this.sendTimer >= SEND_INTERVAL) {
+      this.sendTimer = 0;
+      this.sendState();
+    }
+
+    for (const remote of this.players.values()) {
+      remote.current.x = THREE.MathUtils.lerp(
+        remote.current.x,
+        remote.target.x,
+        1 - Math.exp(-REMOTE_LERP * dt)
+      );
+      remote.current.z = THREE.MathUtils.lerp(
+        remote.current.z,
+        remote.target.z,
+        1 - Math.exp(-REMOTE_LERP * dt)
+      );
+      remote.current.yaw = remote.target.yaw;
+      remote.current.level = remote.target.level;
+      remote.current.crouched = remote.target.crouched;
+
+      remote.group.position.set(
+        remote.current.x,
+        0,
+        remote.current.z
+      );
+      remote.group.rotation.y = remote.current.yaw;
+
+      const sameLevel = remote.current.level === (this.getLevel() ? "house" : "backrooms");
+      remote.group.visible = sameLevel;
+
+      const targetBodyY = remote.current.crouched ? 0.72 : 1.0;
+      remote.body.position.y += (targetBodyY - remote.body.position.y) * (1 - Math.exp(-12 * dt));
+      remote.head.position.y = remote.current.crouched ? 1.43 : 1.86;
+    }
+  }
+
+  disconnect() {
+    this.closedManually = true;
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = 0;
+    }
+
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+
+    for (const remote of this.players.values()) {
+      this.scene.remove(remote.group);
+    }
+    this.players.clear();
+  }
+}
