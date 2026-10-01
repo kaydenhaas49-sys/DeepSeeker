@@ -211,6 +211,8 @@ export class World {
     this.seed = seed;
     this.chunks = new Map(); // "cx,cz" -> { data, group, wallBounds }
     this.root = new THREE.Group();
+    this.lastStreamCX = null;
+    this.lastStreamCZ = null;
     this.wallQueryScratch = [];
     scene.add(this.root);
 
@@ -275,6 +277,13 @@ export class World {
     const pcx = Math.floor(px / CHUNK_SIZE);
     const pcz = Math.floor(pz / CHUNK_SIZE);
 
+    if(pcx===this.lastStreamCX && pcz===this.lastStreamCZ){
+      return;
+    }
+
+    this.lastStreamCX=pcx;
+    this.lastStreamCZ=pcz;
+
     // Generate missing chunks within radius, nearest first (1–2 per frame).
     const missing = [];
     for (let dz = -R_GENERATE; dz <= R_GENERATE; dz++) {
@@ -294,9 +303,11 @@ export class World {
     }
 
     // Dispose chunks beyond the dispose radius.
-    for (const key of [...this.chunks.keys()]) {
-      const [cx, cz] = key.split(",").map(Number);
-      const d = Math.max(Math.abs(cx - pcx), Math.abs(cz - pcz));
+    for (const [key, entry] of this.chunks) {
+      const d = Math.max(
+        Math.abs(entry.data.cx - pcx),
+        Math.abs(entry.data.cz - pcz)
+      );
       if (d > R_DISPOSE) this.disposeChunk(key);
     }
   }
