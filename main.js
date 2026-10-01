@@ -429,9 +429,9 @@ const debugSpawnBacteria=false;
 function fitBacteriaModel(model){
   model.traverse((obj)=>{
     if(!obj.isMesh) return;
-    obj.frustumCulled=false;
-    obj.castShadow=true;
-    obj.receiveShadow=true;
+    obj.frustumCulled=true;
+    obj.castShadow=!lowEndDevice;
+    obj.receiveShadow=false;
   });
 
   const box=new THREE.Box3().setFromObject(model);
