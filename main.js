@@ -138,7 +138,7 @@ houseKey.position.set(20,18,10);
 scene.add(houseKey);
 
 const houseTestFloor=new THREE.Mesh(
-  new THREE.PlaneGeometry(90,90),
+  new THREE.PlaneGeometry(48,48),
   new THREE.MeshStandardMaterial({
     color:0x11100d,
     roughness:1
@@ -331,9 +331,10 @@ function loadHouse(){
       houseSpawn=findHouseSpawn(box);
       player.extraCollisionBoxes=houseCollisionBoxes;
 
-      // Keep the test portal physically attached to the house's world position,
-      // so it moves with the imported model instead of floating in the void.
+      // Keep the entry portal physically attached to the imported house.
+      // This means it appears in the house itself instead of floating in the void.
       const portalPosition=houseSpawn.clone().add(HOUSE_PORTAL_LOCAL_OFFSET);
+      portalPosition.y=houseSpawn.y-0.85;
       housePortalGroup.position.copy(portalPosition);
       housePortalLight.position.set(
         portalPosition.x,
@@ -349,6 +350,9 @@ function loadHouse(){
       houseSpawn.y=Math.max(houseSpawn.y,box.min.y+EYE+0.25);
 
       houseLoaded=true;
+      // Show the imported house in the test world so the entry portal has a
+      // visible physical location before the player enters the level.
+      houseModel.visible=true;
       houseFill.position.set(box.min.x,box.max.y,box.min.z);
       houseKey.position.set(box.min.x,box.max.y,box.min.z);
 
@@ -395,13 +399,15 @@ function setHouseMode(enabled){
   houseTestFloor.visible=houseMode;
   houseTestCeiling.visible=houseMode;
 
-  if(houseModel) houseModel.visible=houseMode;
+  if(houseModel) houseModel.visible=true;
   houseFill.intensity=houseMode?1.35:0;
   houseKey.intensity=houseMode?1.6:0;
   for(const item of houseLights) item.light.intensity=houseMode?1.2:0;
 
+  // The house is a real physical object in the test world. Keep its
+  // collision active both before and after teleporting into it.
   player.ignoreWorldCollision=houseMode;
-  player.extraCollisionBoxes=houseMode ? houseCollisionBoxes : [];
+  player.extraCollisionBoxes=houseCollisionBoxes;
 
   figure.visible=false;
   figureLife=0;
