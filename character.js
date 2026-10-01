@@ -261,20 +261,32 @@ function applyNeutralStandingPose(model){
 export async function createHazmatCharacter(){
   const template = await loadHazmatCharacter();
   const model = cloneSkeleton(template.scene);
+  const mixer = new THREE.AnimationMixer(model);
 
-  // Do not use the asset's single locomotion clip. It has no real idle
-  // animation, so any sampled frame looks like a frozen running pose.
-  // Instead, pose the rig itself into a neutral standing stance.
-  applyNeutralStandingPose(model);
+  // The exported file's first clip is the rig's locomotion animation.
+  // Its opening frame is the closest thing this asset has to a neutral pose.
+  // Apply exactly frame 0, then freeze the action so it cannot run in place.
+  const idleClip = template.animations?.[0] || null;
+  let action = null;
+
+  if(idleClip){
+    action = mixer.clipAction(idleClip);
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.reset();
+    action.play();
+    action.time = 0;
+    action.paused = true;
+    mixer.update(0);
+  }
 
   const flashlight = attachFlashlight(model);
 
   return {
     model,
-    mixer: null,
-    action: null,
+    mixer,
+    action,
     flashlight,
     animations: template.animations,
-    idleClip: null
+    idleClip
   };
 }
