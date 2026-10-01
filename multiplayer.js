@@ -3,7 +3,8 @@ import {
   createHazmatCharacter,
   createRemoteFlashlight,
   updateRemoteFlashlight,
-  disposeRemoteFlashlight
+  disposeRemoteFlashlight,
+  flashlightFlicker
 } from "./character.js";
 
 const SEND_INTERVAL = 0.10;
@@ -31,6 +32,7 @@ export class Multiplayer {
     this.reconnectTimer = 0;
     this.closedManually = false;
     this.lastStatus = "";
+    this.elapsedTime = 0;
 
     this.connect();
   }
@@ -349,6 +351,7 @@ export class Multiplayer {
   }
 
   update(dt) {
+    this.elapsedTime += dt;
     this.sendTimer += dt;
     this.heartbeatTimer += dt;
 
@@ -400,6 +403,9 @@ export class Multiplayer {
           remote.current.pitch,
           remote.current.flashlight && sameLevel && nearby
         );
+        if(remote.remoteLight.light.visible){
+          remote.remoteLight.light.intensity = 27 * flashlightFlicker(this.elapsedTime);
+        }
       }
 
       remote.group.position.y = remote.current.crouched ? -0.05 : 0;
