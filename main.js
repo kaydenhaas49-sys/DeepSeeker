@@ -423,6 +423,7 @@ function tryHouseTeleport(){
   if(d<3) setHouseMode(true);
 }
 
+loadHouse();
 
 player.hands.visible=true;
 
