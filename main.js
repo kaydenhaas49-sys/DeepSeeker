@@ -60,8 +60,9 @@ scene.background=new THREE.Color(0x000100);
 scene.fog=new THREE.Fog(0x030302,14,lowEndDevice?46:62);
 
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
+const HOUSE_ONLY_LEVEL=true;
 const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
-if(HOUSE_ONLY_LEVEL) world.root.visible=false;
+world.root.visible=false;
 
 const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,.08);
 scene.add(hemi);
@@ -89,7 +90,6 @@ player.hands.visible=true;
 // ---------------------------------------------------------------------------
 // The uploaded house is kept separate from the procedural world so it can
 // become a real level later without rewriting the current map.
-const HOUSE_ONLY_LEVEL=true;
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
 const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
 const HOUSE_TARGET_HEIGHT=7.2;
