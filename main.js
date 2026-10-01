@@ -77,9 +77,9 @@ player.hands.visible=true;
 // The uploaded house is kept separate from the procedural world so it can
 // become a real level later without rewriting the current map.
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
-const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
+const HOUSE_ORIGIN=new THREE.Vector3(32,0,32);
 const HOUSE_MODEL_SCALE=3.0;
-const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
+const HOUSE_PORTAL_LOCAL_OFFSET=new THREE.Vector3(0,1.0,2.2);
 let houseModel=null;
 let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
 let houseMode=false;
@@ -136,6 +136,30 @@ houseKey.castShadow=false;
 houseKey.shadow.mapSize.set(1024,1024);
 houseKey.position.set(20,18,10);
 scene.add(houseKey);
+
+const houseTestFloor=new THREE.Mesh(
+  new THREE.PlaneGeometry(90,90),
+  new THREE.MeshStandardMaterial({
+    color:0x11100d,
+    roughness:1
+  })
+);
+houseTestFloor.rotation.x=-Math.PI/2;
+houseTestFloor.position.set(HOUSE_ORIGIN.x,-0.02,HOUSE_ORIGIN.z);
+houseTestFloor.visible=false;
+scene.add(houseTestFloor);
+
+const houseTestCeiling=new THREE.Mesh(
+  new THREE.PlaneGeometry(90,90),
+  new THREE.MeshStandardMaterial({
+    color:0x090909,
+    roughness:1
+  })
+);
+houseTestCeiling.rotation.x=Math.PI/2;
+houseTestCeiling.position.set(HOUSE_ORIGIN.x,8.5,HOUSE_ORIGIN.z);
+houseTestCeiling.visible=false;
+scene.add(houseTestCeiling);
 
 const houseLights=[];
 const houseLightOffsets=[
@@ -307,6 +331,19 @@ function loadHouse(){
       houseSpawn=findHouseSpawn(box);
       player.extraCollisionBoxes=houseCollisionBoxes;
 
+      // Keep the test portal physically attached to the house's world position,
+      // so it moves with the imported model instead of floating in the void.
+      const portalPosition=houseSpawn.clone().add(HOUSE_PORTAL_LOCAL_OFFSET);
+      housePortalGroup.position.copy(portalPosition);
+      housePortalLight.position.set(
+        portalPosition.x,
+        portalPosition.y+0.5,
+        portalPosition.z-0.4
+      );
+
+      houseTestFloor.position.set(HOUSE_ORIGIN.x,box.min.y-0.02,HOUSE_ORIGIN.z);
+      houseTestCeiling.position.set(HOUSE_ORIGIN.x,box.max.y+0.02,HOUSE_ORIGIN.z);
+
       // Never start below the house. This model contains a pool and other
       // lower geometry, so the GLB's absolute minimum Y is not the floor.
       houseSpawn.y=Math.max(houseSpawn.y,box.min.y+EYE+0.25);
@@ -355,6 +392,8 @@ function setHouseMode(enabled){
   housePortalLight.visible=!houseMode;
   houseExitPortal.visible=houseMode;
   houseExitPortalLight.visible=houseMode;
+  houseTestFloor.visible=houseMode;
+  houseTestCeiling.visible=houseMode;
 
   if(houseModel) houseModel.visible=houseMode;
   houseFill.intensity=houseMode?1.35:0;
@@ -405,8 +444,8 @@ function tryHouseTeleport(){
   }
 
   const d=Math.hypot(
-    player.pos.x-HOUSE_TEST_PORTAL_POSITION.x,
-    player.pos.z-HOUSE_TEST_PORTAL_POSITION.z
+    player.pos.x-housePortalGroup.position.x,
+    player.pos.z-housePortalGroup.position.z
   );
   if(d<3.0) setHouseMode(true);
 }
