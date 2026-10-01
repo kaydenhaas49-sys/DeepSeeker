@@ -185,97 +185,101 @@ export function attachFlashlight(model){
   return flashlight;
 }
 
+function findBone(root, patterns){
+  const list=Array.isArray(patterns)?patterns:[patterns];
+  let found=null;
+
+  root.traverse(obj=>{
+    if(found || !obj.isBone) return;
+    const n=(obj.name||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(list.some(rx=>rx.test(n))) found=obj;
+  });
+
+  return found;
+}
+
+function applyNeutralMixamoPose(model){
+  const left=findBone(model,[/mixamorigleftarm$/,/leftupperarm$/,/leftarm$/]);
+  const right=findBone(model,[/mixamorigrightarm$/,/rightupperarm$/,/rightarm$/]);
+
+  if(left) left.rotation.z += Math.PI/2;
+  if(right) right.rotation.z -= Math.PI/2;
+
+  model.updateMatrixWorld(true);
+}
+
 function pickIdleAnimation(clips){
   if(!clips?.length) return null;
 
   const ranked=clips.map((clip,index)=>{
-    const name=(clip.name || "").toLowerCase();
+    const n=(clip.name||"").toLowerCase();
     let score=0;
 
-    if(/idle|standing|stand|rest|neutral|breath/.test(name)) score+=1000;
-    if(/walk|walking/.test(name)) score+=120;
-    if(/run|running|sprint|jog|jump|fall|attack|hit|death|roll|slide/.test(name)) score-=1000;
+    if(/idle|standing|stand|rest|neutral|breath/.test(n)) score+=1000;
+    if(/walk|walking/.test(n)) score+=50;
+    if(/run|running|sprint|jog|jump|fall|attack|hit|death|roll|slide/.test(n)) score-=1000;
 
-    if(clip.duration>=1.0 && clip.duration<=8.0) score+=20;
-    score-=index*0.01;
+    if(clip.duration>=1 && clip.duration<=8) score+=20;
+    score-=index*.01;
 
     return {clip,score};
   });
 
   ranked.sort((x,y)=>y.score-x.score);
-
-  // For a generic Mixamo-exported rig, use its best available clip rather
-  // than silently leaving the skinned character in its bind/T-pose.
-  return ranked[0]?.clip || null;
+  return ranked[0]?.score>=500 ? ranked[0].clip : null;
 }
 
-function attachRemoteBeam(flashlight){
-  const beamMaterial=new THREE.MeshBasicMaterial({
-    color:0xffedb4,
-    transparent:true,
-    opacity:0.075,
-    depthWrite:false,
-    side:THREE.DoubleSide,
-    blending:THREE.AdditiveBlending
-  });
-
-  const beamLength=10;
-  const beamRadius=1.45;
-  const beamGeometry=new THREE.ConeGeometry(beamRadius,beamLength,24,1,true);
-  beamGeometry.rotateX(Math.PI/2);
-  beamGeometry.translate(0,0,-beamLength/2);
-
-  const beam=new THREE.Mesh(beamGeometry,beamMaterial);
-  beam.name="RemoteFlashlightBeam";
-  beam.position.set(0,0,-0.02);
-  beam.frustumCulled=false;
-
+export function createRemoteFlashlight(scene){
   const target=new THREE.Object3D();
-  target.name="RemoteFlashlightTarget";
-  target.position.set(0,0,-10);
-
-  const light=new THREE.SpotLight(0xffe9af,5.5,16,Math.PI/9,.92,1.35);
-  light.name="RemoteFlashlightLight";
+  const light=new THREE.SpotLight(0xf0dfad,27,60,Math.PI/5.5,.88,1.5);
   light.castShadow=false;
+  scene.add(light);
+  scene.add(target);
   light.target=target;
 
-  flashlight.add(beam,light,target);
-
-  flashlight.userData.remoteBeam=beam;
-  flashlight.userData.remoteBeamLight=light;
-
-  return {beam,light};
+  return {
+    light,
+    target,
+    origin:new THREE.Vector3(),
+    direction:new THREE.Vector3()
+  };
 }
 
-function setRemoteFlashlightVisible(flashlight,on){
-  if(!flashlight) return;
-  const beam=flashlight.userData.remoteBeam;
-  const light=flashlight.userData.remoteBeamLight;
+export function updateRemoteFlashlight(remoteLight, origin, yaw, pitch, enabled){
+  remoteLight.light.position.copy(origin);
+  remoteLight.direction.set(
+    -Math.sin(yaw)*Math.cos(pitch),
+    -Math.sin(pitch),
+    -Math.cos(yaw)*Math.cos(pitch)
+  );
+  remoteLight.target.position.copy(origin).addScaledVector(remoteLight.direction,60);
+  remoteLight.light.visible=enabled;
+  remoteLight.light.intensity=enabled ? 27 : 0;
+}
 
-  if(beam) beam.visible=on;
-  if(light) light.visible=on;
-  flashlight.userData.remoteFlashlightOn=on;
+export function disposeRemoteFlashlight(scene, remoteLight){
+  if(!remoteLight) return;
+  scene.remove(remoteLight.light);
+  scene.remove(remoteLight.target);
 }
 
 export async function createHazmatCharacter(){
   const template=await loadHazmatCharacter();
   const model=cloneSkeleton(template.scene);
 
-  const mixer=template.animations?.length
-    ? new THREE.AnimationMixer(model)
-    : null;
-
   const idleClip=pickIdleAnimation(template.animations);
+  const mixer=idleClip ? new THREE.AnimationMixer(model) : null;
   let action=null;
 
   if(mixer && idleClip){
     action=mixer.clipAction(idleClip);
     action.setLoop(THREE.LoopRepeat,Infinity);
     action.play();
+  }else{
+    applyNeutralMixamoPose(model);
   }
 
   const flashlight=attachFlashlight(model);
-  if(flashlight) attachRemoteBeam(flashlight);
 
   return {
     model,
@@ -286,5 +290,3 @@ export async function createHazmatCharacter(){
     idleClip
   };
 }
-
-export { setRemoteFlashlightVisible };
