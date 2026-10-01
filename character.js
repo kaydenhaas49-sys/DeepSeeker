@@ -163,6 +163,7 @@ export function attachFlashlight(model){
     new THREE.CylinderGeometry(.073,.073,.022,12),
     lensMat
   );
+  lens.name="FlashlightLens";
   lens.rotation.x=Math.PI/2;
   lens.position.z=-.388;
 
