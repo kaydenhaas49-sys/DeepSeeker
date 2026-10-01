@@ -63,6 +63,192 @@ const audio=new HorrorAudio();
 
 player.hands.visible=true;
 
+// ---------------------------------------------------------------------------
+// Test house level
+// ---------------------------------------------------------------------------
+// The uploaded house is kept separate from the procedural world so it can
+// become a real level later without rewriting the current map.
+const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
+const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
+const HOUSE_TARGET_HEIGHT=7.2;
+const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
+let houseModel=null;
+let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
+let houseMode=false;
+let houseLoaded=false;
+const houseCollisionBoxes=[];
+
+const housePortal=new THREE.Mesh(
+  new THREE.BoxGeometry(0.9,1.8,0.25),
+  new THREE.MeshStandardMaterial({
+    color:0x8e7740,
+    emissive:0x5c4718,
+    emissiveIntensity:2.2,
+    roughness:.55,
+    metalness:.15
+  })
+);
+housePortal.name="HouseTestTeleport";
+housePortal.position.copy(HOUSE_TEST_PORTAL_POSITION);
+scene.add(housePortal);
+
+const housePortalLight=new THREE.PointLight(0xc6a85c,3.5,8,2);
+housePortalLight.position.set(
+  HOUSE_TEST_PORTAL_POSITION.x,
+  HOUSE_TEST_PORTAL_POSITION.y+0.5,
+  HOUSE_TEST_PORTAL_POSITION.z-0.4
+);
+scene.add(housePortalLight);
+
+function boxContainsPlayer(box,x,z,r=0.42){
+  const nx=Math.max(box.min.x,Math.min(x,box.max.x));
+  const nz=Math.max(box.min.z,Math.min(z,box.max.z));
+  const dx=x-nx;
+  const dz=z-nz;
+  return dx*dx+dz*dz<r*r;
+}
+
+function findHouseSpawn(bounds){
+  const center=bounds.getCenter(new THREE.Vector3());
+  const size=bounds.getSize(new THREE.Vector3());
+  const maxX=size.x*0.35;
+  const maxZ=size.z*0.35;
+
+  const candidates=[];
+  for(let z=-maxZ;z<=maxZ;z+=1.5){
+    for(let x=-maxX;x<=maxX;x+=1.5){
+      candidates.push(new THREE.Vector3(center.x+x,0,center.z+z));
+    }
+  }
+  candidates.sort((a,b)=>Math.hypot(a.x-center.x,a.z-center.z)-Math.hypot(b.x-center.x,b.z-center.z));
+
+  for(const candidate of candidates){
+    let blocked=false;
+    for(const box of houseCollisionBoxes){
+      if(boxContainsPlayer(box,candidate.x,candidate.z)) {
+        blocked=true;
+        break;
+      }
+    }
+    if(!blocked) {
+      return new THREE.Vector3(candidate.x, HOUSE_ORIGIN.y+EYE, candidate.z);
+    }
+  }
+
+  return new THREE.Vector3(center.x,HOUSE_ORIGIN.y+EYE,center.z);
+}
+
+function loadHouse(){
+  const loader=new GLTFLoader();
+  loader.load(
+    HOUSE_MODEL_PATH,
+    (gltf)=>{
+      houseModel=gltf.scene;
+      houseModel.name="DeepSeekerHouse";
+      houseModel.visible=false;
+      houseModel.traverse((obj)=>{
+        if(!obj.isMesh) return;
+        obj.castShadow=true;
+        obj.receiveShadow=true;
+        obj.frustumCulled=false;
+      });
+
+      let box=new THREE.Box3().setFromObject(houseModel);
+      const size=box.getSize(new THREE.Vector3());
+      const scale=HOUSE_TARGET_HEIGHT/Math.max(size.y,0.001);
+      houseModel.scale.setScalar(scale);
+      houseModel.updateMatrixWorld(true);
+
+      box=new THREE.Box3().setFromObject(houseModel);
+      const center=box.getCenter(new THREE.Vector3());
+      houseModel.position.x+=HOUSE_ORIGIN.x-center.x;
+      houseModel.position.z+=HOUSE_ORIGIN.z-center.z;
+      houseModel.position.y+=HOUSE_ORIGIN.y-box.min.y;
+      houseModel.updateMatrixWorld(true);
+
+      box=new THREE.Box3().setFromObject(houseModel);
+
+      houseCollisionBoxes.length=0;
+      houseModel.traverse((obj)=>{
+        if(!obj.isMesh) return;
+        const meshBox=new THREE.Box3().setFromObject(obj);
+        const meshSize=meshBox.getSize(new THREE.Vector3());
+        // Skip paper-thin floors/ceilings and giant encompassing meshes.
+        if(meshSize.y<0.18) return;
+        if(meshSize.x>45 && meshSize.z>45) return;
+        houseCollisionBoxes.push(meshBox);
+      });
+
+      houseSpawn=findHouseSpawn(box);
+      player.extraCollisionBoxes=houseCollisionBoxes;
+      houseLoaded=true;
+      eventText.textContent="HOUSE TEST LEVEL READY";
+      eventText.style.opacity="1";
+      setTimeout(()=>{eventText.style.opacity="0";},2200);
+    },
+    undefined,
+    (error)=>{
+      console.error("Failed to load house:",error);
+      eventText.textContent="HOUSE MODEL FAILED TO LOAD";
+      eventText.style.opacity="1";
+    }
+  );
+}
+
+function setHouseMode(enabled){
+  if(enabled && !houseLoaded) return;
+  houseMode=enabled;
+
+  world.root.visible=!houseMode;
+  housePortal.visible=!houseMode;
+  housePortalLight.visible=!houseMode;
+
+  if(houseModel) houseModel.visible=houseMode;
+
+  player.ignoreWorldCollision=houseMode;
+
+  figure.visible=false;
+  figureLife=0;
+
+  if(houseMode){
+    player.pos.set(houseSpawn.x,houseSpawn.y-EYE,houseSpawn.z);
+    player.jumpY=0;
+    player.jumpVelocity=0;
+    objective.textContent="Explore the house. Press E at the test pad to return.";
+    eventText.textContent="HOUSE TEST LEVEL";
+    eventText.style.opacity="1";
+    setTimeout(()=>{eventText.style.opacity="0";},1600);
+  }else{
+    player.pos.set(32, EYE, 32);
+    player.jumpY=0;
+    player.jumpVelocity=0;
+    objective.textContent=STORY[storyStage].objective;
+  }
+}
+
+function tryHouseTeleport(){
+  if(!houseLoaded) return;
+
+  if(houseMode){
+    const d=Math.hypot(
+      player.pos.x-houseSpawn.x,
+      player.pos.z-houseSpawn.z
+    );
+    if(d<2.6) setHouseMode(false);
+    return;
+  }
+
+  const d=Math.hypot(
+    player.pos.x-HOUSE_TEST_PORTAL_POSITION.x,
+    player.pos.z-HOUSE_TEST_PORTAL_POSITION.z
+  );
+  if(d<2.6) setHouseMode(true);
+}
+
+loadHouse();
+
+player.hands.visible=true;
+
 
 const figure=new THREE.Group();
 figure.name="BackroomsBacteriaEntity";
@@ -436,6 +622,10 @@ document.addEventListener("pointerlockchange",()=>{
 });
 
 document.addEventListener("keydown",e=>{
+  if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen){
+    tryHouseTeleport();
+    return;
+  }
   if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !phoneOpen && !controlsOpen){ newSeed(); }
@@ -485,7 +675,7 @@ function animate(){
   const t=clock.elapsedTime;
 
   player.update(dt);
-  updateStoryProgress();
+  if(!houseMode) updateStoryProgress();
   world.update(player.pos.x,player.pos.z);
   world.updateFlicker(t);
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
@@ -539,7 +729,7 @@ function animate(){
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
-  if(eventCooldown<=0 && t>nextEvent){
+  if(!houseMode && eventCooldown<=0 && t>nextEvent){
     triggerEvent();
     nextEvent=t+28+Math.random()*35;
   }
@@ -568,4 +758,11 @@ function animate(){
 }
 animate();
 
-window.__deepseeker={player,world,camera,renderer,seed:SEED};
+window.__deepseeker={
+  player,
+  world,
+  camera,
+  renderer,
+  seed:SEED,
+  house:{model:()=>houseModel,spawn:()=>houseSpawn,active:()=>houseMode,toggle:()=>setHouseMode(!houseMode)}
+};
