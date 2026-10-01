@@ -72,27 +72,27 @@ const audio=new HorrorAudio();
 player.hands.visible=true;
 
 // ---------------------------------------------------------------------------
-// House level
+// House level — the imported house IS the level.
 // ---------------------------------------------------------------------------
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
-const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
 const HOUSE_TARGET_HEIGHT=7.2;
 const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
 
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
-let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
+let houseSpawn=new THREE.Vector3(0,EYE,0);
 const houseCollisionBoxes=[];
 let houseMeshes=[];
 const houseRaycaster=new THREE.Raycaster();
 
+// Exactly like the procedural Backrooms root: one root owns the level.
 const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
 houseRoot.visible=false;
 scene.add(houseRoot);
 
-// Backrooms-style return/entry pad. It is not part of the house geometry.
+// This portal belongs to the Backrooms side and is not part of the house.
 const housePortalGroup=new THREE.Group();
 housePortalGroup.name="HouseTeleport";
 
@@ -125,15 +125,7 @@ housePortalLight.position.set(
 );
 scene.add(housePortalLight);
 
-// Minimal house-dimension lighting. No generated floor, room, shell, or box.
-const houseFill=new THREE.HemisphereLight(0xffe9c5,0x3b342b,1.1);
-houseFill.name="HouseFill";
-houseRoot.add(houseFill);
-
-const houseKey=new THREE.PointLight(0xffe1b0,1.8,22,2);
-houseKey.name="HouseKey";
-houseRoot.add(houseKey);
-
+// Return pad is the only helper object inside the house level.
 const houseExitPortal=housePortal.clone();
 houseExitPortal.name="HouseReturnPad";
 houseExitPortal.visible=false;
@@ -143,7 +135,7 @@ const houseExitPortalLight=housePortalLight.clone();
 houseExitPortalLight.visible=false;
 houseRoot.add(houseExitPortalLight);
 
-function boxBlocked(box,x,z,r=.42){
+function houseBoxBlocked(box,x,z,r=.42){
   const nx=Math.max(box.min.x,Math.min(x,box.max.x));
   const nz=Math.max(box.min.z,Math.min(z,box.max.z));
   const dx=x-nx;
@@ -158,29 +150,26 @@ function getHouseFloorAt(x,z,bounds){
   );
 
   const hits=houseRaycaster.intersectObjects(houseMeshes,false);
-  if(!hits.length) return null;
-
-  // Prefer a broad lower surface over roof/decorative surfaces.
-  let best=null;
   for(const hit of hits){
-    if(hit.point.y<bounds.min.y-.1) continue;
-    if(hit.point.y>bounds.min.y+4.5) continue;
-    if(!best || hit.point.y>best.point.y) best=hit;
+    if(hit.point.y<bounds.min.y-.05) continue;
+    if(hit.point.y>bounds.min.y+3.8) continue;
+    return hit.point.y;
   }
 
-  return best ? best.point.y : null;
+  return null;
 }
 
 function findHouseSpawn(bounds){
   const center=bounds.getCenter(new THREE.Vector3());
   const size=bounds.getSize(new THREE.Vector3());
 
+  // Search the imported model itself for a floor point that is not inside a
+  // wall collider. No external room/floor/spawn geometry is created.
+  const spanX=Math.max(3,size.x*.28);
+  const spanZ=Math.max(3,size.z*.28);
+
   let best=null;
   let bestScore=-Infinity;
-
-  // Search actual model space for a floor surrounded by interior walls.
-  const spanX=Math.max(4,size.x*.34);
-  const spanZ=Math.max(4,size.z*.34);
 
   for(let z=-spanZ;z<=spanZ;z+=1){
     for(let x=-spanX;x<=spanX;x+=1){
@@ -189,45 +178,24 @@ function findHouseSpawn(bounds){
       const floorY=getHouseFloorAt(px,pz,bounds);
       if(floorY===null) continue;
 
-      const py=floorY+1.15;
-      let wallHits=0;
-      let nearest=Infinity;
-
-      const directions=[
-        [1,0],[-1,0],[0,1],[0,-1],
-        [.707,.707],[-.707,.707],[.707,-.707],[-.707,-.707]
-      ];
-
-      for(const [dx,dz] of directions){
-        houseRaycaster.set(
-          new THREE.Vector3(px,py,pz),
-          new THREE.Vector3(dx,0,dz)
-        );
-        const hits=houseRaycaster.intersectObjects(houseMeshes,false);
-
-        if(hits.length){
-          const d=hits[0].distance;
-          if(d>.65 && d<8){
-            wallHits++;
-            nearest=Math.min(nearest,d);
-          }
-        }
-      }
-
-      // An exterior point normally won't have walls surrounding it.
-      if(wallHits<3 || nearest===Infinity) continue;
-
+      let nearestWall=Infinity;
       let blocked=false;
-      for(const box of houseCollisionBoxes){
-        if(boxBlocked(box,px,pz,.65)){
+
+      for(const wall of houseCollisionBoxes){
+        const nx=Math.max(wall.min.x,Math.min(px,wall.max.x));
+        const nz=Math.max(wall.min.z,Math.min(pz,wall.max.z));
+        nearestWall=Math.min(nearestWall,Math.hypot(px-nx,pz-nz));
+
+        if(houseBoxBlocked(wall,px,pz,.7)){
           blocked=true;
           break;
         }
       }
+
       if(blocked) continue;
 
       const centerDistance=Math.hypot(px-center.x,pz-center.z);
-      const score=wallHits*4+Math.min(nearest,5)-centerDistance*.025;
+      const score=Math.min(nearestWall,8)-centerDistance*.02;
 
       if(score>bestScore){
         bestScore=score;
@@ -236,8 +204,13 @@ function findHouseSpawn(bounds){
     }
   }
 
-  return best || new THREE.Vector3(center.x,HOUSE_ORIGIN.y+EYE,center.z);
+  return best || new THREE.Vector3(
+    center.x,
+    bounds.min.y+EYE,
+    center.z
+  );
 }
+
 function loadHouse(){
   const houseUrl=new URL(HOUSE_MODEL_PATH,import.meta.url).href;
 
@@ -248,11 +221,9 @@ function loadHouse(){
       houseModel.name="DeepSeekerHouse";
       houseRoot.add(houseModel);
 
-      let meshCount=0;
       houseMeshes=[];
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
-        meshCount++;
         houseMeshes.push(obj);
 
         obj.castShadow=false;
@@ -270,11 +241,11 @@ function loadHouse(){
         }
       });
 
-      if(meshCount===0){
+      if(!houseMeshes.length){
         throw new Error("House GLB contains no meshes.");
       }
 
-      // Scale and place the actual imported model. No surrounding geometry.
+      // Normalize only the imported model. No extra geometry is created.
       let box=new THREE.Box3().setFromObject(houseModel);
       const size=box.getSize(new THREE.Vector3());
       const scale=HOUSE_TARGET_HEIGHT/Math.max(size.y,.001);
@@ -285,39 +256,31 @@ function loadHouse(){
       box=new THREE.Box3().setFromObject(houseModel);
       const center=box.getCenter(new THREE.Vector3());
 
-      houseModel.position.x+=HOUSE_ORIGIN.x-center.x;
-      houseModel.position.y+=HOUSE_ORIGIN.y-box.min.y;
-      houseModel.position.z+=HOUSE_ORIGIN.z-center.z;
+      houseModel.position.x-=center.x;
+      houseModel.position.y-=box.min.y;
+      houseModel.position.z-=center.z;
       houseModel.updateMatrixWorld(true);
 
       box=new THREE.Box3().setFromObject(houseModel);
 
-      // Collision comes only from the imported house meshes.
-      // Floors/ceilings stay passable; vertical geometry becomes solid.
+      // Only thin, vertical imported meshes become wall collision.
       houseCollisionBoxes.length=0;
       for(const obj of houseMeshes){
         const meshBox=new THREE.Box3().setFromObject(obj);
         const meshSize=meshBox.getSize(new THREE.Vector3());
 
-        if(meshSize.y<.75) continue;
-        if(meshSize.x>45 && meshSize.z>45) continue;
+        if(meshSize.y<1.0) continue;
 
-        houseCollisionBoxes.push(meshBox);
+        const xWall=meshSize.x>1.2 && meshSize.z<.8;
+        const zWall=meshSize.z>1.2 && meshSize.x<.8;
+
+        if(xWall||zWall){
+          houseCollisionBoxes.push(meshBox);
+        }
       }
 
       houseSpawn=findHouseSpawn(box);
       houseLoaded=true;
-
-      houseFill.position.set(
-        HOUSE_ORIGIN.x,
-        HOUSE_ORIGIN.y+3.5,
-        HOUSE_ORIGIN.z
-      );
-      houseKey.position.set(
-        HOUSE_ORIGIN.x-2,
-        HOUSE_ORIGIN.y+3,
-        HOUSE_ORIGIN.z-3
-      );
 
       houseExitPortal.visible=false;
       houseExitPortalLight.visible=false;
@@ -350,8 +313,10 @@ function setHouseMode(enabled){
 
   houseMode=enabled;
 
+  // These are the only level roots that switch visibility.
   world.root.visible=!houseMode;
   houseRoot.visible=houseMode;
+
   housePortalGroup.visible=!houseMode;
   housePortalLight.visible=!houseMode;
 
@@ -367,9 +332,6 @@ function setHouseMode(enabled){
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    houseFill.visible=true;
-    houseKey.visible=true;
-
     houseExitPortal.position.set(
       houseSpawn.x,
       houseSpawn.y-.9,
@@ -380,6 +342,7 @@ function setHouseMode(enabled){
       houseSpawn.y+.5,
       houseSpawn.z-.4
     );
+
     houseExitPortal.visible=true;
     houseExitPortalLight.visible=true;
 
@@ -392,8 +355,10 @@ function setHouseMode(enabled){
     player.vel.set(0,0,0);
     player.jumpY=0;
     player.jumpVelocity=0;
+
     houseExitPortal.visible=false;
     houseExitPortalLight.visible=false;
+
     objective.textContent=STORY[storyStage].objective;
   }
 }
@@ -411,6 +376,7 @@ function tryHouseTeleport(){
       player.pos.x-houseSpawn.x,
       player.pos.z-houseSpawn.z
     );
+
     if(d<2.6) setHouseMode(false);
     return;
   }
@@ -422,7 +388,6 @@ function tryHouseTeleport(){
 
   if(d<3) setHouseMode(true);
 }
-
 loadHouse();
 
 player.hands.visible=true;
