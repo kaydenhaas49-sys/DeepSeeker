@@ -49,7 +49,7 @@ scene.add(ambient);
 const playerLight=new THREE.PointLight(0xb59b68,2.0,24,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xf0dfad,27,36,Math.PI/6,.82,1.5);
+const flashlight=new THREE.SpotLight(0xf0dfad,27,60,Math.PI/6,.82,1.5);
 flashlight.castShadow=true;
 flashlight.shadow.mapSize.set(512,512);
 flashlight.target.position.set(0,0,-1);
