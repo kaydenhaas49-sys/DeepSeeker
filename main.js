@@ -78,25 +78,83 @@ fallbackFigure.add(figureBody,figureHead);
 fallbackFigure.visible=false;
 figure.add(fallbackFigure);
 
-let bacteriaMixer=null;
 let bacteriaLoaded=false;
-let bacteriaActions={};
 let bacteriaAnimState="";
+const bacteriaRigs=new Map();
 const debugSpawnBacteria=true;
 
-function setBacteriaAnimation(state){
-  if(!bacteriaMixer || !bacteriaActions[state] || bacteriaAnimState===state) return;
+function playBacteriaState(state){
+  let rig=bacteriaRigs.get(state);
+  if(!rig) rig=bacteriaRigs.get("idle")||bacteriaRigs.get("stalk")||bacteriaRigs.get("chase");
+  if(!rig) return;
+
+  if(bacteriaAnimState===state && rig.model.visible) return;
   bacteriaAnimState=state;
 
-  for(const [name,action] of Object.entries(bacteriaActions)){
-    if(name===state) continue;
-    action.fadeOut(.15);
+  for(const candidate of bacteriaRigs.values()){
+    candidate.model.visible=candidate===rig;
   }
 
-  const action=bacteriaActions[state];
-  action.reset().fadeIn(.15);
-  action.setLoop(THREE.LoopRepeat,Infinity);
-  action.play();
+  rig.action.reset();
+  rig.action.setLoop(THREE.LoopRepeat,Infinity);
+  rig.action.clampWhenFinished=false;
+  rig.action.timeScale=1;
+  rig.action.play();
+}
+
+function updateBacteriaAnimation(dt,state){
+  const rig=bacteriaRigs.get(bacteriaAnimState);
+  if(rig) rig.mixer.update(dt);
+  if(bacteriaAnimState!==state) playBacteriaState(state);
+}
+
+function loadBacteriaRig(path,state,targetCenter,targetHeight,onReady){
+  bacteriaLoader.load(
+    path,
+    (gltf)=>{
+      const model=gltf.scene;
+      model.name=`BacteriaModel_${state}`;
+      model.position.set(0,0,0);
+      model.scale.setScalar(1);
+      model.traverse((obj)=>{
+        if(!obj.isMesh) return;
+        obj.frustumCulled=false;
+        obj.castShadow=true;
+        obj.receiveShadow=true;
+      });
+
+      const box=new THREE.Box3().setFromObject(model);
+      const size=box.getSize(new THREE.Vector3());
+      const scale=targetHeight/Math.max(size.y,0.001);
+      model.scale.setScalar(scale);
+      model.updateMatrixWorld(true);
+
+      const fittedBox=new THREE.Box3().setFromObject(model);
+      const fittedCenter=fittedBox.getCenter(new THREE.Vector3());
+      model.position.set(
+        targetCenter.x-fittedCenter.x,
+        targetCenter.y-fittedCenter.y,
+        targetCenter.z-fittedCenter.z
+      );
+
+      model.visible=false;
+      figure.add(model);
+
+      const mixer=new THREE.AnimationMixer(model);
+      const clip=gltf.animations?.[0];
+      if(!clip){
+        console.warn(`Bacteria ${state} GLB has no animation clip`);
+        figure.remove(model);
+        return;
+      }
+
+      const action=mixer.clipAction(clip);
+      bacteriaRigs.set(state,{model,mixer,action});
+      onReady?.();
+    },
+    undefined,
+    (error)=>console.warn(`Bacteria ${state} animation failed to load`,error)
+  );
 }
 
 const bacteriaLoader=new GLTFLoader();
@@ -123,95 +181,62 @@ bacteriaLoader.load(
       -box.min.y*scale,
       -center.z*scale
     );
-    model.scale.set(scale * 1.65, scale, scale * 1.65);
+    model.scale.set(scale*1.65,scale,scale*1.65);
+    model.updateMatrixWorld(true);
+
+    const targetBox=new THREE.Box3().setFromObject(model);
+    const targetCenter=targetBox.getCenter(new THREE.Vector3());
+    const targetHeightWorld=targetBox.getSize(new THREE.Vector3()).y;
+
     figure.add(model);
     bacteriaLoaded=true;
 
-    // Keep the original Bacteria mesh, scale, position, and spawn untouched.
-    // Only borrow the UniMate animation clips from their matching rigs.
-    bacteriaMixer=new THREE.AnimationMixer(model);
-
-    const loadAnimationClip=async(path)=>{
-      let lastError=null;
-      for(let attempt=0;attempt<3;attempt++){
-        try{
-          const gltf=await new Promise((resolve,reject)=>{
-            bacteriaLoader.load(
-              path,
-              resolve,
-              undefined,
-              reject
-            );
-          });
-          const clip=gltf.animations?.[0];
-          if(clip) return clip;
-          throw new Error("No animation clip in "+path);
-        }catch(error){
-          lastError=error;
-          await new Promise(resolve=>setTimeout(resolve,120*(attempt+1)));
-        }
-      }
-      throw lastError||new Error("Failed to load "+path);
-    };
-
-    Promise.allSettled([
-      loadAnimationClip("./assets/bacteria/bacteria_idle.glb"),
-      loadAnimationClip("./assets/bacteria/bacteria_stalk.glb"),
-      loadAnimationClip("./assets/bacteria/bacteria_chase.glb")
-    ]).then(results=>{
-      const [idle,stalk,chase]=results.map(result=>result.status==="fulfilled"?result.value:null);
-
-      bacteriaActions={};
-      if(idle) bacteriaActions.idle=bacteriaMixer.clipAction(idle);
-      if(stalk) bacteriaActions.stalk=bacteriaMixer.clipAction(stalk);
-      if(chase) bacteriaActions.chase=bacteriaMixer.clipAction(chase);
-
-      const firstState=bacteriaActions.idle?"idle":bacteriaActions.stalk?"stalk":"chase";
-      if(bacteriaActions[firstState]){
-        setBacteriaAnimation(firstState);
+    let readyCount=0;
+    const onRigReady=()=>{
+      readyCount++;
+      if(readyCount>=3){
+        model.visible=false;
+        playBacteriaState("idle");
         eventText.textContent="BACTERIA ANIMATIONS READY";
         eventText.style.opacity="1";
         setTimeout(()=>{eventText.style.opacity="0";},2200);
       }
+    };
 
-      const failed=results.filter(result=>result.status==="rejected").length;
-      if(failed) console.warn(`Bacteria animation assets failed: ${failed}/3`);
-    });
+    loadBacteriaRig("./assets/bacteria/bacteria_idle.glb","idle",targetCenter,targetHeightWorld,onRigReady);
+    loadBacteriaRig("./assets/bacteria/bacteria_stalk.glb","stalk",targetCenter,targetHeightWorld,onRigReady);
+    loadBacteriaRig("./assets/bacteria/bacteria_chase.glb","chase",targetCenter,targetHeightWorld,onRigReady);
 
-    if (debugSpawnBacteria) {
-      const dx = -Math.sin(player.yaw);
-      const dz = -Math.cos(player.yaw);
+    if(debugSpawnBacteria){
+      const dx=-Math.sin(player.yaw);
+      const dz=-Math.cos(player.yaw);
       figure.position.set(
-        player.pos.x + dx * 5,
+        player.pos.x+dx*5,
         0,
-        player.pos.z + dz * 5
+        player.pos.z+dz*5
       );
-      figure.rotation.y = player.yaw + Math.PI;
-      figureLife = Infinity;
-      figure.visible = true;
-      eventText.textContent = "BACTERIA LOADED";
-      eventText.style.opacity = "1";
+      figure.rotation.y=player.yaw+Math.PI;
+      figureLife=Infinity;
+      figure.visible=true;
+      eventText.textContent="BACTERIA LOADED";
+      eventText.style.opacity="1";
     }
-
-    // Leave animation disabled during the visual test so the model stays
-    // exactly where it was spawned.
   },
   undefined,
   ()=>{
-    // Make the failure obvious during the test instead of silently showing nothing.
-    fallbackFigure.visible = true;
-    const dx = -Math.sin(player.yaw);
-    const dz = -Math.cos(player.yaw);
+    fallbackFigure.visible=true;
+    const dx=-Math.sin(player.yaw);
+    const dz=-Math.cos(player.yaw);
     figure.position.set(
-      player.pos.x + dx * 5,
+      player.pos.x+dx*5,
       0,
-      player.pos.z + dz * 5
+      player.pos.z+dz*5
     );
-    figure.rotation.y = player.yaw + Math.PI;
-    figureLife = Infinity;
-    figure.visible = true;
-    eventText.textContent = "BACTERIA GLB FAILED TO LOAD";
-    eventText.style.opacity = "1";
+    figure.rotation.y=player.yaw+Math.PI;
+    figureLife=Infinity;
+    figure.visible=true;
+    eventText.textContent="BACTERIA GLB FAILED TO LOAD";
+    eventText.style.opacity="1";
   }
 );
 let figureLife=0;
@@ -467,13 +492,12 @@ function animate(){
   flashlight.intensity=flashlightOn ? 13.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
-  if(bacteriaMixer){
+  if(bacteriaRigs.size){
     const d=Math.hypot(player.pos.x-figure.position.x,player.pos.z-figure.position.z);
     const state=Number.isFinite(figureLife)
       ? (figureLife<.72 ? "chase" : "stalk")
       : (d<8 ? "chase" : d<18 ? "stalk" : "idle");
-    setBacteriaAnimation(state);
-    bacteriaMixer.update(dt);
+    updateBacteriaAnimation(dt,state);
   }
 
   if(figureLife>0){
