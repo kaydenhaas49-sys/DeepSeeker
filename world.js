@@ -6,7 +6,7 @@ import { createTextures } from "./textures.js";
 export const CELL = 4; // meters per grid cell
 export const CHUNK_CELLS = 16; // cells per chunk side
 export const CHUNK_SIZE = CELL * CHUNK_CELLS; // 64 m
-export const WALL_H = 6.0; // tall Backrooms ceiling with plenty of jump headroom
+export const WALL_H = 20.0; // 20 m Backrooms ceiling
 export const WALL_T = 0.35; // wall thickness
 export const EYE = 1.6; // eye height
 
