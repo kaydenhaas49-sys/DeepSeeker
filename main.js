@@ -77,11 +77,12 @@ player.hands.visible=true;
 // The uploaded house is kept separate from the procedural world so it can
 // become a real level later without rewriting the current map.
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
-const HOUSE_ORIGIN=new THREE.Vector3(32,0,32);
+const HOUSE_ORIGIN=new THREE.Vector3(32,0,8);
 const HOUSE_MODEL_SCALE=3.0;
 const HOUSE_PORTAL_LOCAL_OFFSET=new THREE.Vector3(0,1.0,2.2);
 let houseModel=null;
 let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
+let houseExteriorSpawn=new THREE.Vector3(32,EYE,32);
 let houseMode=false;
 let houseLoaded=false;
 const houseCollisionBoxes=[];
@@ -329,6 +330,13 @@ function loadHouse(){
       }
 
       houseSpawn=findHouseSpawn(box);
+      const houseSize=box.getSize(new THREE.Vector3());
+      // Return point sits just outside the front/nearest edge of the house.
+      houseExteriorSpawn.set(
+        HOUSE_ORIGIN.x,
+        EYE,
+        box.max.z + 3.0
+      );
       player.extraCollisionBoxes=houseCollisionBoxes;
 
       // Keep the entry portal physically attached to the imported house.
@@ -423,7 +431,7 @@ function setHouseMode(enabled){
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},1600);
   }else{
-    player.pos.set(32, EYE, 32);
+    player.pos.copy(houseExteriorSpawn);
     player.jumpY=0;
     player.jumpVelocity=0;
     houseExitPortal.visible=false;
