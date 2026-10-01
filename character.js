@@ -185,108 +185,125 @@ export function attachFlashlight(model){
   return flashlight;
 }
 
-function pickIdleAnimation(clips){
-  // This hazmat asset exports one animation clip and it is a locomotion
-  // cycle, not a true idle. Use it only to establish a useful standing pose;
-  // createHazmatCharacter() freezes that pose immediately.
-  return clips?.[0] || null;
-}
-function findBone(root, pattern){
+function findBoneByPattern(root, patterns){
+  const list=Array.isArray(patterns)?patterns:[patterns];
   let found=null;
+
   root.traverse(obj=>{
     if(found || !obj.isBone) return;
-    if(pattern.test((obj.name || "").toLowerCase())) found=obj;
+    const name=(obj.name || "").toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(list.some(pattern=>pattern.test(name))) found=obj;
   });
+
   return found;
 }
 
-function pointBoneToward(bone, targetDirection){
-  if(!bone) return false;
-  const child=bone.children.find(child=>child.isBone);
-  if(!child) return false;
+function scoreStandingPose(root, bones){
+  root.updateMatrixWorld(true);
 
-  bone.updateMatrixWorld(true);
-  child.updateMatrixWorld(true);
-
-  const from=new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
-  const to=new THREE.Vector3().setFromMatrixPosition(child.matrixWorld);
-  const current=to.sub(from);
-  if(current.lengthSq()<1e-8) return false;
-  current.normalize();
-
-  const target=targetDirection.clone().normalize();
-  const delta=new THREE.Quaternion().setFromUnitVectors(current,target);
-
-  const worldQuat=new THREE.Quaternion();
-  bone.getWorldQuaternion(worldQuat);
-  worldQuat.premultiply(delta);
-
-  if(bone.parent){
-    const parentWorld=new THREE.Quaternion();
-    bone.parent.getWorldQuaternion(parentWorld);
-    parentWorld.invert();
-    bone.quaternion.copy(parentWorld.multiply(worldQuat));
-  }else{
-    bone.quaternion.copy(worldQuat);
+  const p={};
+  for(const [key,bone] of Object.entries(bones)){
+    if(!bone) continue;
+    p[key]=new THREE.Vector3();
+    bone.getWorldPosition(p[key]);
   }
 
-  bone.updateMatrixWorld(true);
-  return true;
+  let score=0;
+
+  // A standing pose has the two feet close together and at a similar height.
+  if(p.leftFoot && p.rightFoot){
+    score -= Math.abs(p.leftFoot.x-p.rightFoot.x)*3;
+    score -= Math.abs(p.leftFoot.z-p.rightFoot.z)*1.5;
+    score -= Math.abs(p.leftFoot.y-p.rightFoot.y)*4;
+  }
+
+  // Arms should hang below the shoulders instead of being spread wide.
+  if(p.leftShoulder && p.leftHand){
+    score += Math.max(0,p.leftShoulder.y-p.leftHand.y)*5;
+    score -= Math.abs(p.leftHand.x-p.leftShoulder.x)*1.8;
+  }
+
+  if(p.rightShoulder && p.rightHand){
+    score += Math.max(0,p.rightShoulder.y-p.rightHand.y)*5;
+    score -= Math.abs(p.rightHand.x-p.rightShoulder.x)*1.8;
+  }
+
+  // Penalize extreme hand separation, which is common during a running swing.
+  if(p.leftHand && p.rightHand){
+    score -= Math.max(0,Math.abs(p.leftHand.x-p.rightHand.x)-0.45)*1.5;
+  }
+
+  return score;
 }
 
-function applyNeutralStandingPose(model){
-  const leftArm=findBone(model,/(?:mixamorig[:._-]?)?leftarm$/i) ||
-               findBone(model,/left.*upper.*arm|upper.*arm.*left/i);
-  const rightArm=findBone(model,/(?:mixamorig[:._-]?)?rightarm$/i) ||
-                findBone(model,/right.*upper.*arm|upper.*arm.*right/i);
+function sampleBestStandingFrame(model,mixer,clip){
+  try{
+    const bones={
+      leftFoot:findBoneByPattern(model,[/leftfoot$/,/leftankle$/,/lefttoes$/]),
+      rightFoot:findBoneByPattern(model,[/rightfoot$/,/rightankle$/,/righttoes$/]),
+      leftHand:findBoneByPattern(model,[/lefthand$/,/leftwrist$/]),
+      rightHand:findBoneByPattern(model,[/righthand$/,/rightwrist$/]),
+      leftShoulder:findBoneByPattern(model,[/leftshoulder$/,/leftarm$/,/leftupperarm$/]),
+      rightShoulder:findBoneByPattern(model,[/rightshoulder$/,/rightarm$/,/rightupperarm$/])
+    };
 
-  const leftForeArm=findBone(model,/(?:mixamorig[:._-]?)?leftforearm$/i) ||
-                    findBone(model,/left.*forearm|left.*lower.*arm/i);
-  const rightForeArm=findBone(model,/(?:mixamorig[:._-]?)?rightforearm$/i) ||
-                     findBone(model,/right.*forearm|right.*lower.*arm/i);
+    const action=mixer.clipAction(clip);
+    action.reset();
+    action.setLoop(THREE.LoopRepeat,Infinity);
+    action.play();
 
-  // Drop the arms from the rig's T/rest position to a relaxed standing pose.
-  pointBoneToward(leftArm,new THREE.Vector3(0.10,-0.99,0.03));
-  model.updateMatrixWorld(true);
-  pointBoneToward(rightArm,new THREE.Vector3(-0.10,-0.99,0.03));
-  model.updateMatrixWorld(true);
+    const samples=32;
+    let bestTime=0;
+    let bestScore=-Infinity;
 
-  // Give the elbows a tiny natural bend rather than perfectly straight arms.
-  pointBoneToward(leftForeArm,new THREE.Vector3(0.08,-0.98,0.10));
-  model.updateMatrixWorld(true);
-  pointBoneToward(rightForeArm,new THREE.Vector3(-0.08,-0.98,0.10));
-  model.updateMatrixWorld(true);
+    for(let i=0;i<samples;i++){
+      const t=(clip.duration*i)/samples;
+      mixer.setTime(t);
+      const score=scoreStandingPose(model,bones);
+
+      if(Number.isFinite(score) && score>bestScore){
+        bestScore=score;
+        bestTime=t;
+      }
+    }
+
+    mixer.setTime(bestTime);
+    action.paused=true;
+    action.time=bestTime;
+    mixer.update(0);
+
+    console.log("[DeepSeeker] hazmat standing frame:",bestTime.toFixed(3),bestScore.toFixed(3));
+
+    return {action,bestTime};
+  }catch(error){
+    console.warn("[DeepSeeker] hazmat pose sampling failed; using bind pose safely:",error);
+    return {action:null,bestTime:0};
+  }
 }
 
 export async function createHazmatCharacter(){
-  const template = await loadHazmatCharacter();
-  const model = cloneSkeleton(template.scene);
-  const mixer = new THREE.AnimationMixer(model);
+  const template=await loadHazmatCharacter();
+  const model=cloneSkeleton(template.scene);
+  const mixer=new THREE.AnimationMixer(model);
 
-  // The exported file's first clip is the rig's locomotion animation.
-  // Its opening frame is the closest thing this asset has to a neutral pose.
-  // Apply exactly frame 0, then freeze the action so it cannot run in place.
-  const idleClip = template.animations?.[0] || null;
-  let action = null;
+  const clip=template.animations?.[0] || null;
+  let action=null;
+  let idleClip=null;
 
-  if(idleClip){
-    action = mixer.clipAction(idleClip);
-    action.setLoop(THREE.LoopRepeat, Infinity);
-    action.reset();
-    action.play();
-    action.time = 0;
-    action.paused = true;
-    mixer.update(0);
+  if(clip){
+    const sampled=sampleBestStandingFrame(model,mixer,clip);
+    action=sampled.action;
+    idleClip=clip;
   }
 
-  const flashlight = attachFlashlight(model);
+  const flashlight=attachFlashlight(model);
 
   return {
     model,
     mixer,
     action,
     flashlight,
-    animations: template.animations,
+    animations:template.animations,
     idleClip
   };
 }
