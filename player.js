@@ -3,6 +3,8 @@ import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
 import { Capsule } from "three/addons/math/Capsule.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -104,6 +106,12 @@ export class Player {
 
   loadCharacterModel() {
     const loader = new GLTFLoader();
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath(
+      "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/libs/draco/gltf/"
+    );
+    loader.setDRACOLoader(dracoLoader);
+    loader.setMeshoptDecoder(MeshoptDecoder);
 
     loader.load(
       "./assets/backrooms_rigged_hazmat.glb",
@@ -172,8 +180,55 @@ export class Player {
       undefined,
       (error)=>{
         console.error("[DeepSeeker] hazmat model failed to load:",error);
+        this.characterLoaded=false;
+        this.buildFallbackViewmodel();
       }
     );
+  }
+
+  buildFallbackViewmodel(){
+    if(this.fallbackViewmodel) return;
+
+    const group=new THREE.Group();
+    group.name="FallbackFirstPersonViewmodel";
+    this.hands.add(group);
+
+    const mat=new THREE.MeshStandardMaterial({
+      color:0x34362f,
+      roughness:1
+    });
+    const handMat=new THREE.MeshStandardMaterial({
+      color:0xc58f6d,
+      roughness:.92
+    });
+
+    const makeArm=(x)=>{
+      const arm=new THREE.Mesh(
+        new THREE.CapsuleGeometry(.11,.55,5,8),
+        mat
+      );
+      arm.position.set(x,-.62,-.96);
+      group.add(arm);
+      return arm;
+    };
+
+    makeArm(-.43);
+    makeArm(.43);
+
+    const hand=new THREE.Mesh(
+      new THREE.SphereGeometry(.125,9,7),
+      handMat
+    );
+    hand.position.set(.46,-.88,-1.08);
+    group.add(hand);
+
+    const flashlight=this.buildHeldFlashlight();
+    flashlight.position.set(.03,0,-.18);
+    group.add(flashlight);
+
+    this.fallbackViewmodel=group;
+    this.viewmodelFlashlight=flashlight;
+    this.setFlashlightVisual(true);
   }
 
   findRightHandBone(root){
