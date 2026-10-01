@@ -105,6 +105,8 @@ let houseLoadFailed=false;
 let houseLoadStarted=false;
 let houseCollisionReady=false;
 let houseCollisionBuildStarted=false;
+const houseCollisionBoxes=[];
+const houseRenderMeshes=[];
 let gameStarted=false;
 let lastAutoSave=0;
 let pendingSaveLoad=null;
@@ -497,31 +499,72 @@ function updateHouseDoors(dt){
 }
 
 
-function buildHouseOctree(root){
-  const detached=[];
-
-  // Door meshes are animated separately. Keep them out of the static
-  // triangle collision tree so open doors can actually be walked through.
-  for(const door of houseDoors){
-    const parent=door.pivot.parent;
-    if(!parent) continue;
-    detached.push({pivot:door.pivot,parent});
-    parent.remove(door.pivot);
-  }
-
-  houseOctree.clear();
-  houseOctree.fromGraphNode(root);
-
-  for(const item of detached){
-    item.parent.add(item.pivot);
-  }
+function buildHouseCollisionProxies(root){
+  houseCollisionBoxes.length=0;
 
   root.updateMatrixWorld(true);
-  console.log("[DeepSeeker] house octree built");
+
+  const wallName=/wall|partition|panel|barrier|room|door|window|frame|column|pillar/i;
+
+  root.traverse((obj)=>{
+    if(!obj.isMesh || !obj.geometry) return;
+    if(obj.userData.houseCollisionDoor) return;
+
+    const box=new THREE.Box3().setFromObject(obj);
+    const size=box.getSize(new THREE.Vector3());
+    const vertical=size.y>1.15;
+    const thin=Math.min(size.x,size.z)<0.7;
+    const named=obj.name && wallName.test(obj.name);
+
+    if(named || (vertical && thin && Math.max(size.x,size.z)>0.9)){
+      houseCollisionBoxes.push({
+        minX:box.min.x,
+        maxX:box.max.x,
+        minZ:box.min.z,
+        maxZ:box.max.z
+      });
+    }
+  });
+
+  // Keep collision cheap even if the source GLB has hundreds of tiny wall pieces.
+  if(houseCollisionBoxes.length>220){
+    houseCollisionBoxes.splice(220);
+  }
+
+  console.log("[DeepSeeker] house collision proxies:",houseCollisionBoxes.length);
+}
+
+function prepareHouseRenderCulling(root){
+  houseRenderMeshes.length=0;
+  root.traverse((obj)=>{
+    if(!obj.isMesh) return;
+    obj.userData.houseCullCenter=new THREE.Vector3();
+    obj.getWorldPosition(obj.userData.houseCullCenter);
+    obj.userData.houseCullRadius=new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()).length()*0.5;
+    houseRenderMeshes.push(obj);
+    obj.visible=false;
+  });
+}
+
+function updateHouseRenderCulling(x,z){
+  const maxDistance=34;
+  const maxDistanceSq=maxDistance*maxDistance;
+
+  for(const mesh of houseRenderMeshes){
+    const p=mesh.userData.houseCullCenter;
+    if(!p){
+      mesh.visible=true;
+      continue;
+    }
+    const dx=p.x-x;
+    const dz=p.z-z;
+    const r=mesh.userData.houseCullRadius||0;
+    mesh.visible=dx*dx+dz*dz <= (maxDistance+r)*(maxDistance+r);
+  }
 }
 
 function updateHouseDoorCollisions(){
-  const boxes=[];
+  const boxes=houseCollisionBoxes.slice();
 
   for(const door of houseDoors){
     const open=door.pivot.userData.openProgress||0;
@@ -584,7 +627,12 @@ function ensureHouseCollisionSetup(){
     const started=performance.now();
 
     setupHouseDoors(houseModel);
-    buildHouseOctree(houseModel);
+    for(const door of houseDoors){
+      door.pivot.traverse(obj=>{
+        obj.userData.houseCollisionDoor=true;
+      });
+    }
+    buildHouseCollisionProxies(houseModel);
 
     houseCollisionReady=true;
     houseCollisionBuildStarted=false;
@@ -686,11 +734,13 @@ function loadHouse(){
       // Spawn at the model's normalized center.
       houseSpawn.set(0,EYE,0);
 
+      prepareHouseRenderCulling(houseModel);
+
       houseLoaded=true;
       houseLoadFailed=false;
       houseRoot.visible=false;
 
-      // Door discovery + triangle collision are deliberately deferred.
+      // Door discovery + lightweight collision are deliberately deferred.
       // Building the Octree is one of the most expensive parts of loading
       // this level and should never block the main menu.
       ensureHouseCollisionSetup();
@@ -758,7 +808,7 @@ function setHouseMode(enabled){
   houseReturnGroup.visible=houseMode;
 
   player.ignoreWorldCollision=houseMode;
-  player.houseOctree=houseMode ? houseOctree : null;
+  player.houseOctree=null;
   player.extraCollisionBoxes=[];
 
   figure.visible=false;
@@ -766,6 +816,7 @@ function setHouseMode(enabled){
 
   if(houseMode){
     player.pos.copy(houseSpawn);
+    updateHouseRenderCulling(houseSpawn.x,houseSpawn.z);
     player.vel.set(0,0,0);
     player.jumpY=0;
     player.jumpVelocity=0;
@@ -1322,6 +1373,7 @@ function animate(){
   if(houseMode){
     updateHouseDoors(dt);
     updateHouseDoorCollisions();
+    updateHouseRenderCulling(player.pos.x,player.pos.z);
   }else{
     player.houseOctree=null;
     player.extraCollisionBoxes=[];
