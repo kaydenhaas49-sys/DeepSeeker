@@ -147,52 +147,88 @@ const houseReturnLight=housePortalLight.clone();
 houseReturnGroup.add(houseReturn,houseReturnLight);
 scene.add(houseReturnGroup);
 
-function setupHouseDoors(root){
-  houseDoors.length=0;
-  root.traverse((obj)=>{
-    if(obj===root || !obj.name || !houseDoorPattern.test(obj.name)) return;
+function attachHouseDoor(obj,index){
+  const parent=obj.parent;
+  if(!parent) return;
 
-    const pivot=new THREE.Group();
-    pivot.name="DoorPivot_"+obj.name;
-    const parent=obj.parent;
-    if(!parent) return;
+  const pivot=new THREE.Group();
+  pivot.name="DoorPivot_"+(obj.name||("Door_"+index));
 
-    obj.updateMatrixWorld(true);
-    const worldMatrix=new THREE.Matrix4().copy(obj.matrixWorld);
-    const worldPosition=new THREE.Vector3().setFromMatrixPosition(worldMatrix);
-    const invParent=new THREE.Matrix4().copy(parent.matrixWorld).invert();
-    worldPosition.applyMatrix4(invParent);
+  obj.updateMatrixWorld(true);
+  const worldMatrix=new THREE.Matrix4().copy(obj.matrixWorld);
+  const worldPosition=new THREE.Vector3().setFromMatrixPosition(worldMatrix);
+  const invParent=new THREE.Matrix4().copy(parent.matrixWorld).invert();
 
-    pivot.position.copy(worldPosition);
-    parent.add(pivot);
-    pivot.updateMatrixWorld(true);
+  worldPosition.applyMatrix4(invParent);
+  pivot.position.copy(worldPosition);
+  parent.add(pivot);
+  pivot.updateMatrixWorld(true);
 
-    const localMatrix=new THREE.Matrix4().multiplyMatrices(
-      new THREE.Matrix4().copy(pivot.matrixWorld).invert(),
-      worldMatrix
-    );
-
-    pivot.add(obj);
-    localMatrix.decompose(obj.position,obj.quaternion,obj.scale);
-
-    const index=houseDoors.length;
-
-    // Only about 1 in 4 doors actually opens. The rest are solid/locked.
-    houseDoors.push({
-      pivot,
-      target:0,
-      angle:index%2===0?Math.PI/2:-Math.PI/2,
-      functional:index%4===0,
-      collisionBox:{minX:0,maxX:0,minZ:0,maxZ:0}
-    });
-  });
-
-  console.log(
-    "[DeepSeeker] doors:",
-    houseDoors.map((d,i)=>({index:i,functional:d.functional}))
+  const localMatrix=new THREE.Matrix4().multiplyMatrices(
+    new THREE.Matrix4().copy(pivot.matrixWorld).invert(),
+    worldMatrix
   );
+
+  pivot.add(obj);
+  localMatrix.decompose(obj.position,obj.quaternion,obj.scale);
+
+  houseDoors.push({
+    pivot,
+    target:0,
+    angle:index%2===0?Math.PI/2:-Math.PI/2,
+    functional:index%4===0,
+    collisionBox:{minX:0,maxX:0,minZ:0,maxZ:0}
+  });
 }
 
+function setupHouseDoors(root){
+  houseDoors.length=0;
+
+  const candidates=[];
+  const excluded=/window|wall|frame|cabinet|wardrobe|closet|table|chair|bed|shelf|counter|stairs?|rail|column|floor|ceiling/i;
+
+  root.traverse((obj)=>{
+    if(obj===root || !obj.isMesh) return;
+
+    if(obj.name && houseDoorPattern.test(obj.name)){
+      candidates.push(obj);
+      return;
+    }
+
+    if(obj.name && excluded.test(obj.name)) return;
+    if(!obj.geometry) return;
+
+    if(!obj.geometry.boundingBox) obj.geometry.computeBoundingBox();
+    const box=obj.geometry.boundingBox;
+    if(!box) return;
+
+    const size=box.getSize(new THREE.Vector3());
+    const vertical=size.y>=1.55 && size.y<=3.1;
+    const width=Math.max(size.x,size.z);
+    const depth=Math.min(size.x,size.z);
+
+    // Generic-name fallback for common game-ready door panels.
+    if(vertical && width>=.55 && width<=1.55 && depth>=.04 && depth<=.42){
+      candidates.push(obj);
+    }
+  });
+
+  const unique=[];
+  for(const obj of candidates){
+    if(!unique.includes(obj)) unique.push(obj);
+  }
+
+  unique.forEach((obj,index)=>attachHouseDoor(obj,index));
+
+  console.log(
+    "[DeepSeeker] doors found:",
+    houseDoors.map((d,i)=>({
+      index:i,
+      name:d.pivot.name,
+      functional:d.functional
+    }))
+  );
+}
 function updateHouseDoors(dt){
   for(const door of houseDoors){
     const current=door.pivot.userData.openProgress||0;
@@ -276,7 +312,7 @@ function buildHouseOctree(root){
 }
 
 function updateHouseDoorCollisions(){
-  const boxes=houseStaticCollisionBoxes.slice();
+  const boxes=[];
 
   for(const door of houseDoors){
     const open=door.pivot.userData.openProgress||0;
