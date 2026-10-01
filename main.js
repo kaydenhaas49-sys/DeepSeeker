@@ -202,29 +202,45 @@ function findHouseSpawn(bounds){
   const maxZ=size.z*0.28;
 
   const candidates=[];
-  for(let z=-maxZ;z<=maxZ;z+=1.5){
-    for(let x=-maxX;x<=maxX;x+=1.5){
+  for(let z=-maxZ;z<=maxZ;z+=1.0){
+    for(let x=-maxX;x<=maxX;x+=1.0){
       candidates.push(new THREE.Vector3(center.x+x,0,center.z+z));
     }
   }
-  candidates.sort((a,b)=>Math.hypot(a.x-center.x,a.z-center.z)-Math.hypot(b.x-center.x,b.z-center.z));
+
+  let best=null;
+  let bestClearance=-1;
 
   for(const candidate of candidates){
+    const localFloorY=estimateHouseFloorY(candidate.x,candidate.z,bounds);
+    if(!Number.isFinite(localFloorY)) continue;
+
     let blocked=false;
+    let clearance=Infinity;
     for(const box of houseCollisionBoxes){
-      if(boxContainsPlayer(box,candidate.x,candidate.z)) {
+      const nx=Math.max(box.min.x,Math.min(candidate.x,box.max.x));
+      const nz=Math.max(box.min.z,Math.min(candidate.z,box.max.z));
+      const d=Math.hypot(candidate.x-nx,candidate.z-nz);
+      clearance=Math.min(clearance,d);
+      if(d<0.7){
         blocked=true;
         break;
       }
     }
-    if(!blocked) {
-      const localFloorY=estimateHouseFloorY(candidate.x,candidate.z,bounds);
-      return new THREE.Vector3(
-        candidate.x,
-        (Number.isFinite(localFloorY) ? localFloorY : floorY) + EYE,
-        candidate.z
-      );
+
+    if(!blocked && clearance>bestClearance){
+      bestClearance=clearance;
+      best=candidate;
     }
+  }
+
+  if(best){
+    const localFloorY=estimateHouseFloorY(best.x,best.z,bounds);
+    return new THREE.Vector3(
+      best.x,
+      localFloorY + EYE,
+      best.z
+    );
   }
 
   return new THREE.Vector3(center.x,floorY+EYE,center.z);
