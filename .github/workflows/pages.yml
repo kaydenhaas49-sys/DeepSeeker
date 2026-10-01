@@ -25,32 +25,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Inspect house doors
-        run: |
-          python3 - <<'PY'
-          import json, struct
-          from pathlib import Path
-          b=Path("assets/house_interior.glb").read_bytes()
-          _,_,length=struct.unpack_from("<4sII",b,0)
-          pos=12
-          gltf=None
-          while pos<length:
-              n,typ=struct.unpack_from("<I4s",b,pos); pos+=8
-              chunk=b[pos:pos+n]; pos+=n
-              if typ==b"JSON": gltf=json.loads(chunk.decode("utf-8"))
-          nodes=gltf.get("nodes",[])
-          print("=== HOUSE NODE REPORT ===")
-          print("nodes:",len(nodes),"meshes:",len(gltf.get("meshes",[])))
-          for i,n in enumerate(nodes):
-              name=n.get("name","")
-              if any(k in name.lower() for k in ("door","porte","pintu","puerta","entry","entrance","gate","hinge")):
-                  print("DOOR:",i,json.dumps(n,ensure_ascii=False))
-          print("=== ALL NAMED NODES ===")
-          for i,n in enumerate(nodes):
-              if n.get("name"):
-                  print(i,n["name"],"mesh=",n.get("mesh"),"children=",n.get("children",[]),"t=",n.get("translation",[0,0,0]))
-          PY
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
