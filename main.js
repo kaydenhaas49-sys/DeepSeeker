@@ -303,7 +303,7 @@ function loadHouse(){
         if(meshSize.x>45 && meshSize.z>45) continue;
 
         houseCollisionBoxes.push(meshBox);
-      });
+      }
 
       houseSpawn=findHouseSpawn(box);
       houseLoaded=true;
