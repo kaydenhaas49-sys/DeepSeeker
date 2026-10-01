@@ -148,50 +148,114 @@ function setupHouseDoors(root){
   houseDoors.length=0;
   root.traverse((obj)=>{
     if(obj===root || !obj.name || !houseDoorPattern.test(obj.name)) return;
+
     const pivot=new THREE.Group();
     pivot.name="DoorPivot_"+obj.name;
     const parent=obj.parent;
     if(!parent) return;
+
     obj.updateMatrixWorld(true);
-    const world=new THREE.Matrix4().copy(obj.matrixWorld);
-    const wp=new THREE.Vector3().setFromMatrixPosition(world);
+    const worldMatrix=new THREE.Matrix4().copy(obj.matrixWorld);
+    const worldPosition=new THREE.Vector3().setFromMatrixPosition(worldMatrix);
     const invParent=new THREE.Matrix4().copy(parent.matrixWorld).invert();
-    wp.applyMatrix4(invParent);
-    pivot.position.copy(wp);
+    worldPosition.applyMatrix4(invParent);
+
+    pivot.position.copy(worldPosition);
     parent.add(pivot);
     pivot.updateMatrixWorld(true);
-    const local=new THREE.Matrix4().multiplyMatrices(
+
+    const localMatrix=new THREE.Matrix4().multiplyMatrices(
       new THREE.Matrix4().copy(pivot.matrixWorld).invert(),
-      world
+      worldMatrix
     );
+
     pivot.add(obj);
-    local.decompose(obj.position,obj.quaternion,obj.scale);
-    houseDoors.push({pivot,target:0,angle:obj.name.length%2?Math.PI/2:-Math.PI/2});
+    localMatrix.decompose(obj.position,obj.quaternion,obj.scale);
+
+    const index=houseDoors.length;
+
+    // Only about 1 in 4 doors actually opens. The rest are solid/locked.
+    houseDoors.push({
+      pivot,
+      target:0,
+      angle:index%2===0?Math.PI/2:-Math.PI/2,
+      functional:index%4===0,
+      collisionBox:{minX:0,maxX:0,minZ:0,maxZ:0}
+    });
   });
-  console.log("[DeepSeeker] doors found:",houseDoors.map(d=>d.pivot.name));
+
+  console.log(
+    "[DeepSeeker] doors:",
+    houseDoors.map((d,i)=>({index:i,functional:d.functional}))
+  );
 }
 
 function updateHouseDoors(dt){
   for(const door of houseDoors){
-    door.target += (door.target===1 ? 0 : 0);
     const current=door.pivot.userData.openProgress||0;
-    const next=THREE.MathUtils.lerp(current,door.pivot.userData.target||0,Math.min(1,dt*6));
+    const next=THREE.MathUtils.lerp(
+      current,
+      door.pivot.userData.target||0,
+      Math.min(1,dt*6)
+    );
     door.pivot.userData.openProgress=next;
     door.pivot.rotation.y=door.angle*next;
   }
 }
 
+function updateHouseDoorCollisions(){
+  const boxes=[];
+
+  for(const door of houseDoors){
+    const open=door.pivot.userData.openProgress||0;
+
+    // Locked doors always block. Functional doors only block while closed.
+    if(door.functional && open>0.72) continue;
+
+    door.pivot.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(door.pivot);
+
+    // A small horizontal padding prevents squeezing through door geometry.
+    const pad=.08;
+    door.collisionBox.minX=box.min.x-pad;
+    door.collisionBox.maxX=box.max.x+pad;
+    door.collisionBox.minZ=box.min.z-pad;
+    door.collisionBox.maxZ=box.max.z+pad;
+
+    boxes.push(door.collisionBox);
+  }
+
+  player.extraCollisionBoxes=boxes;
+}
+
 function toggleHouseDoor(){
-  let best=null,bestDist=999;
+  let best=null;
+  let bestDist=2.7;
   const p=player.pos;
   const wp=new THREE.Vector3();
+
   for(const door of houseDoors){
     door.pivot.getWorldPosition(wp);
     const d=Math.hypot(wp.x-p.x,wp.z-p.z);
-    if(d<2.7 && d<bestDist){best=door;bestDist=d;}
+    if(d<bestDist){
+      best=door;
+      bestDist=d;
+    }
   }
+
   if(!best) return false;
+
+  if(!best.functional){
+    eventText.textContent="DOOR LOCKED";
+    eventText.style.opacity="1";
+    setTimeout(()=>{eventText.style.opacity="0";},700);
+    return true;
+  }
+
   best.pivot.userData.target=(best.pivot.userData.target||0)>0.5?0:1;
+  eventText.textContent=best.pivot.userData.target ? "DOOR OPENING" : "DOOR CLOSING";
+  eventText.style.opacity="1";
+  setTimeout(()=>{eventText.style.opacity="0";},700);
   return true;
 }
 
@@ -798,8 +862,14 @@ function animate(){
   const dt=Math.min(clock.getDelta(),.05);
   const t=clock.elapsedTime;
 
+  if(houseMode){
+    updateHouseDoors(dt);
+    updateHouseDoorCollisions();
+  }else{
+    player.extraCollisionBoxes=[];
+  }
+
   player.update(dt);
-  if(houseMode) updateHouseDoors(dt);
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
   flashlight.target.position.set(0,0,-80);
