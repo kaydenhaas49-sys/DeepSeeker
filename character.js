@@ -264,7 +264,7 @@ export function disposeRemoteFlashlight(scene, remoteLight){
 }
 
 export function flashlightFlicker(time){
-  return .78 + .22 * Math.sin(time * 17.1) * Math.sin(time * 7.3);
+  return .78 + .22 * Math.sin(time * 12.0) * Math.sin(time * 5.2);
 }
 
 export async function createHazmatCharacter(){
