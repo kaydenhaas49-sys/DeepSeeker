@@ -32,6 +32,8 @@ export class Player {
     this.onStep = null;
     this.jumpY = 0;
     this.jumpVelocity = 0;
+    this.extraCollisionBoxes = [];
+    this.ignoreWorldCollision = false;
 
     camera.rotation.order = "YXZ";
     this.setupHands();
@@ -286,14 +288,23 @@ export class Player {
   // Exact circle-vs-thin-wall test at a proposed player position.
   isWallBlocked(x, z) {
     const r = PLAYER_RADIUS;
-    const walls = this.world.getNearbyWallBounds(x, z, r + 1.0);
 
-    for (const wall of walls) {
-      const nx = Math.max(wall.minX, Math.min(x, wall.maxX));
-      const nz = Math.max(wall.minZ, Math.min(z, wall.maxZ));
+    if (!this.ignoreWorldCollision) {
+      const walls = this.world.getNearbyWallBounds(x, z, r + 1.0);
+      for (const wall of walls) {
+        const nx = Math.max(wall.minX, Math.min(x, wall.maxX));
+        const nz = Math.max(wall.minZ, Math.min(z, wall.maxZ));
+        const dx = x - nx;
+        const dz = z - nz;
+        if (dx * dx + dz * dz < r * r) return true;
+      }
+    }
+
+    for (const box of this.extraCollisionBoxes) {
+      const nx = Math.max(box.minX, Math.min(x, box.maxX));
+      const nz = Math.max(box.minZ, Math.min(z, box.maxZ));
       const dx = x - nx;
       const dz = z - nz;
-
       if (dx * dx + dz * dz < r * r) return true;
     }
 
