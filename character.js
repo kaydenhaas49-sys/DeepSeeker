@@ -191,36 +191,90 @@ function pickIdleAnimation(clips){
   // createHazmatCharacter() freezes that pose immediately.
   return clips?.[0] || null;
 }
+function findBone(root, pattern){
+  let found=null;
+  root.traverse(obj=>{
+    if(found || !obj.isBone) return;
+    if(pattern.test((obj.name || "").toLowerCase())) found=obj;
+  });
+  return found;
+}
+
+function pointBoneToward(bone, targetDirection){
+  if(!bone) return false;
+  const child=bone.children.find(child=>child.isBone);
+  if(!child) return false;
+
+  bone.updateMatrixWorld(true);
+  child.updateMatrixWorld(true);
+
+  const from=new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
+  const to=new THREE.Vector3().setFromMatrixPosition(child.matrixWorld);
+  const current=to.sub(from);
+  if(current.lengthSq()<1e-8) return false;
+  current.normalize();
+
+  const target=targetDirection.clone().normalize();
+  const delta=new THREE.Quaternion().setFromUnitVectors(current,target);
+
+  const worldQuat=new THREE.Quaternion();
+  bone.getWorldQuaternion(worldQuat);
+  worldQuat.premultiply(delta);
+
+  if(bone.parent){
+    const parentWorld=new THREE.Quaternion();
+    bone.parent.getWorldQuaternion(parentWorld);
+    parentWorld.invert();
+    bone.quaternion.copy(parentWorld.multiply(worldQuat));
+  }else{
+    bone.quaternion.copy(worldQuat);
+  }
+
+  bone.updateMatrixWorld(true);
+  return true;
+}
+
+function applyNeutralStandingPose(model){
+  const leftArm=findBone(model,/(?:mixamorig[:._-]?)?leftarm$/i) ||
+               findBone(model,/left.*upper.*arm|upper.*arm.*left/i);
+  const rightArm=findBone(model,/(?:mixamorig[:._-]?)?rightarm$/i) ||
+                findBone(model,/right.*upper.*arm|upper.*arm.*right/i);
+
+  const leftForeArm=findBone(model,/(?:mixamorig[:._-]?)?leftforearm$/i) ||
+                    findBone(model,/left.*forearm|left.*lower.*arm/i);
+  const rightForeArm=findBone(model,/(?:mixamorig[:._-]?)?rightforearm$/i) ||
+                     findBone(model,/right.*forearm|right.*lower.*arm/i);
+
+  // Drop the arms from the rig's T/rest position to a relaxed standing pose.
+  pointBoneToward(leftArm,new THREE.Vector3(0.10,-0.99,0.03));
+  model.updateMatrixWorld(true);
+  pointBoneToward(rightArm,new THREE.Vector3(-0.10,-0.99,0.03));
+  model.updateMatrixWorld(true);
+
+  // Give the elbows a tiny natural bend rather than perfectly straight arms.
+  pointBoneToward(leftForeArm,new THREE.Vector3(0.08,-0.98,0.10));
+  model.updateMatrixWorld(true);
+  pointBoneToward(rightForeArm,new THREE.Vector3(-0.08,-0.98,0.10));
+  model.updateMatrixWorld(true);
+}
 
 export async function createHazmatCharacter(){
   const template = await loadHazmatCharacter();
   const model = cloneSkeleton(template.scene);
-  const mixer = new THREE.AnimationMixer(model);
 
-  const idleClip = pickIdleAnimation(template.animations);
-  let action = null;
-
-  if(idleClip){
-    action = mixer.clipAction(idleClip);
-    action.setLoop(THREE.LoopRepeat, Infinity);
-    action.reset();
-
-    // Sample a single frame from the exported locomotion clip and freeze it.
-    // This prevents the character from constantly running while idle.
-    action.time = Math.min(idleClip.duration * 0.08, 0.18);
-    action.play();
-    action.paused = true;
-    mixer.update(0);
-  }
+  // Do not use the asset's single locomotion clip. It has no real idle
+  // animation, so any sampled frame looks like a frozen running pose.
+  // Instead, pose the rig itself into a neutral standing stance.
+  applyNeutralStandingPose(model);
 
   const flashlight = attachFlashlight(model);
 
   return {
     model,
-    mixer,
-    action,
+    mixer: null,
+    action: null,
     flashlight,
     animations: template.animations,
-    idleClip
+    idleClip: null
   };
 }
