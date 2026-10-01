@@ -78,7 +78,7 @@ player.hands.visible=true;
 // become a real level later without rewriting the current map.
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
 const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
-const HOUSE_TARGET_HEIGHT=8.5;
+const HOUSE_TARGET_HEIGHT=16.0;
 const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
 let houseModel=null;
 let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
