@@ -228,19 +228,11 @@ export class Player {
 
     // --- camera ---
     const targetEye = this.crouched ? 1.12 : EYE;
-    const roofClearance = 0.25;
-    const maxJumpY = Math.max(0, WALL_H - roofClearance - targetEye);
 
     this.jumpVelocity -= 18 * dt;
     this.jumpY += this.jumpVelocity * dt;
 
-    // Never let the camera enter the ceiling, while preserving the normal
-    // jump height whenever there is plenty of room above the player.
-    if (this.jumpY > maxJumpY) {
-      this.jumpY = maxJumpY;
-      this.jumpVelocity = 0;
-    }
-
+    // Jumping is not blocked by the ceiling.
     if(this.jumpY <= 0){
       this.jumpY = 0;
       this.jumpVelocity = 0;
