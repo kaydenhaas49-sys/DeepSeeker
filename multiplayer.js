@@ -210,6 +210,7 @@ export class Multiplayer {
         if (!remote) return;
 
         this.scene.remove(remote.group);
+        disposeRemoteFlashlight(this.scene, remote.remoteLight);
         this.players.delete(data.id);
         this.updateCount();
         break;
@@ -317,6 +318,7 @@ export class Multiplayer {
       x: Number(this.player.pos.x.toFixed(3)),
       z: Number(this.player.pos.z.toFixed(3)),
       yaw: Number(this.player.yaw.toFixed(2)),
+      pitch: Number(this.player.pitch.toFixed(2)),
       level: this.getLevel() ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
       flashlight: Boolean(this.getFlashlightOn()),
