@@ -78,7 +78,7 @@ player.hands.visible=true;
 // become a real level later without rewriting the current map.
 const HOUSE_MODEL_PATH="./assets/house_fully_furnished.glb";
 const HOUSE_ORIGIN=new THREE.Vector3(32,0,-58);
-const HOUSE_TARGET_HEIGHT=7.2;
+const HOUSE_TARGET_HEIGHT=11.5;
 const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
 let houseModel=null;
 let houseSpawn=new THREE.Vector3(HOUSE_ORIGIN.x,HOUSE_ORIGIN.y+EYE,HOUSE_ORIGIN.z);
@@ -143,6 +143,20 @@ const houseDebugBounds=new THREE.Box3Helper(
 );
 houseDebugBounds.visible=false;
 scene.add(houseDebugBounds);
+
+const houseLights=[];
+const houseLightOffsets=[
+  [-0.35,0.82,-0.25],
+  [ 0.20,0.88,-0.18],
+  [-0.18,0.86, 0.24],
+  [ 0.32,0.80, 0.30]
+];
+for(const [x,y,z] of houseLightOffsets){
+  const light=new THREE.PointLight(0xffe7b0,0,16,1.8);
+  light.castShadow=false;
+  scene.add(light);
+  houseLights.push({light,phase:Math.random()*Math.PI*2,x,y,z});
+}
 
 function boxContainsPlayer(box,x,z,r=0.42){
   const nx=Math.max(box.min.x,Math.min(x,box.max.x));
@@ -281,8 +295,9 @@ function loadHouse(){
         if(!obj.isMesh) return;
         const meshBox=new THREE.Box3().setFromObject(obj);
         const meshSize=meshBox.getSize(new THREE.Vector3());
-        // Skip paper-thin floors/ceilings and giant encompassing meshes.
+        // Skip paper-thin floors/ceilings and tiny decorations.
         if(meshSize.y<0.18) return;
+        if(meshSize.x<0.15 || meshSize.z<0.15) return;
         if(meshSize.x>45 && meshSize.z>45) return;
         houseCollisionBoxes.push(meshBox);
       });
@@ -297,6 +312,15 @@ function loadHouse(){
       houseLoaded=true;
       houseFill.position.set(box.min.x,box.max.y,box.min.z);
       houseKey.position.set(box.min.x,box.max.y,box.min.z);
+
+      for(const item of houseLights){
+        item.light.position.set(
+          box.min.x + box.getSize(new THREE.Vector3()).x * (item.x + 0.5),
+          box.min.y + box.getSize(new THREE.Vector3()).y * item.y,
+          box.min.z + box.getSize(new THREE.Vector3()).z * (item.z + 0.5)
+        );
+      }
+
       objective.textContent="Test pad ready. Press E to enter the house.";
       eventText.textContent="HOUSE TEST LEVEL READY";
       eventText.style.opacity="1";
@@ -335,6 +359,7 @@ function setHouseMode(enabled){
 
   houseFill.intensity=houseMode?1.35:0;
   houseKey.intensity=houseMode?1.6:0;
+  for(const item of houseLights) item.light.intensity=houseMode?1.2:0;
 
   player.ignoreWorldCollision=houseMode;
 
@@ -813,6 +838,17 @@ function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05);
   const t=clock.elapsedTime;
+
+  if(houseMode){
+    for(const item of houseLights){
+      const flicker=0.78+0.18*Math.sin(t*7.5+item.phase)+0.08*Math.sin(t*19.0+item.phase*1.7);
+      item.light.intensity=1.2*Math.max(0.35,flicker);
+    }
+    housePortalGroup.rotation.y=Math.sin(t*1.4)*0.04;
+    houseExitPortal.rotation.y=-Math.sin(t*1.4)*0.04;
+  }else{
+    housePortalGroup.rotation.y=Math.sin(t*1.4)*0.04;
+  }
 
   player.update(dt);
   if(!houseMode) updateStoryProgress();
