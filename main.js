@@ -328,7 +328,7 @@ const multiplayer=new Multiplayer({
     startLobbyButton.style.opacity=host ? "1" : ".45";
 
     const slots=[];
-    for(let i=0;i<4;i++){
+    for(let i=0;i<10;i++){
       const p=players[i];
       if(p){
         slots.push(`
