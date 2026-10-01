@@ -2,9 +2,7 @@
 import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
 import { Capsule } from "three/addons/math/Capsule.js";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
-import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { createHazmatCharacter } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -89,255 +87,54 @@ export class Player {
   }
 
   setupHands() {
+    // The hazmat is the actual player character, not a camera prop.
+    // First-person keeps the world-space body hidden to avoid clipping through
+    // the camera; multiplayer renders the same full-body model.
     this.hands = new THREE.Group();
-    this.hands.name = "FirstPersonHazmatViewmodel";
-    this.hands.renderOrder = 1000;
-    this.hands.visible = true;
+    this.hands.name = "PlayerCharacterRoot";
+    this.hands.visible = false;
     this.camera.add(this.hands);
 
-    this.characterRoot = new THREE.Group();
-    this.characterRoot.name = "BackroomsHazmatCharacter";
-    // Keep the full-body model slightly in front of the camera so its
-    // forearms/hands are visible without putting the camera inside it.
-    this.characterRoot.position.set(0,-1.34,-0.72);
-    this.characterRoot.scale.setScalar(0.98);
-    this.characterRoot.renderOrder = 1000;
-    this.hands.add(this.characterRoot);
+    this.characterModel = null;
+    this.characterMixer = null;
+    this.characterFlashlight = null;
+    this.characterLoaded = false;
 
-    this.handModels = [];
+    this.worldAvatar = new THREE.Group();
+    this.worldAvatar.name = "LocalHazmatAvatar";
+    this.worldAvatar.visible = false;
+
+    const worldRoot = this.camera.parent || this.camera;
+    worldRoot.add(this.worldAvatar);
+
     this.loadCharacterModel();
   }
 
-  loadCharacterModel() {
-    const loader = new GLTFLoader();
-    const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath(
-      "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/libs/draco/gltf/"
-    );
-    loader.setDRACOLoader(dracoLoader);
-    loader.setMeshoptDecoder(MeshoptDecoder);
+  async loadCharacterModel() {
+    try{
+      const character = await createHazmatCharacter();
 
-    loader.load(
-      "./assets/backrooms_rigged_hazmat.glb",
-      (gltf)=>{
-        const model=gltf.scene;
-        model.name="Loco_BackroomsRiggedHazmat";
-        model.traverse((obj)=>{
-          if(!obj.isMesh) return;
-          obj.frustumCulled=false;
-          obj.renderOrder=1000;
-          obj.castShadow=false;
-          obj.receiveShadow=false;
+      this.characterModel = character.model;
+      this.characterMixer = character.mixer;
+      this.characterFlashlight = character.flashlight;
+      this.worldAvatar.add(character.model);
+      this.characterLoaded = true;
 
-          const mats=Array.isArray(obj.material)?obj.material:[obj.material];
-          for(const mat of mats){
-            if(!mat) continue;
-            mat.toneMapped=true;
-            // First-person camera sits very close to the body.
-            // Double-sided materials prevent the inside of the hazmat suit
-            // from disappearing due to backface culling.
-            mat.side=THREE.DoubleSide;
-          }
-
-          // Hide the head so the camera never intersects the face/helmet.
-          if(obj.name && /head|face|gasmask|mask|helmet/i.test(obj.name)){
-            obj.visible=false;
-          }
-        });
-
-        const box=new THREE.Box3().setFromObject(model);
-        const size=box.getSize(new THREE.Vector3());
-        const height=Math.max(size.y,0.001);
-        const scale=1.78/height;
-
-        model.scale.multiplyScalar(scale);
-        model.rotation.y=Math.PI;
-
-        const scaledBox=new THREE.Box3().setFromObject(model);
-        const scaledCenter=scaledBox.getCenter(new THREE.Vector3());
-        model.position.set(
-          -scaledCenter.x,
-          -scaledBox.min.y,
-          -scaledCenter.z
-        );
-
-        this.characterRoot.add(model);
-        this.characterModel=model;
-        this.characterLoaded=true;
-
-        const clip=gltf.animations?.[0];
-        if(clip){
-          this.characterMixer=new THREE.AnimationMixer(model);
-          const action=this.characterMixer.clipAction(clip);
-          action.setLoop(THREE.LoopRepeat,Infinity);
-          action.play();
-          this.characterMixer._deepseekerAction=action;
-        }
-
-        const hand=this.findRightHandBone(model);
-        const flashlight=this.buildHeldFlashlight();
-        hand.add(flashlight);
-
-        this.characterFlashlight=flashlight;
-
-        console.log(
-          "[DeepSeeker] hazmat model ready",
-          "animation:",clip?.name||"none",
-          "hand:",hand.name
-        );
-      },
-      undefined,
-      (error)=>{
-        console.error("[DeepSeeker] hazmat model failed to load:",error);
-        this.characterLoaded=false;
-        this.buildFallbackViewmodel();
-      }
-    );
+      console.log("[DeepSeeker] local hazmat avatar ready");
+    }catch(error){
+      console.error("[DeepSeeker] local hazmat avatar failed:",error);
+    }
   }
 
-  buildFallbackViewmodel(){
-    if(this.fallbackViewmodel) return;
+  setFlashlightVisual(on){
+    if(!this.characterFlashlight) return;
 
-    const group=new THREE.Group();
-    group.name="FallbackFirstPersonViewmodel";
-    this.hands.add(group);
+    const lens = this.characterFlashlight.getObjectByName("HeldFlashlight")
+      ?.getObjectByProperty("type","Mesh");
 
-    const mat=new THREE.MeshStandardMaterial({
-      color:0x34362f,
-      roughness:1
-    });
-    const handMat=new THREE.MeshStandardMaterial({
-      color:0xc58f6d,
-      roughness:.92
-    });
-
-    const makeArm=(x)=>{
-      const arm=new THREE.Mesh(
-        new THREE.CapsuleGeometry(.11,.55,5,8),
-        mat
-      );
-      arm.position.set(x,-.62,-.96);
-      group.add(arm);
-      return arm;
-    };
-
-    makeArm(-.43);
-    makeArm(.43);
-
-    const hand=new THREE.Mesh(
-      new THREE.SphereGeometry(.125,9,7),
-      handMat
-    );
-    hand.position.set(.46,-.88,-1.08);
-    group.add(hand);
-
-    const flashlight=this.buildHeldFlashlight();
-    flashlight.position.set(.03,0,-.18);
-    group.add(flashlight);
-
-    this.fallbackViewmodel=group;
-    this.viewmodelFlashlight=flashlight;
-    this.setFlashlightVisual(true);
-  }
-
-  findRightHandBone(root){
-    let best=null;
-    root.traverse((obj)=>{
-      if(!obj.isBone) return;
-      const n=(obj.name||"").toLowerCase();
-
-      if(
-        /righthand|hand_r|hand.r|right_hand|mixamorig.*righthand|rightwrist/.test(n)
-      ){
-        best=best||obj;
-      }
-    });
-
-    if(best) return best;
-
-    root.traverse((obj)=>{
-      if(!obj.isBone || best) return;
-      const n=(obj.name||"").toLowerCase();
-      if(/hand|wrist/.test(n)) best=obj;
-    });
-
-    return best||root;
-  }
-
-  buildHeldFlashlight(){
-    const bodyMat=new THREE.MeshStandardMaterial({
-      color:0x171917,
-      roughness:.6,
-      metalness:.35
-    });
-
-    const ringMat=new THREE.MeshStandardMaterial({
-      color:0x55564c,
-      roughness:.38,
-      metalness:.7
-    });
-
-    const lensMat=new THREE.MeshStandardMaterial({
-      color:0xf4e8be,
-      emissive:0xd8bd72,
-      emissiveIntensity:2.4,
-      roughness:.28,
-      metalness:.04
-    });
-
-    const flashlight=new THREE.Group();
-    flashlight.name="HeldFlashlight";
-    flashlight.position.set(0.055,-0.07,-0.13);
-    flashlight.rotation.set(
-      THREE.MathUtils.degToRad(-8),
-      THREE.MathUtils.degToRad(-2),
-      THREE.MathUtils.degToRad(2)
-    );
-
-    const body=new THREE.Mesh(
-      new THREE.CylinderGeometry(.055,.066,.50,10),
-      bodyMat
-    );
-    body.rotation.x=Math.PI/2;
-
-    const head=new THREE.Mesh(
-      new THREE.CylinderGeometry(.092,.067,.15,10),
-      bodyMat
-    );
-    head.rotation.x=Math.PI/2;
-    head.position.z=-.30;
-
-    const bezel=new THREE.Mesh(
-      new THREE.TorusGeometry(.094,.011,6,14),
-      ringMat
-    );
-    bezel.rotation.x=Math.PI/2;
-    bezel.position.z=-.375;
-
-    const lens=new THREE.Mesh(
-      new THREE.CylinderGeometry(.073,.073,.022,12),
-      lensMat
-    );
-    lens.rotation.x=Math.PI/2;
-    lens.position.z=-.388;
-
-    const rear=new THREE.Mesh(
-      new THREE.CylinderGeometry(.064,.064,.04,10),
-      ringMat
-    );
-    rear.rotation.x=Math.PI/2;
-    rear.position.z=.278;
-
-    flashlight.add(body,head,bezel,lens,rear);
-
-    flashlight.traverse(obj=>{
-      obj.renderOrder=1100;
-      if(obj.isMesh) obj.frustumCulled=false;
-    });
-
-    this.characterFlashlightLens=lens;
-    this.setFlashlightVisual(true);
-    return flashlight;
+    if(lens?.material?.emissiveIntensity !== undefined){
+      lens.material.emissiveIntensity=on ? 2.4 : 0.18;
+    }
   }
   setFlashlightVisual(on){
     const lens=this.characterFlashlightLens;
@@ -514,45 +311,18 @@ export class Player {
       }
     }
 
-    // --- first-person hands ---
-    if (this.hands && this.hands.visible && !this.characterLoaded) {
-      // Viewmodel arms should never visibly pass through walls. When the
-      // player gets close to a wall, retract the simple arm rectangles toward
-      // the camera until they are safely on the player's side.
-      let nearestWall = Infinity;
-      for (const wall of this.world.getNearbyWallBounds(this.pos.x, this.pos.z, 1.2)) {
-      const nx = Math.max(wall.minX, Math.min(this.pos.x, wall.maxX));
-      const nz = Math.max(wall.minZ, Math.min(this.pos.z, wall.maxZ));
-      nearestWall = Math.min(
-      nearestWall,
-      Math.hypot(this.pos.x - nx, this.pos.z - nz)
+    if(this.characterMixer){
+      this.characterMixer.update(dt);
+    }
+
+    if(this.worldAvatar && this.characterLoaded){
+      this.worldAvatar.position.set(
+        this.pos.x,
+        0,
+        this.pos.z
       );
-      }
-      const wallNear = nearestWall < 0.9;
-      const armDepthTarget = wallNear ? -0.30 : -0.92;
-      
-      const moving = hSpeed > 0.5 ? Math.min(1, hSpeed / RUN_SPEED) : 0;
-      const sway = moving ? Math.sin(this.bobPhase) * 0.018 : Math.sin(this.bobPhase * 0.35) * 0.004;
-      const lift = moving ? Math.abs(Math.cos(this.bobPhase)) * 0.012 : 0;
-      
-      for (let i = 0; i < this.handModels.length; i++) {
-      const side = i === 0 ? -1 : 1;
-      const pivot = this.handModels[i];
-      const baseX = side < 0 ? -0.42 : 0.45;
-      const baseY = -0.62 - (this.crouched ? 0.08 : 0);
-      const baseZ = -0.95;
-      
-      pivot.position.x = baseX + sway * side * 0.22;
-      pivot.position.y = baseY + lift * 0.55;
-      pivot.position.z += (baseZ - pivot.position.z) * (1 - Math.exp(-18 * dt));
-      
-      pivot.rotation.z =
-      THREE.MathUtils.degToRad(side * 5) + sway * side * 0.8;
-      }
-      
-      if(this.viewmodelFlashlight){
-      this.viewmodelFlashlight.rotation.z=THREE.MathUtils.degToRad(-2)+sway*0.9;
-      }
+      this.worldAvatar.rotation.y=this.yaw + Math.PI;
+      this.worldAvatar.visible=false;
     }
   }
 
