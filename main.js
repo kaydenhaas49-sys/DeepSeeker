@@ -213,6 +213,7 @@ function buildHouseStaticCollisions(root){
 
   root.traverse((obj)=>{
     if(!obj.isMesh || !obj.geometry) return;
+    if(obj.name && houseDoorPattern.test(obj.name)) return;
 
     worldBox.setFromObject(obj);
     worldBox.getSize(size);
