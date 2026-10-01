@@ -317,6 +317,11 @@ const multiplayer=new Multiplayer({
       lobbyPlayers.textContent="PLAYERS "+count+"/"+max;
     }
   },
+  onGameStart:()=>{
+    if(!gameStarted){
+      startGame();
+    }
+  },
   onRoster:(players)=>{
     const params=new URLSearchParams(location.search);
     if(params.get("lobby")!=="1") return;
@@ -1267,7 +1272,10 @@ joinLobbyButton.addEventListener("click",()=>{
 });
 
 startLobbyButton.addEventListener("click",()=>{
-  startGame();
+  const params=new URLSearchParams(location.search);
+  if(params.get("host")==="1"){
+    multiplayer.startGameRoom();
+  }
 });
 
 copyLobbyButton.addEventListener("click",async()=>{
