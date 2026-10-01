@@ -210,8 +210,9 @@ export class World {
   constructor(scene, seed, anisotropy) {
     this.scene = scene;
     this.seed = seed;
-    this.chunks = new Map(); // "cx,cz" -> { data, group }
+    this.chunks = new Map(); // "cx,cz" -> { data, group, wallBounds }
     this.root = new THREE.Group();
+    this.wallQueryScratch = [];
     scene.add(this.root);
 
     const tex = createTextures(anisotropy);
@@ -238,8 +239,24 @@ export class World {
   spawnChunk(cx, cz) {
     const data = generateChunk(cx, cz, this.seed);
     const group = this.buildChunkMeshes(data, cx, cz);
+    const wallBounds = data.walls.map((w) => {
+      if (w.horiz) {
+        const minX = w.x * CELL;
+        const maxX = (w.x + w.len) * CELL;
+        const midZ = (w.z + 0.5) * CELL;
+        const halfT = WALL_T * 0.5;
+        return { minX, maxX, minZ: midZ - halfT, maxZ: midZ + halfT };
+      }
+
+      const midX = (w.x + 0.5) * CELL;
+      const halfT = WALL_T * 0.5;
+      const minZ = w.z * CELL;
+      const maxZ = (w.z + w.len) * CELL;
+      return { minX: midX - halfT, maxX: midX + halfT, minZ, maxZ };
+    });
+
     this.root.add(group);
-    this.chunks.set(cellKey(cx, cz), { data, group });
+    this.chunks.set(cellKey(cx, cz), { data, group, wallBounds });
   }
 
   disposeChunk(key) {
@@ -301,31 +318,18 @@ export class World {
     const maxCx = Math.floor((px + radius) / CHUNK_SIZE);
     const minCz = Math.floor((pz - radius) / CHUNK_SIZE);
     const maxCz = Math.floor((pz + radius) / CHUNK_SIZE);
-    const bounds = [];
+
+    this.wallQueryScratch.length = 0;
 
     for (let cx = minCx; cx <= maxCx; cx++) {
       for (let cz = minCz; cz <= maxCz; cz++) {
         const entry = this.chunks.get(cellKey(cx, cz));
         if (!entry) continue;
-
-        for (const w of entry.data.walls) {
-          if (w.horiz) {
-            const minX = w.x * CELL;
-            const maxX = (w.x + w.len) * CELL;
-            const midZ = (w.z + 0.5) * CELL;
-            const halfT = WALL_T * 0.5;
-            bounds.push({ minX, maxX, minZ: midZ - halfT, maxZ: midZ + halfT });
-          } else {
-            const midX = (w.x + 0.5) * CELL;
-            const halfT = WALL_T * 0.5;
-            const minZ = w.z * CELL;
-            const maxZ = (w.z + w.len) * CELL;
-            bounds.push({ minX: midX - halfT, maxX: midX + halfT, minZ, maxZ });
-          }
-        }
+        this.wallQueryScratch.push(...entry.wallBounds);
       }
     }
-    return bounds;
+
+    return this.wallQueryScratch;
   }
 
   // -- mesh building ---------------------------------------------------------
