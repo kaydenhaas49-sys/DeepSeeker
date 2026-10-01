@@ -97,7 +97,7 @@ export class Multiplayer {
       }
       this.players.clear();
       this.playerId = null;
-      this.onCount(0, 4);
+      this.onCount(0, 10);
 
       if (!this.closedManually) {
         this.setStatus("MULTIPLAYER RECONNECTING...");
@@ -204,7 +204,7 @@ export class Multiplayer {
   }
 
   updateCount() {
-    this.onCount(Math.min(4, this.players.size + (this.playerId ? 1 : 0)), 4);
+    this.onCount(Math.min(10, this.players.size + (this.playerId ? 1 : 0)), 10);
     this.onRoster([
       {id:this.playerId, name:this.getPlayerName(), self:true},
       ...Array.from(this.players.values()).map(remote=>({
