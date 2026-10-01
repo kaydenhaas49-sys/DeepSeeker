@@ -418,7 +418,7 @@ function loadHouse(){
     },
     xhr=>{
       if(xhr.total){
-        const percent=Math.round(xhr.loaded/xhr.total*100);
+        const percent=Math.min(100,Math.max(0,Math.round(xhr.loaded/xhr.total*100)));
         objective.textContent="Loading house… "+percent+"%";
         prompt.textContent="LOADING HOUSE… "+percent+"%";
       }else{
