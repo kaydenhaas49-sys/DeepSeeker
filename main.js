@@ -102,6 +102,9 @@ let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
 let houseLoadFailed=false;
+let houseLoadStarted=false;
+let houseCollisionReady=false;
+let houseCollisionBuildStarted=false;
 let gameStarted=false;
 let lastAutoSave=0;
 let pendingSaveLoad=null;
@@ -214,10 +217,24 @@ function showLobbyScreen(){
   startLobbyButton.style.display="block";
 }
 
+function ensureHouseLoading(){
+  if(houseLoadStarted || houseLoaded || houseLoadFailed) return;
+
+  houseLoadStarted=true;
+  const start=()=>loadHouse();
+
+  if("requestIdleCallback" in window){
+    window.requestIdleCallback(start,{timeout:3500});
+  }else{
+    setTimeout(start,1200);
+  }
+}
+
 function startGame(save=null){
   gameStarted=true;
   overlay.classList.add("hidden");
   audio.start();
+  ensureHouseLoading();
   if(save) applySavedGame(save);
   player.lock();
 }
@@ -559,6 +576,35 @@ function toggleHouseDoor(){
   return true;
 }
 
+function ensureHouseCollisionSetup(){
+  if(!houseLoaded || houseCollisionReady || houseCollisionBuildStarted || !houseModel) return;
+
+  houseCollisionBuildStarted=true;
+  const build=()=>{
+    const started=performance.now();
+
+    setupHouseDoors(houseModel);
+    buildHouseOctree(houseModel);
+
+    houseCollisionReady=true;
+    houseCollisionBuildStarted=false;
+
+    console.log("[DeepSeeker] house collision ready in",Math.round(performance.now()-started),"ms");
+
+    if(gameStarted){
+      eventText.textContent="HOUSE READY";
+      eventText.style.opacity="1";
+      setTimeout(()=>{eventText.style.opacity="0";},1000);
+    }
+  };
+
+  if("requestIdleCallback" in window){
+    window.requestIdleCallback(build,{timeout:2500});
+  }else{
+    setTimeout(build,100);
+  }
+}
+
 function loadHouse(){
   const houseUrl=new URL(HOUSE_MODEL_PATH,import.meta.url).href;
 
@@ -637,9 +683,6 @@ function loadHouse(){
         houseLights.add(light);
       }
 
-      setupHouseDoors(houseModel);
-      buildHouseOctree(houseModel);
-
       // Spawn at the model's normalized center.
       houseSpawn.set(0,EYE,0);
 
@@ -647,17 +690,20 @@ function loadHouse(){
       houseLoadFailed=false;
       houseRoot.visible=false;
 
-      prompt.textContent="HOUSE READY";
-      objective.textContent="Find the glowing teleporter to the house.";
+      // Door discovery + triangle collision are deliberately deferred.
+      // Building the Octree is one of the most expensive parts of loading
+      // this level and should never block the main menu.
+      ensureHouseCollisionSetup();
 
-      if(new URLSearchParams(location.search).get("save")==="1"){
-        pendingSaveLoad=getSavedGame();
+      if(pendingSaveLoad && pendingSaveLoad.houseMode && gameStarted){
+        setHouseMode(true);
+        pendingSaveLoad=null;
       }
 
-      if(new URLSearchParams(location.search).get("lobby")==="1"){
-        showLobbyScreen();
-      }else{
-        showHomeScreen();
+      if(gameStarted){
+        eventText.textContent="HOUSE READY";
+        eventText.style.opacity="1";
+        setTimeout(()=>{eventText.style.opacity="0";},1100);
       }
     },
     xhr=>{
@@ -674,16 +720,32 @@ function loadHouse(){
       console.error("Failed to load house:",houseUrl,error);
       houseLoaded=false;
       houseLoadFailed=true;
-      prompt.textContent="HOUSE FAILED TO LOAD";
-      eventText.textContent="HOUSE FAILED TO LOAD";
-      objective.textContent="House asset failed to load. Check the browser console.";
-      eventText.style.opacity="1";
+      houseLoadStarted=false;
+
+      if(!gameStarted){
+        eventText.textContent="HOUSE FAILED TO LOAD";
+        eventText.style.opacity="1";
+      }
     }
   );
 }
 
 function setHouseMode(enabled){
-  if(enabled && !houseLoaded) return;
+  if(enabled && !houseLoaded){
+    ensureHouseLoading();
+    eventText.textContent="HOUSE STILL LOADING...";
+    eventText.style.opacity="1";
+    setTimeout(()=>{eventText.style.opacity="0";},1000);
+    return;
+  }
+
+  if(enabled && !houseCollisionReady){
+    ensureHouseCollisionSetup();
+    eventText.textContent="HOUSE PREPARING...";
+    eventText.style.opacity="1";
+    setTimeout(()=>{eventText.style.opacity="0";},1000);
+    return;
+  }
 
   houseMode=enabled;
 
@@ -727,7 +789,16 @@ function setHouseMode(enabled){
 
 function tryHouseTeleport(){
   if(!houseLoaded){
+    ensureHouseLoading();
     eventText.textContent="HOUSE STILL LOADING...";
+    eventText.style.opacity="1";
+    setTimeout(()=>{eventText.style.opacity="0";},1200);
+    return;
+  }
+
+  if(!houseCollisionReady){
+    ensureHouseCollisionSetup();
+    eventText.textContent="HOUSE PREPARING...";
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},1200);
     return;
@@ -748,7 +819,13 @@ function tryHouseTeleport(){
   if(d<3) setHouseMode(true);
 }
 
-loadHouse();
+if(new URLSearchParams(location.search).get("lobby")==="1"){
+  showLobbyScreen();
+}else{
+  showHomeScreen();
+}
+
+setTimeout(()=>ensureHouseLoading(),900);
 
 player.hands.visible=true;
 
