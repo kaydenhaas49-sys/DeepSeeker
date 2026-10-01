@@ -34,6 +34,7 @@ export class Player {
     this.jumpVelocity = 0;
     this.extraCollisionBoxes = [];
     this.ignoreWorldCollision = false;
+    this.ceilingHeight = WALL_H;
     this.nearbyWallBounds = [];
 
     camera.rotation.order = "YXZ";
@@ -145,7 +146,9 @@ export class Player {
   update(dt) {
     // Query nearby walls once per frame instead of once for every collision test.
     // This removes a large amount of garbage/CPU work on low-end devices.
-    this.nearbyWallBounds=this.world.getNearbyWallBounds(this.pos.x,this.pos.z,2.5);
+    this.nearbyWallBounds=this.ignoreWorldCollision
+      ? []
+      : this.world.getNearbyWallBounds(this.pos.x,this.pos.z,2.5);
 
     // --- input direction (relative to yaw); ignored while unlocked ---
     const k = this.keys;
@@ -241,7 +244,7 @@ export class Player {
 
     // Keep the camera safely below the ceiling even if the map ceiling changes.
     const ceilingClearance = 0.15;
-    const maxJumpY = Math.max(0, WALL_H - ceilingClearance - targetEye - this.bobOffset);
+    const maxJumpY = Math.max(0, this.ceilingHeight - ceilingClearance - targetEye - this.bobOffset);
     if(this.jumpY > maxJumpY){
       this.jumpY = maxJumpY;
       if(this.jumpVelocity > 0) this.jumpVelocity = 0;
