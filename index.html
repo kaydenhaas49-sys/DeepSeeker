@@ -39,7 +39,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 #overlay .sub{margin:0;font-size:13px;letter-spacing:4px;color:#9a8d5e}
 #overlay .prompt{margin:14px 0 0;font-size:17px;letter-spacing:3px;animation:pulse 1.6s ease-in-out infinite}
 #overlay .controls{font-size:12px;letter-spacing:2px;color:#80774f;line-height:1.9}
-#homeScreen,#lobbyScreen{width:min(520px,calc(100vw - 40px));display:flex;flex-direction:column;align-items:center;gap:12px}
+#homeScreen,#lobbyScreen{width:min(620px,calc(100vw - 40px));display:flex;flex-direction:column;align-items:center;gap:12px}
 #homeScreen.hidden,#lobbyScreen.hidden{display:none}
 .menuTitle{font-size:11px;letter-spacing:4px;color:#8d8258;margin-bottom:6px}
 .menuButton{width:min(360px,86vw);padding:13px 16px;border:1px solid #ffffff18;border-radius:10px;background:#ffffff08;color:#ded6af;font:inherit;font-size:12px;letter-spacing:2px;cursor:pointer;transition:.15s}
@@ -49,6 +49,24 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 .menuInput:focus{border-color:#d8c98a66}
 .menuInfo{font-size:11px;letter-spacing:2px;color:#817b65;text-align:center;line-height:1.7}
 .roomCode{font-size:32px;letter-spacing:8px;color:#ece5bd;text-shadow:0 0 18px #d6be5a33}
+.lobbyCard{width:min(560px,90vw);box-sizing:border-box;padding:20px;border:1px solid #ffffff16;border-radius:16px;background:linear-gradient(145deg,#0b0d0bd9,#050605e8);box-shadow:0 20px 70px #0009, inset 0 1px #ffffff08}
+.lobbyHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:18px}
+.lobbyHeaderLabel{font-size:9px;letter-spacing:3px;color:#696957;margin-bottom:5px}
+.lobbyHeaderValue{font-size:18px;letter-spacing:3px;color:#e5dfbd}
+.roomCodeSmall{font-size:22px;letter-spacing:6px;color:#eee6bd}
+.lobbySlots{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.lobbySlot{min-height:66px;padding:12px;box-sizing:border-box;border:1px solid #ffffff12;border-radius:10px;background:#ffffff05;display:flex;flex-direction:column;justify-content:center}
+.lobbySlot.empty{border-style:dashed;opacity:.65}
+.lobbySlotTop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lobbySlotName{font-size:12px;color:#d9d4b8;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lobbySlotStatus{font-size:8px;letter-spacing:2px;color:#8e896f}
+.lobbySlotEmpty{font-size:10px;letter-spacing:2px;color:#5f604f}
+.lobbyDivider{height:1px;background:#ffffff0c;margin:4px 0 16px}
+.lobbyFooter{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.lobbyPlayerCount{font-size:10px;letter-spacing:2px;color:#8c8872}
+.lobbyHostBadge{font-size:8px;letter-spacing:2px;padding:4px 7px;border:1px solid #d8c98a33;border-radius:99px;color:#bfb58a}
+.lobbyActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;width:min(560px,90vw)}
+.lobbyActions .menuButton{width:100%}
 #phone{position:fixed;left:50%;bottom:6%;transform:translateX(-50%) translateY(115%);width:min(330px,82vw);aspect-ratio:.49;border:7px solid #090909;border-radius:30px;background:#050505;box-shadow:0 24px 80px #000,0 0 0 1px #ffffff16;z-index:15;opacity:0;pointer-events:none;transition:transform .22s ease,opacity .22s ease}
 #phone.open{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
 #phoneScreen{position:absolute;inset:7px;border-radius:22px;overflow:hidden;background:linear-gradient(180deg,#11130f 0%,#080907 100%);color:#dedbbf}
@@ -183,13 +201,37 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
   </div>
 
   <div id="lobbyScreen" class="hidden">
-    <div class="menuTitle" id="lobbyModeTitle">LOBBY</div>
-    <div class="roomCode" id="roomCode">------</div>
-    <div class="menuInfo">Share this room code with your friends.</div>
-    <div class="menuInfo" id="lobbyPlayers">PLAYERS 1/4</div>
-    <button id="startLobbyButton" class="menuButton">START GAME</button>
-    <button id="copyLobbyButton" class="menuButton secondary">COPY ROOM LINK</button>
-    <button id="leaveLobbyButton" class="menuButton secondary">BACK</button>
+    <div class="menuTitle" id="lobbyModeTitle">CREATE LOBBY</div>
+
+    <div class="lobbyCard">
+      <div class="lobbyHeader">
+        <div>
+          <div class="lobbyHeaderLabel">ROOM</div>
+          <div class="lobbyHeaderValue">DEEPSEEKER</div>
+        </div>
+        <div style="text-align:right">
+          <div class="lobbyHeaderLabel">ROOM CODE</div>
+          <div class="roomCodeSmall" id="roomCode">------</div>
+        </div>
+      </div>
+
+      <div class="lobbySlots" id="lobbySlots"></div>
+
+      <div class="lobbyDivider"></div>
+
+      <div class="lobbyFooter">
+        <div class="lobbyPlayerCount" id="lobbyPlayers">PLAYERS 1/4</div>
+        <div class="lobbyHostBadge" id="lobbyHostBadge">HOST</div>
+      </div>
+    </div>
+
+    <div class="menuInfo">Invite your friends with the room link. The house will load before the match starts.</div>
+
+    <div class="lobbyActions">
+      <button id="startLobbyButton" class="menuButton">START GAME</button>
+      <button id="copyLobbyButton" class="menuButton secondary">COPY ROOM LINK</button>
+    </div>
+    <button id="leaveLobbyButton" class="menuButton secondary">LEAVE LOBBY</button>
   </div>
 </div>
 
