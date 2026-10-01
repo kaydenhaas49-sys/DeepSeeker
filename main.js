@@ -152,11 +152,38 @@ function boxContainsPlayer(box,x,z,r=0.42){
   return dx*dx+dz*dz<r*r;
 }
 
+function estimateHouseFloorY(x,z,bounds){
+  const candidates=[];
+
+  houseModel.traverse((obj)=>{
+    if(!obj.isMesh) return;
+    const box=new THREE.Box3().setFromObject(obj);
+    const size=box.getSize(new THREE.Vector3());
+
+    // Floors are generally broad, very thin horizontal meshes. Ignore walls,
+    // ceilings, furniture and tiny decorative pieces.
+    if(size.y>0.5) return;
+    if(size.x<2.5 && size.z<2.5) return;
+    if(x<box.min.x-0.25 || x>box.max.x+0.25 || z<box.min.z-0.25 || z>box.max.z+0.25) return;
+
+    candidates.push(box.max.y);
+  });
+
+  if(candidates.length){
+    // The lowest broad horizontal surface is the safest main-floor estimate.
+    return Math.min(...candidates);
+  }
+
+  // Fallback: keep the player inside the vertical range of the imported model.
+  return bounds.min.y;
+}
+
 function findHouseSpawn(bounds){
   const center=bounds.getCenter(new THREE.Vector3());
   const size=bounds.getSize(new THREE.Vector3());
-  const maxX=size.x*0.35;
-  const maxZ=size.z*0.35;
+  const floorY=estimateHouseFloorY(center.x,center.z,bounds);
+  const maxX=size.x*0.28;
+  const maxZ=size.z*0.28;
 
   const candidates=[];
   for(let z=-maxZ;z<=maxZ;z+=1.5){
@@ -175,11 +202,16 @@ function findHouseSpawn(bounds){
       }
     }
     if(!blocked) {
-      return new THREE.Vector3(candidate.x, HOUSE_ORIGIN.y+EYE, candidate.z);
+      const localFloorY=estimateHouseFloorY(candidate.x,candidate.z,bounds);
+      return new THREE.Vector3(
+        candidate.x,
+        (Number.isFinite(localFloorY) ? localFloorY : floorY) + EYE,
+        candidate.z
+      );
     }
   }
 
-  return new THREE.Vector3(center.x,HOUSE_ORIGIN.y+EYE,center.z);
+  return new THREE.Vector3(center.x,floorY+EYE,center.z);
 }
 
 function loadHouse(){
@@ -256,6 +288,11 @@ function loadHouse(){
 
       houseSpawn=findHouseSpawn(box);
       player.extraCollisionBoxes=houseCollisionBoxes;
+
+      // Never start below the house. This model contains a pool and other
+      // lower geometry, so the GLB's absolute minimum Y is not the floor.
+      houseSpawn.y=Math.max(houseSpawn.y,box.min.y+EYE+0.25);
+
       houseLoaded=true;
       houseFill.position.set(box.min.x,box.max.y,box.min.z);
       houseKey.position.set(box.min.x,box.max.y,box.min.z);
