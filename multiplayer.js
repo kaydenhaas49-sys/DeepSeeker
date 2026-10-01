@@ -311,6 +311,7 @@ export class Multiplayer {
       yaw: Number(this.player.yaw.toFixed(2)),
       level: this.getLevel() ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
+      flashlight: Boolean(this.getFlashlightOn()),
     };
 
     const changed =
@@ -319,7 +320,8 @@ export class Multiplayer {
       Math.abs(state.z - this.lastSent.z) > 0.03 ||
       Math.abs(state.yaw - this.lastSent.yaw) > 0.03 ||
       state.level !== this.lastSent.level ||
-      state.crouched !== this.lastSent.crouched;
+      state.crouched !== this.lastSent.crouched ||
+      state.flashlight !== this.lastSent.flashlight;
 
     const heartbeat = this.heartbeatTimer >= 1.0;
 
