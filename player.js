@@ -232,7 +232,14 @@ export class Player {
     this.jumpVelocity -= 18 * dt;
     this.jumpY += this.jumpVelocity * dt;
 
-    // Jumping is not blocked by the ceiling.
+    // Keep the camera safely below the ceiling even if the map ceiling changes.
+    const ceilingClearance = 0.15;
+    const maxJumpY = Math.max(0, WALL_H - ceilingClearance - targetEye - this.bobOffset);
+    if(this.jumpY > maxJumpY){
+      this.jumpY = maxJumpY;
+      if(this.jumpVelocity > 0) this.jumpVelocity = 0;
+    }
+
     if(this.jumpY <= 0){
       this.jumpY = 0;
       this.jumpVelocity = 0;
