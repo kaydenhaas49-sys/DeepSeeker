@@ -168,10 +168,7 @@ for action_name, (frames, fps) in ANIMS.items():
     bpy.context.view_layer.objects.active = arm
     arm.select_set(True)
     out = os.path.join(OUT, action_name + ".glb")
-    if hasattr(bpy.ops.wm, "gltf_export"):
-        bpy.ops.wm.gltf_export(filepath=out, export_format="GLB", export_animations=True)
-    else:
-        bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", export_animations=True)
+    bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", export_animations=True)
     bpy.data.actions.remove(act)
 
 print("Bacteria animation generation complete")
