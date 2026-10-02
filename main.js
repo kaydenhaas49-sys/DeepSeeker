@@ -955,7 +955,8 @@ function ensureHouseCollisionSetup(){
 
     updateHouseLoadingUI(82,"PROCESSING HOUSE — PREPARING COLLISION…");
     setupHouseDoors(houseModel);
-    updateHouseLoadingUI(86,"PROCESSING HOUSE — BUILDING WALL COLLISION…");{
+    updateHouseLoadingUI(86,"PROCESSING HOUSE — BUILDING WALL COLLISION…");
+    for(const door of houseDoors){
       door.pivot.traverse(obj=>{
         obj.userData.houseCollisionDoor=true;
       });
