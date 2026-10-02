@@ -11,7 +11,7 @@ const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
 
 export class Multiplayer {
-  constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart, onSharedFall }) {
+  constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart, onSharedFall, onChat }) {
     this.scene = scene;
     this.player = player;
     this.getLevel = getLevel;
@@ -21,6 +21,7 @@ export class Multiplayer {
     this.onRoster = onRoster || (() => {});
     this.onGameStart = onGameStart || (() => {});
     this.onSharedFall = onSharedFall || (() => {});
+    this.onChat = onChat || (() => {});
 
     this.socket = null;
     this.room = this.getRoomName();
@@ -37,6 +38,10 @@ export class Multiplayer {
     this.fallSequence = 0;
     this.fallStartedAt = 0;
     this.lastSharedFallSequence = 0;
+    this.chatSequence = 0;
+    this.chatMessage = "";
+    this.chatSender = "";
+    this.lastChatSentAt = 0;
 
     this.connect();
   }
@@ -113,6 +118,10 @@ export class Multiplayer {
 
       for (const remote of this.players.values()) {
         this.scene.remove(remote.group);
+        if(remote.nameplate){
+          remote.nameplate.texture.dispose();
+          remote.nameplate.material.dispose();
+        }
         disposeRemoteFlashlight(this.scene, remote.remoteLight);
       }
       this.players.clear();
@@ -148,7 +157,7 @@ export class Multiplayer {
       localStorage.setItem(key, name);
     }
 
-    return name;
+    return this.sanitizeName(name);
   }
 
   setStatus(message) {
@@ -215,12 +224,21 @@ export class Multiplayer {
         if (!remote) {
           this.addOrUpdatePlayer({
             id: data.id,
-            name: "Player",
+            name: nextState.playerName || "Player",
             state: data.state || {},
           });
           remote = this.players.get(data.id);
         } else {
           remote.target = nextState;
+        }
+
+        if(remote){
+          if(nextState.playerName && nextState.playerName!==remote.name){
+            remote.name=nextState.playerName;
+            this.updateNameplate(remote);
+            this.updateCount();
+          }
+          this.checkRemoteChat(remote,nextState);
         }
 
         this.checkSharedFall(nextState);
@@ -274,9 +292,104 @@ export class Multiplayer {
       level: state?.level === "house" ? "house" : "backrooms",
       crouched: Boolean(state?.crouched),
       flashlight: state?.flashlight !== false,
+      playerName: this.sanitizeName(state?.playerName || ""),
       fallSequence: Number.isFinite(fallSequence) ? fallSequence : 0,
       fallStartedAt: Number.isFinite(fallStartedAt) ? fallStartedAt : 0,
+      chatSequence: Number.isFinite(Number(state?.chatSequence)) ? Number(state.chatSequence) : 0,
+      chatMessage: this.sanitizeMessage(state?.chatMessage || ""),
+      chatSender: this.sanitizeName(state?.chatSender || ""),
     };
+  }
+
+  sanitizeName(name){
+    const clean=String(name||"").replace(/[<>]/g,"").replace(/\s+/g," ").trim().slice(0,20);
+    return clean || "Player";
+  }
+
+  sanitizeMessage(message){
+    return String(message||"").replace(/[<>]/g,"").replace(/\s+/g," ").trim().slice(0,120);
+  }
+
+  setPlayerName(name){
+    const clean=this.sanitizeName(name);
+    localStorage.setItem("deepseeker-player-name",clean);
+    this.sendState(true);
+    return clean;
+  }
+
+  createNameplate(remote){
+    const canvas=document.createElement("canvas");
+    canvas.width=512;
+    canvas.height=96;
+    const context=canvas.getContext("2d");
+    const texture=new THREE.CanvasTexture(canvas);
+    texture.colorSpace=THREE.SRGBColorSpace;
+
+    const material=new THREE.SpriteMaterial({
+      map:texture,
+      transparent:true,
+      depthTest:true,
+      depthWrite:false
+    });
+    const sprite=new THREE.Sprite(material);
+    sprite.position.set(0,2.75,0);
+    sprite.scale.set(3.15,.59,1);
+    sprite.renderOrder=5;
+
+    remote.nameplate={canvas,context,texture,material,sprite};
+    remote.group.add(sprite);
+    this.updateNameplate(remote);
+  }
+
+  updateNameplate(remote){
+    if(!remote?.nameplate) return;
+    const {canvas,context,texture}=remote.nameplate;
+    context.clearRect(0,0,canvas.width,canvas.height);
+    const name=this.sanitizeName(remote.name);
+    context.font="600 30px system-ui, -apple-system, sans-serif";
+    const width=Math.min(canvas.width-36,Math.max(150,context.measureText(name).width+46));
+    const left=(canvas.width-width)/2;
+
+    context.fillStyle="rgba(4,5,4,.78)";
+    context.beginPath();
+    context.roundRect(left,16,width,56,16);
+    context.fill();
+
+    context.fillStyle="rgba(232,225,191,.96)";
+    context.textAlign="center";
+    context.textBaseline="middle";
+    context.fillText(name,canvas.width/2,44);
+    texture.needsUpdate=true;
+  }
+
+  checkRemoteChat(remote,state){
+    const sequence=state.chatSequence||0;
+    if(sequence<=0 || sequence<=remote.lastChatSequence) return;
+
+    remote.lastChatSequence=sequence;
+    const message=this.sanitizeMessage(state.chatMessage);
+    if(message){
+      this.onChat({
+        sender:this.sanitizeName(state.chatSender || remote.name || "Player"),
+        message
+      });
+    }
+  }
+
+  sendChat(message){
+    const clean=this.sanitizeMessage(message);
+    if(!clean) return false;
+
+    const now=performance.now();
+    if(now-this.lastChatSentAt<350) return false;
+
+    this.lastChatSentAt=now;
+    this.chatSequence+=1;
+    this.chatMessage=clean;
+    this.chatSender=this.getPlayerName();
+    this.sendState(true);
+    this.onChat({sender:this.getPlayerName(),message:clean,self:true});
+    return true;
   }
 
   addOrUpdatePlayer(player) {
@@ -299,9 +412,12 @@ export class Multiplayer {
         remoteLight: createRemoteFlashlight(this.scene),
         target: this.normalizeState(player.state || {}),
         current: this.normalizeState(player.state || {}),
+        nameplate:null,
+        lastChatSequence:this.normalizeState(player.state || {}).chatSequence,
       };
 
       this.players.set(player.id, remote);
+      this.createNameplate(remote);
 
       createHazmatCharacter()
         .then(character=>{
@@ -316,7 +432,8 @@ export class Multiplayer {
           console.error("[DeepSeeker] remote hazmat failed:",error);
         });
     }else if(player.name){
-      remote.name = String(player.name).slice(0,20);
+      remote.name = this.sanitizeName(player.name);
+      this.updateNameplate(remote);
     }
 
     if(player.state){
@@ -386,8 +503,12 @@ export class Multiplayer {
       level: this.getLevel() ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
       flashlight: Boolean(this.getFlashlightOn()),
+      playerName: this.getPlayerName(),
       fallSequence: this.fallSequence,
       fallStartedAt: this.fallStartedAt,
+      chatSequence: this.chatSequence,
+      chatMessage: this.chatMessage,
+      chatSender: this.chatSender,
     };
 
     const changed =
@@ -399,8 +520,10 @@ export class Multiplayer {
       state.level !== this.lastSent.level ||
       state.crouched !== this.lastSent.crouched ||
       state.flashlight !== this.lastSent.flashlight ||
+      state.playerName !== this.lastSent.playerName ||
       state.fallSequence !== this.lastSent.fallSequence ||
-      state.fallStartedAt !== this.lastSent.fallStartedAt;
+      state.fallStartedAt !== this.lastSent.fallStartedAt ||
+      state.chatSequence !== this.lastSent.chatSequence;
 
     const heartbeat = this.heartbeatTimer >= 1.0;
 
@@ -442,6 +565,7 @@ export class Multiplayer {
       remote.current.level = remote.target.level;
       remote.current.crouched = remote.target.crouched;
       remote.current.flashlight = remote.target.flashlight;
+      remote.current.playerName = remote.target.playerName;
 
       remote.group.position.set(
         remote.current.x,
@@ -455,6 +579,13 @@ export class Multiplayer {
       const dz = remote.current.z - this.player.pos.z;
       const nearby = dx * dx + dz * dz < 60 * 60;
       remote.group.visible = sameLevel && nearby;
+
+      if(remote.nameplate){
+        remote.nameplate.sprite.visible = sameLevel && nearby;
+        remote.nameplate.material.opacity = sameLevel && nearby
+          ? Math.min(1,Math.max(0,(45-Math.sqrt(dx*dx+dz*dz))/15))
+          : 0;
+      }
 
       if(remote.mixer && remote.group.visible){
         remote.mixer.update(dt);
@@ -493,6 +624,10 @@ export class Multiplayer {
 
     for (const remote of this.players.values()) {
       this.scene.remove(remote.group);
+      if(remote.nameplate){
+        remote.nameplate.texture.dispose();
+        remote.nameplate.material.dispose();
+      }
     }
     this.players.clear();
   }

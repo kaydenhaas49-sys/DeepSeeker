@@ -117,6 +117,21 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 
 #phoneHome::after{content:"";position:absolute;left:0;top:6px;width:105px;height:4px;border-radius:8px;background:#ffffff55}
 #phoneHint{position:fixed;left:50%;bottom:3%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#77745f;z-index:16;opacity:0;pointer-events:none;transition:opacity .2s}
+.usernameRow{display:flex;gap:8px;width:min(420px,88vw)}
+.usernameInput{flex:1;min-width:0;padding:12px 13px;border:1px solid #ffffff18;border-radius:10px;background:#050605;color:#e2ddbe;font:inherit;font-size:12px;letter-spacing:1.5px;outline:none}
+.usernameInput:focus{border-color:#d8c98a66}
+.usernameButton{padding:12px 14px;border:1px solid rgba(229,218,170,.18);border-radius:10px;background:#ffffff06;color:#bdb38c;font:inherit;font-size:10px;letter-spacing:1.5px;cursor:pointer}
+.usernameButton:hover{background:#ffffff10}
+#chatPanel{position:fixed;left:18px;bottom:18px;width:min(380px,calc(100vw - 36px));z-index:17;display:none;color:#e8e3c8;pointer-events:none}
+#chatPanel.visible{display:block}
+#chatPanel.open{pointer-events:auto}
+#chatMessages{max-height:190px;overflow:auto;margin-bottom:8px;padding:10px 12px;border:1px solid #ffffff10;border-radius:12px;background:rgba(5,6,5,.72);backdrop-filter:blur(7px);box-shadow:0 10px 35px #0006}
+.chatMessage{display:flex;gap:7px;align-items:flex-start;font-size:11px;line-height:1.45;padding:3px 0;text-shadow:0 1px 5px #000}
+.chatName{color:#d8c98a;font-weight:700;white-space:nowrap}
+.chatText{color:#ddd9c9;overflow-wrap:anywhere}
+#chatInput{display:none;width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid rgba(216,201,138,.34);border-radius:10px;background:rgba(4,5,4,.95);color:#eee7cc;font:inherit;font-size:12px;outline:none;box-shadow:0 10px 30px #0008}
+#chatPanel.open #chatInput{display:block}
+#chatHint{margin-top:6px;font-size:9px;letter-spacing:1.5px;color:#8d8a76;text-shadow:0 1px 5px #000}
 #phone.open + #phoneHint{opacity:1}
 
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
@@ -156,6 +171,12 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 </div>
 <div id="phoneHint">P — CLOSE PHONE · TAP HOME BAR TO RETURN</div>
 
+<div id="chatPanel">
+  <div id="chatMessages"></div>
+  <input id="chatInput" maxlength="120" autocomplete="off" placeholder="MESSAGE…">
+  <div id="chatHint">ENTER · SEND MESSAGE &nbsp; ESC · CLOSE</div>
+</div>
+
 <div id="vignette"></div>
 <div id="grain"></div>
 
@@ -193,6 +214,7 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
       <div class="row"><span class="key">E</span><span class="action">Use the apartment teleporter</span></div>
     </div>
     <p class="closeHint">TAB to close • click the world to resume</p>
+    <p class="closeHint">ENTER to chat • ESC to close chat</p>
     <p class="closeHint">APARTMENT ASSET: “Studio apartment (vray baked textures included)” by zamorev4d · Sketchfab · CC BY</p>
     <p class="closeHint">PLAYER MODEL: “Backrooms Rigged Hazmat” by Loco (@Loco420) · Sketchfab · CC BY</p>
   </div>
@@ -207,6 +229,10 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 
   <div id="homeScreen" class="hidden">
     <div class="menuTitle">MAIN MENU</div>
+    <div class="usernameRow">
+      <input id="usernameInput" class="usernameInput" maxlength="20" autocomplete="nickname" placeholder="USERNAME">
+      <button id="usernameSaveButton" class="usernameButton" type="button">SAVE NAME</button>
+    </div>
     <div class="houseLoader" id="houseLoaderHome">
       <div class="houseLoaderTop"><span>APARTMENT ASSET</span><span id="houseLoadPercentHome">0%</span></div>
       <div class="houseLoaderTrack"><div class="houseLoaderFill" id="houseLoadFillHome"></div></div>
@@ -227,6 +253,9 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
         <div>
           <div class="lobbyHeaderLabel">ROOM</div>
           <div class="lobbyHeaderValue">DEEPSEEKER</div>
+          <div class="usernameRow" style="width:min(340px,54vw);margin-top:8px">
+            <input id="lobbyUsernameInput" class="usernameInput" maxlength="20" autocomplete="nickname" placeholder="USERNAME">
+          </div>
         </div>
         <div style="text-align:right">
           <div class="lobbyHeaderLabel">ROOM CODE</div>

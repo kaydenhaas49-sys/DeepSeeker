@@ -450,6 +450,16 @@ function enterLobby(code,host){
 }
 
 const multiplayerStatus=document.getElementById("multiplayerStatus");
+const usernameInputs=[
+  document.getElementById("usernameInput"),
+  document.getElementById("lobbyUsernameInput")
+].filter(Boolean);
+const usernameSaveButton=document.getElementById("usernameSaveButton");
+const chatPanel=document.getElementById("chatPanel");
+const chatMessages=document.getElementById("chatMessages");
+const chatInput=document.getElementById("chatInput");
+let chatOpen=false;
+let chatHideTimer=0;
 
 const multiplayer=new Multiplayer({
   scene,
@@ -485,6 +495,28 @@ const multiplayer=new Multiplayer({
   onSharedFall:(startedAt)=>{
     startBackroomsFall(startedAt,false);
   },
+  onChat:({sender,message,self=false})=>{
+    const row=document.createElement("div");
+    row.className="chatMessage";
+    const name=document.createElement("span");
+    name.className="chatName";
+    name.textContent=self ? "YOU" : String(sender||"PLAYER").slice(0,20);
+    const text=document.createElement("span");
+    text.className="chatText";
+    text.textContent=String(message||"").slice(0,120);
+    row.append(name,text);
+    chatMessages.appendChild(row);
+    while(chatMessages.children.length>30) chatMessages.firstChild.remove();
+
+    chatPanel.classList.add("visible");
+    clearTimeout(chatHideTimer);
+    if(!chatOpen){
+      chatHideTimer=setTimeout(()=>{
+        if(!chatOpen) chatPanel.classList.remove("visible");
+      },6500);
+    }
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+  },
   onRoster:(players)=>{
     const params=new URLSearchParams(location.search);
     if(params.get("lobby")!=="1") return;
@@ -516,8 +548,50 @@ const multiplayer=new Multiplayer({
       }
     }
     lobbySlots.innerHTML=slots.join("");
+    const self=players.find(p=>p.self);
+    if(self){
+      usernameInputs.forEach(input=>{
+        if(document.activeElement!==input) input.value=String(self.name||"");
+      });
+    }
   }
 });
+
+function refreshUsernameInputs(){
+  const name=multiplayer.getPlayerName();
+  usernameInputs.forEach(input=>input.value=name);
+}
+
+function saveUsername(name){
+  const clean=multiplayer.setPlayerName(name);
+  usernameInputs.forEach(input=>input.value=clean);
+  eventText.textContent="USERNAME SAVED";
+  eventText.style.opacity="1";
+  setTimeout(()=>{
+    if(eventText.textContent==="USERNAME SAVED") eventText.style.opacity="0";
+  },1200);
+}
+
+function openChat(){
+  if(!gameStarted || phoneOpen || controlsOpen) return;
+  chatOpen=true;
+  chatPanel.classList.add("visible","open");
+  clearTimeout(chatHideTimer);
+  if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
+  chatInput.value="";
+  setTimeout(()=>chatInput.focus(),0);
+}
+
+function closeChat(resume=true){
+  chatOpen=false;
+  chatPanel.classList.remove("open");
+  chatInput.blur();
+  clearTimeout(chatHideTimer);
+  chatHideTimer=setTimeout(()=>{
+    if(!chatOpen) chatPanel.classList.remove("visible");
+  },4500);
+  if(resume && gameStarted && !phoneOpen && !controlsOpen) player.lock();
+}
 
 const houseDoors=[];
 const houseRoot=new THREE.Group();
@@ -1934,6 +2008,33 @@ leaveLobbyButton.addEventListener("click",()=>{
   location.href=location.pathname;
 });
 
+if(usernameSaveButton){
+  usernameSaveButton.addEventListener("click",()=>{
+    saveUsername(usernameInputs[0]?.value||"");
+  });
+}
+usernameInputs.forEach(input=>{
+  input.addEventListener("keydown",e=>{
+    if(e.code==="Enter"){
+      e.preventDefault();
+      saveUsername(input.value);
+    }
+  });
+});
+refreshUsernameInputs();
+
+chatInput.addEventListener("keydown",e=>{
+  if(e.code==="Enter"){
+    e.preventDefault();
+    const message=chatInput.value.trim();
+    if(message) multiplayer.sendChat(message);
+    closeChat();
+  }else if(e.code==="Escape"){
+    e.preventDefault();
+    closeChat();
+  }
+});
+
 deepseekerIcon.addEventListener("click",openDeepSeekerApp);
 phoneHome.addEventListener("click",()=>{
   if(!phoneOpen) return;
@@ -1976,7 +2077,7 @@ overlay.addEventListener("click",(e)=>{
 });
 
 renderer.domElement.addEventListener("click",()=>{
-  if(gameStarted && !phoneOpen && !controlsOpen && document.pointerLockElement!==renderer.domElement){
+  if(gameStarted && !phoneOpen && !controlsOpen && !chatOpen && document.pointerLockElement!==renderer.domElement){
     audio.start();
     player.lock();
   }
@@ -1988,7 +2089,7 @@ controls.addEventListener("click",e=>{
 
 document.addEventListener("pointerlockchange",()=>{
   const locked=document.pointerLockElement===renderer.domElement;
-  if(!controlsOpen && !phoneOpen){
+  if(!controlsOpen && !phoneOpen && !chatOpen){
     if(locked){
       overlay.classList.add("hidden");
     }else if(gameStarted){
@@ -1999,7 +2100,7 @@ document.addEventListener("pointerlockchange",()=>{
       overlay.classList.remove("hidden");
     }
   }
-  crosshair.style.display=locked?"block":"none";
+  crosshair.style.display=locked && !chatOpen?"block":"none";
   if(locked && phoneOpen){
     phoneOpen=false;
     deepseekerAppOpen=false;
@@ -2009,7 +2110,15 @@ document.addEventListener("pointerlockchange",()=>{
 });
 
 document.addEventListener("keydown",e=>{
-  if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen){
+  if(e.code==="Enter" && !e.repeat && gameStarted && !phoneOpen && !controlsOpen && !chatOpen){
+    e.preventDefault();
+    openChat();
+    return;
+  }
+
+  if(chatOpen) return;
+
+  if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen && !chatOpen){
     if(useHouseReturnTeleporter()){
       return;
     }
