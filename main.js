@@ -32,7 +32,6 @@ const lobbyHostBadge=document.getElementById("lobbyHostBadge");
 const startLobbyButton=document.getElementById("startLobbyButton");
 const copyLobbyButton=document.getElementById("copyLobbyButton");
 const leaveLobbyButton=document.getElementById("leaveLobbyButton");
-const saveGameButton=document.getElementById("saveGameButton");
 const crosshair=document.getElementById("crosshair");
 const controls=document.getElementById("controlsPanel");
 const staminaBar=document.getElementById("staminaBar");
@@ -148,6 +147,79 @@ const SELECTED_SAVE_COOKIE="deepseeker-selected-save-slot";
 const SAVE_COOKIE_MAX_AGE=60*60*24*365*10;
 
 const saveCache=[null,null,null,null];
+const SAVE_DB_NAME="deepseeker-save-db";
+const SAVE_DB_VERSION=1;
+const SAVE_DB_STORE="slots";
+let saveDbPromise=null;
+
+function openSaveDatabase(){
+  if(!("indexedDB" in window)){
+    return Promise.reject(new Error("IndexedDB unavailable"));
+  }
+  if(saveDbPromise) return saveDbPromise;
+
+  saveDbPromise=new Promise((resolve,reject)=>{
+    const request=indexedDB.open(SAVE_DB_NAME,SAVE_DB_VERSION);
+    request.onupgradeneeded=()=>{
+      const db=request.result;
+      if(!db.objectStoreNames.contains(SAVE_DB_STORE)){
+        db.createObjectStore(SAVE_DB_STORE,{keyPath:"slot"});
+      }
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error("IndexedDB open failed"));
+  });
+
+  return saveDbPromise;
+}
+
+function readIndexedSaveSlot(slot){
+  return openSaveDatabase().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(SAVE_DB_STORE,"readonly");
+    const request=tx.objectStore(SAVE_DB_STORE).get(normalizeSaveSlot(slot));
+    request.onsuccess=()=>resolve(request.result?.data||null);
+    request.onerror=()=>reject(request.error||new Error("IndexedDB read failed"));
+  }));
+}
+
+function writeIndexedSaveSlot(slot,data){
+  return openSaveDatabase().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(SAVE_DB_STORE,"readwrite");
+    tx.objectStore(SAVE_DB_STORE).put({
+      slot:normalizeSaveSlot(slot),
+      data
+    });
+    tx.oncomplete=()=>resolve(true);
+    tx.onerror=()=>reject(tx.error||new Error("IndexedDB write failed"));
+    tx.onabort=()=>reject(tx.error||new Error("IndexedDB write aborted"));
+  }));
+}
+
+async function hydrateIndexedSaveSlots(){
+  try{
+    for(let slot=1;slot<=SAVE_SLOT_COUNT;slot++){
+      const data=await readIndexedSaveSlot(slot);
+      if(!data) continue;
+
+      const parsed=parseSave(JSON.stringify(data));
+      if(
+        parsed &&
+        (!saveCache[slot] ||
+          Number(parsed.savedAt||0)>Number(saveCache[slot].savedAt||0))
+      ){
+        saveCache[slot]=parsed;
+        try{
+          localStorage.setItem(saveSlotKey(slot),JSON.stringify(parsed));
+        }catch{}
+        writeCookie(saveSlotCookieKey(slot),JSON.stringify(parsed));
+      }
+    }
+    renderSaveSlots();
+    updateSaveSlotLabels();
+  }catch(error){
+    console.warn("[DeepSeeker] IndexedDB save backup unavailable:",error);
+  }
+}
 
 function normalizeSaveSlot(slot){
   const value=Number(slot);
@@ -255,22 +327,24 @@ function getSavedGame(slot=selectedSaveSlot){
 function persistSaveSlot(slot,data){
   const targetSlot=normalizeSaveSlot(slot);
   const serialized=JSON.stringify(data);
-  let persisted=false;
 
   saveCache[targetSlot]=data;
 
+  let stored=false;
   try{
     localStorage.setItem(saveSlotKey(targetSlot),serialized);
-    persisted=localStorage.getItem(saveSlotKey(targetSlot))===serialized;
-  }catch{
-    // Cookie backup below may still work.
-  }
+    stored=localStorage.getItem(saveSlotKey(targetSlot))===serialized;
+  }catch{}
 
   if(writeCookie(saveSlotCookieKey(targetSlot),serialized)){
-    persisted=true;
+    stored=true;
   }
 
-  return persisted;
+  writeIndexedSaveSlot(targetSlot,data).catch(error=>{
+    console.warn("[DeepSeeker] IndexedDB save backup failed:",error);
+  });
+
+  return stored;
 }
 
 function readSelectedSaveSlot(){
@@ -289,6 +363,7 @@ function readSelectedSaveSlot(){
 
 let selectedSaveSlot=readSelectedSaveSlot();
 hydrateSaveSlots();
+hydrateIndexedSaveSlots();
 
 try{
   if(window.navigator?.storage?.persist){
@@ -473,26 +548,31 @@ function updateHouseLoadingUI(progress=null,status=null){
   }
 }
 
-function saveGame(slot=selectedSaveSlot){
+async function saveGame(slot=selectedSaveSlot){
   const targetSlot=normalizeSaveSlot(slot);
   setSelectedSaveSlot(targetSlot,false);
 
   const params=new URLSearchParams(location.search);
   const roomCode=(params.get("room")||"").trim().toUpperCase();
 
+  let playerName="Player";
+  try{
+    playerName=multiplayer.getPlayerName();
+  }catch{}
+
   const data={
-    version:4,
+    version:5,
     seed:SEED,
     level:houseMode ? "apartment" : "backrooms",
     savedAt:Date.now(),
     saveSlot:targetSlot,
     saveType:roomCode ? "MULTIPLAYER" : "SOLO",
     roomCode:roomCode || null,
-    playerName:multiplayer?.getPlayerName?.() || "Player",
-    x:player.pos.x,
-    z:player.pos.z,
-    yaw:player.yaw,
-    pitch:player.pitch,
+    playerName,
+    x:Number(player.pos.x),
+    z:Number(player.pos.z),
+    yaw:Number(player.yaw),
+    pitch:Number(player.pitch),
     storyStage,
     maxStoryDistance,
     battery,
@@ -500,25 +580,43 @@ function saveGame(slot=selectedSaveSlot){
     houseMode
   };
 
-  const persisted=persistSaveSlot(targetSlot,data);
-  const verified=getSavedGame(targetSlot);
+  const stored=persistSaveSlot(targetSlot,data);
+  let indexedStored=false;
 
-  if(!persisted || !verified || verified.savedAt!==data.savedAt){
-    console.error("[DeepSeeker] save failed",{
-      slot:targetSlot,
-      persisted,
-      verified
-    });
+  try{
+    indexedStored=await writeIndexedSaveSlot(targetSlot,data);
+  }catch(error){
+    console.warn("[DeepSeeker] IndexedDB save failed:",error);
+  }
+
+  const verified=getSavedGame(targetSlot);
+  const verifiedOk=Boolean(
+    verified &&
+    verified.saveSlot===targetSlot &&
+    verified.savedAt===data.savedAt &&
+    Number(verified.x)===data.x &&
+    Number(verified.z)===data.z
+  );
+
+  if(!stored && !indexedStored){
+    console.error("[DeepSeeker] No persistent save backend accepted slot",targetSlot);
     eventText.textContent=`SAVE FAILED · SLOT ${targetSlot}`;
     eventText.style.opacity="1";
     return false;
   }
 
+  if(!verifiedOk){
+    console.warn("[DeepSeeker] Save verified only from fallback cache",{
+      slot:targetSlot,
+      verified
+    });
+  }
+
   refreshSaveInfo();
   updateSaveSlotLabels();
+
   eventText.textContent=`GAME SAVED · SLOT ${targetSlot}`;
   eventText.style.opacity="1";
-
   setTimeout(()=>{
     if(eventText.textContent===`GAME SAVED · SLOT ${targetSlot}`){
       eventText.style.opacity="0";
@@ -2319,9 +2417,10 @@ function openDeepSeekerApp(){
 
 const phoneSaveStatus=document.getElementById("phoneSaveStatus");
 document.querySelectorAll(".phoneSaveSlot").forEach(button=>{
-  button.addEventListener("click",()=>{
+  button.addEventListener("click",async()=>{
     const slot=normalizeSaveSlot(button.dataset.slot);
-    const saved=saveGame(slot);
+    if(phoneSaveStatus) phoneSaveStatus.textContent=`SAVING SLOT ${slot}…`;
+    const saved=await saveGame(slot);
     if(phoneSaveStatus){
       phoneSaveStatus.textContent=saved
         ? `SAVED TO SLOT ${slot}`
