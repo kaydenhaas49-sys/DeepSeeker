@@ -736,9 +736,15 @@ function chooseHousePositions(){
   const spawn=samples[0];
   houseSpawn.set(spawn.x,EYE,spawn.z);
 
-  // Put the return teleporter on the far side of the house, tucked toward
-  // the perimeter rather than directly in the player's initial sightline.
-  samples.sort((a,b)=>{
+  // Never place the teleporter at/near the spawn. Prefer a spot at least
+  // 8 m away, then bias toward a wall/corner so it feels hidden.
+  const MIN_PORTAL_DISTANCE=8;
+  const portalCandidates=samples.filter(sample=>{
+    return Math.hypot(sample.x-spawn.x,sample.z-spawn.z)>=MIN_PORTAL_DISTANCE;
+  });
+
+  const candidates=portalCandidates.length ? portalCandidates : samples;
+  candidates.sort((a,b)=>{
     const da=Math.hypot(a.x-spawn.x,a.z-spawn.z);
     const db=Math.hypot(b.x-spawn.x,b.z-spawn.z);
     const ea=Math.min(
@@ -753,10 +759,11 @@ function chooseHousePositions(){
       Math.abs(b.z-bounds.min.z),
       Math.abs(bounds.max.z-b.z)
     );
-    return (db + eb*.65) - (da + ea*.65);
+    // Distance from spawn matters most; edge distance makes it less obvious.
+    return (db - eb*.5) - (da - ea*.5);
   });
 
-  const portal=samples[0];
+  const portal=candidates[0];
   houseReturnPosition.set(portal.x,0,portal.z);
   return true;
 }
