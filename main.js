@@ -512,25 +512,22 @@ function buildHouseCollisionProxies(root){
     const box=new THREE.Box3().setFromObject(obj);
     const size=box.getSize(new THREE.Vector3());
 
-    const horizontal=Math.max(size.x,size.z);
     const vertical=size.y;
+    const thin=Math.min(size.x,size.z);
+    const horizontal=Math.max(size.x,size.z);
 
-    // Ignore tiny decorative geometry. Keep anything tall enough to be a
-    // wall/partition/door/furniture obstacle and anything substantial that
-    // intersects the player's normal standing range.
-    const tallObstacle =
-      vertical >= 1.0 &&
-      horizontal >= 0.45 &&
-      box.max.y >= 0.45 &&
-      box.min.y <= EYE + 0.25;
-
-    const lowObstacle =
-      vertical >= 0.35 &&
+    // Only collide with tall, relatively thin structural pieces. The imported
+    // house contains furniture and decorative meshes whose AABBs can span a
+    // surprisingly large area; treating those as walls is what caused the
+    // player to spawn/move trapped.
+    const architecturalWall =
+      vertical >= 1.2 &&
+      thin <= 1.25 &&
       horizontal >= 0.9 &&
-      box.max.y >= 0.45 &&
-      box.min.y <= 1.35;
+      size.x <= 18 &&
+      size.z <= 18;
 
-    if(!tallObstacle && !lowObstacle) return;
+    if(!architecturalWall) return;
 
     houseCollisionBoxes.push({
       minX:box.min.x,
@@ -619,13 +616,11 @@ function updateHouseDoorCollisions(){
     door.pivot.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(door.pivot);
 
-    const doorX=door.collisionBox;
-    const doorCenterX=(doorX.minX+doorX.maxX)*.5;
-    const doorCenterZ=(doorX.minZ+doorX.maxZ)*.5;
-    const doorDx=doorCenterX-px;
-    const doorDz=doorCenterZ-pz;
-
-    if(doorDx*doorDx+doorDz*doorDz>rangeSq) continue;
+    const centerX=(box.min.x+box.max.x)*.5;
+    const centerZ=(box.min.z+box.max.z)*.5;
+    const dx=centerX-px;
+    const dz=centerZ-pz;
+    if(dx*dx+dz*dz>rangeSq) continue;
 
     // A small horizontal padding prevents squeezing through door geometry.
     const pad=.08;
