@@ -642,6 +642,86 @@ function toggleHouseDoor(){
   return true;
 }
 
+function chooseSafeHouseSpawn(root){
+  if(!root || !houseCollisionBoxes.length) return false;
+
+  const bounds=new THREE.Box3().setFromObject(root);
+  const margin=1.25;
+  const minX=bounds.min.x+margin;
+  const maxX=bounds.max.x-margin;
+  const minZ=bounds.min.z+margin;
+  const maxZ=bounds.max.z-margin;
+
+  if(minX>=maxX || minZ>=maxZ) return false;
+
+  const blocked=(x,z,radius=.55)=>{
+    for(const box of houseCollisionBoxes){
+      if(
+        x>=box.minX-radius &&
+        x<=box.maxX+radius &&
+        z>=box.minZ-radius &&
+        z<=box.maxZ+radius
+      ) return true;
+    }
+
+    // Also avoid spawning directly in a discovered door.
+    const wp=new THREE.Vector3();
+    for(const door of houseDoors){
+      door.pivot.getWorldPosition(wp);
+      const d=Math.hypot(wp.x-x,wp.z-z);
+      if(d<1.15) return true;
+    }
+
+    return false;
+  };
+
+  // Prefer the center of the house, but search outward until we find a
+  // genuinely clear standing position. The step is deliberately fine enough
+  // to avoid placing the player's 0.4 m collision radius into furniture/walls.
+  const center=bounds.getCenter(new THREE.Vector3());
+  const maxRadius=Math.hypot(maxX-minX,maxZ-minZ);
+  const step=.75;
+
+  let best=null;
+  let bestScore=Infinity;
+
+  for(let x=minX;x<=maxX;x+=step){
+    for(let z=minZ;z<=maxZ;z+=step){
+      if(blocked(x,z)) continue;
+
+      const d=Math.hypot(x-center.x,z-center.z);
+      if(d<bestScore){
+        bestScore=d;
+        best={x,z};
+      }
+    }
+  }
+
+  if(!best){
+    // Fallback: use a broader search without the preference for the center.
+    for(let radius=0;radius<=maxRadius;radius+=1.0){
+      for(let angle=0;angle<Math.PI*2;angle+=Math.PI/12){
+        const x=THREE.MathUtils.clamp(center.x+Math.cos(angle)*radius,minX,maxX);
+        const z=THREE.MathUtils.clamp(center.z+Math.sin(angle)*radius,minZ,maxZ);
+        if(!blocked(x,z)){
+          best={x,z};
+          break;
+        }
+      }
+      if(best) break;
+    }
+  }
+
+  if(!best) return false;
+
+  houseSpawn.set(best.x,EYE,best.z);
+  console.log("[DeepSeeker] safe house spawn:",{
+    x:Number(best.x.toFixed(2)),
+    z:Number(best.z.toFixed(2))
+  });
+  return true;
+}
+
 function ensureHouseCollisionSetup(){
   if(!houseLoaded || houseCollisionReady || houseCollisionBuildStarted || !houseModel) return;
 
@@ -656,6 +736,7 @@ function ensureHouseCollisionSetup(){
       });
     }
     buildHouseCollisionProxies(houseModel);
+    chooseSafeHouseSpawn(houseModel);
     houseCollisionReady=true;
     houseCollisionBuildStarted=false;
 
@@ -757,9 +838,6 @@ function loadHouse(){
         light.position.copy(position);
         houseLights.add(light);
       }
-
-      // Spawn at the model's normalized center.
-      houseSpawn.set(0,EYE,0);
 
       prepareHouseRenderCulling(houseModel);
 
