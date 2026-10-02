@@ -555,34 +555,52 @@ function updateHouseDoors(dt){
 function buildHouseCollisionProxies(root){
   houseCollisionBoxes.length=0;
 
-  // The exported house GLB uses generic FrontSide/BackSide mesh names, so
-  // name-based wall detection misses most of the actual architecture.
-  // Build lightweight AABB collision proxies directly from the normalized
-  // world-space mesh bounds instead. The model is only ~126 meshes, so this
-  // stays cheap while covering walls/partitions/frames reliably.
+  // The house export uses generic mesh names, so classify geometry by its
+  // LOCAL shape instead of its rotated world-space AABB. This keeps real
+  // walls/partitions while avoiding furniture-sized collision boxes.
   root.updateMatrixWorld(true);
 
   root.traverse((obj)=>{
     if(!obj.isMesh || !obj.geometry) return;
     if(obj.userData.houseCollisionDoor) return;
 
-    const box=new THREE.Box3().setFromObject(obj);
-    const size=box.getSize(new THREE.Vector3());
+    if(!obj.geometry.boundingBox){
+      obj.geometry.computeBoundingBox();
+    }
+
+    const localBox=obj.geometry.boundingBox;
+    if(!localBox) return;
+
+    const localSize=localBox.getSize(new THREE.Vector3());
+    const worldScale=new THREE.Vector3();
+    obj.getWorldScale(worldScale);
+
+    const size=new THREE.Vector3(
+      Math.abs(localSize.x*worldScale.x),
+      Math.abs(localSize.y*worldScale.y),
+      Math.abs(localSize.z*worldScale.z)
+    );
 
     const vertical=size.y;
-    const thin=Math.min(size.x,size.z);
-    const horizontal=Math.max(size.x,size.z);
+    const hMin=Math.min(size.x,size.z);
+    const hMax=Math.max(size.x,size.z);
 
-    // Only collide with tall, relatively thin structural pieces. The imported
-    // house contains furniture and decorative meshes whose AABBs can span a
-    // surprisingly large area; treating those as walls is what caused the
-    // player to spawn/move trapped.
-    const architecturalWall =
-      vertical >= 0.6 &&
-      horizontal >= 0.45 &&
-      !(size.x > 35 && size.z > 35);
+    // Real architectural walls are usually tall and much thinner in one
+    // horizontal axis than the other. Using the local mesh shape means
+    // rotated/angled walls still qualify without their world AABBs becoming
+    // giant solid barriers.
+    const wallLike =
+      vertical >= 0.75 &&
+      hMax >= 0.9 &&
+      hMin <= Math.min(0.6,hMax*0.45);
 
-    if(!architecturalWall) return;
+    if(!wallLike) return;
+
+    // Collision is still an AABB because Player supports lightweight box
+    // tests. For angled walls this remains a conservative approximation, but
+    // the classified set is now restricted to actual wall-shaped meshes.
+    const box=new THREE.Box3().setFromObject(obj);
+    if(!Number.isFinite(box.min.x) || !Number.isFinite(box.min.z)) return;
 
     houseCollisionBoxes.push({
       minX:box.min.x,
