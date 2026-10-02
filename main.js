@@ -7,6 +7,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
 import JSZip from "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm";
 import { flashlightFlicker } from "./character.js";
 
@@ -2011,7 +2013,6 @@ scene.add(spiderEntity);
 
 let spiderLoaded=false;
 let spiderModel=null;
-let spiderFallbackVisual=null;
 let spiderMixer=null;
 const spiderActions=new Map();
 let spiderAnimationState="";
@@ -2030,7 +2031,7 @@ const SPIDER_ATTACK_RANGE=1.65;
 const SPIDER_SPEED=.72;
 const SPIDER_RADIUS=.55;
 const SPIDER_GROUND_OFFSET=.08;
-const SPIDER_TARGET_SPAN=4.2;
+const SPIDER_TARGET_SPAN=2.4;
 
 const SPIDER_ANIMATION_RANGES={
   idle1:[164,213],
@@ -2060,101 +2061,60 @@ const SPIDER_ANIMATION_ALIAS={
 };
 
 
-function createFallbackSpiderVisual(){
-  const root=new THREE.Group();
-  root.name="SpiderVisualFallback";
-
-  const bodyMat=new THREE.MeshStandardMaterial({
-    color:0x252020,
-    roughness:.72,
-    metalness:.08
-  });
-  const accentMat=new THREE.MeshStandardMaterial({
-    color:0x72503d,
-    emissive:0x2f140a,
-    emissiveIntensity:.85,
-    roughness:.62
-  });
-
-  const abdomen=new THREE.Mesh(
-    new THREE.SphereGeometry(.65,10,7),
-    bodyMat
-  );
-  abdomen.scale.set(1.35,.75,1.7);
-  abdomen.position.z=.18;
-
-  const thorax=new THREE.Mesh(
-    new THREE.SphereGeometry(.46,10,7),
-    accentMat
-  );
-  thorax.scale.set(1.25,.72,1.15);
-  thorax.position.z=-.95;
-
-  root.add(abdomen,thorax);
-
-  for(let i=0;i<4;i++){
-    for(const side of [-1,1]){
-      const leg=new THREE.Mesh(
-        new THREE.CylinderGeometry(.07,.045,1.45,6),
-        bodyMat
-      );
-      const z=-.95+i*.48;
-      const x=side*(.52+.10*i);
-      leg.position.set(x,.05,z);
-      leg.rotation.z=side*(.78-.08*i);
-      leg.rotation.x=side*(.28-.04*i);
-      root.add(leg);
-    }
-  }
-
-  const eyeMat=new THREE.MeshStandardMaterial({
-    color:0xffb36a,
-    emissive:0xff5a18,
-    emissiveIntensity:4.5,
-    roughness:.24
-  });
-  for(let i=0;i<2;i++){
-    const eye=new THREE.Mesh(
-      new THREE.SphereGeometry(.07,8,6),
-      eyeMat
-    );
-    eye.position.set(i===0?-.16:.16,.02,-1.38);
-    eye.scale.z=.65;
-    root.add(eye);
-  }
-
-  root.traverse(obj=>{
-    if(obj.isMesh){
-      obj.frustumCulled=false;
-    }
-  });
-
-  return root;
-}
-
 function fitSpiderModel(model){
-  model.traverse((obj)=>{
+  model.traverse(obj=>{
     if(!obj.isMesh) return;
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
     obj.receiveShadow=true;
+
+    if(Array.isArray(obj.material)){
+      obj.material=obj.material.map(material=>material||new THREE.MeshStandardMaterial({
+        color:0x38251f,
+        roughness:.8,
+        metalness:.04
+      }));
+    }else if(!obj.material){
+      obj.material=new THREE.MeshStandardMaterial({
+        color:0x38251f,
+        roughness:.8,
+        metalness:.04
+      });
+    }
+
+    const materials=Array.isArray(obj.material)?obj.material:[obj.material];
+    for(const material of materials){
+      material.visible=true;
+      material.transparent=false;
+      material.opacity=1;
+      material.depthTest=true;
+      material.depthWrite=true;
+      material.side=THREE.DoubleSide;
+      material.needsUpdate=true;
+    }
   });
 
-  const box=new THREE.Box3().setFromObject(model);
-  const size=box.getSize(new THREE.Vector3());
-  const center=box.getCenter(new THREE.Vector3());
-  const horizontalSpan=Math.max(size.x,size.z);
-  const scale=SPIDER_TARGET_SPAN/Math.max(horizontalSpan,size.y*.9,.001);
+  model.updateMatrixWorld(true);
+  const rawBox=new THREE.Box3().setFromObject(model);
+  const rawSize=rawBox.getSize(new THREE.Vector3());
+  const maxDimension=Math.max(rawSize.x,rawSize.y,rawSize.z);
 
-  model.position.set(
-    -center.x*scale,
-    -box.min.y*scale,
-    -center.z*scale
-  );
-  model.scale.setScalar(scale);
+  if(!Number.isFinite(maxDimension) || maxDimension<.0001){
+    throw new Error("Spider model has invalid or empty bounds.");
+  }
+
+  model.scale.setScalar(SPIDER_TARGET_SPAN/maxDimension);
+  model.updateMatrixWorld(true);
+
+  const fittedBox=new THREE.Box3().setFromObject(model);
+  const center=fittedBox.getCenter(new THREE.Vector3());
+
+  model.position.x-=center.x;
+  model.position.z-=center.z;
+  model.position.y+=SPIDER_GROUND_OFFSET-fittedBox.min.y;
+  model.updateMatrixWorld(true);
 }
-
 function setSpiderAnimation(name){
   spiderWantedState=name;
   const actualName=SPIDER_ANIMATION_ALIAS[name] || name;
@@ -2177,7 +2137,7 @@ function setSpiderAnimation(name){
 function groundSpiderEntity(){
   if(!spiderEntity.visible) return;
 
-  const activeModel=spiderFallbackVisual || spiderModel;
+  const activeModel=spiderModel;
   if(!activeModel) return;
 
   activeModel.updateMatrixWorld(true);
@@ -2378,11 +2338,6 @@ async function loadSpiderFromPack(){
 
     const zip=await JSZip.loadAsync(await response.arrayBuffer());
     const names=Object.keys(zip.files);
-    const fbxName=
-      names.find(name=>/\.fbx$/i.test(name)&&/spider/i.test(name)) ||
-      names.find(name=>/\.fbx$/i.test(name));
-
-    if(!fbxName) throw new Error("Spider ZIP has no FBX.");
 
     const textureUrls=new Map();
     for(const name of names){
@@ -2393,61 +2348,90 @@ async function loadSpiderFromPack(){
     }
 
     const manager=new THREE.LoadingManager();
-    manager.setURLModifier((url)=>{
+    manager.setURLModifier(url=>{
       const base=decodeURIComponent(url)
         .replaceAll("\\","/")
         .split("/")
         .pop()
         .toLowerCase();
-      return textureUrls.get(base) || url;
+      return textureUrls.get(base)||url;
     });
 
-    const loader=new FBXLoader(manager);
-    const buffer=await zip.file(fbxName).async("arraybuffer");
-    const model=loader.parse(buffer,"");
-    model.name="SpiderVisual";
-    model.visible=true;
+    let model=null;
+    let modelSource="";
+    const fbxNames=names
+      .filter(name=>/\.fbx$/i.test(name))
+      .sort((a,b)=>Number(/spider/i.test(b))-Number(/spider/i.test(a)));
 
-    model.traverse(obj=>{
-      if(!obj.isMesh) return;
-      obj.visible=true;
-      obj.frustumCulled=false;
-      const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
-      for(const material of materials){
-        if(!material) continue;
-        material.visible=true;
-        material.transparent=false;
-        material.opacity=1;
-        material.depthTest=true;
-        material.depthWrite=true;
-        material.side=THREE.DoubleSide;
-        material.needsUpdate=true;
+    for(const fbxName of fbxNames){
+      try{
+        const buffer=await zip.file(fbxName).async("arraybuffer");
+        const candidate=new FBXLoader(manager).parse(buffer,"");
+        candidate.name="SpiderVisualFBX";
+
+        let meshCount=0;
+        candidate.traverse(obj=>{ if(obj.isMesh) meshCount++; });
+        if(meshCount===0) continue;
+
+        candidate.updateMatrixWorld(true);
+        const box=new THREE.Box3().setFromObject(candidate);
+        const size=box.getSize(new THREE.Vector3());
+        const maxDimension=Math.max(size.x,size.y,size.z);
+        if(!Number.isFinite(maxDimension)||maxDimension<.0001) continue;
+
+        model=candidate;
+        modelSource="FBX";
+        break;
+      }catch(error){
+        console.warn("[DeepSeeker] FBX candidate failed:",fbxName,error);
       }
-    });
+    }
+
+    if(!model){
+      const objName=
+        names.find(name=>/\.obj$/i.test(name)&&/spider/i.test(name)) ||
+        names.find(name=>/\.obj$/i.test(name));
+      if(!objName) throw new Error("Spider ZIP has no usable FBX or OBJ.");
+
+      const objText=await zip.file(objName).async("text");
+      const objLoader=new OBJLoader(manager);
+
+      const objBase=objName.split("/").pop().replace(/\.obj$/i,"").toLowerCase();
+      const mtlName=
+        names.find(name=>
+          /\.mtl$/i.test(name) &&
+          name.split("/").pop().replace(/\.mtl$/i,"").toLowerCase()===objBase
+        ) ||
+        names.find(name=>/\.mtl$/i.test(name));
+
+      if(mtlName){
+        try{
+          const mtlText=await zip.file(mtlName).async("text");
+          const mtlLoader=new MTLLoader(manager);
+          const materials=mtlLoader.parse(mtlText,"");
+          materials.preload();
+          objLoader.setMaterials(materials);
+        }catch(error){
+          console.warn("[DeepSeeker] Spider MTL failed; using OBJ geometry:",error);
+        }
+      }
+
+      model=objLoader.parse(objText);
+      model.name="SpiderVisualOBJ";
+      modelSource="OBJ";
+    }
 
     fitSpiderModel(model);
-
-    let meshCount=0;
-    model.traverse(obj=>{
-      if(obj.isMesh) meshCount++;
-    });
-
-    if(meshCount===0){
-      throw new Error("Spider FBX parsed without renderable meshes.");
-    }
 
     spiderModel=model;
     spiderEntity.add(model);
     spiderLoaded=true;
 
-    if(!spiderFallbackVisual){
-      spiderFallbackVisual=createFallbackSpiderVisual();
-      spiderFallbackVisual.name="SpiderVisualSafety";
-      spiderEntity.add(spiderFallbackVisual);
-    }
-    spiderFallbackVisual.visible=true;
+    spiderMixer=null;
+    spiderActions.clear();
+    spiderAnimationState="";
 
-    const sourceClip=model.animations?.[0] || null;
+    const sourceClip=modelSource==="FBX" ? model.animations?.[0] || null : null;
     if(sourceClip){
       const sourceFPS=329/Math.max(sourceClip.duration,.001);
       spiderMixer=new THREE.AnimationMixer(model);
@@ -2465,63 +2449,34 @@ async function loadSpiderFromPack(){
           name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
           name.startsWith("die") ? 1 : Infinity
         );
-        if(name.startsWith("die")){
-          action.clampWhenFinished=true;
-        }
+        if(name.startsWith("die")) action.clampWhenFinished=true;
         spiderActions.set(name,action);
       }
 
       setSpiderAnimation(spiderWantedState);
-      console.log("[DeepSeeker] spider model loaded with animations:",sourceClip.name||"unnamed");
     }else{
-      spiderMixer=null;
-      spiderAnimationState="";
       spiderWantedState="idle";
-      console.warn("[DeepSeeker] spider model loaded without animation clips; using static visual");
     }
 
-    eventText.textContent="SPIDER READY";
+    console.log("[DeepSeeker] exact Spider-Psionic asset loaded:",modelSource);
+    eventText.textContent=modelSource==="FBX" ? "SPIDER READY" : "SPIDER READY (STATIC)";
     eventText.style.opacity="1";
     setTimeout(()=>{
-      if(eventText.textContent==="SPIDER READY") eventText.style.opacity="0";
+      if(eventText.textContent==="SPIDER READY"||eventText.textContent==="SPIDER READY (STATIC)"){
+        eventText.style.opacity="0";
+      }
     },1800);
   }catch(error){
-    console.error("[DeepSeeker] failed to load Spider-Psionic.zip:",error);
-
-    if(spiderModel){
-      spiderEntity.remove(spiderModel);
-      spiderModel=null;
-    }
-
+    spiderLoaded=false;
+    spiderModel=null;
     spiderMixer=null;
     spiderActions.clear();
     spiderAnimationState="";
-    spiderWantedState="idle";
-
-    if(!spiderFallbackVisual){
-      spiderFallbackVisual=createFallbackSpiderVisual();
-      spiderFallbackVisual.name="SpiderVisualSafety";
-      spiderEntity.add(spiderFallbackVisual);
-    }
-    spiderFallbackVisual.visible=true;
-    spiderModel=spiderFallbackVisual;
-    spiderLoaded=true;
-
-    eventText.textContent="SPIDER VISUAL FALLBACK";
+    console.error("[DeepSeeker] exact Spider-Psionic asset failed to load:",error);
+    eventText.textContent="SPIDER ASSET FAILED TO LOAD";
     eventText.style.opacity="1";
-    setTimeout(()=>{
-      if(eventText.textContent==="SPIDER VISUAL FALLBACK"){
-        eventText.style.opacity="0";
-      }
-    },1600);
   }
 }
-
-spiderFallbackVisual=createFallbackSpiderVisual();
-spiderFallbackVisual.name="SpiderVisualSafety";
-spiderFallbackVisual.visible=true;
-spiderEntity.add(spiderFallbackVisual);
-
 loadSpiderFromPack();
 player.onStep=({intensity})=>audio.step(intensity);
 
