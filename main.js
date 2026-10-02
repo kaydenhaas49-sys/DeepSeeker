@@ -602,6 +602,19 @@ function buildHouseCollisionProxies(root){
     const box=new THREE.Box3().setFromObject(obj);
     if(!Number.isFinite(box.min.x) || !Number.isFinite(box.min.z)) return;
 
+    // Never let a proxy that already contains the intended spawn point
+    // trap the player before they get a chance to move. These are usually
+    // oversized AABBs from angled/compound meshes, not a real wall crossing
+    // the middle of the living room.
+    const spawnPad=.65;
+    const overlapsSpawn =
+      houseSpawn.x >= box.min.x-spawnPad &&
+      houseSpawn.x <= box.max.x+spawnPad &&
+      houseSpawn.z >= box.min.z-spawnPad &&
+      houseSpawn.z <= box.max.z+spawnPad;
+
+    if(overlapsSpawn) return;
+
     houseCollisionBoxes.push({
       minX:box.min.x,
       maxX:box.max.x,
@@ -675,7 +688,17 @@ function updateHouseDoorCollisions(){
     door.collisionBox.minZ=box.min.z-pad;
     door.collisionBox.maxZ=box.max.z+pad;
 
-    boxes.push(door.collisionBox);
+    // Same spawn protection for door pivots. A door accidentally discovered
+    // at the center should not make the initial player position immovable.
+    const doorOverlapsSpawn =
+      houseSpawn.x >= door.collisionBox.minX-.65 &&
+      houseSpawn.x <= door.collisionBox.maxX+.65 &&
+      houseSpawn.z >= door.collisionBox.minZ-.65 &&
+      houseSpawn.z <= door.collisionBox.maxZ+.65;
+
+    if(!doorOverlapsSpawn){
+      boxes.push(door.collisionBox);
+    }
   }
 
   player.extraCollisionBoxes=boxes;
