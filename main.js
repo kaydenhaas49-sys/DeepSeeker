@@ -446,6 +446,9 @@ const multiplayer=new Multiplayer({
 
 const houseDoors=[];
 const houseDoorPattern=/door|doors|porte|puerta|pintu/i;
+// Geometry inspection found this unnamed standalone door panel in the active GLB.
+// Keep the exact mesh removed while leaving the rest of the architecture intact.
+const houseStaticRemovedDoorNames=new Set(["FrontSide_55"]);
 const houseOctree=new Octree();
 
 const houseRoot=new THREE.Group();
@@ -554,21 +557,25 @@ function attachHouseDoor(obj,index){
 
 function setupHouseDoors(root){
   houseDoors.length=0;
+  const removed=[];
 
   root.traverse((obj)=>{
     if(obj===root || !obj.isMesh) return;
-    if(obj.name && houseDoorPattern.test(obj.name)){
-      attachHouseDoor(obj,houseDoors.length);
+
+    const explicitDoor = obj.name && houseDoorPattern.test(obj.name);
+    const inspectedStaticDoor = obj.name && houseStaticRemovedDoorNames.has(obj.name);
+
+    if(explicitDoor || inspectedStaticDoor){
+      obj.userData.houseRemovedDoor=true;
+      obj.userData.houseCollisionDoor=true;
+      obj.visible=false;
+      removed.push(obj.name);
     }
   });
 
   console.log(
-    "[DeepSeeker] explicitly named doors found:",
-    houseDoors.map((d,i)=>({
-      index:i,
-      name:d.pivot.name,
-      functional:d.functional
-    }))
+    "[DeepSeeker] removed house doors:",
+    removed
   );
 }
 
@@ -599,7 +606,7 @@ function buildHouseCollisionProxies(root){
 
   root.traverse((obj)=>{
     if(!obj.isMesh || !obj.geometry) return;
-    if(obj.userData.houseCollisionDoor) return;
+    if(obj.userData.houseCollisionDoor || obj.userData.houseRemovedDoor) return;
 
     const box=new THREE.Box3().setFromObject(obj);
     const size=box.getSize(new THREE.Vector3());
@@ -641,7 +648,7 @@ function buildHouseCollisionOctree(root){
 
   root.traverse((obj)=>{
     if(!obj.isMesh || !obj.geometry) return;
-    if(obj.userData.houseCollisionDoor) return;
+    if(obj.userData.houseCollisionDoor || obj.userData.houseRemovedDoor) return;
 
     const collisionMesh=new THREE.Mesh(obj.geometry);
     collisionMesh.matrixAutoUpdate=false;
@@ -668,7 +675,7 @@ function prepareHouseRenderCulling(root){
   root.traverse((obj)=>{
     if(!obj.isMesh) return;
     houseRenderMeshes.push(obj);
-    obj.visible=true;
+    obj.visible=!obj.userData.houseRemovedDoor;
   });
 }
 
