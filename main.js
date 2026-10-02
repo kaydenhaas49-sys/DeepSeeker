@@ -2058,6 +2058,79 @@ const SPIDER_ANIMATION_ALIAS={
   death:"die1"
 };
 
+
+function createFallbackSpiderVisual(){
+  const root=new THREE.Group();
+  root.name="SpiderVisualFallback";
+
+  const bodyMat=new THREE.MeshStandardMaterial({
+    color:0x151515,
+    roughness:.82,
+    metalness:.05
+  });
+  const accentMat=new THREE.MeshStandardMaterial({
+    color:0x5f4d35,
+    emissive:0x171108,
+    emissiveIntensity:.45,
+    roughness:.7
+  });
+
+  const abdomen=new THREE.Mesh(
+    new THREE.SphereGeometry(.65,10,7),
+    bodyMat
+  );
+  abdomen.scale.set(1.35,.75,1.7);
+  abdomen.position.z=.18;
+
+  const thorax=new THREE.Mesh(
+    new THREE.SphereGeometry(.46,10,7),
+    accentMat
+  );
+  thorax.scale.set(1.25,.72,1.15);
+  thorax.position.z=-.95;
+
+  root.add(abdomen,thorax);
+
+  for(let i=0;i<4;i++){
+    for(const side of [-1,1]){
+      const leg=new THREE.Mesh(
+        new THREE.CylinderGeometry(.07,.045,1.45,6),
+        bodyMat
+      );
+      const z=-.95+i*.48;
+      const x=side*(.52+.10*i);
+      leg.position.set(x,.05,z);
+      leg.rotation.z=side*(.78-.08*i);
+      leg.rotation.x=side*(.28-.04*i);
+      root.add(leg);
+    }
+  }
+
+  const eyeMat=new THREE.MeshStandardMaterial({
+    color:0x8f7a4b,
+    emissive:0x6e4b16,
+    emissiveIntensity:2.5,
+    roughness:.3
+  });
+  for(let i=0;i<2;i++){
+    const eye=new THREE.Mesh(
+      new THREE.SphereGeometry(.07,8,6),
+      eyeMat
+    );
+    eye.position.set(i===0?-.16:.16,.02,-1.38);
+    eye.scale.z=.65;
+    root.add(eye);
+  }
+
+  root.traverse(obj=>{
+    if(obj.isMesh){
+      obj.frustumCulled=false;
+    }
+  });
+
+  return root;
+}
+
 function fitSpiderModel(model){
   model.traverse((obj)=>{
     if(!obj.isMesh) return;
@@ -2353,35 +2426,51 @@ async function loadSpiderFromPack(){
 
     fitSpiderModel(model);
 
-    const sourceClip=model.animations?.[0];
-    if(!sourceClip) throw new Error("Spider FBX has no animation clip.");
+    let meshCount=0;
+    model.traverse(obj=>{
+      if(obj.isMesh) meshCount++;
+    });
 
-    const sourceFPS=329/Math.max(sourceClip.duration,.001);
-    spiderMixer=new THREE.AnimationMixer(model);
-
-    for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
-      const clip=THREE.AnimationUtils.subclip(
-        sourceClip,
-        "spider_"+name,
-        startFrame,
-        endFrame+1,
-        sourceFPS
-      );
-      const action=spiderMixer.clipAction(clip);
-      action.setLoop(
-        name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
-        name.startsWith("die") ? 1 : Infinity
-      );
-      if(name.startsWith("die")){
-        action.clampWhenFinished=true;
-      }
-      spiderActions.set(name,action);
+    if(meshCount===0){
+      throw new Error("Spider FBX parsed without renderable meshes.");
     }
 
     spiderModel=model;
     spiderEntity.add(model);
     spiderLoaded=true;
-    setSpiderAnimation(spiderWantedState);
+
+    const sourceClip=model.animations?.[0] || null;
+    if(sourceClip){
+      const sourceFPS=329/Math.max(sourceClip.duration,.001);
+      spiderMixer=new THREE.AnimationMixer(model);
+
+      for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
+        const clip=THREE.AnimationUtils.subclip(
+          sourceClip,
+          "spider_"+name,
+          startFrame,
+          endFrame+1,
+          sourceFPS
+        );
+        const action=spiderMixer.clipAction(clip);
+        action.setLoop(
+          name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
+          name.startsWith("die") ? 1 : Infinity
+        );
+        if(name.startsWith("die")){
+          action.clampWhenFinished=true;
+        }
+        spiderActions.set(name,action);
+      }
+
+      setSpiderAnimation(spiderWantedState);
+      console.log("[DeepSeeker] spider model loaded with animations:",sourceClip.name||"unnamed");
+    }else{
+      spiderMixer=null;
+      spiderAnimationState="";
+      spiderWantedState="idle";
+      console.warn("[DeepSeeker] spider model loaded without animation clips; using static visual");
+    }
 
     eventText.textContent="SPIDER READY";
     eventText.style.opacity="1";
@@ -2390,9 +2479,29 @@ async function loadSpiderFromPack(){
     },1800);
   }catch(error){
     console.error("[DeepSeeker] failed to load Spider-Psionic.zip:",error);
-    spiderLoaded=false;
-    eventText.textContent="SPIDER FAILED TO LOAD";
+
+    if(spiderModel){
+      spiderEntity.remove(spiderModel);
+      spiderModel=null;
+    }
+
+    spiderMixer=null;
+    spiderActions.clear();
+    spiderAnimationState="";
+    spiderWantedState="idle";
+
+    const fallback=createFallbackSpiderVisual();
+    spiderModel=fallback;
+    spiderEntity.add(fallback);
+    spiderLoaded=true;
+
+    eventText.textContent="SPIDER VISUAL FALLBACK";
     eventText.style.opacity="1";
+    setTimeout(()=>{
+      if(eventText.textContent==="SPIDER VISUAL FALLBACK"){
+        eventText.style.opacity="0";
+      }
+    },1600);
   }
 }
 
