@@ -42,7 +42,10 @@ const eventText=document.getElementById("event");
 const objective=document.getElementById("objective");
 const vignette=document.getElementById("vignette");
 const phone=document.getElementById("phone");
+const phoneAppName=document.getElementById("phoneAppName");
 const phoneDepth=document.getElementById("phoneDepth");
+const phoneDepthLabel=document.getElementById("phoneDepthLabel");
+const phoneCardTitle=document.getElementById("phoneCardTitle");
 const phoneCardText=document.getElementById("phoneCardText");
 const phoneStory=document.getElementById("phoneStory");
 const deepseekerIcon=document.getElementById("deepseekerIcon");
@@ -132,6 +135,7 @@ let houseCullTimer=0;
 let houseDoorCollisionDirty=true;
 let houseCollisionTimer=0;
 let gameStarted=false;
+let houseIntroMessageShown=false;
 let lastAutoSave=0;
 let pendingSaveLoad=null;
 
@@ -1276,9 +1280,10 @@ function setHouseMode(enabled){
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    objective.textContent="Explore the house. Find the hidden return teleporter.";
+    objective.textContent="Find the hidden coffee cup. Press E to interact with it.";
     eventText.textContent="HOUSE LEVEL";
     eventText.style.opacity="1";
+    showHouseIntroPhoneMessage();
     setTimeout(()=>{eventText.style.opacity="0";},1400);
   }else{
     renderer.setPixelRatio(currentPixelRatio);
@@ -1603,6 +1608,40 @@ function toggleFlashlight(){
   flashlightOn=!flashlightOn;
   player.setFlashlightVisual(flashlightOn);
 }
+function refreshPhoneContent(){
+  phoneAppName.textContent="DEEPSEEKER";
+  phoneDepth.textContent=String(STORY[storyStage].depth);
+  phoneDepthLabel.textContent="DEPTH";
+  phoneCardTitle.textContent="CURRENT OBJECTIVE";
+  phoneCardText.textContent=STORY[storyStage].objective;
+  renderStoryLog();
+}
+
+function showHouseIntroPhoneMessage(){
+  if(houseIntroMessageShown) return;
+  houseIntroMessageShown=true;
+
+  phoneOpen=true;
+  deepseekerAppOpen=true;
+  phone.classList.add("open","app-open");
+  phone.setAttribute("aria-hidden","false");
+  crosshair.style.display="none";
+
+  phoneAppName.textContent="MESSAGE FROM M";
+  phoneDepth.textContent="!";
+  phoneDepthLabel.textContent="NEW MESSAGE";
+  phoneCardTitle.textContent="LOOK FOR THE COFFEE CUP";
+  phoneCardText.textContent="It's hidden somewhere in the living room. When you find it, press E to interact with it.";
+
+  renderStoryLog();
+  phoneStory.insertAdjacentHTML("afterbegin",`
+    <div class="storyEntry">
+      <div class="storyMeta">M · HOUSE MESSAGE</div>
+      <div class="storyText">Look for the coffee cup. It's hidden in the living room. When you find it, press E to interact with it.</div>
+    </div>
+  `);
+}
+
 function togglePhone(){
   phoneOpen=!phoneOpen;
   deepseekerAppOpen=false;
@@ -1613,9 +1652,7 @@ function togglePhone(){
   if(phoneOpen){
     if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
     crosshair.style.display="none";
-    phoneDepth.textContent=String(STORY[storyStage].depth);
-    phoneCardText.textContent=STORY[storyStage].objective;
-    renderStoryLog();
+    refreshPhoneContent();
   }else if(!controlsOpen){
     player.lock();
   }
