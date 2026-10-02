@@ -404,16 +404,19 @@ export class Multiplayer {
       }
 
       if(remote.remoteLight && remote.flashlight){
-        remote.flashlight.getWorldPosition(remote.remoteLight.origin);
-        updateRemoteFlashlight(
-          remote.remoteLight,
-          remote.remoteLight.origin,
-          remote.current.yaw,
-          remote.current.pitch,
-          remote.current.flashlight && sameLevel && nearby
-        );
-        if(remote.remoteLight.light.visible){
+        const remoteLightActive=remote.current.flashlight && sameLevel && nearby;
+        if(remoteLightActive){
+          remote.flashlight.getWorldPosition(remote.remoteLight.origin);
+          updateRemoteFlashlight(
+            remote.remoteLight,
+            remote.remoteLight.origin,
+            remote.current.yaw,
+            remote.current.pitch,
+            true
+          );
           remote.remoteLight.light.intensity = 27 * flashlightFlicker(this.elapsedTime);
+        }else{
+          remote.remoteLight.light.visible=false;
         }
       }
 
