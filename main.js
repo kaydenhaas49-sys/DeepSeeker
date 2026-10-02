@@ -6,6 +6,8 @@ import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import JSZip from "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm";
 import { flashlightFlicker } from "./character.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
@@ -1289,8 +1291,9 @@ fallbackFigure.visible=false;
 figure.add(fallbackFigure);
 
 let bacteriaLoaded=false;
-const bacteriaModels=new Map();
-const bacteriaMixers=new Map();
+let bacteriaModel=null;
+let bacteriaMixer=null;
+const bacteriaActions=new Map();
 let bacteriaState="";
 let bacteriaWantedState="idle";
 let generatedBacteriaFailures=0;
@@ -1305,7 +1308,35 @@ const ENTITY_MAX_CHASE_TIME=8.0;
 const ENTITY_ATTACK_RANGE=1.45;
 const ENTITY_CHASE_SPEED=5.8;
 const ENTITY_RADIUS=.55;
-const ENTITY_GROUND_OFFSET=.12;
+const ENTITY_GROUND_OFFSET=.08;
+const ENTITY_TARGET_SPAN=3.0;
+
+const SPIDER_ANIMATION_RANGES={
+  idle1:[164,213],
+  idle2:[214,249],
+  walk:[0,45],
+  attack1:[46,65],
+  attack2:[66,85],
+  eat:[86,99],
+  defend:[100,120],
+  hit1:[121,134],
+  hit2:[135,149],
+  crouch:[150,155],
+  stand:[157,162],
+  jump:[250,269],
+  sidestep:[270,279],
+  die1:[280,299],
+  die2:[300,329]
+};
+
+const SPIDER_ANIMATION_ALIAS={
+  idle:"idle1",
+  stalk:"idle2",
+  chase:"walk",
+  attack:"attack1",
+  hit:"hit1",
+  death:"die1"
+};
 
 function fitBacteriaModel(model){
   model.traverse((obj)=>{
@@ -1318,43 +1349,30 @@ function fitBacteriaModel(model){
   const box=new THREE.Box3().setFromObject(model);
   const size=box.getSize(new THREE.Vector3());
   const center=box.getCenter(new THREE.Vector3());
-  const targetHeight=6.2;
-  const scale=targetHeight/Math.max(size.y,0.001);
+  const horizontalSpan=Math.max(size.x,size.z);
+  const scale=ENTITY_TARGET_SPAN/Math.max(horizontalSpan,size.y*.9,.001);
 
   model.position.set(
     -center.x*scale,
     -box.min.y*scale,
     -center.z*scale
   );
-  model.scale.set(scale*1.65,scale,scale*1.65);
+  model.scale.setScalar(scale);
 }
 
 function setBacteriaAnimation(name){
   bacteriaWantedState=name;
+  const actualName=SPIDER_ANIMATION_ALIAS[name] || name;
+  const action=bacteriaActions.get(actualName);
+  if(!action || bacteriaState===actualName) return;
 
-  const actualName=bacteriaModels.has(name)
-    ? name
-    : bacteriaModels.has("idle")
-      ? "idle"
-      : bacteriaModels.keys().next().value;
-
-  if(!actualName || bacteriaState===actualName) return;
-
-  const entry=bacteriaModels.get(actualName);
-  if(!entry) return;
-
-  for(const [key,item] of bacteriaModels){
-    item.model.visible=key===actualName;
-  }
-
-  for(const [key,mixer] of bacteriaMixers){
-    const action=mixer._bacteriaAction;
-    if(!action) continue;
+  for(const [key,item] of bacteriaActions){
     if(key===actualName){
-      action.reset();
-      action.play();
+      item.reset();
+      item.fadeIn(.08);
+      item.play();
     }else{
-      action.stop();
+      item.fadeOut(.08);
     }
   }
 
@@ -1364,24 +1382,13 @@ function setBacteriaAnimation(name){
 function groundBacteriaEntity(){
   if(!figure.visible) return;
 
-  let activeModel=null;
-  for(const [,item] of bacteriaModels){
-    if(item.model.visible){
-      activeModel=item.model;
-      break;
-    }
-  }
-
-  if(!activeModel && fallbackFigure.visible) activeModel=fallbackFigure;
+  const activeModel=bacteriaModel || fallbackFigure;
   if(!activeModel) return;
 
   activeModel.updateMatrixWorld(true);
-
   const box=new THREE.Box3().setFromObject(activeModel);
   if(!Number.isFinite(box.min.y)) return;
 
-  // Animation clips can move the rendered feet relative to the entity root.
-  // Pin the actual visible mesh bottom to a tiny offset above floor level.
   const correction=ENTITY_GROUND_OFFSET-box.min.y;
   if(Math.abs(correction)>.0005){
     figure.position.y+=correction;
@@ -1449,85 +1456,135 @@ function loadStaticFallback(){
       const model=gltf.scene;
       model.name="BacteriaModelFallback";
       fitBacteriaModel(model);
+      bacteriaModel=model;
       figure.add(model);
       bacteriaLoaded=true;
       fallbackFigure.visible=false;
 
-      if(debugSpawnBacteria) spawnBacteriaAtPlayer();
-
-      eventText.textContent="BACTERIA STATIC FALLBACK";
+      eventText.textContent="SPIDER LOAD FALLBACK";
       eventText.style.opacity="1";
-      setTimeout(()=>{eventText.style.opacity="0";},2200);
+      setTimeout(()=>{eventText.style.opacity="0";},1800);
     },
     undefined,
     ()=>{
       fallbackFigure.visible=true;
-      const dx=-Math.sin(player.yaw);
-      const dz=-Math.cos(player.yaw);
-      figure.position.set(player.pos.x+dx*5,ENTITY_GROUND_OFFSET,player.pos.z+dz*5);
-      figure.rotation.y=player.yaw+Math.PI;
+      const spawn=findEntitySpawnPosition();
+      figure.position.set(spawn.x,ENTITY_GROUND_OFFSET,spawn.z);
+      figure.rotation.y=Math.atan2(
+        player.pos.x-spawn.x,
+        player.pos.z-spawn.z
+      );
       figureLife=Infinity;
       figure.visible=true;
-      eventText.textContent="BACTERIA LOAD FAILED";
+      eventText.textContent="SPIDER LOAD FAILED";
       eventText.style.opacity="1";
     }
   );
 }
 
-const bacteriaLoader=new GLTFLoader();
-const bacteriaAnimationPaths={
-  idle:"./assets/bacteria/generated/bacteria_idle.glb",
-  stalk:"./assets/bacteria/generated/bacteria_stalk.glb",
-  chase:"./assets/bacteria/generated/bacteria_chase.glb",
-  attack:"./assets/bacteria/generated/bacteria_attack.glb"
-};
+async function loadSpiderFromPack(){
+  try{
+    const response=await fetch("./assets/Spider-Psionic.zip");
+    if(!response.ok) throw new Error("HTTP "+response.status);
 
-for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
-  bacteriaLoader.load(
-    path,
-    (gltf)=>{
-      const model=gltf.scene;
-      model.name="BacteriaModel_"+name;
-      fitBacteriaModel(model);
-      model.visible=false;
-      figure.add(model);
+    const zip=await JSZip.loadAsync(await response.arrayBuffer());
+    const names=Object.keys(zip.files);
+    const fbxName=
+      names.find(name=>/\.fbx$/i.test(name)&&/spider/i.test(name)) ||
+      names.find(name=>/\.fbx$/i.test(name));
 
-      const mixer=new THREE.AnimationMixer(model);
-      const clip=gltf.animations?.[0];
-      if(clip){
-        const action=mixer.clipAction(clip);
+    if(!fbxName) throw new Error("Spider ZIP has no FBX.");
+
+    const textureUrls=new Map();
+    for(const name of names){
+      if(!/\.(jpg|jpeg|png)$/i.test(name)) continue;
+      const base=name.replaceAll("\\","/").split("/").pop().toLowerCase();
+      const blob=await zip.file(name).async("blob");
+      textureUrls.set(base,URL.createObjectURL(blob));
+    }
+
+    const manager=new THREE.LoadingManager();
+    manager.setURLModifier((url)=>{
+      const base=decodeURIComponent(url)
+        .replaceAll("\\","/")
+        .split("/")
+        .pop()
+        .toLowerCase();
+      return textureUrls.get(base) || url;
+    });
+
+    const loader=new FBXLoader(manager);
+    const buffer=await zip.file(fbxName).async("arraybuffer");
+    const model=loader.parse(buffer,"");
+    model.name="SpiderEntity";
+    model.visible=true;
+
+    fitBacteriaModel(model);
+
+    const sourceClip=model.animations?.[0];
+    if(!sourceClip) throw new Error("Spider FBX has no animation clip.");
+
+    // The pack's documented 329-frame range lets us derive its actual source
+    // FPS from the imported clip instead of assuming a fixed frame rate.
+    const sourceFPS=329/Math.max(sourceClip.duration,.001);
+
+    for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
+      const clip=THREE.AnimationUtils.subclip(
+        sourceClip,
+        "spider_"+name,
+        startFrame,
+        endFrame+1,
+        sourceFPS
+      );
+      const action=bacteriaMixer?.clipAction(clip);
+      if(action){
         action.setLoop(THREE.LoopRepeat,Infinity);
-        mixer._bacteriaAction=action;
-        bacteriaMixers.set(name,mixer);
-      }
-
-      bacteriaModels.set(name,{model,gltf});
-      bacteriaLoaded=true;
-
-      if(name===bacteriaWantedState){
-        setBacteriaAnimation(bacteriaWantedState);
-      }else if(!bacteriaState){
-        setBacteriaAnimation("idle");
-      }
-      if(debugSpawnBacteria && name==="stalk"){
-        spawnBacteriaAtPlayer();
-      }
-
-      if(bacteriaModels.size===Object.keys(bacteriaAnimationPaths).length){
-        eventText.textContent="BACTERIA ANIMATIONS READY";
-        eventText.style.opacity="1";
-        setTimeout(()=>{eventText.style.opacity="0";},2200);
-      }
-    },
-    undefined,
-    ()=>{
-      generatedBacteriaFailures++;
-      if(generatedBacteriaFailures===Object.keys(bacteriaAnimationPaths).length){
-        loadStaticFallback();
+        bacteriaActions.set(name,action);
       }
     }
-  );
+
+    bacteriaModel=model;
+    bacteriaMixer=new THREE.AnimationMixer(model);
+    bacteriaActions.clear();
+
+    // Build the actions again now that the mixer exists.
+    for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
+      const clip=THREE.AnimationUtils.subclip(
+        sourceClip,
+        "spider_"+name,
+        startFrame,
+        endFrame+1,
+        sourceFPS
+      );
+      const action=bacteriaMixer.clipAction(clip);
+      action.setLoop(
+        name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
+        name.startsWith("die") ? 1 : Infinity
+      );
+      if(name.startsWith("die")){
+        action.clampWhenFinished=true;
+      }
+      bacteriaActions.set(name,action);
+    }
+
+    figure.add(model);
+    bacteriaLoaded=true;
+    setBacteriaAnimation(bacteriaWantedState);
+
+    eventText.textContent="SPIDER READY";
+    eventText.style.opacity="1";
+    setTimeout(()=>{
+      if(eventText.textContent==="SPIDER READY") eventText.style.opacity="0";
+    },1800);
+
+    // Keep texture blobs alive for the model's lifetime.
+  }catch(error){
+    console.error("[DeepSeeker] failed to load Spider-Psionic.zip:",error);
+    loadStaticFallback();
+  }
 }
+
+loadSpiderFromPack();
 let figureLife=0;
 player.onStep=({intensity})=>audio.step(intensity);
 
@@ -1991,10 +2048,8 @@ function animate(){
     playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
   }
 
-  if(!houseMode){
-    for(const mixer of bacteriaMixers.values()){
-      mixer.update(dt);
-    }
+  if(!houseMode && bacteriaMixer){
+    bacteriaMixer.update(dt);
   }
 
   groundBacteriaEntity();
