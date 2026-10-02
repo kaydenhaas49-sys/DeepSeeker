@@ -96,7 +96,7 @@ scene.add(ambient);
 const playerLight=new THREE.PointLight(0xb59b68,0,24,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xf0dfad,42,68,Math.PI/5.5,.88,1.5);
+const flashlight=new THREE.SpotLight(0xf0dfad,95,110,Math.PI/4.2,.78,1.1);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
@@ -847,6 +847,7 @@ function resetForNewGame(slot=selectedSaveSlot){
   setSelectedSaveSlot(targetSlot,false);
   pendingHouseStart=false;
   pendingSaveLoad=null;
+  toggleMultiplayerMap(false);
   houseIntroMessageShown=false;
   lastAutoSave=0;
 
@@ -1010,6 +1011,171 @@ const multiplayer=new Multiplayer({
     }
   }
 });
+
+
+let multiplayerMapOpen=false;
+const multiplayerMap=document.createElement("div");
+multiplayerMap.id="multiplayerMap";
+multiplayerMap.innerHTML="<div id='multiplayerMapHeader'><span>MULTIPLAYER MAP</span><span id='multiplayerMapLevel'>BACKROOMS</span></div><canvas id='multiplayerMapCanvas' width='240' height='240'></canvas><div id='multiplayerMapLegend'>N · CLOSE MAP</div>";
+document.body.appendChild(multiplayerMap);
+
+const multiplayerMapCanvas=document.getElementById("multiplayerMapCanvas");
+const multiplayerMapContext=multiplayerMapCanvas.getContext("2d");
+const multiplayerMapLevel=document.getElementById("multiplayerMapLevel");
+
+const multiplayerMapStyle=document.createElement("style");
+multiplayerMapStyle.textContent=`
+#multiplayerMap{position:fixed;top:18px;right:18px;width:min(252px,34vw);min-width:210px;aspect-ratio:1;z-index:8;display:none;padding:9px;box-sizing:border-box;border:1px solid rgba(216,201,138,.28);border-radius:16px;background:rgba(5,7,5,.82);box-shadow:0 18px 55px rgba(0,0,0,.52),inset 0 1px rgba(255,255,255,.04);backdrop-filter:blur(8px);pointer-events:none}
+#multiplayerMap.visible{display:block}
+#multiplayerMapHeader{position:absolute;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;font-size:8px;letter-spacing:1.7px;color:#d5cda8;text-shadow:0 2px 8px #000;z-index:2}
+#multiplayerMapLevel{color:#8e8a72}
+#multiplayerMapCanvas{width:100%;height:100%;display:block;border-radius:11px}
+#multiplayerMapLegend{position:absolute;left:12px;bottom:10px;font-size:7px;letter-spacing:1.4px;color:#8f8a73;text-shadow:0 2px 8px #000}
+@media(max-width:700px){#multiplayerMap{width:210px;min-width:0}}
+`;
+document.head.appendChild(multiplayerMapStyle);
+
+function toggleMultiplayerMap(force=null){
+  if(!gameStarted && force!==true) return;
+  multiplayerMapOpen=force===null ? !multiplayerMapOpen : Boolean(force);
+  multiplayerMap.classList.toggle("visible",multiplayerMapOpen);
+  if(multiplayerMapOpen) updateMultiplayerMap();
+}
+
+function projectMapPoint(x,z,centerX,centerY,scale,yaw){
+  const dx=x-player.pos.x;
+  const dz=z-player.pos.z;
+  const forwardX=-Math.sin(yaw);
+  const forwardZ=-Math.cos(yaw);
+  const rightX=Math.cos(yaw);
+  const rightZ=-Math.sin(yaw);
+  return {
+    x:centerX+(dx*rightX+dz*rightZ)*scale,
+    y:centerY-(dx*forwardX+dz*forwardZ)*scale
+  };
+}
+
+function updateMultiplayerMap(){
+  if(!multiplayerMapOpen) return;
+
+  const ctx=multiplayerMapContext;
+  const width=multiplayerMapCanvas.width;
+  const height=multiplayerMapCanvas.height;
+  const centerX=width/2;
+  const centerY=height/2;
+  const radius=width*.42;
+  const range=55;
+  const scale=radius/range;
+  const currentLevel=houseMode ? "house" : "backrooms";
+
+  ctx.clearRect(0,0,width,height);
+  ctx.fillStyle="rgba(7,9,7,.94)";
+  ctx.fillRect(0,0,width,height);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centerX,centerY,radius,0,Math.PI*2);
+  ctx.clip();
+
+  ctx.strokeStyle="rgba(216,201,138,.08)";
+  ctx.lineWidth=1;
+  for(let ring=1;ring<=3;ring++){
+    ctx.beginPath();
+    ctx.arc(centerX,centerY,radius*ring/3,0,Math.PI*2);
+    ctx.stroke();
+  }
+
+  if(currentLevel==="backrooms"){
+    const walls=world.getNearbyWallBounds(player.pos.x,player.pos.z,range+6);
+    for(const wall of walls){
+      const corners=[
+        projectMapPoint(wall.minX,wall.minZ,centerX,centerY,scale,player.yaw),
+        projectMapPoint(wall.maxX,wall.minZ,centerX,centerY,scale,player.yaw),
+        projectMapPoint(wall.maxX,wall.maxZ,centerX,centerY,scale,player.yaw),
+        projectMapPoint(wall.minX,wall.maxZ,centerX,centerY,scale,player.yaw)
+      ];
+
+      ctx.strokeStyle="rgba(196,188,151,.34)";
+      ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(corners[0].x,corners[0].y);
+      for(let i=1;i<corners.length;i++) ctx.lineTo(corners[i].x,corners[i].y);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+
+  for(const remote of multiplayer.players.values()){
+    const state=remote.current || remote.target;
+    if(!state || state.level!==currentLevel) continue;
+
+    const raw=projectMapPoint(state.x,state.z,centerX,centerY,scale,player.yaw);
+    const dx=raw.x-centerX;
+    const dy=raw.y-centerY;
+    const distance=Math.hypot(dx,dy);
+    const maxRadius=radius-10;
+    const clamped=Math.min(distance,maxRadius);
+    const ratio=distance>0 ? clamped/distance : 0;
+    const pointX=centerX+dx*ratio;
+    const pointY=centerY+dy*ratio;
+    const onEdge=distance>maxRadius;
+
+    ctx.save();
+    ctx.translate(pointX,pointY);
+
+    if(onEdge){
+      ctx.rotate(Math.atan2(dy,dx)+Math.PI/2);
+      ctx.fillStyle="#d8c98a";
+      ctx.beginPath();
+      ctx.moveTo(0,-8);
+      ctx.lineTo(6,7);
+      ctx.lineTo(-6,7);
+      ctx.closePath();
+      ctx.fill();
+    }else{
+      ctx.fillStyle="#d8c98a";
+      ctx.beginPath();
+      ctx.arc(0,0,5,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle="#17170f";
+      ctx.beginPath();
+      ctx.arc(0,0,2,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.font="600 10px system-ui, sans-serif";
+      ctx.textAlign="center";
+      ctx.textBaseline="top";
+      ctx.fillStyle="rgba(238,231,198,.92)";
+      ctx.fillText(String(remote.name||"PLAYER").slice(0,14),0,8);
+    }
+
+    ctx.restore();
+  }
+
+  ctx.fillStyle="#eee4b8";
+  ctx.beginPath();
+  ctx.arc(centerX,centerY,7,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.strokeStyle="#17170f";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(centerX,centerY);
+  ctx.lineTo(centerX,centerY-10);
+  ctx.stroke();
+
+  ctx.restore();
+
+  ctx.strokeStyle="rgba(216,201,138,.34)";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(centerX,centerY,radius,0,Math.PI*2);
+  ctx.stroke();
+
+  multiplayerMapLevel.textContent=currentLevel==="house" ? "APARTMENT" : "BACKROOMS";
+  if(!multiplayer.playerId) multiplayerMapLevel.textContent="CONNECTING";
+}
 
 function refreshUsernameInputs(){
   const name=multiplayer.getPlayerName();
@@ -1838,6 +2004,9 @@ player.hands.visible=true;
 const spiderEntity=new THREE.Group();
 spiderEntity.name="SpiderEntity";
 spiderEntity.visible=false;
+const spiderRevealLight=new THREE.PointLight(0xf0d49a,0,12,2);
+spiderRevealLight.position.set(0,1.2,0);
+spiderEntity.add(spiderRevealLight);
 scene.add(spiderEntity);
 
 let spiderLoaded=false;
@@ -1855,9 +2024,9 @@ let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
 let spiderJumpscareScale=1;
 
-const SPIDER_STALK_TIME=1.4;
-const SPIDER_ATTACK_RANGE=1.45;
-const SPIDER_SPEED=1.15;
+const SPIDER_STALK_TIME=2.0;
+const SPIDER_ATTACK_RANGE=1.65;
+const SPIDER_SPEED=.72;
 const SPIDER_RADIUS=.55;
 const SPIDER_GROUND_OFFSET=.08;
 const SPIDER_TARGET_SPAN=4.2;
@@ -1892,6 +2061,7 @@ const SPIDER_ANIMATION_ALIAS={
 function fitSpiderModel(model){
   model.traverse((obj)=>{
     if(!obj.isMesh) return;
+    obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
     obj.receiveShadow=true;
@@ -1965,8 +2135,8 @@ function findSpiderSpawnPosition(){
   const rightZ=-Math.sin(player.yaw);
 
   const candidates=[
-    [12,0],[15,0],[10,3],[10,-3],
-    [13,4],[13,-4],[17,2],[17,-2]
+    [9,0],[12,0],[10,3],[10,-3],
+    [13,4],[13,-4],[16,2],[16,-2]
   ];
 
   for(const [distance,side] of candidates){
@@ -2163,6 +2333,23 @@ async function loadSpiderFromPack(){
     const model=loader.parse(buffer,"");
     model.name="SpiderVisual";
     model.visible=true;
+
+    model.traverse(obj=>{
+      if(!obj.isMesh) return;
+      obj.visible=true;
+      obj.frustumCulled=false;
+      const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
+      for(const material of materials){
+        if(!material) continue;
+        material.visible=true;
+        material.transparent=false;
+        material.opacity=1;
+        material.depthTest=true;
+        material.depthWrite=true;
+        material.side=THREE.DoubleSide;
+        material.needsUpdate=true;
+      }
+    });
 
     fitSpiderModel(model);
 
@@ -2564,6 +2751,7 @@ document.addEventListener("pointerlockchange",()=>{
     if(locked){
       overlay.classList.add("hidden");
     }else if(gameStarted){
+      if(multiplayerMapOpen) toggleMultiplayerMap(false);
       loadingScreen.style.display="flex";
       homeScreen.classList.add("hidden");
       lobbyScreen.classList.add("hidden");
@@ -2595,7 +2783,12 @@ document.addEventListener("keydown",e=>{
     }
   }else if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
-  else if(e.code==="KeyP" && !e.repeat){
+  }else if(e.code==="KeyN" && !e.repeat){
+    if(gameStarted && !phoneOpen && !controlsOpen){
+      e.preventDefault();
+      toggleMultiplayerMap();
+    }
+    else if(e.code==="KeyP" && !e.repeat){
     if(controlsOpen) hideControls();
     else togglePhone();
   }else if(e.code==="Tab"){
@@ -2728,6 +2921,7 @@ function animate(){
   }
 
   multiplayer.update(dt);
+  if(multiplayerMapOpen) updateMultiplayerMap();
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
     if(!houseMode) updateStoryProgress();
@@ -2755,7 +2949,7 @@ function animate(){
   }
 
   const flicker=flashlightFlicker(t);
-  flashlight.intensity=flashlightOn ? 39.0*flicker : 0;
+  flashlight.intensity=flashlightOn ? 88.0*flicker : 0;
   if(!houseMode){
     playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
   }
@@ -2767,6 +2961,10 @@ function animate(){
   if(spiderJumpscareTimer<=0){
     groundSpiderEntity();
   }
+
+  spiderRevealLight.intensity=(!houseMode && spiderActive)
+    ? (spiderJumpscareTimer>0 ? 3.8 : 2.1)
+    : 0;
 
   if(spiderActive && !houseMode){
     if(spiderJumpscareTimer>0){
