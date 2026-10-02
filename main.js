@@ -6,7 +6,6 @@ import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
-import { Octree } from "three/addons/math/Octree.js";
 import { flashlightFlicker } from "./character.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
@@ -68,8 +67,10 @@ const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-per
 renderer.setSize(innerWidth,innerHeight);
 
 const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,1.25);
-const HOUSE_PIXEL_RATIO=0.85;
+const HOUSE_PIXEL_RATIO=0.70;
+const MIN_HOUSE_PIXEL_RATIO=0.52;
 let currentPixelRatio=BASE_PIXEL_RATIO;
+let housePixelRatio=HOUSE_PIXEL_RATIO;
 let perfElapsed=0;
 let perfFrames=0;
 let perfCooldown=0;
@@ -124,16 +125,11 @@ let houseCollisionReady=false;
 let houseCollisionBuildStarted=false;
 let houseUnloadTimer=0;
 const houseCollisionBoxes=[];
-const houseRenderMeshes=[];
-const houseCollisionRoot=new THREE.Group();
-houseCollisionRoot.name="HouseCollisionGeometry";
-const houseMeshes=[];
 
 
 const houseFloorRaycaster=new THREE.Raycaster();
 let houseCullTimer=0;
 let houseDoorCollisionDirty=true;
-let houseCollisionTimer=0;
 let gameStarted=false;
 let houseIntroMessageShown=false;
 let lastAutoSave=0;
@@ -305,17 +301,7 @@ function disposeHouseResources(){
   });
 
   houseModel=null;
-  houseMeshes.length=0;
-  houseRenderMeshes.length=0;
   houseCollisionBoxes.length=0;
-
-  if(typeof houseOctree.clear==="function"){
-    houseOctree.clear();
-  }else{
-    houseOctree.triangles=[];
-  }
-
-  houseCollisionRoot.clear();
   houseReturnPortal.visible=false;
   houseReturnPortal.userData.active=false;
 
@@ -324,7 +310,6 @@ function disposeHouseResources(){
   houseCollisionBuildStarted=false;
   houseLoadStarted=false;
   houseDoorCollisionDirty=true;
-  houseCollisionTimer=0;
 
   updateHouseLoadingUI(0,"HOUSE UNLOADED — WILL RELOAD WHEN NEEDED.");
   console.log("[DeepSeeker] house fully unloaded from memory");
@@ -523,7 +508,6 @@ const houseDoorPattern=/door|doors|porte|puerta|pintu/i;
 // Geometry inspection found this unnamed standalone door panel in the active GLB.
 // Keep the exact mesh removed while leaving the rest of the architecture intact.
 const houseStaticRemovedDoorNames=new Set(["FrontSide_55"]);
-const houseOctree=new Octree();
 
 const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
@@ -725,48 +709,24 @@ function buildHouseCollisionProxies(root){
 }
 
 
-function buildHouseCollisionOctree(root){
-  // Use the actual GLB triangles for collision instead of guessing which
-  // meshes are walls from their bounding-box dimensions. Door meshes are
-  // excluded here because their moving collision is handled separately.
-  houseCollisionRoot.clear();
-  root.updateMatrixWorld(true);
-
+function freezeStaticHouseTransforms(root){
   root.traverse((obj)=>{
-    if(!obj.isMesh || !obj.geometry) return;
-    if(obj.userData.houseCollisionDoor || obj.userData.houseRemovedDoor) return;
-
-    const collisionMesh=new THREE.Mesh(obj.geometry);
-    collisionMesh.matrixAutoUpdate=false;
-    collisionMesh.matrix.copy(obj.matrixWorld);
-    collisionMesh.matrixWorld.copy(obj.matrixWorld);
-    houseCollisionRoot.add(collisionMesh);
+    if(obj===root) return;
+    obj.updateMatrix();
+    obj.matrixAutoUpdate=false;
+    obj.matrixWorldNeedsUpdate=true;
   });
-
-  houseCollisionRoot.updateMatrixWorld(true);
-  houseOctree.fromGraphNode(houseCollisionRoot);
-
-  console.log(
-    "[DeepSeeker] house triangle collision ready:",
-    houseOctree.triangles.length
-  );
+  root.updateMatrixWorld(true);
 }
 
 function prepareHouseRenderCulling(root){
-  houseRenderMeshes.length=0;
-
-  // Do not distance-cull the imported house. Its 126 meshes are already a
-  // manageable draw set, while per-mesh culling caused walls/floors/furniture
-  // to pop out as the player moved through the building.
+  // Three.js still performs normal frustum culling per mesh. The important
+  // optimization here is keeping the imported hierarchy static so its local
+  // transforms do not get recomputed every frame.
   root.traverse((obj)=>{
     if(!obj.isMesh) return;
-    houseRenderMeshes.push(obj);
     obj.visible=!obj.userData.houseRemovedDoor;
   });
-}
-
-function updateHouseRenderCulling(){
-  // Intentionally disabled for the house level. See prepareHouseRenderCulling.
 }
 
 function updateHouseDoorCollisions(){
@@ -1047,8 +1007,8 @@ function ensureHouseCollisionSetup(){
     }
 
     buildHouseCollisionProxies(houseModel);
-    updateHouseLoadingUI(91,"PROCESSING HOUSE — BUILDING COLLISION MESH…");
-    buildHouseCollisionOctree(houseModel);
+    updateHouseLoadingUI(91,"PROCESSING HOUSE — FINALIZING STATIC HOUSE…");
+    freezeStaticHouseTransforms(houseModel);
     chooseSafeHouseSpawn(houseModel);
     chooseHouseReturnPortalPosition(houseModel);
     houseCollisionReady=true;
@@ -1106,11 +1066,9 @@ function loadHouse(){
       houseRoot.add(houseModel);
 
       let meshCount=0;
-      houseMeshes.length=0;
       houseModel.traverse((obj)=>{
         if(!obj.isMesh) return;
         meshCount++;
-        houseMeshes.push(obj);
 
         obj.castShadow=false;
         obj.receiveShadow=false;
