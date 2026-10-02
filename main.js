@@ -615,11 +615,22 @@ function buildHouseCollisionProxies(root){
 
     if(overlapsSpawn) return;
 
+    const geometryCenter=localBox.getCenter(new THREE.Vector3());
+    const worldCenter=geometryCenter.clone().applyMatrix4(obj.matrixWorld);
+    const worldQuaternion=new THREE.Quaternion();
+    obj.getWorldQuaternion(worldQuaternion);
+    const worldEuler=new THREE.Euler().setFromQuaternion(worldQuaternion,"YXZ");
+
     houseCollisionBoxes.push({
       minX:box.min.x,
       maxX:box.max.x,
       minZ:box.min.z,
-      maxZ:box.max.z
+      maxZ:box.max.z,
+      centerX:worldCenter.x,
+      centerZ:worldCenter.z,
+      halfX:size.x*.5,
+      halfZ:size.z*.5,
+      rotationY:worldEuler.y
     });
   });
 
@@ -687,6 +698,7 @@ function updateHouseDoorCollisions(){
     door.collisionBox.maxX=box.max.x+pad;
     door.collisionBox.minZ=box.min.z-pad;
     door.collisionBox.maxZ=box.max.z+pad;
+    door.collisionBox.rotationY=0;
 
     // Same spawn protection for door pivots. A door accidentally discovered
     // at the center should not make the initial player position immovable.
