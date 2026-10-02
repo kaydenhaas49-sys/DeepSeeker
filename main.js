@@ -1079,25 +1079,6 @@ function loadHouse(){
       );
       houseModel.updateMatrixWorld(true);
 
-      // Add a few interior lights based on the normalized house bounds.
-      houseLights.clear();
-      houseLights.add(houseAmbient);
-      houseLights.add(houseFill);
-
-      const houseBox=new THREE.Box3().setFromObject(houseModel);
-      const houseSize=houseBox.getSize(new THREE.Vector3());
-      const min=houseBox.min;
-      const max=houseBox.max;
-
-      // One local fill light is enough with the hemisphere + flashlight.
-      // Avoid several extra point lights; imported PBR meshes get much more
-      // expensive when every fragment evaluates many dynamic lights.
-      houseFill.position.set(
-        (min.x+max.x)*.5,
-        Math.min(max.y-1.0,2.8),
-        (min.z+max.z)*.5
-      );
-
       prepareHouseRenderCulling(houseModel);
 
       houseLoaded=true;
