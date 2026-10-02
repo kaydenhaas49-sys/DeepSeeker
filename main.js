@@ -117,36 +117,7 @@ const houseCollisionBoxes=[];
 const houseRenderMeshes=[];
 const houseMeshes=[];
 
-const houseReturnPortal=new THREE.Group();
-houseReturnPortal.name="HouseHiddenReturnTeleporter";
-const housePortalBody=new THREE.Mesh(
-  new THREE.CylinderGeometry(.55,.55,.12,24),
-  new THREE.MeshStandardMaterial({
-    color:0xd8bd68,
-    emissive:0xa78328,
-    emissiveIntensity:3.2,
-    roughness:.35,
-    metalness:.15
-  })
-);
-housePortalBody.rotation.x=0;
-housePortalBody.position.y=.06;
 
-const housePortalRing=new THREE.Mesh(
-  new THREE.TorusGeometry(.72,.065,10,32),
-  new THREE.MeshBasicMaterial({color:0xffdf78})
-);
-housePortalRing.rotation.x=Math.PI/2;
-housePortalRing.position.y=.085;
-
-houseReturnPortal.add(housePortalBody,housePortalRing);
-houseReturnPortal.visible=false;
-houseRoot.add(houseReturnPortal);
-
-const housePortalLight=new THREE.PointLight(0xffd36a,1.2,7,2);
-housePortalLight.position.set(0,.8,0);
-housePortalLight.visible=false;
-houseRoot.add(housePortalLight);
 const houseFloorRaycaster=new THREE.Raycaster();
 let houseCullTimer=0;
 let houseDoorCollisionDirty=true;
@@ -412,6 +383,37 @@ const houseRoot=new THREE.Group();
 houseRoot.name="HouseWorld";
 houseRoot.visible=false;
 scene.add(houseRoot);
+
+const houseReturnPortal=new THREE.Group();
+houseReturnPortal.name="HouseHiddenReturnTeleporter";
+const housePortalBody=new THREE.Mesh(
+  new THREE.CylinderGeometry(.55,.55,.12,24),
+  new THREE.MeshStandardMaterial({
+    color:0xd8bd68,
+    emissive:0xa78328,
+    emissiveIntensity:3.2,
+    roughness:.35,
+    metalness:.15
+  })
+);
+housePortalBody.rotation.x=0;
+housePortalBody.position.y=.06;
+
+const housePortalRing=new THREE.Mesh(
+  new THREE.TorusGeometry(.72,.065,10,32),
+  new THREE.MeshBasicMaterial({color:0xffdf78})
+);
+housePortalRing.rotation.x=Math.PI/2;
+housePortalRing.position.y=.085;
+
+houseReturnPortal.add(housePortalBody,housePortalRing);
+houseReturnPortal.visible=false;
+houseRoot.add(houseReturnPortal);
+
+const housePortalLight=new THREE.PointLight(0xffd36a,1.2,7,2);
+housePortalLight.position.set(0,.8,0);
+housePortalLight.visible=false;
+houseRoot.add(housePortalLight);
 
 // Warm interior illumination so the house is readable without killing the horror mood.
 const houseLights=new THREE.Group();
