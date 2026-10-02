@@ -331,15 +331,16 @@ function shouldKeepHouseLoaded(){
 }
 
 function updateHouseMemoryState(dt){
-  if(!gameStarted) return;
-
   if(shouldKeepHouseLoaded()){
     houseUnloadTimer=0;
     return;
   }
 
-  // Give the level a small grace period after leaving so a rapid return does
-  // not immediately destroy and rebuild the GLB.
+  // Once gameplay is active, release the house shortly after returning to the
+  // Backrooms. Keeping this tied to gameplay prevents the menu's initial load
+  // from fighting the loading gate.
+  if(!gameStarted) return;
+
   houseUnloadTimer+=dt;
   if(houseUnloadTimer>=1.5 && houseLoaded && !houseLoadStarted){
     disposeHouseResources();
@@ -1905,10 +1906,9 @@ function animate(){
   flashlight.intensity=flashlightOn ? 27.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
-  if(!houseMode){
-    for(const mixer of bacteriaMixers.values()){
-      mixer.update(dt);
-    }
+  if(!houseMode && figure.visible && bacteriaState){
+    const activeMixer=bacteriaMixers.get(bacteriaState);
+    if(activeMixer) activeMixer.update(dt);
   }
 
   if(Number.isFinite(figureLife) && figureLife>0 && bacteriaLoaded){
