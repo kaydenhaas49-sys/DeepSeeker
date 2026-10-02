@@ -908,7 +908,7 @@ function setHouseMode(enabled){
   if(houseMode){
     renderer.setPixelRatio(HOUSE_PIXEL_RATIO);
     flashlight.castShadow=false;
-    playerLight.intensity=0.6;
+    playerLight.intensity=0;
 
     player.pos.copy(houseSpawn);
     updateHouseRenderCulling(houseSpawn.x,houseSpawn.z);
@@ -1465,7 +1465,7 @@ function animate(){
       if(Math.abs(nextRatio-currentPixelRatio)>=0.05){
         currentPixelRatio=Number(nextRatio.toFixed(2));
         renderer.setPixelRatio(houseMode
-          ? Math.min(currentPixelRatio,1.0)
+          ? HOUSE_PIXEL_RATIO
           : currentPixelRatio
         );
         perfCooldown=2.0;
