@@ -1286,8 +1286,19 @@ let bacteriaLoaded=false;
 const bacteriaModels=new Map();
 const bacteriaMixers=new Map();
 let bacteriaState="";
+let bacteriaWantedState="idle";
 let generatedBacteriaFailures=0;
+let figureState="idle";
+let figureStateTime=0;
+let figureAge=0;
+let figureAttackPlayed=false;
 const debugSpawnBacteria=false;
+
+const ENTITY_STALK_TIME=1.15;
+const ENTITY_MAX_CHASE_TIME=8.0;
+const ENTITY_ATTACK_RANGE=1.45;
+const ENTITY_CHASE_SPEED=5.8;
+const ENTITY_RADIUS=.55;
 
 function fitBacteriaModel(model){
   model.traverse((obj)=>{
@@ -1312,6 +1323,8 @@ function fitBacteriaModel(model){
 }
 
 function setBacteriaAnimation(name){
+  bacteriaWantedState=name;
+
   const actualName=bacteriaModels.has(name)
     ? name
     : bacteriaModels.has("idle")
@@ -1341,16 +1354,55 @@ function setBacteriaAnimation(name){
   bacteriaState=actualName;
 }
 
+function isEntityBlocked(x,z){
+  const walls=world.getNearbyWallBounds(x,z,ENTITY_RADIUS+.35);
+  for(const wall of walls){
+    const nx=Math.max(wall.minX,Math.min(x,wall.maxX));
+    const nz=Math.max(wall.minZ,Math.min(z,wall.maxZ));
+    const dx=x-nx;
+    const dz=z-nz;
+    if(dx*dx+dz*dz<ENTITY_RADIUS*ENTITY_RADIUS) return true;
+  }
+  return false;
+}
+
+function findEntitySpawnPosition(){
+  const forwardX=-Math.sin(player.yaw);
+  const forwardZ=-Math.cos(player.yaw);
+  const rightX=Math.cos(player.yaw);
+  const rightZ=-Math.sin(player.yaw);
+
+  const candidates=[
+    [12,0],[14,0],[10,2.5],[10,-2.5],
+    [13,3.5],[13,-3.5],[16,2],[16,-2]
+  ];
+
+  for(const [distance,side] of candidates){
+    const x=player.pos.x+forwardX*distance+rightX*side;
+    const z=player.pos.z+forwardZ*distance+rightZ*side;
+    if(!isEntityBlocked(x,z)){
+      return {x,z};
+    }
+  }
+
+  return {
+    x:player.pos.x+forwardX*10,
+    z:player.pos.z+forwardZ*10
+  };
+}
+
 function spawnBacteriaAtPlayer(){
-  const dx=-Math.sin(player.yaw);
-  const dz=-Math.cos(player.yaw);
-  figure.position.set(
-    player.pos.x+dx*5,
-    0,
-    player.pos.z+dz*5
+  const spawn=findEntitySpawnPosition();
+  figure.position.set(spawn.x,0,spawn.z);
+  figure.rotation.y=Math.atan2(
+    player.pos.x-spawn.x,
+    player.pos.z-spawn.z
   );
-  figure.rotation.y=player.yaw+Math.PI;
-  figureLife=Infinity;
+  figureState="stalk";
+  figureStateTime=0;
+  figureAge=0;
+  figureAttackPlayed=false;
+  figureLife=ENTITY_MAX_CHASE_TIME;
   figure.visible=true;
   setBacteriaAnimation("stalk");
 }
@@ -1418,11 +1470,13 @@ for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
       bacteriaModels.set(name,{model,gltf});
       bacteriaLoaded=true;
 
-      if(name==="stalk"){
-        setBacteriaAnimation("stalk");
-        if(debugSpawnBacteria) spawnBacteriaAtPlayer();
+      if(name===bacteriaWantedState){
+        setBacteriaAnimation(bacteriaWantedState);
       }else if(!bacteriaState){
         setBacteriaAnimation("idle");
+      }
+      if(debugSpawnBacteria && name==="stalk"){
+        spawnBacteriaAtPlayer();
       }
 
       if(bacteriaModels.size===Object.keys(bacteriaAnimationPaths).length){
@@ -1781,19 +1835,22 @@ document.addEventListener("keydown",e=>{
 function triggerEvent(){
   eventCooldown=3.5;
   pulse=1;
-  figureLife=1.25;
-  const dx=-Math.sin(player.yaw), dz=-Math.cos(player.yaw);
-  const side=Math.random()>.5?1:-1;
-  figure.position.set(
-    player.pos.x + dx*(9+Math.random()*7) + Math.cos(player.yaw)*side*2.5,
-    0,
-    player.pos.z + dz*(9+Math.random()*7) - Math.sin(player.yaw)*side*2.5
-  );
-  figure.rotation.y=player.yaw+Math.PI;
-  figure.visible=true;
+
+  if(!bacteriaLoaded && !fallbackFigure.visible){
+    return;
+  }
+
+  spawnBacteriaAtPlayer();
   audio.scare();
-  objective.textContent=Math.random()>.5 ? "Something moved nearby." : "The lights don't feel right.";
-  eventText.textContent=Math.random()>.5 ? "DID YOU HEAR THAT?" : "THE LIGHTS ARE FLICKERING";
+
+  objective.textContent=Math.random()>.5
+    ? "Something moved nearby."
+    : "Something is following you.";
+
+  eventText.textContent=Math.random()>.5
+    ? "DID YOU HEAR THAT?"
+    : "RUN.";
+
   eventText.style.opacity="1";
   setTimeout(()=>{
     eventText.style.opacity="0";
@@ -1906,37 +1963,87 @@ function animate(){
     }
   }
 
-  if(Number.isFinite(figureLife) && figureLife>0 && bacteriaLoaded){
-    const elapsed=1.25-figureLife;
-    if(elapsed<0.28) setBacteriaAnimation("stalk");
-    else if(elapsed<0.72) setBacteriaAnimation("chase");
-    else setBacteriaAnimation("attack");
-  }
+  if(figureLife>0 && !houseMode){
+    figureAge+=dt;
+    figureStateTime+=dt;
 
-  if(figureLife>0){
-    if (Number.isFinite(figureLife)) figureLife=Math.max(0,figureLife-dt);
-    figure.visible=true;
-    const fade=!Number.isFinite(figureLife) ? 1 : (figureLife>0.85 ? 1 : figureLife/0.85);
-    if(bacteriaLoaded){
-      for(const child of figure.children){
-        if(child===fallbackFigure) continue;
-        child.traverse((obj)=>{
-          if(!obj.isMesh || !obj.material) return;
-          const mats=Array.isArray(obj.material)?obj.material:[obj.material];
-          for(const mat of mats){
-            if(!mat) continue;
-            mat.transparent=fade<1;
-            mat.opacity=fade;
-          }
-        });
+    const targetX=player.pos.x;
+    const targetZ=player.pos.z;
+    const dx=targetX-figure.position.x;
+    const dz=targetZ-figure.position.z;
+    const distance=Math.hypot(dx,dz);
+
+    if(figureState==="stalk"){
+      setBacteriaAnimation("stalk");
+      if(figureStateTime>=ENTITY_STALK_TIME){
+        figureState="chase";
+        figureStateTime=0;
+        setBacteriaAnimation("chase");
+      }
+    }else if(figureState==="chase"){
+      setBacteriaAnimation("chase");
+
+      if(distance<=ENTITY_ATTACK_RANGE){
+        figureState="attack";
+        figureStateTime=0;
+        figureAttackPlayed=false;
+        setBacteriaAnimation("attack");
+        pulse=1;
+        audio.scare();
+      }else{
+        const inv=1/Math.max(distance,.001);
+        const step=Math.min(ENTITY_CHASE_SPEED*dt,Math.max(0,distance-ENTITY_ATTACK_RANGE));
+        const moveX=dx*inv*step;
+        const moveZ=dz*inv*step;
+
+        const nextX=figure.position.x+moveX;
+        const nextZ=figure.position.z+moveZ;
+
+        if(!isEntityBlocked(nextX,nextZ)){
+          figure.position.x=nextX;
+          figure.position.z=nextZ;
+        }else if(!isEntityBlocked(nextX,figure.position.z)){
+          figure.position.x=nextX;
+        }else if(!isEntityBlocked(figure.position.x,nextZ)){
+          figure.position.z=nextZ;
+        }
+      }
+
+      // Keep the entity facing the player while stalking/chasing.
+      figure.rotation.y=Math.atan2(
+        player.pos.x-figure.position.x,
+        player.pos.z-figure.position.z
+      );
+
+      if(figureAge>=ENTITY_MAX_CHASE_TIME){
+        figureLife=0;
+      }
+    }else if(figureState==="attack"){
+      setBacteriaAnimation("attack");
+      figure.rotation.y=Math.atan2(
+        player.pos.x-figure.position.x,
+        player.pos.z-figure.position.z
+      );
+
+      if(!figureAttackPlayed){
+        figureAttackPlayed=true;
+        pulse=1;
+      }
+
+      if(figureStateTime>=1.0){
+        figureLife=0;
       }
     }
-    fallbackFigure.visible=!bacteriaLoaded && fade>0.01;
-    fallbackFigure.scale.setScalar(.96 + .08*Math.sin(t*12));
-    figure.rotation.y=figure.rotation.y;
+
+    figure.visible=true;
+    fallbackFigure.visible=!bacteriaLoaded;
+    fallbackFigure.scale.setScalar(.96+.08*Math.sin(t*12));
   }else{
     figure.visible=false;
     fallbackFigure.visible=false;
+    figureState="idle";
+    figureStateTime=0;
+    figureAge=0;
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
