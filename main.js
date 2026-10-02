@@ -288,7 +288,6 @@ function disposeHouseResources(){
 
     if(obj.geometry){
       obj.geometry.dispose();
-    }
 
     const materials=Array.isArray(obj.material)
       ? obj.material
@@ -297,7 +296,6 @@ function disposeHouseResources(){
     for(const material of materials){
       if(!material) continue;
       material.dispose();
-    }
   });
 
   houseModel=null;
@@ -372,8 +370,7 @@ function startGame(save=null){
       if(eventText.textContent==="HOUSE STILL LOADING..." ||
          eventText.textContent==="HOUSE FAILED TO LOAD"){
         eventText.style.opacity="0";
-      }
-    },1400);
+      },1400);
     return false;
   }
 
@@ -389,7 +386,6 @@ function startGame(save=null){
     if(houseCollisionReady){
       pendingHouseStart=false;
       setHouseMode(true);
-    }
   }
 
   player.lock();
@@ -454,7 +450,6 @@ const multiplayer=new Multiplayer({
       setTimeout(()=>{
         if(eventText.textContent===message) eventText.style.opacity="0";
       },1800);
-    }
   },
   onCount:(count,max)=>{
     multiplayerStatus.textContent="MULTIPLAYER · "+count+"/"+max;
@@ -462,12 +457,10 @@ const multiplayer=new Multiplayer({
     const params=new URLSearchParams(location.search);
     if(params.get("lobby")==="1"){
       lobbyPlayers.textContent="PLAYERS "+count+"/"+max;
-    }
   },
   onGameStart:()=>{
     if(!gameStarted){
       startGame();
-    }
   },
   onRoster:(players)=>{
     const params=new URLSearchParams(location.search);
@@ -497,9 +490,7 @@ const multiplayer=new Multiplayer({
             <div class="lobbySlotEmpty">WAITING FOR PLAYER…</div>
           </div>
         `);
-      }
-    }
-    lobbySlots.innerHTML=slots.join("");
+      lobbySlots.innerHTML=slots.join("");
   }
 });
 
@@ -635,7 +626,6 @@ function setupHouseDoors(root){
       obj.userData.houseCollisionDoor=true;
       obj.visible=false;
       removed.push(obj.name);
-    }
   });
 
   console.log(
@@ -744,7 +734,6 @@ function updateHouseDoorCollisions(){
     const dz=pz-nz;
     if(dx*dx+dz*dz<=rangeSq){
       boxes.push(box);
-    }
   }
 
   for(const door of houseDoors){
@@ -780,7 +769,6 @@ function updateHouseDoorCollisions(){
 
     if(!doorOverlapsSpawn){
       boxes.push(door.collisionBox);
-    }
   }
 
   player.extraCollisionBoxes=boxes;
@@ -799,7 +787,6 @@ function toggleHouseDoor(){
     if(d<bestDist){
       best=door;
       bestDist=d;
-    }
   }
 
   if(!best) return false;
@@ -829,13 +816,11 @@ function chooseSafeHouseSpawn(root){
       const dx=x-nx;
       const dz=z-nz;
       if(dx*dx+dz*dz<radius*radius) return true;
-    }
 
     const wp=new THREE.Vector3();
     for(const door of houseDoors){
       door.pivot.getWorldPosition(wp);
       if(Math.hypot(wp.x-x,wp.z-z)<1.15) return true;
-    }
 
     return false;
   };
@@ -860,7 +845,6 @@ function chooseSafeHouseSpawn(root){
         z:Number(z.toFixed(2))
       });
       return true;
-    }
   }
 
   // Even in a malformed export, keep the player in the model center rather
@@ -886,7 +870,6 @@ function chooseHouseReturnPortalPosition(root){
       const dx=x-nx;
       const dz=z-nz;
       if(dx*dx+dz*dz<radius*radius) return true;
-    }
     return false;
   };
 
@@ -927,7 +910,6 @@ function chooseHouseReturnPortalPosition(root){
       if(hit.point.y<0.35 || hit.point.y>2.0) continue;
       y=hit.point.y;
       break;
-    }
 
     // Fallback to a normal tabletop-ish height if no suitable surface was hit.
     if(y===null) y=1.02;
@@ -999,7 +981,6 @@ function ensureHouseCollisionSetup(){
       door.pivot.traverse(obj=>{
         obj.userData.houseCollisionDoor=true;
       });
-    }
 
     buildHouseCollisionProxies(houseModel);
     updateHouseLoadingUI(91,"PROCESSING HOUSE — FINALIZING STATIC HOUSE…");
@@ -1025,8 +1006,7 @@ function ensureHouseCollisionSetup(){
         applySavedGame(queuedSave);
       }else{
         setHouseMode(true);
-      }
-
+  
       audio.start();
       player.lock();
     }else if(gameStarted){
@@ -1037,9 +1017,7 @@ function ensureHouseCollisionSetup(){
         eventText.textContent="HOUSE READY";
         eventText.style.opacity="1";
         setTimeout(()=>{eventText.style.opacity="0";},1000);
-      }
-    }
-  };
+    };
 
   if("requestIdleCallback" in window){
     window.requestIdleCallback(build,{timeout:2500});
@@ -1077,13 +1055,11 @@ function loadHouse(){
           if(!material) continue;
           material.side=THREE.FrontSide;
           material.toneMapped=true;
-        }
-      });
+          });
 
       if(meshCount===0){
         throw new Error("House GLB contains no meshes.");
-      }
-
+  
       // Normalize the actual model only:
       // centered on X/Z and sitting directly on Y=0.
       let box=new THREE.Box3().setFromObject(houseModel);
@@ -1140,19 +1116,16 @@ function loadHouse(){
         overlay.classList.add("hidden");
         audio.start();
         player.lock();
-      }
-
+  
       if(pendingSaveLoad && pendingSaveLoad.houseMode && gameStarted){
         setHouseMode(true);
         pendingSaveLoad=null;
-      }
-
+  
       if(gameStarted){
         eventText.textContent="HOUSE READY";
         eventText.style.opacity="1";
         setTimeout(()=>{eventText.style.opacity="0";},1100);
-      }
-    },
+      },
     xhr=>{
       if(xhr.total){
         const downloadPercent=Math.min(
@@ -1171,8 +1144,7 @@ function loadHouse(){
         updateHouseLoadingUI(10,"DOWNLOADING HOUSE…");
         objective.textContent="Loading house…";
         prompt.textContent="LOADING HOUSE…";
-      }
-    },
+      },
     error=>{
       console.error("Failed to load house:",houseUrl,error);
       houseLoaded=false;
@@ -1183,9 +1155,7 @@ function loadHouse(){
       if(!gameStarted){
         eventText.textContent="HOUSE FAILED TO LOAD";
         eventText.style.opacity="1";
-      }
-    }
-  );
+    );
 }
 
 function setHouseMode(enabled){
@@ -1214,21 +1184,18 @@ function setHouseMode(enabled){
   houseReturnPortal.visible=houseMode && houseReturnPortal.userData.active;
 
   player.ignoreWorldCollision=houseMode;
-  player.houseOctree=houseMode ? houseOctree : null;
   player.extraCollisionBoxes=[];
   houseDoorCollisionDirty=true;
-  houseCollisionTimer=0;
 
   figure.visible=false;
   figureLife=0;
 
   if(houseMode){
-    renderer.setPixelRatio(HOUSE_PIXEL_RATIO);
+
     flashlight.castShadow=false;
     playerLight.intensity=0;
 
     player.pos.copy(houseSpawn);
-    updateHouseRenderCulling();
     player.vel.set(0,0,0);
     player.jumpY=0;
     player.jumpVelocity=0;
@@ -1336,7 +1303,6 @@ function setBacteriaAnimation(name){
       action.play();
     }else{
       action.stop();
-    }
   }
 
   bacteriaState=actualName;
@@ -1385,7 +1351,6 @@ function loadStaticFallback(){
       figure.visible=true;
       eventText.textContent="BACTERIA LOAD FAILED";
       eventText.style.opacity="1";
-    }
   );
 }
 
@@ -1414,8 +1379,7 @@ for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
         action.setLoop(THREE.LoopRepeat,Infinity);
         mixer._bacteriaAction=action;
         bacteriaMixers.set(name,mixer);
-      }
-
+  
       bacteriaModels.set(name,{model,gltf});
       bacteriaLoaded=true;
 
@@ -1424,22 +1388,18 @@ for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
         if(debugSpawnBacteria) spawnBacteriaAtPlayer();
       }else if(!bacteriaState){
         setBacteriaAnimation("idle");
-      }
-
+  
       if(bacteriaModels.size===Object.keys(bacteriaAnimationPaths).length){
         eventText.textContent="BACTERIA ANIMATIONS READY";
         eventText.style.opacity="1";
         setTimeout(()=>{eventText.style.opacity="0";},2200);
-      }
-    },
+      },
     undefined,
     ()=>{
       generatedBacteriaFailures++;
       if(generatedBacteriaFailures===Object.keys(bacteriaAnimationPaths).length){
         loadStaticFallback();
-      }
-    }
-  );
+    );
 }
 let figureLife=0;
 player.onStep=({intensity})=>audio.step(intensity);
@@ -1750,7 +1710,6 @@ document.addEventListener("pointerlockchange",()=>{
       lobbyScreen.classList.add("hidden");
       prompt.textContent="CLICK TO RESUME";
       overlay.classList.remove("hidden");
-    }
   }
   crosshair.style.display=locked?"block":"none";
   if(locked && phoneOpen){
@@ -1765,7 +1724,6 @@ document.addEventListener("keydown",e=>{
   if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen){
     if(useHouseReturnTeleporter()){
       return;
-    }
   }else if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !phoneOpen && !controlsOpen){ newSeed(); }
@@ -1830,8 +1788,7 @@ function animate(){
         nextRatio=Math.max(0.8,currentPixelRatio-0.1);
       }else if(fps>58){
         nextRatio=Math.min(BASE_PIXEL_RATIO,currentPixelRatio+0.1);
-      }
-
+  
       if(Math.abs(nextRatio-currentPixelRatio)>=0.05){
         currentPixelRatio=Number(nextRatio.toFixed(2));
         renderer.setPixelRatio(houseMode
@@ -1839,25 +1796,16 @@ function animate(){
           : currentPixelRatio
         );
         perfCooldown=2.0;
-      }
     }
-  }
 
   updateHouseMemoryState(dt);
 
   if(houseMode){
     updateHouseDoors(dt);
-
-    houseCollisionTimer-=dt;
-    if(houseCollisionTimer<=0 || houseDoorCollisionDirty){
-      houseCollisionTimer=0.15;
+    if(houseDoorCollisionDirty){
       updateHouseDoorCollisions();
     }
-
-    houseCullTimer=0;
   }else{
-    houseCullTimer=0;
-    player.houseOctree=null;
     player.extraCollisionBoxes=[];
   }
 
@@ -1872,7 +1820,6 @@ function animate(){
     if(t-lastAutoSave>20){
       lastAutoSave=t;
       saveGame();
-    }
   }
 
   if(!houseMode){
@@ -1898,7 +1845,6 @@ function animate(){
   if(!houseMode){
     for(const mixer of bacteriaMixers.values()){
       mixer.update(dt);
-    }
   }
 
   if(Number.isFinite(figureLife) && figureLife>0 && bacteriaLoaded){
@@ -1922,11 +1868,8 @@ function animate(){
             if(!mat) continue;
             mat.transparent=fade<1;
             mat.opacity=fade;
-          }
-        });
-      }
-    }
-    fallbackFigure.visible=!bacteriaLoaded && fade>0.01;
+              });
+      fallbackFigure.visible=!bacteriaLoaded && fade>0.01;
     fallbackFigure.scale.setScalar(.96 + .08*Math.sin(t*12));
     figure.rotation.y=figure.rotation.y;
   }else{
