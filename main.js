@@ -1032,18 +1032,116 @@ function loadHouse(){
       houseModel.updateMatrixWorld(true);
 
       box=new THREE.Box3().setFromObject(houseModel);
-      const center=box.getCenter(new THREE.Vector3());
 
-      houseModel.position.set(
-        -center.x,
-        -box.min.y,
-        -center.z
-      );
+      // Do not use the outer bounding-box center as the world origin. House
+      // GLBs often include exterior walls, porches, yards, or offset pieces,
+      // which can put (0,0) outside the actual living area.
+      //
+      // Find a large horizontal floor surface that also has nearby enclosing
+      // geometry above/around it. That gives us a real interior-room origin.
+      const normalizedMeshes=[];
+      houseModel.traverse(obj=>{
+        if(obj.isMesh && obj.geometry) normalizedMeshes.push(obj);
+      });
+
+      const modelCenter=box.getCenter(new THREE.Vector3());
+      const modelSize=box.getSize(new THREE.Vector3());
+      const floorCandidates=[];
+
+      for(const mesh of normalizedMeshes){
+        const meshBox=new THREE.Box3().setFromObject(mesh);
+        const meshSize=meshBox.getSize(new THREE.Vector3());
+        const area=meshSize.x*meshSize.z;
+
+        // Floors are broad and very thin vertically compared with walls.
+        if(meshSize.y>0.32 || area<3) continue;
+
+        const candidateCenter=new THREE.Vector3(
+          (meshBox.min.x+meshBox.max.x)*.5,
+          meshBox.max.y,
+          (meshBox.min.z+meshBox.max.z)*.5
+        );
+
+        let ceilingDistance=0;
+        houseFloorRaycaster.set(
+          new THREE.Vector3(candidateCenter.x,candidateCenter.y+0.15,candidateCenter.z),
+          new THREE.Vector3(0,1,0)
+        );
+        const ceilingHits=houseFloorRaycaster.intersectObjects(normalizedMeshes,true);
+        const ceilingHit=ceilingHits.find(hit=>hit.point.y-candidateCenter.y>1.5);
+        if(ceilingHit){
+          ceilingDistance=THREE.MathUtils.clamp(
+            ceilingHit.point.y-candidateCenter.y,
+            0,
+            4.5
+          );
+        }
+
+        let nearbyWalls=0;
+        const probeDirections=[
+          new THREE.Vector3(1,0,0),
+          new THREE.Vector3(-1,0,0),
+          new THREE.Vector3(0,0,1),
+          new THREE.Vector3(0,0,-1)
+        ];
+
+        for(const dir of probeDirections){
+          houseFloorRaycaster.set(
+            new THREE.Vector3(candidateCenter.x,candidateCenter.y+1.15,candidateCenter.z),
+            dir
+          );
+          houseFloorRaycaster.near=.8;
+          houseFloorRaycaster.far=10;
+          const wallHits=houseFloorRaycaster.intersectObjects(normalizedMeshes,true);
+          if(wallHits.length) nearbyWalls++;
+        }
+
+        const centeredPenalty=Math.hypot(
+          candidateCenter.x-modelCenter.x,
+          candidateCenter.z-modelCenter.z
+        )/(Math.max(modelSize.x,modelSize.z,1));
+
+        const score=
+          Math.min(area,120)*1.2+
+          ceilingDistance*18+
+          nearbyWalls*20-
+          centeredPenalty*12;
+
+        floorCandidates.push({
+          center:candidateCenter,
+          bottomY:meshBox.min.y,
+          score,
+          area
+        });
+      }
+
+      floorCandidates.sort((a,b)=>b.score-a.score);
+      const mainFloor=floorCandidates[0] || null;
+
+      if(mainFloor){
+        houseModel.position.set(
+          -mainFloor.center.x,
+          -mainFloor.bottomY,
+          -mainFloor.center.z
+        );
+        console.log("[DeepSeeker] house origin anchored to interior floor:",{
+          x:Number(mainFloor.center.x.toFixed(2)),
+          y:Number(mainFloor.bottomY.toFixed(2)),
+          z:Number(mainFloor.center.z.toFixed(2)),
+          area:Number(mainFloor.area.toFixed(2)),
+          score:Number(mainFloor.score.toFixed(1))
+        });
+      }else{
+        const center=box.getCenter(new THREE.Vector3());
+        houseModel.position.set(
+          -center.x,
+          -box.min.y,
+          -center.z
+        );
+        console.warn("[DeepSeeker] no floor candidate found; using model center");
+      }
+
       houseModel.updateMatrixWorld(true);
-
-      // The model is now normalized to a sane real-world height. Keep its
-      // X/Z origin at the exact center of the house so the fixed living-room
-      // spawn uses the same coordinate system as the rendered model.
 
       // Add a few interior lights based on the normalized house bounds.
       houseLights.clear();
