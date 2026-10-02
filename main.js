@@ -459,53 +459,65 @@ scene.add(houseRoot);
 const houseReturnPortal=new THREE.Group();
 houseReturnPortal.name="HouseHiddenReturnTeleporter";
 
-// The return point is disguised as an ordinary electrical/service panel.
-// No big ring, beam, portal glow, or floor pad.
-const housePanelFrame=new THREE.Mesh(
-  new THREE.BoxGeometry(.92,1.22,.13),
+// Disguised as a completely ordinary coffee mug. No glow, ring, beam, or
+// obvious teleporter geometry so it can sit naturally in the living room.
+const houseCupBody=new THREE.Mesh(
+  new THREE.CylinderGeometry(.11,.095,.22,16,1,true),
   new THREE.MeshStandardMaterial({
-    color:0x5b5848,
-    roughness:.86,
-    metalness:.04
+    color:0xb5ab8e,
+    roughness:.82,
+    metalness:.01,
+    side:THREE.DoubleSide
   })
 );
-housePanelFrame.position.y=.02;
+houseCupBody.position.y=.11;
 
-const housePanelFace=new THREE.Mesh(
-  new THREE.BoxGeometry(.72,1.02,.035),
+const houseCupCoffee=new THREE.Mesh(
+  new THREE.CylinderGeometry(.085,.085,.012,16),
   new THREE.MeshStandardMaterial({
-    color:0x8b866d,
-    roughness:.78,
-    metalness:.02
+    color:0x2a1b10,
+    roughness:.95
   })
 );
-housePanelFace.position.set(0,.02,.08);
+houseCupCoffee.position.y=.223;
 
-const housePanelInset=new THREE.Mesh(
-  new THREE.BoxGeometry(.52,.52,.022),
+const houseCupRim=new THREE.Mesh(
+  new THREE.TorusGeometry(.098,.012,8,18),
   new THREE.MeshStandardMaterial({
-    color:0x38382f,
-    roughness:.9
+    color:0x91886f,
+    roughness:.8,
+    metalness:.01
   })
 );
-housePanelInset.position.set(0,.12,.11);
+houseCupRim.position.y=.22;
 
-const housePanelIndicator=new THREE.Mesh(
-  new THREE.SphereGeometry(.035,10,8),
+const houseCupHandle=new THREE.Mesh(
+  new THREE.TorusGeometry(.065,.014,8,18,Math.PI*1.55),
   new THREE.MeshStandardMaterial({
-    color:0x5d5b4e,
-    emissive:0x4d4a39,
-    emissiveIntensity:.5,
-    roughness:.7
+    color:0xb5ab8e,
+    roughness:.82,
+    metalness:.01
   })
 );
-housePanelIndicator.position.set(.22,-.28,.13);
+houseCupHandle.rotation.x=Math.PI/2;
+houseCupHandle.position.set(.105,.115,0);
+
+const houseCupSaucer=new THREE.Mesh(
+  new THREE.CylinderGeometry(.145,.13,.025,20),
+  new THREE.MeshStandardMaterial({
+    color:0x8e866f,
+    roughness:.88,
+    metalness:.01
+  })
+);
+houseCupSaucer.position.y=.012;
 
 houseReturnPortal.add(
-  housePanelFrame,
-  housePanelFace,
-  housePanelInset,
-  housePanelIndicator
+  houseCupSaucer,
+  houseCupBody,
+  houseCupCoffee,
+  houseCupRim,
+  houseCupHandle
 );
 houseReturnPortal.visible=false;
 houseReturnPortal.userData.active=false;
@@ -830,15 +842,15 @@ function chooseSafeHouseSpawn(root){
 }
 
 function chooseHouseReturnPortalPosition(root){
-  const bounds=new THREE.Box3().setFromObject(root);
-  const margin=1.5;
-  const minX=bounds.min.x+margin;
-  const maxX=bounds.max.x-margin;
-  const minZ=bounds.min.z+margin;
-  const maxZ=bounds.max.z-margin;
-  const minSpawnDistance=12;
+  if(!root) return false;
 
-  const blocked=(x,z,radius=.72)=>{
+  const bounds=new THREE.Box3().setFromObject(root);
+  const minX=bounds.min.x+1.25;
+  const maxX=bounds.max.x-1.25;
+  const minZ=bounds.min.z+1.25;
+  const maxZ=bounds.max.z-1.25;
+
+  const blocked=(x,z,radius=.38)=>{
     for(const box of houseCollisionBoxes){
       const nx=Math.max(box.minX,Math.min(x,box.maxX));
       const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
@@ -849,88 +861,79 @@ function chooseHouseReturnPortalPosition(root){
     return false;
   };
 
-  let best=null;
-  let bestScore=-Infinity;
+  // The living-room spawn is our anchor. Test a handful of nearby spots so
+  // the cup stays inside the living room instead of being randomly attached
+  // to a wall somewhere else in the house.
+  const candidates=[
+    [ 3.10, 0.35],
+    [ 2.70,-1.30],
+    [-2.90,-0.45],
+    [-2.55, 1.25],
+    [ 1.15, 2.55],
+    [-1.20, 2.45]
+  ];
 
-  // Put the panel on an actual structural wall, on the side facing the house
-  // interior. This makes the teleporter visible/reachable and keeps it from
-  // randomly landing in the middle of furniture or outside the building.
-  for(const wall of houseCollisionBoxes){
-    const wx=(wall.minX+wall.maxX)*.5;
-    const wz=(wall.minZ+wall.maxZ)*.5;
-    const sx=wall.maxX-wall.minX;
-    const sz=wall.maxZ-wall.minZ;
+  const hits=[];
+  const rayOrigin=new THREE.Vector3();
+  const rayDirection=new THREE.Vector3(0,-1,0);
 
-    if(Math.min(sx,sz)>2.25) continue;
-    if(Math.max(sx,sz)<1.2) continue;
+  for(const [ox,oz] of candidates){
+    const x=THREE.MathUtils.clamp(houseSpawn.x+ox,minX,maxX);
+    const z=THREE.MathUtils.clamp(houseSpawn.z+oz,minZ,maxZ);
 
-    const distanceFromSpawn=Math.hypot(wx-houseSpawn.x,wz-houseSpawn.z);
-    if(distanceFromSpawn<minSpawnDistance) continue;
-
-    let x=wx;
-    let z=wz;
-    let rotationY=0;
-
-    if(sx<=sz){
-      // Wall is thin on X; panel faces toward the interior side.
-      const towardPositiveX=houseSpawn.x>=wx;
-      x=towardPositiveX ? wall.maxX+.08 : wall.minX-.08;
-      rotationY=Math.PI/2;
-    }else{
-      // Wall is thin on Z; panel faces toward the interior side.
-      const towardPositiveZ=houseSpawn.z>=wz;
-      z=towardPositiveZ ? wall.maxZ+.08 : wall.minZ-.08;
-      rotationY=0;
-    }
-
-    if(x<minX || x>maxX || z<minZ || z>maxZ) continue;
+    if(Math.hypot(x-houseSpawn.x,z-houseSpawn.z)<2.55) continue;
     if(blocked(x,z)) continue;
 
-    const edgeClearance=Math.min(
-      x-minX,maxX-x,z-minZ,maxZ-z
-    );
+    // Find an upward-facing surface under the cup. This lets it rest on a
+    // table/counter in the living room when the model has one at that spot.
+    rayOrigin.set(x,Math.min(bounds.max.y-0.2,4.5),z);
+    houseFloorRaycaster.set(rayOrigin,rayDirection);
+    const hitsForSpot=houseFloorRaycaster.intersectObject(root,true);
 
-    const score=distanceFromSpawn*10 + Math.min(edgeClearance,8);
-    if(score>bestScore){
-      bestScore=score;
-      best={x,z,rotationY};
+    let y=null;
+    for(const hit of hitsForSpot){
+      if(!hit.face) continue;
+      const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+      if(normal.y<0.65) continue;
+      if(hit.point.y<0.35 || hit.point.y>2.0) continue;
+      y=hit.point.y;
+      break;
     }
+
+    // Fallback to a normal tabletop-ish height if no suitable surface was hit.
+    if(y===null) y=1.02;
+
+    hits.push({
+      x,
+      z,
+      y,
+      distanceFromSpawn:Math.hypot(x-houseSpawn.x,z-houseSpawn.z)
+    });
   }
 
-  // Fallback: a safe floor position far from spawn, should a wall collider
-  // not be found in a malformed/changed asset.
-  if(!best){
-    const fallbackOffsets=[
-      [8,0],[-8,0],[0,8],[0,-8],
-      [10,4],[-10,4],[10,-4],[-10,-4]
-    ];
-
-    for(const [ox,oz] of fallbackOffsets){
-      const x=THREE.MathUtils.clamp(houseSpawn.x+ox,minX,maxX);
-      const z=THREE.MathUtils.clamp(houseSpawn.z+oz,minZ,maxZ);
-      const d=Math.hypot(x-houseSpawn.x,z-houseSpawn.z);
-      if(d>=minSpawnDistance && !blocked(x,z)){
-        best={x,z,rotationY:0};
-        break;
-      }
-    }
+  if(!hits.length){
+    const x=houseSpawn.x+2.8;
+    const z=houseSpawn.z;
+    houseReturnPortal.position.set(x,1.02,z);
+    houseReturnPortal.rotation.y=0;
+    houseReturnPortal.userData.active=true;
+    return true;
   }
 
-  if(!best) return false;
+  // Prefer a spot that is a little farther from spawn, so the cup is hidden
+  // naturally in the room without being immediately in the player's face.
+  hits.sort((a,b)=>b.distanceFromSpawn-a.distanceFromSpawn);
+  const best=hits[0];
 
-  // Panel center sits roughly at chest height on the wall.
-  const y=1.35;
-  houseReturnPortal.position.set(best.x,y,best.z);
-  houseReturnPortal.rotation.y=best.rotationY;
+  houseReturnPortal.position.set(best.x,best.y,best.z);
+  houseReturnPortal.rotation.y=Math.PI*0.15;
   houseReturnPortal.userData.active=true;
 
-  console.log("[DeepSeeker] hidden house teleporter:",{
+  console.log("[DeepSeeker] hidden living-room cup teleporter:",{
     x:Number(best.x.toFixed(2)),
+    y:Number(best.y.toFixed(2)),
     z:Number(best.z.toFixed(2)),
-    distanceFromSpawn:Number(
-      Math.hypot(best.x-houseSpawn.x,best.z-houseSpawn.z).toFixed(2)
-    ),
-    wallMounted:true
+    distanceFromSpawn:Number(best.distanceFromSpawn.toFixed(2))
   });
 
   return true;
