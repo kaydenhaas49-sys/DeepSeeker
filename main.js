@@ -87,15 +87,15 @@ scene.fog=new THREE.Fog(0x030302,14,62);
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
 const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
 
-const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,.08);
+const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,0);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0x8f815d,.02);
+const ambient=new THREE.AmbientLight(0x8f815d,0);
 scene.add(ambient);
 
-const playerLight=new THREE.PointLight(0xb59b68,2.0,24,1.9);
+const playerLight=new THREE.PointLight(0xb59b68,0,24,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xf0dfad,30,60,Math.PI/5.5,.88,1.5);
+const flashlight=new THREE.SpotLight(0xf0dfad,42,68,Math.PI/5.5,.88,1.5);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
@@ -1240,7 +1240,7 @@ function setHouseMode(enabled){
   }else{
     renderer.setPixelRatio(currentPixelRatio);
     flashlight.castShadow=ENABLE_SHADOWS;
-    playerLight.intensity=2.0;
+    playerLight.intensity=0;
 
     player.pos.set(32,EYE,32);
     player.vel.set(0,0,0);
@@ -1888,7 +1888,7 @@ function animate(){
   if(flashlightOn && battery>0){
     battery=Math.max(0,battery-dt*.30);
   }else{
-    battery=Math.min(100,battery+dt*2.0);
+    battery=Math.min(100,battery+dt*1.0);
   }
   if(battery<=0){
     flashlightOn=false;
@@ -1896,7 +1896,7 @@ function animate(){
   }
 
   const flicker=flashlightFlicker(t);
-  flashlight.intensity=flashlightOn ? 27.0*flicker : 0;
+  flashlight.intensity=flashlightOn ? 39.0*flicker : 0;
   if(!houseMode){
     playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
   }
@@ -1951,12 +1951,12 @@ function animate(){
     vignette.style.opacity=String(.70+.07*pulse);
     camera.position.x+=Math.sin(t*70)*pulse*.008;
     camera.position.y+=Math.sin(t*61)*pulse*.006;
-    hemi.intensity=.13*(1-pulse*.55);
-    ambient.intensity=.045*(1-pulse*.65);
+    hemi.intensity=0;
+    ambient.intensity=0;
   }else{
     vignette.style.opacity=".70";
-    hemi.intensity=.08;
-    ambient.intensity=.02;
+    hemi.intensity=0;
+    ambient.intensity=0;
   }
 
   const stamina=player.stamina;
