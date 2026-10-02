@@ -28,41 +28,27 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Extract exact spider asset
+      - name: Extract and convert exact spider asset
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf assets/Spider-Psionic
-          mkdir -p assets/Spider-Psionic
+          rm -rf assets/Spider-Psionic assets/Spider-Psionic-runtime
+          mkdir -p assets/Spider-Psionic assets/Spider-Psionic-runtime
           unzip -q assets/Spider-Psionic.zip -d assets/Spider-Psionic
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
 
-          root = Path("assets/Spider-Psionic")
-          files = sorted(
-              str(path.relative_to(root)).replace("\\", "/")
-              for path in root.rglob("*")
-              if path.is_file()
+          sudo apt-get update
+          sudo apt-get install -y assimp-utils
+
+          test -f assets/Spider-Psionic/spider.fbx
+          assimp info assets/Spider-Psionic/spider.fbx
+
+          (
+            cd assets/Spider-Psionic
+            assimp export spider.fbx ../Spider-Psionic-runtime/spider.glb -f glb2
           )
 
-          manifest = {
-              "files": files,
-              "fbx": [name for name in files if name.lower().endswith(".fbx")],
-              "obj": [name for name in files if name.lower().endswith(".obj")],
-              "mtl": [name for name in files if name.lower().endswith(".mtl")],
-          }
-
-          (root / "manifest.json").write_text(
-              json.dumps(manifest, indent=2),
-              encoding="utf-8"
-          )
-          print(json.dumps({
-              "fbx": manifest["fbx"],
-              "obj": manifest["obj"],
-              "mtl": manifest["mtl"],
-          }, indent=2))
-          PY
+          test -s assets/Spider-Psionic-runtime/spider.glb
+          ls -lh assets/Spider-Psionic/spider.fbx assets/Spider-Psionic-runtime/spider.glb
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
