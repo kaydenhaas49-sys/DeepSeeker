@@ -112,8 +112,8 @@ player.hands.visible=true;
 // ---------------------------------------------------------------------------
 // House level — the GLB itself is the level.
 // ---------------------------------------------------------------------------
-const HOUSE_MODEL_PATH="./assets/house_interior.glb";
-const HOUSE_TARGET_HEIGHT=7.2;
+const HOUSE_MODEL_PATH="./assets/studio_apartment_vray_baked_textures_included.glb";
+const HOUSE_TARGET_HEIGHT=3.0;
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
@@ -503,13 +503,8 @@ const multiplayer=new Multiplayer({
 });
 
 const houseDoors=[];
-const houseDoorPattern=/door|doors|porte|puerta|pintu/i;
-// Geometry inspection found this unnamed standalone door panel in the active GLB.
-// Keep the exact mesh removed while leaving the rest of the architecture intact.
-const houseStaticRemovedDoorNames=new Set(["FrontSide_55"]);
-
 const houseRoot=new THREE.Group();
-houseRoot.name="HouseWorld";
+houseRoot.name="ApartmentWorld";
 houseRoot.visible=false;
 scene.add(houseRoot);
 
@@ -580,7 +575,7 @@ houseReturnPortal.visible=false;
 houseReturnPortal.userData.active=false;
 houseRoot.add(houseReturnPortal);
 
-// Cheap ambient house lighting. The flashlight handles local illumination.
+// Low-cost apartment ambience. The flashlight handles local illumination.
 const houseAmbient=new THREE.HemisphereLight(0xffe6b0,0x3c2818,0.55);
 houseRoot.add(houseAmbient);
 
@@ -619,27 +614,10 @@ function attachHouseDoor(obj,index){
 }
 
 function setupHouseDoors(root){
+  // The new asset is an open-plan studio apartment. Do not carry over the
+  // old house-specific door removal rules.
   houseDoors.length=0;
-  const removed=[];
-
-  root.traverse((obj)=>{
-    if(obj===root || !obj.isMesh) return;
-
-    const explicitDoor = obj.name && houseDoorPattern.test(obj.name);
-    const inspectedStaticDoor = obj.name && houseStaticRemovedDoorNames.has(obj.name);
-
-    if(explicitDoor || inspectedStaticDoor){
-      obj.userData.houseRemovedDoor=true;
-      obj.userData.houseCollisionDoor=true;
-      obj.visible=false;
-      removed.push(obj.name);
-    }
-  });
-
-  console.log(
-    "[DeepSeeker] removed house doors:",
-    removed
-  );
+  console.log("[DeepSeeker] apartment doors left in place; no interactive house doors configured");
 }
 
 function updateHouseDoors(dt){
@@ -818,6 +796,10 @@ function toggleHouseDoor(){
 function chooseSafeHouseSpawn(root){
   if(!root) return false;
 
+  const bounds=new THREE.Box3().setFromObject(root);
+  const width=Math.max(.1,bounds.max.x-bounds.min.x);
+  const depth=Math.max(.1,bounds.max.z-bounds.min.z);
+
   const blocked=(x,z,radius=.55)=>{
     for(const box of houseCollisionBoxes){
       const nx=Math.max(box.minX,Math.min(x,box.maxX));
@@ -826,43 +808,75 @@ function chooseSafeHouseSpawn(root){
       const dz=z-nz;
       if(dx*dx+dz*dz<radius*radius) return true;
     }
-
-    const wp=new THREE.Vector3();
-    for(const door of houseDoors){
-      door.pivot.getWorldPosition(wp);
-      if(Math.hypot(wp.x-x,wp.z-z)<1.15) return true;
-    }
-
     return false;
   };
 
-  // The normalized model is centered on X/Z, so this is the intended
-  // living-room anchor. Only search a small local area if a wall happens to
-  // overlap the exact center.
-  const candidates=[
+  const floorYAt=(x,z)=>{
+    houseFloorRaycaster.set(
+      new THREE.Vector3(x,bounds.max.y+.5,z),
+      new THREE.Vector3(0,-1,0)
+    );
+    const hits=houseFloorRaycaster.intersectObject(root,true);
+
+    for(const hit of hits){
+      if(!hit.face) continue;
+      const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+      if(normal.y<.72) continue;
+      if(hit.point.y<-.05 || hit.point.y>.22) continue;
+      return hit.point.y;
+    }
+    return null;
+  };
+
+  // Sample the real apartment footprint instead of the old house's
+  // hard-coded living-room coordinates.
+  const candidates=[];
+  const fractions=[
     [0,0],
-    [.75,0],[-.75,0],[0,.75],[0,-.75],
-    [1.5,0],[-1.5,0],[0,1.5],[0,-1.5],
-    [2.25,0],[-2.25,0],[0,2.25],[0,-2.25],
-    [1.5,1.5],[-1.5,1.5],[1.5,-1.5],[-1.5,-1.5],
-    [3,0],[-3,0],[0,3],[0,-3]
+    [-.12,0],[.12,0],[0,-.12],[0,.12],
+    [-.22,-.12],[.22,-.12],[-.22,.12],[.22,.12],
+    [-.30,0],[.30,0],[0,-.30],[0,.30]
   ];
 
-  for(const [x,z] of candidates){
-    if(!blocked(x,z,.55)){
-      houseSpawn.set(x,EYE,z);
-      console.log("[DeepSeeker] living-room spawn:",{
-        x:Number(x.toFixed(2)),
-        z:Number(z.toFixed(2))
-      });
-      return true;
+  for(const [fx,fz] of fractions){
+    const x=THREE.MathUtils.clamp(fx*width,bounds.min.x+.8,bounds.max.x-.8);
+    const z=THREE.MathUtils.clamp(fz*depth,bounds.min.z+.8,bounds.max.z-.8);
+
+    if(blocked(x,z,.55)) continue;
+    const y=floorYAt(x,z);
+    if(y===null) continue;
+
+    let clearance=999;
+    for(const box of houseCollisionBoxes){
+      const nx=Math.max(box.minX,Math.min(x,box.maxX));
+      const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
+      clearance=Math.min(clearance,Math.hypot(x-nx,z-nz));
     }
+
+    candidates.push({
+      x,z,y,clearance,
+      centerDistance:Math.hypot(fx,fz)
+    });
   }
 
-  // Even in a malformed export, keep the player in the model center rather
-  // than sending them outside the house.
+  candidates.sort((a,b)=>
+    (b.clearance-b.centerDistance*.8)-
+    (a.clearance-a.centerDistance*.8)
+  );
+
+  if(candidates.length){
+    const best=candidates[0];
+    houseSpawn.set(best.x,EYE,best.z);
+    console.log("[DeepSeeker] apartment spawn:",{
+      x:Number(best.x.toFixed(2)),
+      z:Number(best.z.toFixed(2)),
+      floorY:Number(best.y.toFixed(2))
+    });
+    return true;
+  }
+
   houseSpawn.set(0,EYE,0);
-  console.warn("[DeepSeeker] center is blocked; using exact living-room origin");
+  console.warn("[DeepSeeker] no sampled apartment floor position found; using center");
   return true;
 }
 
@@ -889,13 +903,15 @@ function chooseHouseReturnPortalPosition(root){
   // The living-room spawn is our anchor. Test a handful of nearby spots so
   // the cup stays inside the living room instead of being randomly attached
   // to a wall somewhere else in the house.
+  const width=maxX-minX;
+  const depth=maxZ-minZ;
   const candidates=[
-    [ 3.10, 0.35],
-    [ 2.70,-1.30],
-    [-2.90,-0.45],
-    [-2.55, 1.25],
-    [ 1.15, 2.55],
-    [-1.20, 2.45]
+    [ width*.26,  depth*.08],
+    [ width*.20, -depth*.22],
+    [-width*.26, -depth*.08],
+    [-width*.21,  depth*.20],
+    [ width*.08,  depth*.28],
+    [-width*.10, -depth*.27]
   ];
 
   const hits=[];
@@ -1030,7 +1046,7 @@ function ensureHouseCollisionSetup(){
         pendingHouseStart=false;
         setHouseMode(true);
       }else{
-        eventText.textContent="HOUSE READY";
+        eventText.textContent="APARTMENT READY";
         eventText.style.opacity="1";
         setTimeout(()=>{eventText.style.opacity="0";},1000);
       }
@@ -1053,7 +1069,7 @@ function loadHouse(){
       houseModel=gltf.scene;
       houseModel.name="DeepSeekerHouse";
 
-      // The imported model is the entire house level.
+      // The imported model is the entire apartment level.
       houseRoot.add(houseModel);
 
       let meshCount=0;
@@ -1208,7 +1224,7 @@ function setHouseMode(enabled){
     player.jumpVelocity=0;
 
     objective.textContent="Find the hidden coffee cup. Press E to interact with it.";
-    eventText.textContent="HOUSE LEVEL";
+    eventText.textContent="APARTMENT LEVEL";
     eventText.style.opacity="1";
     showHouseIntroPhoneMessage();
     setTimeout(()=>{eventText.style.opacity="0";},1400);
