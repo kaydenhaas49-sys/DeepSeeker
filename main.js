@@ -717,6 +717,8 @@ function toggleHouseDoor(){
 function chooseSafeHouseSpawn(root){
   if(!root || !houseCollisionBoxes.length) return false;
 
+  root.updateMatrixWorld(true);
+
   const bounds=new THREE.Box3().setFromObject(root);
   const margin=1.5;
   const minX=bounds.min.x+margin;
@@ -744,14 +746,61 @@ function chooseSafeHouseSpawn(root){
     return false;
   };
 
-  const center=bounds.getCenter(new THREE.Vector3());
-  const step=.8;
+  // The old spawn search only checked the model's outer X/Z rectangle. That
+  // can select a courtyard, porch, driveway, or other outdoor section.
+  // Instead, sample actual house geometry: a valid spawn needs a real floor
+  // directly below the player AND interior geometry overhead.
+  const meshes=houseMeshes.length ? houseMeshes : [];
+  if(!meshes.length) return false;
+
+  const downOrigin=new THREE.Vector3();
+  const upOrigin=new THREE.Vector3();
+  const downDir=new THREE.Vector3(0,-1,0);
+  const upDir=new THREE.Vector3(0,1,0);
+  const floorHits=[];
+  const ceilingHits=[];
+
+  const rayY=EYE+0.35;
+  const ceilingMin=1.65;
+  const ceilingMax=5.5;
+  const step=.7;
+
   let best=null;
   let bestScore=-Infinity;
 
   for(let x=minX;x<=maxX;x+=step){
     for(let z=minZ;z<=maxZ;z+=step){
-      if(blocked(x,z)) continue;
+      if(blocked(x,z,.72)) continue;
+
+      downOrigin.set(x,rayY,z);
+      houseFloorRaycaster.set(downOrigin,downDir);
+      houseFloorRaycaster.near=0;
+      houseFloorRaycaster.far=rayY+1.5;
+      floorHits.length=0;
+      houseFloorRaycaster.intersectObjects(meshes,true,floorHits);
+
+      const floorHit=floorHits.find(hit=>{
+        if(!hit.face) return false;
+        const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+        return n.y>0.55 && hit.point.y>=-0.05 && hit.point.y<=0.35;
+      });
+
+      if(!floorHit) continue;
+
+      upOrigin.set(x,EYE,z);
+      houseFloorRaycaster.set(upOrigin,upDir);
+      houseFloorRaycaster.near=0;
+      houseFloorRaycaster.far=ceilingMax;
+      ceilingHits.length=0;
+      houseFloorRaycaster.intersectObjects(meshes,true,ceilingHits);
+
+      const ceilingHit=ceilingHits.find(hit=>{
+        if(!hit.face) return false;
+        const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+        return n.y< -0.35 && hit.point.y-EYE>=ceilingMin && hit.point.y-EYE<=ceilingMax;
+      });
+
+      if(!ceilingHit) continue;
 
       let clearance=8;
       for(const box of houseCollisionBoxes){
@@ -760,39 +809,51 @@ function chooseSafeHouseSpawn(root){
         clearance=Math.min(clearance,Math.hypot(x-nx,z-nz));
       }
 
-      const centerDistance=Math.hypot(x-center.x,z-center.z);
-      const score=Math.min(clearance,8)*8-centerDistance;
-      if(score>bestScore){
-        bestScore=score;
+      const ceilingDistance=ceilingHit.point.y-EYE;
+      const floorHeight=Math.max(0,floorHit.point.y);
+      const centerX=(minX+maxX)*.5;
+      const centerZ=(minZ+maxZ)*.5;
+      const centerDistance=Math.hypot(x-centerX,z-centerZ);
+
+      // Favor roomy interior floor, stay away from walls, and slightly favor
+      // central rooms without requiring the geometric center to be indoors.
+      const roomScore =
+        Math.min(clearance,6)*10 +
+        Math.min(ceilingDistance,3.5)*4 -
+        centerDistance*.08 +
+        floorHeight*1.5;
+
+      if(roomScore>bestScore){
+        bestScore=roomScore;
         best={x,z};
+      }
+    }
+  }
+
+  if(!best){
+    // Last-resort center search, still rejecting obvious wall overlap.
+    const center=bounds.getCenter(new THREE.Vector3());
+    const fallbackOffsets=[
+      [0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2],
+      [2.4,0],[-2.4,0],[0,2.4],[0,-2.4],
+      [3.6,0],[-3.6,0],[0,3.6],[0,-3.6]
+    ];
+
+    for(const [ox,oz] of fallbackOffsets){
+      const x=center.x+ox;
+      const z=center.z+oz;
+      if(x<minX || x>maxX || z<minZ || z>maxZ) continue;
+      if(!blocked(x,z,.72)){
+        best={x,z};
+        break;
       }
     }
   }
 
   if(!best) return false;
 
-  // Final safety pass. Keep trying nearby candidates if the best score lands
-  // on an animated-door footprint or another proxy edge.
-  const fallbackOffsets=[
-    [0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2],
-    [2.4,0],[-2.4,0],[0,2.4],[0,-2.4]
-  ];
-
-  let finalBest=null;
-  for(const [ox,oz] of fallbackOffsets){
-    const x=best.x+ox;
-    const z=best.z+oz;
-    if(x<minX || x>maxX || z<minZ || z>maxZ) continue;
-    if(!blocked(x,z,.75)){
-      finalBest={x,z};
-      break;
-    }
-  }
-
-  if(!finalBest) finalBest=best;
-
-  houseSpawn.set(finalBest.x,EYE,finalBest.z);
-  console.log("[DeepSeeker] safe house spawn:",{
+  houseSpawn.set(best.x,EYE,best.z);
+  console.log("[DeepSeeker] safe house interior spawn:",{
     x:Number(best.x.toFixed(2)),
     z:Number(best.z.toFixed(2))
   });
