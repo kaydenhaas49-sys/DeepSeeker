@@ -103,13 +103,10 @@ player.hands.visible=true;
 // ---------------------------------------------------------------------------
 const HOUSE_MODEL_PATH="./assets/house_interior.glb";
 const HOUSE_TARGET_HEIGHT=7.2;
-const HOUSE_TEST_PORTAL_POSITION=new THREE.Vector3(32,1.0,27);
-
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
-let houseReturnPosition=new THREE.Vector3(0,0,0);
 let pendingHouseStart=false;
 let houseLoadFailed=false;
 let houseLoadStarted=false;
@@ -390,50 +387,6 @@ const houseFill=new THREE.PointLight(0xffdca0,2.2,18,1.7);
 houseFill.position.set(0,2.8,0);
 houseLights.add(houseFill);
 
-// Backrooms-side teleporter. The house level itself contains only the GLB.
-const housePortalGroup=new THREE.Group();
-housePortalGroup.name="HouseTeleport";
-
-const housePortal=new THREE.Mesh(
-  new THREE.BoxGeometry(1.15,2.2,0.32),
-  new THREE.MeshStandardMaterial({
-    color:0xd7b85f,
-    emissive:0x8f6916,
-    emissiveIntensity:4,
-    roughness:.4,
-    metalness:.1
-  })
-);
-
-const housePortalRing=new THREE.Mesh(
-  new THREE.TorusGeometry(.9,.07,10,32),
-  new THREE.MeshBasicMaterial({color:0xffdc70})
-);
-housePortalRing.rotation.x=Math.PI/2;
-housePortalRing.position.y=-.84;
-housePortalGroup.add(housePortal,housePortalRing);
-housePortalGroup.position.copy(HOUSE_TEST_PORTAL_POSITION);
-scene.add(housePortalGroup);
-
-const housePortalLight=new THREE.PointLight(0xc6a85c,3.5,8,2);
-housePortalLight.position.set(
-  HOUSE_TEST_PORTAL_POSITION.x,
-  HOUSE_TEST_PORTAL_POSITION.y+.5,
-  HOUSE_TEST_PORTAL_POSITION.z-.4
-);
-scene.add(housePortalLight);
-
-// Return pad lives outside the model so the GLB remains the only level asset.
-const houseReturnGroup=new THREE.Group();
-houseReturnGroup.name="HouseReturnPad";
-houseReturnGroup.visible=false;
-
-const houseReturn=housePortal.clone();
-const houseReturnLight=housePortalLight.clone();
-houseReturnLight.position.set(0,.5,-.4);
-houseReturnGroup.add(houseReturn,houseReturnLight);
-scene.add(houseReturnGroup);
-
 function attachHouseDoor(obj,index){
   const parent=obj.parent;
   if(!parent) return;
@@ -689,92 +642,6 @@ function toggleHouseDoor(){
   return true;
 }
 
-function chooseHousePositions(){
-  if(!houseModel || !houseCollisionBoxes.length) return false;
-
-  const bounds=new THREE.Box3().setFromObject(houseModel);
-  const margin=1.15;
-  const minX=bounds.min.x+margin;
-  const maxX=bounds.max.x-margin;
-  const minZ=bounds.min.z+margin;
-  const maxZ=bounds.max.z-margin;
-  if(minX>=maxX || minZ>=maxZ) return false;
-
-  const collides=(x,z,radius=.55)=>{
-    for(const box of houseCollisionBoxes){
-      if(
-        x>=box.minX-radius &&
-        x<=box.maxX+radius &&
-        z>=box.minZ-radius &&
-        z<=box.maxZ+radius
-      ) return true;
-    }
-    return false;
-  };
-
-  const samples=[];
-  const step=Math.max(.6,Math.min(1.0,Math.max(maxX-minX,maxZ-minZ)/28));
-  for(let x=minX;x<=maxX;x+=step){
-    for(let z=minZ;z<=maxZ;z+=step){
-      if(!collides(x,z)) samples.push({x,z});
-    }
-  }
-  if(!samples.length) return false;
-
-  const center=new THREE.Vector3(
-    (bounds.min.x+bounds.max.x)*.5,
-    EYE,
-    (bounds.min.z+bounds.max.z)*.5
-  );
-
-  // Spawn near the middle of the house, but only on actual walkable space.
-  samples.sort((a,b)=>{
-    const da=Math.hypot(a.x-center.x,a.z-center.z);
-    const db=Math.hypot(b.x-center.x,b.z-center.z);
-    return da-db;
-  });
-  const spawn=samples[0];
-  houseSpawn.set(spawn.x,EYE,spawn.z);
-
-  // Put the teleporter as far from spawn as the house allows. This avoids
-  // ever spawning inside/next to it, even when the house is small.
-  const MIN_PORTAL_DISTANCE=12;
-  const portalCandidates=samples.filter(sample=>{
-    return Math.hypot(sample.x-spawn.x,sample.z-spawn.z)>=MIN_PORTAL_DISTANCE;
-  });
-
-  let candidates=portalCandidates.length ? portalCandidates : samples.filter(sample=>{
-    return Math.hypot(sample.x-spawn.x,sample.z-spawn.z)>=8;
-  });
-  if(!candidates.length) candidates=samples;
-
-  // Farthest point from spawn wins. On ties, prefer the perimeter so the
-  // teleporter naturally ends up tucked away instead of in the main room.
-  candidates.sort((a,b)=>{
-    const da=Math.hypot(a.x-spawn.x,a.z-spawn.z);
-    const db=Math.hypot(b.x-spawn.x,b.z-spawn.z);
-    if(Math.abs(db-da)>.25) return db-da;
-
-    const ea=Math.min(
-      Math.abs(a.x-bounds.min.x),
-      Math.abs(bounds.max.x-a.x),
-      Math.abs(a.z-bounds.min.z),
-      Math.abs(bounds.max.z-a.z)
-    );
-    const eb=Math.min(
-      Math.abs(b.x-bounds.min.x),
-      Math.abs(bounds.max.x-b.x),
-      Math.abs(b.z-bounds.min.z),
-      Math.abs(bounds.max.z-b.z)
-    );
-    return ea-eb;
-  });
-
-  const portal=candidates[0];
-  houseReturnPosition.set(portal.x,0,portal.z);
-  return true;
-}
-
 function ensureHouseCollisionSetup(){
   if(!houseLoaded || houseCollisionReady || houseCollisionBuildStarted || !houseModel) return;
 
@@ -789,8 +656,6 @@ function ensureHouseCollisionSetup(){
       });
     }
     buildHouseCollisionProxies(houseModel);
-    chooseHousePositions();
-
     houseCollisionReady=true;
     houseCollisionBuildStarted=false;
 
@@ -965,10 +830,6 @@ function setHouseMode(enabled){
   world.root.visible=!houseMode;
   houseRoot.visible=houseMode;
 
-  housePortalGroup.visible=!houseMode;
-  housePortalLight.visible=!houseMode;
-  houseReturnGroup.visible=houseMode;
-
   player.ignoreWorldCollision=houseMode;
   player.houseOctree=null;
   player.extraCollisionBoxes=[];
@@ -987,9 +848,7 @@ function setHouseMode(enabled){
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    houseReturnGroup.position.copy(houseReturnPosition);
-
-    objective.textContent="Explore the house. Find the hidden teleporter.";
+    objective.textContent="Explore the house.";
     eventText.textContent="HOUSE LEVEL";
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},1400);
@@ -1003,41 +862,8 @@ function setHouseMode(enabled){
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    houseReturnGroup.visible=false;
     objective.textContent=STORY[storyStage].objective;
   }
-}
-
-function tryHouseTeleport(){
-  if(!houseLoaded){
-    ensureHouseLoading();
-    eventText.textContent="HOUSE STILL LOADING...";
-    eventText.style.opacity="1";
-    setTimeout(()=>{eventText.style.opacity="0";},1200);
-    return;
-  }
-
-  if(!houseCollisionReady){
-    ensureHouseCollisionSetup();
-    eventText.textContent="HOUSE PREPARING...";
-    eventText.style.opacity="1";
-    setTimeout(()=>{eventText.style.opacity="0";},1200);
-    return;
-  }
-
-  if(houseMode){
-    if(toggleHouseDoor()) return;
-    const d=Math.hypot(player.pos.x,player.pos.z);
-    if(d<2.6) setHouseMode(false);
-    return;
-  }
-
-  const d=Math.hypot(
-    player.pos.x-HOUSE_TEST_PORTAL_POSITION.x,
-    player.pos.z-HOUSE_TEST_PORTAL_POSITION.z
-  );
-
-  if(d<3) setHouseMode(true);
 }
 
 const initialParams=new URLSearchParams(location.search);
@@ -1502,10 +1328,6 @@ document.addEventListener("pointerlockchange",()=>{
 });
 
 document.addEventListener("keydown",e=>{
-  if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen){
-    tryHouseTeleport();
-    return;
-  }
   if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !phoneOpen && !controlsOpen){ newSeed(); }
