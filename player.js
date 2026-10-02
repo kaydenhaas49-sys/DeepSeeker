@@ -1,7 +1,6 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
-import { Capsule } from "three/addons/math/Capsule.js";
 import { createHazmatCharacter } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
@@ -37,12 +36,6 @@ export class Player {
     this.jumpY = 0;
     this.jumpVelocity = 0;
     this.extraCollisionBoxes = [];
-    this.houseOctree = null;
-    this.houseCollisionCapsule = new Capsule(
-      new THREE.Vector3(0,0.4,0),
-      new THREE.Vector3(0,EYE-0.2,0),
-      PLAYER_RADIUS
-    );
     this.ignoreWorldCollision = false;
 
     this.characterModel = null;
@@ -312,16 +305,6 @@ export class Player {
         const dz = z - nz;
         if (dx * dx + dz * dz < r * r) return true;
       }
-    }
-
-    if (this.houseOctree && this.ignoreWorldCollision) {
-      const capsule=this.houseCollisionCapsule;
-      capsule.start.set(x,0.4,z);
-      capsule.end.set(x,Math.max(0.8,EYE-0.2),z);
-      capsule.radius=PLAYER_RADIUS;
-
-      const hit=this.houseOctree.capsuleIntersect(capsule);
-      if(hit && hit.normal && Math.abs(hit.normal.y)<0.65) return true;
     }
 
     for (const box of this.extraCollisionBoxes) {
