@@ -1230,8 +1230,10 @@ function setHouseMode(enabled,options={}){
   player.extraCollisionBoxes=[];
   houseDoorCollisionDirty=true;
 
-  figure.visible=false;
-  figureLife=0;
+  spiderEntity.visible=false;
+  spiderActive=false;
+  spiderBehaviorState="idle";
+  spiderBehaviorTime=0;
 
   if(houseMode){
     renderer.setPixelRatio(housePixelRatio);
@@ -1262,8 +1264,11 @@ function setHouseMode(enabled,options={}){
 
     objective.textContent=STORY[storyStage].objective;
 
+    if(gameStarted){
+      spawnSpiderAtPlayer();
+    }
+
     if(options.announceFall){
-      spawnBacteriaAtPlayer();
       eventText.textContent="YOU FELL.";
       eventText.style.opacity="1";
       setTimeout(()=>{
@@ -1290,41 +1295,28 @@ if(new URLSearchParams(location.search).get("lobby")==="1"){
 player.hands.visible=true;
 
 
-const figure=new THREE.Group();
-figure.name="BackroomsBacteriaEntity";
-figure.visible=false;
-scene.add(figure);
+const spiderEntity=new THREE.Group();
+spiderEntity.name="SpiderEntity";
+spiderEntity.visible=false;
+scene.add(spiderEntity);
 
-const fallbackFigure=new THREE.Group();
-const figureMat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1,metalness:0});
-const figureBody=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.95,6,10),figureMat);
-figureBody.position.y=1.05;
-const figureHead=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),figureMat);
-figureHead.position.y=1.85;
-fallbackFigure.add(figureBody,figureHead);
-fallbackFigure.visible=false;
-figure.add(fallbackFigure);
+let spiderLoaded=false;
+let spiderModel=null;
+let spiderMixer=null;
+const spiderActions=new Map();
+let spiderAnimationState="";
+let spiderWantedState="idle";
+let spiderBehaviorState="idle";
+let spiderBehaviorTime=0;
+let spiderAttackPlayed=false;
+let spiderActive=false;
 
-let bacteriaLoaded=false;
-let bacteriaModel=null;
-let bacteriaMixer=null;
-const bacteriaActions=new Map();
-let bacteriaState="";
-let bacteriaWantedState="idle";
-let generatedBacteriaFailures=0;
-let figureState="idle";
-let figureStateTime=0;
-let figureAge=0;
-let figureAttackPlayed=false;
-const debugSpawnBacteria=false;
-
-const ENTITY_STALK_TIME=1.15;
-const ENTITY_MAX_CHASE_TIME=8.0;
-const ENTITY_ATTACK_RANGE=1.45;
-const ENTITY_CHASE_SPEED=5.8;
-const ENTITY_RADIUS=.55;
-const ENTITY_GROUND_OFFSET=.08;
-const ENTITY_TARGET_SPAN=3.0;
+const SPIDER_STALK_TIME=1.4;
+const SPIDER_ATTACK_RANGE=1.45;
+const SPIDER_SPEED=1.15;
+const SPIDER_RADIUS=.55;
+const SPIDER_GROUND_OFFSET=.08;
+const SPIDER_TARGET_SPAN=3.0;
 
 const SPIDER_ANIMATION_RANGES={
   idle1:[164,213],
@@ -1353,7 +1345,7 @@ const SPIDER_ANIMATION_ALIAS={
   death:"die1"
 };
 
-function fitBacteriaModel(model){
+function fitSpiderModel(model){
   model.traverse((obj)=>{
     if(!obj.isMesh) return;
     obj.frustumCulled=false;
@@ -1365,7 +1357,7 @@ function fitBacteriaModel(model){
   const size=box.getSize(new THREE.Vector3());
   const center=box.getCenter(new THREE.Vector3());
   const horizontalSpan=Math.max(size.x,size.z);
-  const scale=ENTITY_TARGET_SPAN/Math.max(horizontalSpan,size.y*.9,.001);
+  const scale=SPIDER_TARGET_SPAN/Math.max(horizontalSpan,size.y*.9,.001);
 
   model.position.set(
     -center.x*scale,
@@ -1375,13 +1367,13 @@ function fitBacteriaModel(model){
   model.scale.setScalar(scale);
 }
 
-function setBacteriaAnimation(name){
-  bacteriaWantedState=name;
+function setSpiderAnimation(name){
+  spiderWantedState=name;
   const actualName=SPIDER_ANIMATION_ALIAS[name] || name;
-  const action=bacteriaActions.get(actualName);
-  if(!action || bacteriaState===actualName) return;
+  const action=spiderActions.get(actualName);
+  if(!action || spiderAnimationState===actualName) return;
 
-  for(const [key,item] of bacteriaActions){
+  for(const [key,item] of spiderActions){
     if(key===actualName){
       item.reset();
       item.fadeIn(.08);
@@ -1391,110 +1383,125 @@ function setBacteriaAnimation(name){
     }
   }
 
-  bacteriaState=actualName;
+  spiderAnimationState=actualName;
 }
 
-function groundBacteriaEntity(){
-  if(!figure.visible) return;
+function groundSpiderEntity(){
+  if(!spiderEntity.visible) return;
 
-  const activeModel=bacteriaModel || fallbackFigure;
+  const activeModel=spiderModel;
   if(!activeModel) return;
 
   activeModel.updateMatrixWorld(true);
   const box=new THREE.Box3().setFromObject(activeModel);
   if(!Number.isFinite(box.min.y)) return;
 
-  const correction=ENTITY_GROUND_OFFSET-box.min.y;
+  const correction=SPIDER_GROUND_OFFSET-box.min.y;
   if(Math.abs(correction)>.0005){
-    figure.position.y+=correction;
+    spiderEntity.position.y+=correction;
   }
 }
 
-function isEntityBlocked(x,z){
-  const walls=world.getNearbyWallBounds(x,z,ENTITY_RADIUS+.35);
+function isSpiderBlocked(x,z){
+  const walls=world.getNearbyWallBounds(x,z,SPIDER_RADIUS+.35);
   for(const wall of walls){
     const nx=Math.max(wall.minX,Math.min(x,wall.maxX));
     const nz=Math.max(wall.minZ,Math.min(z,wall.maxZ));
     const dx=x-nx;
     const dz=z-nz;
-    if(dx*dx+dz*dz<ENTITY_RADIUS*ENTITY_RADIUS) return true;
+    if(dx*dx+dz*dz<SPIDER_RADIUS*SPIDER_RADIUS) return true;
   }
   return false;
 }
 
-function findEntitySpawnPosition(){
+function findSpiderSpawnPosition(){
   const forwardX=-Math.sin(player.yaw);
   const forwardZ=-Math.cos(player.yaw);
   const rightX=Math.cos(player.yaw);
   const rightZ=-Math.sin(player.yaw);
 
   const candidates=[
-    [12,0],[14,0],[10,2.5],[10,-2.5],
-    [13,3.5],[13,-3.5],[16,2],[16,-2]
+    [12,0],[15,0],[10,3],[10,-3],
+    [13,4],[13,-4],[17,2],[17,-2]
   ];
 
   for(const [distance,side] of candidates){
     const x=player.pos.x+forwardX*distance+rightX*side;
     const z=player.pos.z+forwardZ*distance+rightZ*side;
-    if(!isEntityBlocked(x,z)){
+    if(!isSpiderBlocked(x,z)){
       return {x,z};
     }
   }
 
   return {
-    x:player.pos.x+forwardX*10,
-    z:player.pos.z+forwardZ*10
+    x:player.pos.x+forwardX*12,
+    z:player.pos.z+forwardZ*12
   };
 }
 
-function spawnBacteriaAtPlayer(){
-  const spawn=findEntitySpawnPosition();
-  figure.position.set(spawn.x,ENTITY_GROUND_OFFSET,spawn.z);
-  figure.rotation.y=Math.atan2(
+function moveSpiderTowardPlayer(dt){
+  const dx=player.pos.x-spiderEntity.position.x;
+  const dz=player.pos.z-spiderEntity.position.z;
+  const distance=Math.hypot(dx,dz);
+
+  if(distance<=SPIDER_ATTACK_RANGE){
+    return distance;
+  }
+
+  const inv=1/Math.max(distance,.001);
+  const desiredX=dx*inv;
+  const desiredZ=dz*inv;
+  const step=Math.min(SPIDER_SPEED*dt,Math.max(0,distance-SPIDER_ATTACK_RANGE));
+
+  let bestX=0;
+  let bestZ=0;
+  let bestScore=-Infinity;
+
+  const angles=[0,.28,-.28,.56,-.56,.9,-.9,1.25,-1.25,1.6,-1.6,2.0,-2.0,2.55,-2.55];
+  for(const angle of angles){
+    const cos=Math.cos(angle);
+    const sin=Math.sin(angle);
+    const dirX=desiredX*cos-desiredZ*sin;
+    const dirZ=desiredX*sin+desiredZ*cos;
+    const nextX=spiderEntity.position.x+dirX*step;
+    const nextZ=spiderEntity.position.z+dirZ*step;
+
+    if(isSpiderBlocked(nextX,nextZ)) continue;
+
+    const score=dirX*desiredX+dirZ*desiredZ;
+    if(score>bestScore){
+      bestScore=score;
+      bestX=dirX;
+      bestZ=dirZ;
+    }
+  }
+
+  if(bestScore>-Infinity){
+    spiderEntity.position.x+=bestX*step;
+    spiderEntity.position.z+=bestZ*step;
+  }
+
+  return distance;
+}
+
+function spawnSpiderAtPlayer(){
+  if(!gameStarted || houseMode) return false;
+  if(spiderActive) return true;
+
+  const spawn=findSpiderSpawnPosition();
+  spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
+  spiderEntity.rotation.y=Math.atan2(
     player.pos.x-spawn.x,
     player.pos.z-spawn.z
   );
-  figureState="stalk";
-  figureStateTime=0;
-  figureAge=0;
-  figureAttackPlayed=false;
-  figureLife=ENTITY_MAX_CHASE_TIME;
-  figure.visible=true;
-  setBacteriaAnimation("stalk");
-}
 
-function loadStaticFallback(){
-  const fallbackLoader=new GLTFLoader();
-  fallbackLoader.load(
-    "./assets/backrooms_bacteria_rigged_3d_model_unofficial.glb",
-    (gltf)=>{
-      const model=gltf.scene;
-      model.name="BacteriaModelFallback";
-      fitBacteriaModel(model);
-      bacteriaModel=model;
-      figure.add(model);
-      bacteriaLoaded=true;
-      fallbackFigure.visible=false;
-
-      eventText.textContent="SPIDER LOAD FALLBACK";
-      eventText.style.opacity="1";
-      setTimeout(()=>{eventText.style.opacity="0";},1800);
-    },
-    undefined,
-    ()=>{
-      fallbackFigure.visible=true;
-      const spawn=findEntitySpawnPosition();
-      figure.position.set(spawn.x,ENTITY_GROUND_OFFSET,spawn.z);
-      figure.rotation.y=Math.atan2(
-        player.pos.x-spawn.x,
-        player.pos.z-spawn.z
-      );
-      figureLife=Infinity;
-      figure.visible=true;
-      eventText.textContent="SPIDER LOAD FAILED";
-      eventText.style.opacity="1";
-    }
-  );
+  spiderBehaviorState="stalk";
+  spiderBehaviorTime=0;
+  spiderAttackPlayed=false;
+  spiderActive=true;
+  spiderEntity.visible=true;
+  setSpiderAnimation("stalk");
+  return true;
 }
 
 async function loadSpiderFromPack(){
@@ -1531,17 +1538,16 @@ async function loadSpiderFromPack(){
     const loader=new FBXLoader(manager);
     const buffer=await zip.file(fbxName).async("arraybuffer");
     const model=loader.parse(buffer,"");
-    model.name="SpiderEntity";
+    model.name="SpiderVisual";
     model.visible=true;
 
-    fitBacteriaModel(model);
+    fitSpiderModel(model);
 
     const sourceClip=model.animations?.[0];
     if(!sourceClip) throw new Error("Spider FBX has no animation clip.");
 
-    // The pack's documented 329-frame range lets us derive its actual source
-    // FPS from the imported clip instead of assuming a fixed frame rate.
     const sourceFPS=329/Math.max(sourceClip.duration,.001);
+    spiderMixer=new THREE.AnimationMixer(model);
 
     for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
       const clip=THREE.AnimationUtils.subclip(
@@ -1551,27 +1557,7 @@ async function loadSpiderFromPack(){
         endFrame+1,
         sourceFPS
       );
-      const action=bacteriaMixer?.clipAction(clip);
-      if(action){
-        action.setLoop(THREE.LoopRepeat,Infinity);
-        bacteriaActions.set(name,action);
-      }
-    }
-
-    bacteriaModel=model;
-    bacteriaMixer=new THREE.AnimationMixer(model);
-    bacteriaActions.clear();
-
-    // Build the actions again now that the mixer exists.
-    for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
-      const clip=THREE.AnimationUtils.subclip(
-        sourceClip,
-        "spider_"+name,
-        startFrame,
-        endFrame+1,
-        sourceFPS
-      );
-      const action=bacteriaMixer.clipAction(clip);
+      const action=spiderMixer.clipAction(clip);
       action.setLoop(
         name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
         name.startsWith("die") ? 1 : Infinity
@@ -1579,28 +1565,28 @@ async function loadSpiderFromPack(){
       if(name.startsWith("die")){
         action.clampWhenFinished=true;
       }
-      bacteriaActions.set(name,action);
+      spiderActions.set(name,action);
     }
 
-    figure.add(model);
-    bacteriaLoaded=true;
-    setBacteriaAnimation(bacteriaWantedState);
+    spiderModel=model;
+    spiderEntity.add(model);
+    spiderLoaded=true;
+    setSpiderAnimation(spiderWantedState);
 
     eventText.textContent="SPIDER READY";
     eventText.style.opacity="1";
     setTimeout(()=>{
       if(eventText.textContent==="SPIDER READY") eventText.style.opacity="0";
     },1800);
-
-    // Keep texture blobs alive for the model's lifetime.
   }catch(error){
     console.error("[DeepSeeker] failed to load Spider-Psionic.zip:",error);
-    loadStaticFallback();
+    spiderLoaded=false;
+    eventText.textContent="SPIDER FAILED TO LOAD";
+    eventText.style.opacity="1";
   }
 }
 
 loadSpiderFromPack();
-let figureLife=0;
 player.onStep=({intensity})=>audio.step(intensity);
 
 const BACKROOMS_FALL_DURATION=1.8;
@@ -1961,12 +1947,12 @@ function triggerEvent(){
   eventCooldown=3.5;
   pulse=1;
 
-  if(!bacteriaLoaded && !fallbackFigure.visible){
-    return;
+  if(!spiderLoaded || spiderActive){
+    audio.scare();
+  }else{
+    spawnSpiderAtPlayer();
+    audio.scare();
   }
-
-  spawnBacteriaAtPlayer();
-  audio.scare();
 
   objective.textContent=Math.random()>.5
     ? "Something moved nearby."
@@ -2112,95 +2098,66 @@ function animate(){
     playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
   }
 
-  if(!houseMode && bacteriaMixer){
-    bacteriaMixer.update(dt);
+  if(!houseMode && spiderMixer && spiderActive){
+    spiderMixer.update(dt);
   }
 
-  groundBacteriaEntity();
+  groundSpiderEntity();
 
-  if(figureLife>0 && !houseMode){
-    figureAge+=dt;
-    figureStateTime+=dt;
+  if(spiderActive && !houseMode){
+    spiderBehaviorTime+=dt;
 
-    const targetX=player.pos.x;
-    const targetZ=player.pos.z;
-    const dx=targetX-figure.position.x;
-    const dz=targetZ-figure.position.z;
-    const distance=Math.hypot(dx,dz);
+    const targetDistance=Math.hypot(
+      player.pos.x-spiderEntity.position.x,
+      player.pos.z-spiderEntity.position.z
+    );
 
-    if(figureState==="stalk"){
-      setBacteriaAnimation("stalk");
-      if(figureStateTime>=ENTITY_STALK_TIME){
-        figureState="chase";
-        figureStateTime=0;
-        setBacteriaAnimation("chase");
+    if(spiderBehaviorState==="stalk"){
+      setSpiderAnimation("stalk");
+
+      if(spiderBehaviorTime>=SPIDER_STALK_TIME){
+        spiderBehaviorState="chase";
+        spiderBehaviorTime=0;
+        setSpiderAnimation("chase");
       }
-    }else if(figureState==="chase"){
-      setBacteriaAnimation("chase");
+    }else if(spiderBehaviorState==="chase"){
+      setSpiderAnimation("chase");
 
-      if(distance<=ENTITY_ATTACK_RANGE){
-        figureState="attack";
-        figureStateTime=0;
-        figureAttackPlayed=false;
-        setBacteriaAnimation("attack");
+      const distance=moveSpiderTowardPlayer(dt);
+
+      if(distance<=SPIDER_ATTACK_RANGE){
+        spiderBehaviorState="attack";
+        spiderBehaviorTime=0;
+        spiderAttackPlayed=false;
+        setSpiderAnimation("attack");
         pulse=1;
         audio.scare();
-      }else{
-        const inv=1/Math.max(distance,.001);
-        const step=Math.min(ENTITY_CHASE_SPEED*dt,Math.max(0,distance-ENTITY_ATTACK_RANGE));
-        const moveX=dx*inv*step;
-        const moveZ=dz*inv*step;
-
-        const nextX=figure.position.x+moveX;
-        const nextZ=figure.position.z+moveZ;
-
-        if(!isEntityBlocked(nextX,nextZ)){
-          figure.position.x=nextX;
-          figure.position.z=nextZ;
-        }else if(!isEntityBlocked(nextX,figure.position.z)){
-          figure.position.x=nextX;
-        }else if(!isEntityBlocked(figure.position.x,nextZ)){
-          figure.position.z=nextZ;
-        }
       }
+    }else if(spiderBehaviorState==="attack"){
+      setSpiderAnimation("attack");
 
-      // Keep the entity facing the player while stalking/chasing.
-      figure.rotation.y=Math.atan2(
-        player.pos.x-figure.position.x,
-        player.pos.z-figure.position.z
-      );
-
-      if(figureAge>=ENTITY_MAX_CHASE_TIME){
-        figureLife=0;
-      }
-    }else if(figureState==="attack"){
-      setBacteriaAnimation("attack");
-      figure.rotation.y=Math.atan2(
-        player.pos.x-figure.position.x,
-        player.pos.z-figure.position.z
-      );
-
-      if(!figureAttackPlayed){
-        figureAttackPlayed=true;
+      if(!spiderAttackPlayed){
+        spiderAttackPlayed=true;
         pulse=1;
       }
 
-      if(figureStateTime>=1.0){
-        figureLife=0;
+      if(spiderBehaviorTime>=1.0){
+        spiderBehaviorState="chase";
+        spiderBehaviorTime=0;
+        setSpiderAnimation("chase");
       }
     }
 
-    figure.visible=true;
-    fallbackFigure.visible=!bacteriaLoaded;
-    fallbackFigure.scale.setScalar(.96+.08*Math.sin(t*12));
+    spiderEntity.rotation.y=Math.atan2(
+      player.pos.x-spiderEntity.position.x,
+      player.pos.z-spiderEntity.position.z
+    );
+    spiderEntity.visible=true;
   }else{
-    figure.visible=false;
-    fallbackFigure.visible=false;
-    figureState="idle";
-    figureStateTime=0;
-    figureAge=0;
+    spiderEntity.visible=false;
+    spiderBehaviorState="idle";
+    spiderBehaviorTime=0;
   }
-
   if(eventCooldown>0) eventCooldown-=dt;
   if(!houseMode && eventCooldown<=0 && t>nextEvent){
     triggerEvent();
