@@ -399,7 +399,7 @@ export class Multiplayer {
       const nearby = dx * dx + dz * dz < 60 * 60;
       remote.group.visible = sameLevel && nearby;
 
-      if(remote.mixer){
+      if(remote.mixer && remote.group.visible){
         remote.mixer.update(dt);
       }
 
