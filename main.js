@@ -739,14 +739,81 @@ function toggleHouseDoor(){
 function chooseSafeHouseSpawn(root){
   if(!root) return false;
 
-  // The house model is normalized in loadHouse() so its X/Z center is exactly
-  // 0,0. This is the intended living-room spawn: do not try to infer an
-  // interior room from collision geometry.
-  houseSpawn.set(0,EYE,0);
+  // Keep the intended spawn in the living room near the model center, but
+  // never start the player inside a collision proxy. Search outward only a
+  // few metres so we stay in the same room.
+  const targetX=0;
+  const targetZ=0;
+  const radius=.48;
 
-  console.log("[DeepSeeker] fixed living-room spawn:",{
-    x:0,
-    z:0
+  const isBlocked=(x,z)=>{
+    for(const box of houseCollisionBoxes){
+      if(
+        Number.isFinite(box.centerX) &&
+        Number.isFinite(box.centerZ) &&
+        Number.isFinite(box.halfX) &&
+        Number.isFinite(box.halfZ) &&
+        Number.isFinite(box.rotationY)
+      ){
+        const c=Math.cos(box.rotationY);
+        const sn=Math.sin(box.rotationY);
+        const dx=x-box.centerX;
+        const dz=z-box.centerZ;
+        const localX=dx*c+dz*sn;
+        const localZ=-dx*sn+dz*c;
+        const nx=Math.max(-box.halfX,Math.min(localX,box.halfX));
+        const nz=Math.max(-box.halfZ,Math.min(localZ,box.halfZ));
+        const ox=localX-nx;
+        const oz=localZ-nz;
+        if(ox*ox+oz*oz < radius*radius) return true;
+      }else{
+        const nx=Math.max(box.minX,Math.min(x,box.maxX));
+        const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
+        const dx=x-nx;
+        const dz=z-nz;
+        if(dx*dx+dz*dz < radius*radius) return true;
+      }
+    }
+
+    const wp=new THREE.Vector3();
+    for(const door of houseDoors){
+      door.pivot.getWorldPosition(wp);
+      if(Math.hypot(wp.x-x,wp.z-z)<1.0) return true;
+    }
+
+    return false;
+  };
+
+  let best={x:targetX,z:targetZ};
+  if(isBlocked(best.x,best.z)){
+    let bestDistance=Infinity;
+
+    for(let r=0.5;r<=7.5;r+=0.5){
+      const samples=Math.max(12,Math.ceil(r*Math.PI*4));
+
+      for(let i=0;i<samples;i++){
+        const angle=(i/samples)*Math.PI*2;
+        const x=targetX+Math.cos(angle)*r;
+        const z=targetZ+Math.sin(angle)*r;
+
+        if(isBlocked(x,z)) continue;
+
+        if(r<bestDistance){
+          bestDistance=r;
+          best={x,z};
+        }
+      }
+
+      if(bestDistance<Infinity) break;
+    }
+  }
+
+  houseSpawn.set(best.x,EYE,best.z);
+
+  console.log("[DeepSeeker] living-room spawn:",{
+    x:Number(best.x.toFixed(2)),
+    z:Number(best.z.toFixed(2)),
+    offset:Number(Math.hypot(best.x,best.z).toFixed(2))
   });
 
   return true;
