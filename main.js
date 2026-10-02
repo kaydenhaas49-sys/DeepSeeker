@@ -125,10 +125,12 @@ let houseCollisionReady=false;
 let houseCollisionBuildStarted=false;
 let houseUnloadTimer=0;
 const houseCollisionBoxes=[];
-
-
 const houseFloorRaycaster=new THREE.Raycaster();
+const houseViewRaycaster=new THREE.Raycaster();
 let houseDoorCollisionDirty=true;
+let houseCollisionRefreshTimer=0;
+let houseCollisionFocusX=NaN;
+let houseCollisionFocusZ=NaN;
 let gameStarted=false;
 let houseIntroMessageShown=false;
 let lastAutoSave=0;
@@ -301,6 +303,9 @@ function disposeHouseResources(){
 
   houseModel=null;
   houseCollisionBoxes.length=0;
+  houseCollisionRefreshTimer=0;
+  houseCollisionFocusX=NaN;
+  houseCollisionFocusZ=NaN;
   houseReturnPortal.visible=false;
   houseReturnPortal.userData.active=false;
 
@@ -645,40 +650,82 @@ function buildHouseCollisionProxies(root){
   houseCollisionBoxes.length=0;
   root.updateMatrixWorld(true);
 
+  // Use the apartment's actual vertical wall faces instead of whole-mesh
+  // bounding-box guesses. This catches walls inside combined meshes.
+  const skipPattern=/chair|sofa|couch|table|desk|bed|cabinet|wardrobe|shelf|bookcase|lamp|light|plant|tv|monitor|computer|counter|stool|oven|fridge|refrigerator|sink|toilet|bathtub|shower|curtain|rug|carpet|painting|picture|decor|drawer|coffee|cup/i;
+
+  const a=new THREE.Vector3();
+  const b=new THREE.Vector3();
+  const d=new THREE.Vector3();
+  const e1=new THREE.Vector3();
+  const e2=new THREE.Vector3();
+  const normal=new THREE.Vector3();
+  const worldA=new THREE.Vector3();
+  const worldB=new THREE.Vector3();
+  const worldC=new THREE.Vector3();
+
   root.traverse((obj)=>{
     if(!obj.isMesh || !obj.geometry) return;
     if(obj.userData.houseCollisionDoor || obj.userData.houseRemovedDoor) return;
+    if(skipPattern.test(String(obj.name||""))) return;
 
-    const box=new THREE.Box3().setFromObject(obj);
-    const size=box.getSize(new THREE.Vector3());
+    const geometry=obj.geometry;
+    const position=geometry.attributes.position;
+    if(!position) return;
 
-    const vertical=size.y;
-    const thin=Math.min(size.x,size.z);
-    const horizontal=Math.max(size.x,size.z);
+    const index=geometry.index;
+    const triCount=index ? Math.floor(index.count/3) : Math.floor(position.count/3);
 
-    // Only tall, thin architectural pieces are solid. This intentionally
-    // ignores furniture/decorative meshes so they cannot create invisible
-    // barriers across rooms.
-    const architecturalWall =
-      vertical >= 1.2 &&
-      thin <= 1.25 &&
-      horizontal >= 0.9 &&
-      size.x <= 18 &&
-      size.z <= 18;
+    for(let tri=0;tri<triCount;tri++){
+      const ia=index ? index.getX(tri*3) : tri*3;
+      const ib=index ? index.getX(tri*3+1) : tri*3+1;
+      const ic=index ? index.getX(tri*3+2) : tri*3+2;
 
-    if(!architecturalWall) return;
+      a.fromBufferAttribute(position,ia);
+      b.fromBufferAttribute(position,ib);
+      d.fromBufferAttribute(position,ic);
 
-    houseCollisionBoxes.push({
-      minX:box.min.x,
-      maxX:box.max.x,
-      minZ:box.min.z,
-      maxZ:box.max.z
-    });
+      worldA.copy(a).applyMatrix4(obj.matrixWorld);
+      worldB.copy(b).applyMatrix4(obj.matrixWorld);
+      worldC.copy(d).applyMatrix4(obj.matrixWorld);
+
+      const minY=Math.min(worldA.y,worldB.y,worldC.y);
+      const maxY=Math.max(worldA.y,worldB.y,worldC.y);
+      const height=maxY-minY;
+
+      if(height<1.15 || maxY<0.55 || minY>1.75) continue;
+
+      e1.subVectors(worldB,worldA);
+      e2.subVectors(worldC,worldA);
+      normal.crossVectors(e1,e2);
+      const normalLength=normal.length();
+      if(normalLength<1e-5) continue;
+      normal.multiplyScalar(1/normalLength);
+
+      // Only near-vertical faces can block horizontal player movement.
+      if(Math.abs(normal.y)>0.38) continue;
+
+      const minX=Math.min(worldA.x,worldB.x,worldC.x);
+      const maxX=Math.max(worldA.x,worldB.x,worldC.x);
+      const minZ=Math.min(worldA.z,worldB.z,worldC.z);
+      const maxZ=Math.max(worldA.z,worldB.z,worldC.z);
+      if(Math.max(maxX-minX,maxZ-minZ)<0.55) continue;
+
+      // Ignore tiny decorative slivers.
+      if(normalLength*.5<0.08) continue;
+
+      const pad=.055;
+      houseCollisionBoxes.push({
+        minX:minX-pad,
+        maxX:maxX+pad,
+        minZ:minZ-pad,
+        maxZ:maxZ+pad
+      });
+    }
   });
 
-  console.log("[DeepSeeker] house wall collision proxies:",houseCollisionBoxes.length);
+  console.log("[DeepSeeker] apartment wall-face collision boxes:",houseCollisionBoxes.length);
 }
-
 
 function freezeStaticHouseTransforms(root){
   root.traverse((obj)=>{
@@ -758,6 +805,9 @@ function updateHouseDoorCollisions(){
   }
 
   player.extraCollisionBoxes=boxes;
+  houseCollisionFocusX=px;
+  houseCollisionFocusZ=pz;
+  houseCollisionRefreshTimer=.12;
   houseDoorCollisionDirty=false;
 }
 
@@ -884,12 +934,14 @@ function chooseHouseReturnPortalPosition(root){
   if(!root) return false;
 
   const bounds=new THREE.Box3().setFromObject(root);
-  const minX=bounds.min.x+1.25;
-  const maxX=bounds.max.x-1.25;
-  const minZ=bounds.min.z+1.25;
-  const maxZ=bounds.max.z-1.25;
+  const minX=bounds.min.x+1.0;
+  const maxX=bounds.max.x-1.0;
+  const minZ=bounds.min.z+1.0;
+  const maxZ=bounds.max.z-1.0;
+  const width=Math.max(.1,maxX-minX);
+  const depth=Math.max(.1,maxZ-minZ);
 
-  const blocked=(x,z,radius=.38)=>{
+  const blocked=(x,z,radius=.34)=>{
     for(const box of houseCollisionBoxes){
       const nx=Math.max(box.minX,Math.min(x,box.maxX));
       const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
@@ -900,81 +952,151 @@ function chooseHouseReturnPortalPosition(root){
     return false;
   };
 
-  // The living-room spawn is our anchor. Test a handful of nearby spots so
-  // the cup stays inside the living room instead of being randomly attached
-  // to a wall somewhere else in the house.
-  const width=maxX-minX;
-  const depth=maxZ-minZ;
-  const candidates=[
-    [ width*.26,  depth*.08],
-    [ width*.20, -depth*.22],
-    [-width*.26, -depth*.08],
-    [-width*.21,  depth*.20],
-    [ width*.08,  depth*.28],
-    [-width*.10, -depth*.27]
-  ];
-
+  const surfaceNamePattern=/table|desk|counter|island|shelf|cabinet|sideboard|dresser|nightstand|kitchen|bar/i;
   const hits=[];
   const rayOrigin=new THREE.Vector3();
   const rayDirection=new THREE.Vector3(0,-1,0);
+  const target=new THREE.Vector3();
+  const spawnEye=new THREE.Vector3(houseSpawn.x,EYE,houseSpawn.z);
 
-  for(const [ox,oz] of candidates){
-    const x=THREE.MathUtils.clamp(houseSpawn.x+ox,minX,maxX);
-    const z=THREE.MathUtils.clamp(houseSpawn.z+oz,minZ,maxZ);
+  for(let x=minX+.45;x<=maxX-.45;x+=.65){
+    for(let z=minZ+.45;z<=maxZ-.45;z+=.65){
+      if(Math.hypot(x-houseSpawn.x,z-houseSpawn.z)<3.0) continue;
 
-    if(Math.hypot(x-houseSpawn.x,z-houseSpawn.z)<2.55) continue;
-    if(blocked(x,z)) continue;
+      rayOrigin.set(x,bounds.max.y+.5,z);
+      houseFloorRaycaster.set(rayOrigin,rayDirection);
+      const surfaceHits=houseFloorRaycaster.intersectObject(root,true);
 
-    // Find an upward-facing surface under the cup. This lets it rest on a
-    // table/counter in the living room when the model has one at that spot.
-    rayOrigin.set(x,Math.min(bounds.max.y-0.2,4.5),z);
-    houseFloorRaycaster.set(rayOrigin,rayDirection);
-    const hitsForSpot=houseFloorRaycaster.intersectObject(root,true);
+      let surface=null;
+      for(const hit of surfaceHits){
+        if(!hit.face || !hit.object?.isMesh) continue;
+        const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+        if(normal.y<.84) continue;
+        if(hit.point.y<.5 || hit.point.y>1.45) continue;
 
-    let y=null;
-    for(const hit of hitsForSpot){
-      if(!hit.face) continue;
-      const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-      if(normal.y<0.65) continue;
-      if(hit.point.y<0.35 || hit.point.y>2.0) continue;
-      y=hit.point.y;
-      break;
+        const surfaceBox=new THREE.Box3().setFromObject(hit.object);
+        const surfaceSize=surfaceBox.getSize(new THREE.Vector3());
+        if(Math.max(surfaceSize.x,surfaceSize.z)<.45) continue;
+        if(Math.min(surfaceSize.x,surfaceSize.z)<.12) continue;
+
+        surface={
+          hit,
+          namedSurface:surfaceNamePattern.test(String(hit.object.name||""))
+        };
+        break;
+      }
+
+      if(!surface || blocked(x,z)) continue;
+
+      target.set(x,surface.hit.point.y,z);
+      const toTarget=target.clone().sub(spawnEye);
+      const distance=toTarget.length();
+      if(distance<3.0) continue;
+
+      const direction=toTarget.normalize();
+      houseViewRaycaster.set(spawnEye,direction);
+      const lineHits=houseViewRaycaster.intersectObject(root,true);
+      const first=lineHits.find(hit=>hit.distance>0.05);
+      const occluded=!!first && first.distance<distance-.2;
+      if(!occluded) continue;
+
+      let nearestWall=999;
+      for(const box of houseCollisionBoxes){
+        const nx=Math.max(box.minX,Math.min(x,box.maxX));
+        const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
+        nearestWall=Math.min(nearestWall,Math.hypot(x-nx,z-nz));
+      }
+
+      const centerDistance=Math.hypot(
+        x-(minX+width*.5),
+        z-(minZ+depth*.5)
+      );
+
+      const heightScore=1-Math.min(1,Math.abs(surface.hit.point.y-.9)/.55);
+      const wallScore=Math.max(0,2.5-nearestWall);
+      hits.push({
+        x,z,
+        y:surface.hit.point.y,
+        score:
+          1000 +
+          distance*7 +
+          wallScore*170 +
+          centerDistance*22 +
+          heightScore*35 +
+          (surface.namedSurface?140:0)
+      });
     }
-
-    // Fallback to a normal tabletop-ish height if no suitable surface was hit.
-    if(y===null) y=1.02;
-
-    hits.push({
-      x,
-      z,
-      y,
-      distanceFromSpawn:Math.hypot(x-houseSpawn.x,z-houseSpawn.z)
-    });
   }
 
   if(!hits.length){
-    const x=houseSpawn.x+2.8;
-    const z=houseSpawn.z;
-    houseReturnPortal.position.set(x,1.02,z);
-    houseReturnPortal.rotation.y=0;
+    // Fallback: put the cup on an actually occluded floor point. It can hide
+    // behind furniture, but it can never float above the floor.
+    const floorCandidates=[];
+    const floorRayOrigin=new THREE.Vector3();
+
+    for(let x=minX+.55;x<=maxX-.55;x+=.6){
+      for(let z=minZ+.55;z<=maxZ-.55;z+=.6){
+        if(Math.hypot(x-houseSpawn.x,z-houseSpawn.z)<3.0) continue;
+        if(blocked(x,z,.28)) continue;
+
+        floorRayOrigin.set(x,bounds.max.y+.5,z);
+        houseFloorRaycaster.set(floorRayOrigin,rayDirection);
+        const downHits=houseFloorRaycaster.intersectObject(root,true);
+
+        let floorY=null;
+        for(const hit of downHits){
+          if(!hit.face) continue;
+          const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+          if(n.y<.84 || Math.abs(hit.point.y)>.12) continue;
+          floorY=hit.point.y;
+          break;
+        }
+        if(floorY===null) continue;
+
+        target.set(x,floorY,z);
+        const toTarget=target.clone().sub(spawnEye);
+        const distance=toTarget.length();
+        houseViewRaycaster.set(spawnEye,toTarget.normalize());
+        const lineHits=houseViewRaycaster.intersectObject(root,true);
+        const first=lineHits.find(hit=>hit.distance>0.05);
+        if(!first || first.distance>=distance-.2) continue;
+
+        floorCandidates.push({x,z,y:floorY,score:distance});
+      }
+    }
+
+    if(floorCandidates.length){
+      floorCandidates.sort((a,b)=>b.score-a.score);
+      const best=floorCandidates[0];
+      houseReturnPortal.position.set(best.x,best.y,best.z);
+      houseReturnPortal.rotation.y=.35;
+      houseReturnPortal.userData.active=true;
+      console.log("[DeepSeeker] hidden apartment cup floor spot:",best);
+      return true;
+    }
+
+    const x=THREE.MathUtils.clamp(houseSpawn.x+width*.32,minX+.8,maxX-.8);
+    const z=THREE.MathUtils.clamp(houseSpawn.z-depth*.25,minZ+.8,maxZ-.8);
+    houseReturnPortal.position.set(x,0,z);
+    houseReturnPortal.rotation.y=.35;
     houseReturnPortal.userData.active=true;
     return true;
   }
 
-  // Prefer a spot that is a little farther from spawn, so the cup is hidden
-  // naturally in the room without being immediately in the player's face.
-  hits.sort((a,b)=>b.distanceFromSpawn-a.distanceFromSpawn);
+  hits.sort((a,b)=>b.score-a.score);
   const best=hits[0];
 
+  // The group origin is the bottom of the cup/saucer, so do not add a fake
+  // vertical offset that makes the cup visibly float.
   houseReturnPortal.position.set(best.x,best.y,best.z);
-  houseReturnPortal.rotation.y=Math.PI*0.15;
+  houseReturnPortal.rotation.y=Math.PI*.15;
   houseReturnPortal.userData.active=true;
 
-  console.log("[DeepSeeker] hidden living-room cup teleporter:",{
+  console.log("[DeepSeeker] hidden apartment coffee cup:",{
     x:Number(best.x.toFixed(2)),
     y:Number(best.y.toFixed(2)),
     z:Number(best.z.toFixed(2)),
-    distanceFromSpawn:Number(best.distanceFromSpawn.toFixed(2))
+    score:Number(best.score.toFixed(1))
   });
 
   return true;
@@ -1840,7 +1962,17 @@ function animate(){
 
   if(houseMode){
     updateHouseDoors(dt);
-    if(houseDoorCollisionDirty){
+
+    houseCollisionRefreshTimer-=dt;
+    const movedEnough=
+      !Number.isFinite(houseCollisionFocusX) ||
+      !Number.isFinite(houseCollisionFocusZ) ||
+      Math.hypot(
+        player.pos.x-houseCollisionFocusX,
+        player.pos.z-houseCollisionFocusZ
+      )>=1.5;
+
+    if(houseDoorCollisionDirty || houseCollisionRefreshTimer<=0 || movedEnough){
       updateHouseDoorCollisions();
     }
   }else{
