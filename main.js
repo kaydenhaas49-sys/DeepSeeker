@@ -103,7 +103,7 @@ player.hands.visible=true;
 // House level — the GLB itself is the level.
 // ---------------------------------------------------------------------------
 const HOUSE_MODEL_PATH="./assets/house_interior.glb";
-const HOUSE_TARGET_HEIGHT=7.2;
+const HOUSE_TARGET_HEIGHT=4.2;
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
@@ -974,6 +974,10 @@ function loadHouse(){
         -center.z
       );
       houseModel.updateMatrixWorld(true);
+
+      // The model is now normalized to a sane real-world height. Keep its
+      // X/Z origin at the exact center of the house so the fixed living-room
+      // spawn uses the same coordinate system as the rendered model.
 
       // Add a few interior lights based on the normalized house bounds.
       houseLights.clear();
