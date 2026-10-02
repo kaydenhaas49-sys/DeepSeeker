@@ -516,66 +516,8 @@ scene.add(houseRoot);
 const houseReturnPortal=new THREE.Group();
 houseReturnPortal.name="HouseHiddenReturnTeleporter";
 
-// Disguised as a completely ordinary coffee mug. No glow, ring, beam, or
-// obvious teleporter geometry so it can sit naturally in the living room.
-const houseCupBody=new THREE.Mesh(
-  new THREE.CylinderGeometry(.11,.095,.22,16,1,true),
-  new THREE.MeshStandardMaterial({
-    color:0xb5ab8e,
-    roughness:.82,
-    metalness:.01,
-    side:THREE.DoubleSide
-  })
-);
-houseCupBody.position.y=.11;
-
-const houseCupCoffee=new THREE.Mesh(
-  new THREE.CylinderGeometry(.085,.085,.012,16),
-  new THREE.MeshStandardMaterial({
-    color:0x2a1b10,
-    roughness:.95
-  })
-);
-houseCupCoffee.position.y=.223;
-
-const houseCupRim=new THREE.Mesh(
-  new THREE.TorusGeometry(.098,.012,8,18),
-  new THREE.MeshStandardMaterial({
-    color:0x91886f,
-    roughness:.8,
-    metalness:.01
-  })
-);
-houseCupRim.position.y=.22;
-
-const houseCupHandle=new THREE.Mesh(
-  new THREE.TorusGeometry(.065,.014,8,18,Math.PI*1.55),
-  new THREE.MeshStandardMaterial({
-    color:0xb5ab8e,
-    roughness:.82,
-    metalness:.01
-  })
-);
-houseCupHandle.rotation.x=Math.PI/2;
-houseCupHandle.position.set(.105,.115,0);
-
-const houseCupSaucer=new THREE.Mesh(
-  new THREE.CylinderGeometry(.145,.13,.025,20),
-  new THREE.MeshStandardMaterial({
-    color:0x8e866f,
-    roughness:.88,
-    metalness:.01
-  })
-);
-houseCupSaucer.position.y=.012;
-
-houseReturnPortal.add(
-  houseCupSaucer,
-  houseCupBody,
-  houseCupCoffee,
-  houseCupRim,
-  houseCupHandle
-);
+// The apartment's magazine is the teleporter target. The group itself stays
+// invisible; the real magazine remains exactly as authored in the GLB.
 houseReturnPortal.visible=false;
 houseReturnPortal.userData.active=false;
 houseRoot.add(houseReturnPortal);
@@ -930,176 +872,121 @@ function chooseSafeHouseSpawn(root){
   return true;
 }
 
-function chooseHouseReturnPortalPosition(root){
+function placeHouseMagazineTeleporter(root){
   if(!root) return false;
 
-  const bounds=new THREE.Box3().setFromObject(root);
-  const minX=bounds.min.x+1.0;
-  const maxX=bounds.max.x-1.0;
-  const minZ=bounds.min.z+1.0;
-  const maxZ=bounds.max.z-1.0;
-  const width=Math.max(.1,maxX-minX);
-  const depth=Math.max(.1,maxZ-minZ);
+  const magazinePattern=/magazine|newspaper|journal|brochure|catalog|paper|book/i;
+  const couchPattern=/sofa|couch|sectional|loveseat|settee/i;
+  const candidates=[];
+  const couches=[];
+  const box=new THREE.Box3();
+  const size=new THREE.Vector3();
+  const center=new THREE.Vector3();
 
-  const blocked=(x,z,radius=.34)=>{
-    for(const box of houseCollisionBoxes){
-      const nx=Math.max(box.minX,Math.min(x,box.maxX));
-      const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
-      const dx=x-nx;
-      const dz=z-nz;
-      if(dx*dx+dz*dz<radius*radius) return true;
-    }
-    return false;
-  };
+  root.updateMatrixWorld(true);
 
-  const surfaceNamePattern=/table|desk|counter|island|shelf|cabinet|sideboard|dresser|nightstand|kitchen|bar/i;
-  const hits=[];
-  const rayOrigin=new THREE.Vector3();
-  const rayDirection=new THREE.Vector3(0,-1,0);
-  const target=new THREE.Vector3();
-  const spawnEye=new THREE.Vector3(houseSpawn.x,EYE,houseSpawn.z);
+  root.traverse((obj)=>{
+    if(!obj.isMesh || !obj.geometry) return;
 
-  for(let x=minX+.45;x<=maxX-.45;x+=.65){
-    for(let z=minZ+.45;z<=maxZ-.45;z+=.65){
-      if(Math.hypot(x-houseSpawn.x,z-houseSpawn.z)<3.0) continue;
+    box.setFromObject(obj);
+    box.getSize(size);
+    box.getCenter(center);
 
-      rayOrigin.set(x,bounds.max.y+.5,z);
-      houseFloorRaycaster.set(rayOrigin,rayDirection);
-      const surfaceHits=houseFloorRaycaster.intersectObject(root,true);
+    if(size.x<.06 || size.z<.06) return;
 
-      let surface=null;
-      for(const hit of surfaceHits){
-        if(!hit.face || !hit.object?.isMesh) continue;
-        const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-        if(normal.y<.84) continue;
-        if(hit.point.y<.5 || hit.point.y>1.45) continue;
+    const name=String(obj.name||"");
 
-        const surfaceBox=new THREE.Box3().setFromObject(hit.object);
-        const surfaceSize=surfaceBox.getSize(new THREE.Vector3());
-        if(Math.max(surfaceSize.x,surfaceSize.z)<.45) continue;
-        if(Math.min(surfaceSize.x,surfaceSize.z)<.12) continue;
-
-        surface={
-          hit,
-          namedSurface:surfaceNamePattern.test(String(hit.object.name||""))
-        };
-        break;
-      }
-
-      if(!surface || blocked(x,z)) continue;
-
-      target.set(x,surface.hit.point.y,z);
-      const toTarget=target.clone().sub(spawnEye);
-      const distance=toTarget.length();
-      if(distance<3.0) continue;
-
-      const direction=toTarget.normalize();
-      houseViewRaycaster.set(spawnEye,direction);
-      const lineHits=houseViewRaycaster.intersectObject(root,true);
-      const first=lineHits.find(hit=>hit.distance>0.05);
-      const occluded=!!first && first.distance<distance-.2;
-      if(!occluded) continue;
-
-      let nearestWall=999;
-      for(const box of houseCollisionBoxes){
-        const nx=Math.max(box.minX,Math.min(x,box.maxX));
-        const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
-        nearestWall=Math.min(nearestWall,Math.hypot(x-nx,z-nz));
-      }
-
-      const centerDistance=Math.hypot(
-        x-(minX+width*.5),
-        z-(minZ+depth*.5)
-      );
-
-      const heightScore=1-Math.min(1,Math.abs(surface.hit.point.y-.9)/.55);
-      const wallScore=Math.max(0,2.5-nearestWall);
-      hits.push({
-        x,z,
-        y:surface.hit.point.y,
-        score:
-          1000 +
-          distance*7 +
-          wallScore*170 +
-          centerDistance*22 +
-          heightScore*35 +
-          (surface.namedSurface?140:0)
+    if(couchPattern.test(name)){
+      couches.push({
+        object:obj,
+        box:box.clone(),
+        size:size.clone(),
+        center:center.clone()
       });
     }
-  }
 
-  if(!hits.length){
-    // Fallback: put the cup on an actually occluded floor point. It can hide
-    // behind furniture, but it can never float above the floor.
-    const floorCandidates=[];
-    const floorRayOrigin=new THREE.Vector3();
+    if(!magazinePattern.test(name)) return;
 
-    for(let x=minX+.55;x<=maxX-.55;x+=.6){
-      for(let z=minZ+.55;z<=maxZ-.55;z+=.6){
-        if(Math.hypot(x-houseSpawn.x,z-houseSpawn.z)<3.0) continue;
-        if(blocked(x,z,.28)) continue;
+    const horizontal=Math.max(size.x,size.z);
+    const vertical=size.y;
 
-        floorRayOrigin.set(x,bounds.max.y+.5,z);
-        houseFloorRaycaster.set(floorRayOrigin,rayDirection);
-        const downHits=houseFloorRaycaster.intersectObject(root,true);
+    if(horizontal>1.5 || vertical>0.35 || vertical>horizontal*.45) return;
 
-        let floorY=null;
-        for(const hit of downHits){
-          if(!hit.face) continue;
-          const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-          if(n.y<.84 || Math.abs(hit.point.y)>.12) continue;
-          floorY=hit.point.y;
-          break;
-        }
-        if(floorY===null) continue;
+    candidates.push({
+      object:obj,
+      box:box.clone(),
+      size:size.clone(),
+      center:center.clone(),
+      name
+    });
+  });
 
-        target.set(x,floorY,z);
-        const toTarget=target.clone().sub(spawnEye);
-        const distance=toTarget.length();
-        houseViewRaycaster.set(spawnEye,toTarget.normalize());
-        const lineHits=houseViewRaycaster.intersectObject(root,true);
-        const first=lineHits.find(hit=>hit.distance>0.05);
-        if(!first || first.distance>=distance-.2) continue;
+  const scoreCandidate=(candidate)=>{
+    let score=0;
 
-        floorCandidates.push({x,z,y:floorY,score:distance});
+    for(const couch of couches){
+      const onCouch =
+        candidate.center.x>=couch.box.min.x-.45 &&
+        candidate.center.x<=couch.box.max.x+.45 &&
+        candidate.center.z>=couch.box.min.z-.45 &&
+        candidate.center.z<=couch.box.max.z+.45 &&
+        candidate.box.max.y>=couch.box.min.y+.15 &&
+        candidate.box.min.y<=couch.box.max.y+.55;
+
+      if(onCouch){
+        const dx=candidate.center.x-couch.center.x;
+        const dz=candidate.center.z-couch.center.z;
+        score+=1000-Math.hypot(dx,dz)*60;
       }
     }
 
-    if(floorCandidates.length){
-      floorCandidates.sort((a,b)=>b.score-a.score);
-      const best=floorCandidates[0];
-      houseReturnPortal.position.set(best.x,best.y,best.z);
-      houseReturnPortal.rotation.y=.35;
-      houseReturnPortal.userData.active=true;
-      console.log("[DeepSeeker] hidden apartment cup floor spot:",best);
-      return true;
-    }
+    score+=Math.max(0,1-candidate.size.y/.35)*80;
+    return score;
+  };
 
-    const x=THREE.MathUtils.clamp(houseSpawn.x+width*.32,minX+.8,maxX-.8);
-    const z=THREE.MathUtils.clamp(houseSpawn.z-depth*.25,minZ+.8,maxZ-.8);
-    houseReturnPortal.position.set(x,0,z);
-    houseReturnPortal.rotation.y=.35;
+  candidates.sort((a,b)=>scoreCandidate(b)-scoreCandidate(a));
+
+  if(candidates.length){
+    const best=candidates[0];
+    houseReturnPortal.position.set(
+      best.center.x,
+      best.box.max.y+.015,
+      best.center.z
+    );
+    houseReturnPortal.rotation.y=0;
     houseReturnPortal.userData.active=true;
+    houseReturnPortal.userData.targetType="magazine";
+    houseReturnPortal.userData.targetName=best.name;
+
+    console.log("[DeepSeeker] magazine teleporter target:",{
+      name:best.name,
+      x:Number(best.center.x.toFixed(2)),
+      y:Number((best.box.max.y+.015).toFixed(2)),
+      z:Number(best.center.z.toFixed(2))
+    });
     return true;
   }
 
-  hits.sort((a,b)=>b.score-a.score);
-  const best=hits[0];
+  // Name-independent fallback: put the interaction point on the couch rather
+  // than creating another fake prop or putting it on the apartment floor.
+  if(couches.length){
+    const couch=couches[0];
+    houseReturnPortal.position.set(
+      couch.center.x,
+      couch.box.max.y+.02,
+      couch.center.z
+    );
+    houseReturnPortal.rotation.y=0;
+    houseReturnPortal.userData.active=true;
+    houseReturnPortal.userData.targetType="couch";
+    houseReturnPortal.userData.targetName=String(couch.object.name||"couch");
+    console.warn("[DeepSeeker] magazine mesh was not named; using couch target");
+    return true;
+  }
 
-  // The group origin is the bottom of the cup/saucer, so do not add a fake
-  // vertical offset that makes the cup visibly float.
-  houseReturnPortal.position.set(best.x,best.y,best.z);
-  houseReturnPortal.rotation.y=Math.PI*.15;
-  houseReturnPortal.userData.active=true;
-
-  console.log("[DeepSeeker] hidden apartment coffee cup:",{
-    x:Number(best.x.toFixed(2)),
-    y:Number(best.y.toFixed(2)),
-    z:Number(best.z.toFixed(2)),
-    score:Number(best.score.toFixed(1))
-  });
-
-  return true;
+  houseReturnPortal.userData.active=false;
+  console.warn("[DeepSeeker] could not locate magazine/couch target");
+  return false;
 }
 
 function useHouseReturnTeleporter(){
@@ -1139,7 +1026,7 @@ function ensureHouseCollisionSetup(){
     updateHouseLoadingUI(91,"PROCESSING HOUSE — FINALIZING STATIC HOUSE…");
     freezeStaticHouseTransforms(houseModel);
     chooseSafeHouseSpawn(houseModel);
-    chooseHouseReturnPortalPosition(houseModel);
+    placeHouseMagazineTeleporter(houseModel);
     houseCollisionReady=true;
     houseCollisionBuildStarted=false;
 
@@ -1345,7 +1232,7 @@ function setHouseMode(enabled){
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    objective.textContent="Find the hidden coffee cup. Press E to interact with it.";
+    objective.textContent="Find the magazine on the couch. Press E to interact with it.";
     eventText.textContent="APARTMENT LEVEL";
     eventText.style.opacity="1";
     showHouseIntroPhoneMessage();
@@ -1695,14 +1582,14 @@ function showHouseIntroPhoneMessage(){
   phoneAppName.textContent="MESSAGE FROM M";
   phoneDepth.textContent="!";
   phoneDepthLabel.textContent="NEW MESSAGE";
-  phoneCardTitle.textContent="LOOK FOR THE COFFEE CUP";
-  phoneCardText.textContent="It's hidden somewhere in the living room. When you find it, press E to interact with it.";
+  phoneCardTitle.textContent="LOOK FOR THE MAGAZINE";
+  phoneCardText.textContent="It's on the couch. When you find it, press E to interact with it.";
 
   renderStoryLog();
   phoneStory.insertAdjacentHTML("afterbegin",`
     <div class="storyEntry">
       <div class="storyMeta">M · HOUSE MESSAGE</div>
-      <div class="storyText">Look for the coffee cup. It's hidden in the living room. When you find it, press E to interact with it.</div>
+      <div class="storyText">Look for the magazine. It's on the couch. When you find it, press E to interact with it.</div>
     </div>
   `);
 }
