@@ -47,6 +47,12 @@ const phoneCardText=document.getElementById("phoneCardText");
 const phoneStory=document.getElementById("phoneStory");
 const deepseekerIcon=document.getElementById("deepseekerIcon");
 const phoneHome=document.getElementById("phoneHome");
+const houseLoadFillHome=document.getElementById("houseLoadFillHome");
+const houseLoadPercentHome=document.getElementById("houseLoadPercentHome");
+const houseLoadStatusHome=document.getElementById("houseLoadStatusHome");
+const houseLoadFillLobby=document.getElementById("houseLoadFillLobby");
+const houseLoadPercentLobby=document.getElementById("houseLoadPercentLobby");
+const houseLoadStatusLobby=document.getElementById("houseLoadStatusLobby");
 
 
 const gltfLoader=new GLTFLoader();
@@ -130,6 +136,40 @@ let pendingSaveLoad=null;
 
 const SAVE_KEY="deepseeker-save-v1";
 
+function updateHouseLoadingUI(progress=null,status=null){
+  const value=Number.isFinite(progress)
+    ? Math.max(0,Math.min(100,Math.round(progress)))
+    : (houseLoaded ? 100 : 0);
+
+  const message=status || (
+    houseLoadFailed
+      ? "HOUSE FAILED TO LOAD."
+      : houseLoaded
+        ? "HOUSE LOADED — GAME READY."
+        : "HOUSE IS LOADING — YOU CAN'T START THE GAME YET."
+  );
+
+  for(const fill of [houseLoadFillHome,houseLoadFillLobby]){
+    if(fill) fill.style.width=value+"%";
+  }
+  for(const label of [houseLoadPercentHome,houseLoadPercentLobby]){
+    if(label) label.textContent=value+"%";
+  }
+  for(const label of [houseLoadStatusHome,houseLoadStatusLobby]){
+    if(label) label.textContent=message;
+  }
+
+  const ready=houseLoaded;
+  if(newGameButton) newGameButton.disabled=!ready;
+  if(continueButton) continueButton.disabled=!ready || !getSavedGame();
+  if(startLobbyButton) startLobbyButton.disabled=!ready;
+
+  for(const button of [newGameButton,continueButton,startLobbyButton]){
+    if(!button) continue;
+    button.style.opacity=button.disabled ? ".38" : "1";
+  }
+}
+
 function getSavedGame(){
   try{
     const raw=localStorage.getItem(SAVE_KEY);
@@ -143,15 +183,11 @@ function refreshSaveInfo(){
   const save=getSavedGame();
   if(!save){
     saveInfo.textContent="NO SAVE DATA";
-    continueButton.disabled=true;
-    continueButton.style.opacity=".45";
-    return;
+  }else{
+    const when=save.savedAt ? new Date(save.savedAt).toLocaleString() : "UNKNOWN";
+    saveInfo.textContent=`SAVE FOUND · ${when}`;
   }
-
-  const when=save.savedAt ? new Date(save.savedAt).toLocaleString() : "UNKNOWN";
-  saveInfo.textContent=`SAVE FOUND · ${when}`;
-  continueButton.disabled=false;
-  continueButton.style.opacity="1";
+  updateHouseLoadingUI();
 }
 
 function saveGame(){
@@ -221,12 +257,14 @@ function showHomeScreen(){
   homeScreen.classList.remove("hidden");
   lobbyScreen.classList.add("hidden");
   refreshSaveInfo();
+  updateHouseLoadingUI();
 }
 
 function showLobbyScreen(){
   loadingScreen.style.display="none";
   homeScreen.classList.add("hidden");
   lobbyScreen.classList.remove("hidden");
+  updateHouseLoadingUI();
 
   const params=new URLSearchParams(location.search);
   const code=(params.get("room")||"").toUpperCase();
@@ -238,9 +276,14 @@ function showLobbyScreen(){
 }
 
 function ensureHouseLoading(){
-  if(houseLoadStarted || houseLoaded || houseLoadFailed) return;
+  if(houseLoadStarted || houseLoaded) return;
+
+  if(houseLoadFailed){
+    houseLoadFailed=false;
+  }
 
   houseLoadStarted=true;
+  updateHouseLoadingUI(1,"HOUSE IS STARTING TO LOAD…");
   const start=()=>loadHouse();
 
   if("requestIdleCallback" in window){
@@ -1040,6 +1083,7 @@ function loadHouse(){
 
       houseLoaded=true;
       houseLoadFailed=false;
+      updateHouseLoadingUI(100,"HOUSE LOADED — GAME READY.");
       houseRoot.visible=false;
 
       // The asset is now safe to start from. Collision setup can finish in the
@@ -1069,9 +1113,11 @@ function loadHouse(){
     xhr=>{
       if(xhr.total){
         const percent=Math.min(100,Math.max(0,Math.round(xhr.loaded/xhr.total*100)));
+        updateHouseLoadingUI(percent,`LOADING HOUSE… ${percent}%`);
         objective.textContent="Loading house… "+percent+"%";
         prompt.textContent="LOADING HOUSE… "+percent+"%";
       }else{
+        updateHouseLoadingUI(null,"LOADING HOUSE…");
         objective.textContent="Loading house…";
         prompt.textContent="LOADING HOUSE…";
       }
@@ -1081,6 +1127,7 @@ function loadHouse(){
       houseLoaded=false;
       houseLoadFailed=true;
       houseLoadStarted=false;
+      updateHouseLoadingUI(0,"HOUSE FAILED TO LOAD — RETRY TO TRY AGAIN.");
 
       if(!gameStarted){
         eventText.textContent="HOUSE FAILED TO LOAD";
@@ -1492,10 +1539,20 @@ if(saveGameButton){
 }
 
 newGameButton.addEventListener("click",()=>{
+  if(!houseLoaded){
+    updateHouseLoadingUI(null,"HOUSE IS STILL LOADING — YOU CAN'T START THE GAME YET.");
+    ensureHouseLoading();
+    return;
+  }
   resetForNewGame();
 });
 
 continueButton.addEventListener("click",()=>{
+  if(!houseLoaded){
+    updateHouseLoadingUI(null,"HOUSE IS STILL LOADING — YOU CAN'T START THE GAME YET.");
+    ensureHouseLoading();
+    return;
+  }
   continueGame();
 });
 
@@ -1512,6 +1569,12 @@ joinLobbyButton.addEventListener("click",()=>{
 startLobbyButton.addEventListener("click",()=>{
   const params=new URLSearchParams(location.search);
   if(params.get("host")!=="1") return;
+
+  if(!houseLoaded){
+    updateHouseLoadingUI(null,"HOUSE IS STILL LOADING — YOU CAN'T START THE GAME YET.");
+    ensureHouseLoading();
+    return;
+  }
 
   // Start the host immediately so the button can never appear dead.
   startGame();
