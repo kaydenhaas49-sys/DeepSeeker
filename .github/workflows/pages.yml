@@ -28,6 +28,42 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Extract exact spider asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf assets/Spider-Psionic
+          mkdir -p assets/Spider-Psionic
+          unzip -q assets/Spider-Psionic.zip -d assets/Spider-Psionic
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("assets/Spider-Psionic")
+          files = sorted(
+              str(path.relative_to(root)).replace("\\", "/")
+              for path in root.rglob("*")
+              if path.is_file()
+          )
+
+          manifest = {
+              "files": files,
+              "fbx": [name for name in files if name.lower().endswith(".fbx")],
+              "obj": [name for name in files if name.lower().endswith(".obj")],
+              "mtl": [name for name in files if name.lower().endswith(".mtl")],
+          }
+
+          (root / "manifest.json").write_text(
+              json.dumps(manifest, indent=2),
+              encoding="utf-8"
+          )
+          print(json.dumps({
+              "fbx": manifest["fbx"],
+              "obj": manifest["obj"],
+              "mtl": manifest["mtl"],
+          }, indent=2))
+          PY
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
         with:

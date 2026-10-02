@@ -9,7 +9,6 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
-import JSZip from "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm";
 import { flashlightFlicker } from "./character.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
@@ -2332,93 +2331,96 @@ function spawnSpiderAtPlayer(){
 }
 
 async function loadSpiderFromPack(){
+  const manifestUrl="./assets/Spider-Psionic/manifest.json";
+
   try{
-    const response=await fetch("./assets/Spider-Psionic.zip");
-    if(!response.ok) throw new Error("HTTP "+response.status);
+    const manifestResponse=await fetch(manifestUrl,{cache:"no-store"});
+    if(!manifestResponse.ok) throw new Error("Spider manifest HTTP "+manifestResponse.status);
 
-    const zip=await JSZip.loadAsync(await response.arrayBuffer());
-    const names=Object.keys(zip.files);
+    const manifest=await manifestResponse.json();
+    const baseUrl=new URL("./assets/Spider-Psionic/",import.meta.url);
 
-    const textureUrls=new Map();
-    for(const name of names){
-      if(!/\.(jpg|jpeg|png)$/i.test(name)) continue;
-      const base=name.replaceAll("\\","/").split("/").pop().toLowerCase();
-      const blob=await zip.file(name).async("blob");
-      textureUrls.set(base,URL.createObjectURL(blob));
-    }
+    const fbxNames=(manifest.fbx||[])
+      .filter(name=>typeof name==="string")
+      .sort((a,b)=>Number(/spider/i.test(b))-Number(/spider/i.test(a)));
 
-    const manager=new THREE.LoadingManager();
-    manager.setURLModifier(url=>{
-      const base=decodeURIComponent(url)
-        .replaceAll("\\","/")
-        .split("/")
-        .pop()
-        .toLowerCase();
-      return textureUrls.get(base)||url;
-    });
+    const objNames=(manifest.obj||[])
+      .filter(name=>typeof name==="string")
+      .sort((a,b)=>Number(/spider/i.test(b))-Number(/spider/i.test(a)));
 
     let model=null;
     let modelSource="";
-    const fbxNames=names
-      .filter(name=>/\.fbx$/i.test(name))
-      .sort((a,b)=>Number(/spider/i.test(b))-Number(/spider/i.test(a)));
+    let loadedPath="";
 
-    for(const fbxName of fbxNames){
+    for(const relativePath of fbxNames){
       try{
-        const buffer=await zip.file(fbxName).async("arraybuffer");
-        const candidate=new FBXLoader(manager).parse(buffer,"");
+        const modelUrl=new URL(relativePath,baseUrl);
+        const response=await fetch(modelUrl,{cache:"no-store"});
+        if(!response.ok) throw new Error("HTTP "+response.status);
+
+        const buffer=await response.arrayBuffer();
+        const candidate=new FBXLoader().parse(buffer,new URL(".",modelUrl).href);
         candidate.name="SpiderVisualFBX";
 
         let meshCount=0;
         candidate.traverse(obj=>{ if(obj.isMesh) meshCount++; });
-        if(meshCount===0) continue;
+        if(meshCount===0) throw new Error("FBX contains no meshes.");
 
         candidate.updateMatrixWorld(true);
         const box=new THREE.Box3().setFromObject(candidate);
         const size=box.getSize(new THREE.Vector3());
         const maxDimension=Math.max(size.x,size.y,size.z);
-        if(!Number.isFinite(maxDimension)||maxDimension<.0001) continue;
+
+        if(!Number.isFinite(maxDimension)||maxDimension<.0001){
+          throw new Error("FBX has invalid bounds.");
+        }
 
         model=candidate;
         modelSource="FBX";
+        loadedPath=relativePath;
         break;
       }catch(error){
-        console.warn("[DeepSeeker] FBX candidate failed:",fbxName,error);
+        console.warn("[DeepSeeker] extracted FBX failed:",relativePath,error);
       }
     }
 
     if(!model){
-      const objName=
-        names.find(name=>/\.obj$/i.test(name)&&/spider/i.test(name)) ||
-        names.find(name=>/\.obj$/i.test(name));
-      if(!objName) throw new Error("Spider ZIP has no usable FBX or OBJ.");
+      const objPath=objNames[0];
+      if(!objPath) throw new Error("Extracted Spider-Psionic pack contains no FBX or OBJ.");
 
-      const objText=await zip.file(objName).async("text");
-      const objLoader=new OBJLoader(manager);
+      const objUrl=new URL(objPath,baseUrl);
+      const objResponse=await fetch(objUrl,{cache:"no-store"});
+      if(!objResponse.ok) throw new Error("OBJ HTTP "+objResponse.status);
 
-      const objBase=objName.split("/").pop().replace(/\.obj$/i,"").toLowerCase();
-      const mtlName=
-        names.find(name=>
-          /\.mtl$/i.test(name) &&
-          name.split("/").pop().replace(/\.mtl$/i,"").toLowerCase()===objBase
-        ) ||
-        names.find(name=>/\.mtl$/i.test(name));
+      const objText=await objResponse.text();
+      const objLoader=new OBJLoader();
 
-      if(mtlName){
+      const objBase=objPath.split("/").pop().replace(/\.obj$/i,"").toLowerCase();
+      const mtlPath=(manifest.mtl||[]).find(name=>
+        name.split("/").pop().replace(/\.mtl$/i,"").toLowerCase()===objBase
+      ) || (manifest.mtl||[])[0];
+
+      if(mtlPath){
         try{
-          const mtlText=await zip.file(mtlName).async("text");
-          const mtlLoader=new MTLLoader(manager);
-          const materials=mtlLoader.parse(mtlText,"");
-          materials.preload();
-          objLoader.setMaterials(materials);
+          const mtlUrl=new URL(mtlPath,baseUrl);
+          const mtlResponse=await fetch(mtlUrl,{cache:"no-store"});
+          if(mtlResponse.ok){
+            const materials=new MTLLoader().parse(
+              await mtlResponse.text(),
+              new URL(".",mtlUrl).href
+            );
+            materials.preload();
+            objLoader.setMaterials(materials);
+          }
         }catch(error){
-          console.warn("[DeepSeeker] Spider MTL failed; using OBJ geometry:",error);
+          console.warn("[DeepSeeker] extracted spider MTL failed:",mtlPath,error);
         }
       }
 
       model=objLoader.parse(objText);
       model.name="SpiderVisualOBJ";
       modelSource="OBJ";
+      loadedPath=objPath;
     }
 
     fitSpiderModel(model);
@@ -2426,6 +2428,25 @@ async function loadSpiderFromPack(){
     spiderModel=model;
     spiderEntity.add(model);
     spiderLoaded=true;
+
+    model.visible=true;
+    model.traverse(obj=>{
+      if(!obj.isMesh) return;
+      obj.visible=true;
+      obj.frustumCulled=false;
+
+      const materials=Array.isArray(obj.material)?obj.material:[obj.material];
+      for(const material of materials){
+        if(!material) continue;
+        material.visible=true;
+        material.transparent=false;
+        material.opacity=1;
+        material.depthTest=true;
+        material.depthWrite=true;
+        material.side=THREE.DoubleSide;
+        material.needsUpdate=true;
+      }
+    });
 
     spiderMixer=null;
     spiderActions.clear();
@@ -2458,11 +2479,14 @@ async function loadSpiderFromPack(){
       spiderWantedState="idle";
     }
 
-    console.log("[DeepSeeker] exact Spider-Psionic asset loaded:",modelSource);
+    console.log("[DeepSeeker] exact Spider-Psionic asset loaded:",modelSource,loadedPath);
     eventText.textContent=modelSource==="FBX" ? "SPIDER READY" : "SPIDER READY (STATIC)";
     eventText.style.opacity="1";
     setTimeout(()=>{
-      if(eventText.textContent==="SPIDER READY"||eventText.textContent==="SPIDER READY (STATIC)"){
+      if(
+        eventText.textContent==="SPIDER READY" ||
+        eventText.textContent==="SPIDER READY (STATIC)"
+      ){
         eventText.style.opacity="0";
       }
     },1800);
@@ -2472,11 +2496,12 @@ async function loadSpiderFromPack(){
     spiderMixer=null;
     spiderActions.clear();
     spiderAnimationState="";
-    console.error("[DeepSeeker] exact Spider-Psionic asset failed to load:",error);
-    eventText.textContent="SPIDER ASSET FAILED TO LOAD";
+    console.error("[DeepSeeker] exact Spider-Psionic extracted asset failed:",error);
+    eventText.textContent="SPIDER ASSET LOAD FAILED";
     eventText.style.opacity="1";
   }
 }
+
 loadSpiderFromPack();
 player.onStep=({intensity})=>audio.step(intensity);
 
