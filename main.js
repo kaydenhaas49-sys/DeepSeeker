@@ -251,23 +251,45 @@ function ensureHouseLoading(){
 }
 
 function startGame(save=null){
+  // Never enter the playable game before the house asset is actually loaded.
+  // Keep the menu/overlay in place while the GLB is downloading.
+  if(!houseLoaded){
+    pendingHouseStart=true;
+    if(save) pendingSaveLoad=save;
+    ensureHouseLoading();
+    prompt.textContent=houseLoadFailed
+      ? "HOUSE FAILED TO LOAD"
+      : "PLEASE WAIT — HOUSE LOADING";
+    eventText.textContent=houseLoadFailed
+      ? "HOUSE FAILED TO LOAD"
+      : "HOUSE STILL LOADING...";
+    eventText.style.opacity="1";
+    setTimeout(()=>{
+      if(eventText.textContent==="HOUSE STILL LOADING..." ||
+         eventText.textContent==="HOUSE FAILED TO LOAD"){
+        eventText.style.opacity="0";
+      }
+    },1400);
+    return false;
+  }
+
   gameStarted=true;
   overlay.classList.add("hidden");
   audio.start();
-  ensureHouseLoading();
 
   if(save){
     pendingHouseStart=false;
     applySavedGame(save);
   }else{
     pendingHouseStart=true;
-    if(houseLoaded && houseCollisionReady){
+    if(houseCollisionReady){
       pendingHouseStart=false;
       setHouseMode(true);
     }
   }
 
   player.lock();
+  return true;
 }
 
 function continueGame(){
@@ -1003,9 +1025,18 @@ function loadHouse(){
       houseLoadFailed=false;
       houseRoot.visible=false;
 
-      // Door discovery and lightweight house collision are prepared off the
-      // startup path so the menu stays responsive.
+      // The asset is now safe to start from. Collision setup can finish in the
+      // background without letting the player enter before the GLB exists.
       ensureHouseCollisionSetup();
+
+      if(pendingHouseStart && !gameStarted && houseCollisionReady){
+        pendingHouseStart=false;
+        setHouseMode(true);
+        gameStarted=true;
+        overlay.classList.add("hidden");
+        audio.start();
+        player.lock();
+      }
 
       if(pendingSaveLoad && pendingSaveLoad.houseMode && gameStarted){
         setHouseMode(true);
