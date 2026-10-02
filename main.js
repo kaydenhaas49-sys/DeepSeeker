@@ -1455,7 +1455,8 @@ overlay.addEventListener("click",(e)=>{
     return;
   }
   if(gameStarted){
-    startGame();
+    audio.start();
+    player.lock();
   }
 });
 
