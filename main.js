@@ -746,24 +746,37 @@ function chooseSafeHouseSpawn(root){
     return false;
   };
 
-  // The old spawn search only checked the model's outer X/Z rectangle. That
-  // can select a courtyard, porch, driveway, or other outdoor section.
-  // Instead, sample actual house geometry: a valid spawn needs a real floor
-  // directly below the player AND interior geometry overhead.
   const meshes=houseMeshes.length ? houseMeshes : [];
   if(!meshes.length) return false;
 
-  const downOrigin=new THREE.Vector3();
-  const upOrigin=new THREE.Vector3();
-  const downDir=new THREE.Vector3(0,-1,0);
-  const upDir=new THREE.Vector3(0,1,0);
-  const floorHits=[];
-  const ceilingHits=[];
+  const ray=new THREE.Raycaster();
+  const origin=new THREE.Vector3();
+  const dir=new THREE.Vector3();
+  const normal=new THREE.Vector3();
+  const hits=[];
 
-  const rayY=EYE+0.35;
-  const ceilingMin=1.65;
-  const ceilingMax=5.5;
-  const step=.7;
+  const directions=[
+    new THREE.Vector3(1,0,0),
+    new THREE.Vector3(-1,0,0),
+    new THREE.Vector3(0,0,1),
+    new THREE.Vector3(0,0,-1)
+  ];
+
+  function hitIsVerticalSurface(hit){
+    if(!hit.face) return false;
+    normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+    return Math.abs(normal.y)<0.35 &&
+      Math.hypot(normal.x,normal.z)>0.65;
+  }
+
+  // Find a point that is not merely "under a roof", but actually enclosed
+  // enough to be part of the house interior. Exterior yards/porches can have
+  // a floor and ceiling, but they usually do not have walls on 3+ sides.
+  const floorY=5;
+  const ceilingMin=1.8;
+  const ceilingMax=5.2;
+  const wallSearch=8.0;
+  const step=.55;
 
   let best=null;
   let bestScore=-Infinity;
@@ -772,35 +785,59 @@ function chooseSafeHouseSpawn(root){
     for(let z=minZ;z<=maxZ;z+=step){
       if(blocked(x,z,.72)) continue;
 
-      downOrigin.set(x,rayY,z);
-      houseFloorRaycaster.set(downOrigin,downDir);
-      houseFloorRaycaster.near=0;
-      houseFloorRaycaster.far=rayY+1.5;
-      floorHits.length=0;
-      houseFloorRaycaster.intersectObjects(meshes,true,floorHits);
+      // Floor.
+      origin.set(x,floorY,z);
+      ray.set(origin,new THREE.Vector3(0,-1,0));
+      ray.near=0;
+      ray.far=floorY+0.5;
+      hits.length=0;
+      ray.intersectObjects(meshes,true,hits);
 
-      const floorHit=floorHits.find(hit=>{
+      const floorHit=hits.find(hit=>{
         if(!hit.face) return false;
-        const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-        return n.y>0.55 && hit.point.y>=-0.05 && hit.point.y<=0.35;
+        normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+        return normal.y>0.55 && hit.point.y>=-0.1 && hit.point.y<=0.3;
       });
-
       if(!floorHit) continue;
 
-      upOrigin.set(x,EYE,z);
-      houseFloorRaycaster.set(upOrigin,upDir);
-      houseFloorRaycaster.near=0;
-      houseFloorRaycaster.far=ceilingMax;
-      ceilingHits.length=0;
-      houseFloorRaycaster.intersectObjects(meshes,true,ceilingHits);
+      // Ceiling.
+      origin.set(x,1.6,z);
+      ray.set(origin,new THREE.Vector3(0,1,0));
+      ray.near=0;
+      ray.far=ceilingMax-1.6;
+      hits.length=0;
+      ray.intersectObjects(meshes,true,hits);
 
-      const ceilingHit=ceilingHits.find(hit=>{
+      const ceilingHit=hits.find(hit=>{
         if(!hit.face) return false;
-        const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-        return n.y< -0.35 && hit.point.y-EYE>=ceilingMin && hit.point.y-EYE<=ceilingMax;
+        normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+        return normal.y< -0.45 && hit.point.y-1.6>=ceilingMin;
       });
-
       if(!ceilingHit) continue;
+
+      let wallCount=0;
+      let wallScore=0;
+
+      for(const d of directions){
+        origin.set(x,1.25,z);
+        dir.copy(d);
+        ray.set(origin,dir);
+        ray.near=0.8;
+        ray.far=wallSearch;
+        hits.length=0;
+        ray.intersectObjects(meshes,true,hits);
+
+        const wallHit=hits.find(hit=>hitIsVerticalSurface(hit));
+        if(!wallHit) continue;
+
+        wallCount++;
+        // Closer walls give stronger evidence that this is a room, while
+        // avoiding a hard preference for tiny cramped spaces.
+        wallScore += Math.max(0,wallSearch-wallHit.distance);
+      }
+
+      // 3+ surrounding vertical surfaces is the important discriminator.
+      if(wallCount<3) continue;
 
       let clearance=8;
       for(const box of houseCollisionBoxes){
@@ -809,51 +846,32 @@ function chooseSafeHouseSpawn(root){
         clearance=Math.min(clearance,Math.hypot(x-nx,z-nz));
       }
 
-      const ceilingDistance=ceilingHit.point.y-EYE;
-      const floorHeight=Math.max(0,floorHit.point.y);
       const centerX=(minX+maxX)*.5;
       const centerZ=(minZ+maxZ)*.5;
       const centerDistance=Math.hypot(x-centerX,z-centerZ);
+      const roomHeight=ceilingHit.point.y-floorHit.point.y;
 
-      // Favor roomy interior floor, stay away from walls, and slightly favor
-      // central rooms without requiring the geometric center to be indoors.
-      const roomScore =
-        Math.min(clearance,6)*10 +
-        Math.min(ceilingDistance,3.5)*4 -
-        centerDistance*.08 +
-        floorHeight*1.5;
+      const score =
+        wallCount*60 +
+        wallScore*3 +
+        Math.min(clearance,4)*10 +
+        Math.min(roomHeight,3.5)*4 -
+        centerDistance*.04;
 
-      if(roomScore>bestScore){
-        bestScore=roomScore;
+      if(score>bestScore){
+        bestScore=score;
         best={x,z};
       }
     }
   }
 
   if(!best){
-    // Last-resort center search, still rejecting obvious wall overlap.
-    const center=bounds.getCenter(new THREE.Vector3());
-    const fallbackOffsets=[
-      [0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2],
-      [2.4,0],[-2.4,0],[0,2.4],[0,-2.4],
-      [3.6,0],[-3.6,0],[0,3.6],[0,-3.6]
-    ];
-
-    for(const [ox,oz] of fallbackOffsets){
-      const x=center.x+ox;
-      const z=center.z+oz;
-      if(x<minX || x>maxX || z<minZ || z>maxZ) continue;
-      if(!blocked(x,z,.72)){
-        best={x,z};
-        break;
-      }
-    }
+    console.warn("[DeepSeeker] could not find strongly enclosed house spawn");
+    return false;
   }
 
-  if(!best) return false;
-
   houseSpawn.set(best.x,EYE,best.z);
-  console.log("[DeepSeeker] safe house interior spawn:",{
+  console.log("[DeepSeeker] enclosed house spawn:",{
     x:Number(best.x.toFixed(2)),
     z:Number(best.z.toFixed(2))
   });
