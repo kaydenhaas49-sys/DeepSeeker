@@ -581,15 +581,10 @@ houseReturnPortal.visible=false;
 houseReturnPortal.userData.active=false;
 houseRoot.add(houseReturnPortal);
 
-// Warm interior illumination so the house is readable without killing the horror mood.
-const houseLights=new THREE.Group();
-houseLights.name="HouseLighting";
-houseRoot.add(houseLights);
-const houseAmbient=new THREE.HemisphereLight(0xffe6b0,0x3c2818,0.48);
-houseLights.add(houseAmbient);
-const houseFill=new THREE.PointLight(0xffdca0,2.2,18,1.7);
-houseFill.position.set(0,2.8,0);
-houseLights.add(houseFill);
+// Cheap ambient interior illumination. Avoid a dynamic point light touching
+// every house fragment; the flashlight provides the local light.
+const houseAmbient=new THREE.HemisphereLight(0xffe6b0,0x3c2818,0.55);
+houseRoot.add(houseAmbient);
 
 function attachHouseDoor(obj,index){
   const parent=obj.parent;
