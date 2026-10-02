@@ -139,14 +139,16 @@ const SAVE_KEY="deepseeker-save-v1";
 function updateHouseLoadingUI(progress=null,status=null){
   const value=Number.isFinite(progress)
     ? Math.max(0,Math.min(100,Math.round(progress)))
-    : (houseLoaded ? 100 : 0);
+    : (houseLoaded && houseCollisionReady ? 100 : houseLoaded ? 76 : 0);
 
   const message=status || (
     houseLoadFailed
       ? "HOUSE FAILED TO LOAD."
-      : houseLoaded
+      : houseCollisionReady
         ? "HOUSE LOADED — GAME READY."
-        : "HOUSE IS LOADING — YOU CAN'T START THE GAME YET."
+        : houseLoaded
+          ? "PROCESSING HOUSE — BUILDING COLLISION."
+          : "HOUSE IS LOADING — YOU CAN'T START THE GAME YET."
   );
 
   for(const fill of [houseLoadFillHome,houseLoadFillLobby]){
@@ -159,7 +161,7 @@ function updateHouseLoadingUI(progress=null,status=null){
     if(label) label.textContent=message;
   }
 
-  const ready=houseLoaded;
+  const ready=houseLoaded && houseCollisionReady;
   if(newGameButton) newGameButton.disabled=!ready;
   if(continueButton) continueButton.disabled=!ready || !getSavedGame();
   if(startLobbyButton) startLobbyButton.disabled=!ready;
@@ -283,7 +285,7 @@ function ensureHouseLoading(){
   }
 
   houseLoadStarted=true;
-  updateHouseLoadingUI(1,"HOUSE IS STARTING TO LOAD…");
+  updateHouseLoadingUI(0,"HOUSE IS STARTING TO LOAD…");
   const start=()=>loadHouse();
 
   if("requestIdleCallback" in window){
@@ -951,14 +953,16 @@ function ensureHouseCollisionSetup(){
   const build=()=>{
     const started=performance.now();
 
+    updateHouseLoadingUI(82,"PROCESSING HOUSE — PREPARING COLLISION…");
     setupHouseDoors(houseModel);
-    for(const door of houseDoors){
+    updateHouseLoadingUI(86,"PROCESSING HOUSE — BUILDING WALL COLLISION…");{
       door.pivot.traverse(obj=>{
         obj.userData.houseCollisionDoor=true;
       });
     }
 
     buildHouseCollisionProxies(houseModel);
+    updateHouseLoadingUI(91,"PROCESSING HOUSE — BUILDING COLLISION MESH…");
     buildHouseCollisionOctree(houseModel);
     chooseSafeHouseSpawn(houseModel);
     chooseHouseReturnPortalPosition(houseModel);
@@ -966,6 +970,7 @@ function ensureHouseCollisionSetup(){
     houseCollisionBuildStarted=false;
 
     console.log("[DeepSeeker] house collision ready in",Math.round(performance.now()-started),"ms");
+    updateHouseLoadingUI(100,"HOUSE LOADED — GAME READY.");
 
     // A start request may have been queued while the GLB or collision setup
     // was loading. Only enter the playable level after both are ready.
@@ -1083,7 +1088,7 @@ function loadHouse(){
 
       houseLoaded=true;
       houseLoadFailed=false;
-      updateHouseLoadingUI(100,"HOUSE LOADED — GAME READY.");
+      updateHouseLoadingUI(76,"HOUSE DOWNLOADED — PROCESSING MODEL…");
       houseRoot.visible=false;
 
       // The asset is now safe to start from. Collision setup can finish in the
@@ -1112,12 +1117,20 @@ function loadHouse(){
     },
     xhr=>{
       if(xhr.total){
-        const percent=Math.min(100,Math.max(0,Math.round(xhr.loaded/xhr.total*100)));
-        updateHouseLoadingUI(percent,`LOADING HOUSE… ${percent}%`);
-        objective.textContent="Loading house… "+percent+"%";
-        prompt.textContent="LOADING HOUSE… "+percent+"%";
+        const downloadPercent=Math.min(
+          100,
+          Math.max(0,Math.round(xhr.loaded/xhr.total*100))
+        );
+        const overallPercent=Math.round(downloadPercent*.75);
+
+        updateHouseLoadingUI(
+          overallPercent,
+          `DOWNLOADING HOUSE… ${downloadPercent}%`
+        );
+        objective.textContent="Loading house… "+downloadPercent+"%";
+        prompt.textContent="LOADING HOUSE… "+downloadPercent+"%";
       }else{
-        updateHouseLoadingUI(null,"LOADING HOUSE…");
+        updateHouseLoadingUI(10,"DOWNLOADING HOUSE…");
         objective.textContent="Loading house…";
         prompt.textContent="LOADING HOUSE…";
       }
