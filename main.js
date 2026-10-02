@@ -715,150 +715,18 @@ function toggleHouseDoor(){
 }
 
 function chooseSafeHouseSpawn(root){
-  if(!root || !houseMeshes.length) return false;
+  if(!root) return false;
 
-  root.updateMatrixWorld(true);
+  // The house model is normalized in loadHouse() so its X/Z center is exactly
+  // 0,0. This is the intended living-room spawn: do not try to infer an
+  // interior room from collision geometry.
+  houseSpawn.set(0,EYE,0);
 
-  const bounds=new THREE.Box3().setFromObject(root);
-  const margin=1.5;
-  const minX=bounds.min.x+margin;
-  const maxX=bounds.max.x-margin;
-  const minZ=bounds.min.z+margin;
-  const maxZ=bounds.max.z-margin;
-
-  if(minX>=maxX || minZ>=maxZ) return false;
-
-  const blocked=(x,z,radius=.55)=>{
-    for(const box of houseCollisionBoxes){
-      const nx=Math.max(box.minX,Math.min(x,box.maxX));
-      const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
-      const dx=x-nx;
-      const dz=z-nz;
-      if(dx*dx+dz*dz<radius*radius) return true;
-    }
-
-    const wp=new THREE.Vector3();
-    for(const door of houseDoors){
-      door.pivot.getWorldPosition(wp);
-      if(Math.hypot(wp.x-x,wp.z-z)<1.15) return true;
-    }
-
-    return false;
-  };
-
-  const ray=new THREE.Raycaster();
-  const origin=new THREE.Vector3();
-  const hits=[];
-  const sideDirs=[
-    new THREE.Vector3(1,0,0),
-    new THREE.Vector3(-1,0,0),
-    new THREE.Vector3(0,0,1),
-    new THREE.Vector3(0,0,-1)
-  ];
-
-  const probeY=1.35;
-  const floorY=6.5;
-  const sideRange=14;
-  const ceilingRange=5.5;
-  const step=.55;
-
-  let best=null;
-  let bestScore=-Infinity;
-
-  // Search the actual model footprint. A valid point needs a floor, a
-  // ceiling, and enclosing geometry on all four sides. This identifies a
-  // real room instead of an exterior patio/yard.
-  for(let x=minX;x<=maxX;x+=step){
-    for(let z=minZ;z<=maxZ;z+=step){
-      if(blocked(x,z,.72)) continue;
-
-      origin.set(x,floorY,z);
-      ray.set(origin,new THREE.Vector3(0,-1,0));
-      ray.near=0;
-      ray.far=floorY+.5;
-      hits.length=0;
-      ray.intersectObjects(houseMeshes,true,hits);
-
-      const floorHit=hits.find(hit=>hit.point.y>=-0.25 && hit.point.y<=0.35);
-      if(!floorHit) continue;
-
-      origin.set(x,probeY,z);
-      ray.set(origin,new THREE.Vector3(0,1,0));
-      ray.near=0;
-      ray.far=ceilingRange;
-      hits.length=0;
-      ray.intersectObjects(houseMeshes,true,hits);
-
-      const ceilingHit=hits.find(hit=>hit.point.y>=probeY+1.9);
-      if(!ceilingHit) continue;
-
-      let wallCount=0;
-      let wallScore=0;
-      const wallDistances=[];
-
-      for(const dir of sideDirs){
-        origin.set(x,probeY,z);
-        ray.set(origin,dir);
-        ray.near=.85;
-        ray.far=sideRange;
-        hits.length=0;
-        ray.intersectObjects(houseMeshes,true,hits);
-
-        // Count the nearest piece of actual geometry in this direction.
-        const hit=hits.find(item=>item.point.y>-0.05 && item.point.y<4.5);
-        if(hit){
-          wallCount++;
-          wallDistances.push(hit.distance);
-          wallScore+=Math.max(0,sideRange-hit.distance);
-        }
-      }
-
-      if(wallCount<4) continue;
-
-      // Prefer a spacious room rather than a tiny closet.
-      const shortestWall=Math.min(...wallDistances);
-      const roomSpan=Math.min(
-        wallDistances[0]+wallDistances[1],
-        wallDistances[2]+wallDistances[3]
-      );
-
-      let clearance=8;
-      for(const box of houseCollisionBoxes){
-        const nx=Math.max(box.minX,Math.min(x,box.maxX));
-        const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
-        clearance=Math.min(clearance,Math.hypot(x-nx,z-nz));
-      }
-
-      const centerX=(minX+maxX)*.5;
-      const centerZ=(minZ+maxZ)*.5;
-      const centerDistance=Math.hypot(x-centerX,z-centerZ);
-
-      const score=
-        wallCount*100+
-        wallScore*5+
-        Math.min(roomSpan,18)*6+
-        Math.min(shortestWall,4)*8+
-        Math.min(clearance,4)*12-
-        centerDistance*.04;
-
-      if(score>bestScore){
-        bestScore=score;
-        best={x,z};
-      }
-    }
-  }
-
-  if(!best){
-    console.warn("[DeepSeeker] could not find enclosed main-room spawn");
-    return false;
-  }
-
-  houseSpawn.set(best.x,EYE,best.z);
-  console.log("[DeepSeeker] main-room house spawn:",{
-    x:Number(best.x.toFixed(2)),
-    z:Number(best.z.toFixed(2)),
-    score:Number(bestScore.toFixed(1))
+  console.log("[DeepSeeker] fixed living-room spawn:",{
+    x:0,
+    z:0
   });
+
   return true;
 }
 
