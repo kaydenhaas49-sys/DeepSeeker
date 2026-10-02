@@ -137,8 +137,302 @@ let gameStarted=false;
 let houseIntroMessageShown=false;
 let lastAutoSave=0;
 let pendingSaveLoad=null;
+let pendingNewGameSlot=null;
 
-const SAVE_KEY="deepseeker-save-v1";
+const SAVE_SLOT_COUNT=3;
+const SAVE_SLOT_KEY_PREFIX="deepseeker-save-slot-";
+const LEGACY_SAVE_KEY="deepseeker-save-v1";
+const SELECTED_SAVE_SLOT_KEY="deepseeker-selected-save-slot";
+const SAVE_COOKIE_PREFIX="deepseeker-save-cookie-";
+const SELECTED_SAVE_COOKIE="deepseeker-selected-save-slot";
+const SAVE_COOKIE_MAX_AGE=60*60*24*365*10;
+
+const saveCache=[null,null,null,null];
+
+function normalizeSaveSlot(slot){
+  const value=Number(slot);
+  if(!Number.isInteger(value)) return 1;
+  return Math.max(1,Math.min(SAVE_SLOT_COUNT,value));
+}
+
+function saveSlotKey(slot){
+  return SAVE_SLOT_KEY_PREFIX+normalizeSaveSlot(slot);
+}
+
+function saveSlotCookieKey(slot){
+  return SAVE_COOKIE_PREFIX+normalizeSaveSlot(slot);
+}
+
+function parseSave(raw){
+  if(typeof raw!=="string" || !raw) return null;
+
+  try{
+    const parsed=JSON.parse(raw);
+    if(!parsed || typeof parsed!=="object") return null;
+    if(!Number.isFinite(Number(parsed.x)) || !Number.isFinite(Number(parsed.z))) return null;
+    if(parsed.level!=="apartment" && parsed.level!=="backrooms" && parsed.houseMode!==true && parsed.houseMode!==false) return null;
+    return parsed;
+  }catch{
+    return null;
+  }
+}
+
+function readCookie(name){
+  const prefix=encodeURIComponent(name)+"=";
+  const entry=document.cookie
+    .split(";")
+    .map(part=>part.trim())
+    .find(part=>part.startsWith(prefix));
+
+  if(!entry) return null;
+
+  try{
+    return decodeURIComponent(entry.slice(prefix.length));
+  }catch{
+    return null;
+  }
+}
+
+function writeCookie(name,value){
+  try{
+    document.cookie=
+      encodeURIComponent(name)+"="+encodeURIComponent(value)+
+      "; Max-Age="+SAVE_COOKIE_MAX_AGE+
+      "; Path=/; SameSite=Lax"+
+      (location.protocol==="https:" ? "; Secure" : "");
+
+    return readCookie(name)!==null;
+  }catch{
+    return false;
+  }
+}
+
+function readSaveSlot(slot){
+  const key=saveSlotKey(slot);
+
+  try{
+    const local=parseSave(localStorage.getItem(key));
+    if(local) return local;
+  }catch{
+    // Continue to cookie backup.
+  }
+
+  const cookie=parseSave(readCookie(saveSlotCookieKey(slot)));
+  if(cookie){
+    try{
+      localStorage.setItem(key,JSON.stringify(cookie));
+    }catch{
+      // Cookie remains the durable fallback.
+    }
+  }
+
+  return cookie;
+}
+
+function hydrateSaveSlots(){
+  // Migrate the old single-save format exactly once.
+  let legacy=null;
+  try{
+    legacy=parseSave(localStorage.getItem(LEGACY_SAVE_KEY));
+  }catch{
+    legacy=parseSave(readCookie(LEGACY_SAVE_KEY));
+  }
+
+  for(let slot=1;slot<=SAVE_SLOT_COUNT;slot++){
+    saveCache[slot]=readSaveSlot(slot);
+  }
+
+  if(legacy && !saveCache[1]){
+    saveCache[1]={...legacy,version:3,saveSlot:1};
+    persistSaveSlot(1,saveCache[1]);
+  }
+}
+
+function getSavedGame(slot=selectedSaveSlot){
+  return saveCache[normalizeSaveSlot(slot)] || null;
+}
+
+function persistSaveSlot(slot,data){
+  const targetSlot=normalizeSaveSlot(slot);
+  const serialized=JSON.stringify(data);
+  let persisted=false;
+
+  saveCache[targetSlot]=data;
+
+  try{
+    localStorage.setItem(saveSlotKey(targetSlot),serialized);
+    persisted=localStorage.getItem(saveSlotKey(targetSlot))===serialized;
+  }catch{
+    // Cookie backup below may still work.
+  }
+
+  if(writeCookie(saveSlotCookieKey(targetSlot),serialized)){
+    persisted=true;
+  }
+
+  return persisted;
+}
+
+function readSelectedSaveSlot(){
+  let raw=null;
+
+  try{
+    raw=localStorage.getItem(SELECTED_SAVE_SLOT_KEY);
+  }catch{
+    raw=null;
+  }
+
+  if(!raw) raw=readCookie(SELECTED_SAVE_COOKIE);
+
+  return normalizeSaveSlot(raw);
+}
+
+let selectedSaveSlot=readSelectedSaveSlot();
+hydrateSaveSlots();
+
+try{
+  if(window.navigator?.storage?.persist){
+    window.navigator.storage.persist().catch(()=>{});
+  }
+}catch{
+  // Persistence permission is only an optimization.
+}
+
+function setSelectedSaveSlot(slot,announce=true){
+  selectedSaveSlot=normalizeSaveSlot(slot);
+
+  try{
+    localStorage.setItem(SELECTED_SAVE_SLOT_KEY,String(selectedSaveSlot));
+  }catch{
+    // Cookie below keeps the selection across a normal storage reset.
+  }
+  writeCookie(SELECTED_SAVE_COOKIE,String(selectedSaveSlot));
+
+  renderSaveSlots();
+  updateSaveSlotLabels();
+
+  if(announce){
+    const save=getSavedGame(selectedSaveSlot);
+    eventText.textContent=save
+      ? `SLOT ${selectedSaveSlot} SELECTED`
+      : `SLOT ${selectedSaveSlot} READY FOR A NEW GAME`;
+    eventText.style.opacity="1";
+    setTimeout(()=>{
+      if(
+        eventText.textContent===`SLOT ${selectedSaveSlot} SELECTED` ||
+        eventText.textContent===`SLOT ${selectedSaveSlot} READY FOR A NEW GAME`
+      ){
+        eventText.style.opacity="0";
+      }
+    },1200);
+  }
+}
+
+function updateSaveSlotLabels(){
+  const selected=getSavedGame(selectedSaveSlot);
+
+  if(saveInfo){
+    saveInfo.textContent=selected
+      ? `SLOT ${selectedSaveSlot} SELECTED · ${getSavedLevel(selected).toUpperCase()}`
+      : `SLOT ${selectedSaveSlot} SELECTED · EMPTY`;
+  }
+
+  for(const button of document.querySelectorAll(".saveSlotCard")){
+    const slot=normalizeSaveSlot(button.dataset.slot);
+    const save=getSavedGame(slot);
+    const title=button.querySelector(".saveSlotTitle");
+    const detail=button.querySelector(".saveSlotDetail");
+    const mode=button.querySelector(".saveSlotMode");
+
+    button.classList.toggle("selected",slot===selectedSaveSlot);
+    button.setAttribute("aria-pressed",slot===selectedSaveSlot ? "true" : "false");
+
+    if(title) title.textContent=`SAVE SLOT ${slot}`;
+    if(detail){
+      detail.textContent=save
+        ? (save.savedAt
+            ? new Date(save.savedAt).toLocaleString()
+            : "SAVE FOUND")
+        : "EMPTY — NEW GAME";
+    }
+    if(mode){
+      mode.textContent=save
+        ? (save.saveType || (save.roomCode ? "MULTIPLAYER" : "SOLO"))
+        : "NO SAVE";
+    }
+
+    const loadButton=button.querySelector(".saveSlotLoad");
+    const newButton=button.querySelector(".saveSlotNew");
+    if(loadButton){
+      loadButton.disabled=!save;
+      loadButton.textContent=save ? "LOAD" : "EMPTY";
+    }
+    if(newButton) newButton.textContent=save ? "OVERWRITE" : "NEW";
+  }
+
+  const lobbySaveChoice=document.getElementById("lobbySaveChoice");
+  if(lobbySaveChoice){
+    const save=getSavedGame(selectedSaveSlot);
+    lobbySaveChoice.textContent=save
+      ? `SLOT ${selectedSaveSlot} · ${save.saveType || (save.roomCode ? "MULTIPLAYER" : "SOLO")} · ${getSavedLevel(save).toUpperCase()}`
+      : `SLOT ${selectedSaveSlot} · EMPTY · STARTS A NEW GAME`;
+  }
+
+  const continueLabel=document.getElementById("continueSlotLabel");
+  if(continueLabel){
+    continueLabel.textContent=`CONTINUE SLOT ${selectedSaveSlot}`;
+  }
+}
+
+function renderSaveSlots(){
+  const container=document.getElementById("saveSlots");
+  if(!container) return;
+
+  if(container.children.length===SAVE_SLOT_COUNT) return;
+
+  container.innerHTML="";
+  for(let slot=1;slot<=SAVE_SLOT_COUNT;slot++){
+    const card=document.createElement("div");
+    card.className="saveSlotCard";
+    card.dataset.slot=String(slot);
+    card.innerHTML=`
+      <div class="saveSlotHeader">
+        <span class="saveSlotTitle"></span>
+        <span class="saveSlotMode"></span>
+      </div>
+      <span class="saveSlotDetail"></span>
+      <div class="saveSlotActions">
+        <button class="saveSlotLoad" type="button">LOAD</button>
+        <button class="saveSlotNew" type="button">NEW</button>
+      </div>
+    `;
+
+    card.addEventListener("click",event=>{
+      if(event.target.closest("button")) return;
+      setSelectedSaveSlot(slot);
+    });
+
+    card.querySelector(".saveSlotLoad").addEventListener("click",event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      continueGame(slot);
+    });
+
+    card.querySelector(".saveSlotNew").addEventListener("click",event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      resetForNewGame(slot);
+    });
+
+    container.appendChild(card);
+  }
+}
+
+function refreshSaveInfo(){
+  renderSaveSlots();
+  updateSaveSlotLabels();
+  updateHouseLoadingUI();
+}
 
 function updateHouseLoadingUI(progress=null,status=null){
   const value=Number.isFinite(progress)
@@ -165,10 +459,10 @@ function updateHouseLoadingUI(progress=null,status=null){
     if(label) label.textContent=message;
   }
 
-  const save=getSavedGame();
+  const save=getSavedGame(selectedSaveSlot);
   if(newGameButton) newGameButton.disabled=false;
   if(continueButton) continueButton.disabled=!save;
-  // Lobby roster logic decides whether this is enabled for the host.
+
   if(startLobbyButton && !new URLSearchParams(location.search).has("lobby")){
     startLobbyButton.disabled=false;
   }
@@ -179,38 +473,22 @@ function updateHouseLoadingUI(progress=null,status=null){
   }
 }
 
-function getSavedGame(){
-  try{
-    const raw=localStorage.getItem(SAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  }catch{
-    return null;
-  }
-}
+function saveGame(slot=selectedSaveSlot){
+  const targetSlot=normalizeSaveSlot(slot);
+  setSelectedSaveSlot(targetSlot,false);
 
-function getSavedLevel(data){
-  if(!data) return "apartment";
-  if(data.level==="backrooms" || data.level==="apartment") return data.level;
-  return data.houseMode ? "apartment" : "backrooms";
-}
+  const params=new URLSearchParams(location.search);
+  const roomCode=(params.get("room")||"").trim().toUpperCase();
 
-function refreshSaveInfo(){
-  const save=getSavedGame();
-  if(!save){
-    saveInfo.textContent="NO SAVE DATA";
-  }else{
-    const when=save.savedAt ? new Date(save.savedAt).toLocaleString() : "UNKNOWN";
-    saveInfo.textContent=`SAVE FOUND · ${when} · ${getSavedLevel(save).toUpperCase()}`;
-  }
-  updateHouseLoadingUI();
-}
-
-function saveGame(){
   const data={
-    version:2,
+    version:4,
     seed:SEED,
     level:houseMode ? "apartment" : "backrooms",
     savedAt:Date.now(),
+    saveSlot:targetSlot,
+    saveType:roomCode ? "MULTIPLAYER" : "SOLO",
+    roomCode:roomCode || null,
+    playerName:multiplayer?.getPlayerName?.() || "Player",
     x:player.pos.x,
     z:player.pos.z,
     yaw:player.yaw,
@@ -222,19 +500,32 @@ function saveGame(){
     houseMode
   };
 
-  try{
-    localStorage.setItem(SAVE_KEY,JSON.stringify(data));
-    refreshSaveInfo();
-    eventText.textContent="GAME SAVED";
+  const persisted=persistSaveSlot(targetSlot,data);
+  const verified=getSavedGame(targetSlot);
+
+  if(!persisted || !verified || verified.savedAt!==data.savedAt){
+    console.error("[DeepSeeker] save failed",{
+      slot:targetSlot,
+      persisted,
+      verified
+    });
+    eventText.textContent=`SAVE FAILED · SLOT ${targetSlot}`;
     eventText.style.opacity="1";
-    setTimeout(()=>{
-      if(eventText.textContent==="GAME SAVED") eventText.style.opacity="0";
-    },1100);
-  }catch(error){
-    console.error("Save failed:",error);
-    eventText.textContent="SAVE FAILED";
-    eventText.style.opacity="1";
+    return false;
   }
+
+  refreshSaveInfo();
+  updateSaveSlotLabels();
+  eventText.textContent=`GAME SAVED · SLOT ${targetSlot}`;
+  eventText.style.opacity="1";
+
+  setTimeout(()=>{
+    if(eventText.textContent===`GAME SAVED · SLOT ${targetSlot}`){
+      eventText.style.opacity="0";
+    }
+  },1100);
+
+  return true;
 }
 
 function applySavedGame(data){
@@ -250,19 +541,23 @@ function applySavedGame(data){
   player.vel.set(0,0,0);
   player.jumpY=0;
   player.jumpVelocity=0;
+  player.keys.clear();
 
-  battery=Number.isFinite(data.battery)?THREE.MathUtils.clamp(data.battery,0,100):100;
+  battery=Number.isFinite(data.battery)
+    ? THREE.MathUtils.clamp(data.battery,0,100)
+    : 100;
   flashlightOn=data.flashlightOn!==false;
   player.setFlashlightVisual(flashlightOn);
 
   const stage=Number.isInteger(data.storyStage)
-    ?THREE.MathUtils.clamp(data.storyStage,0,STORY.length-1)
-    :0;
-  maxStoryDistance=Number.isFinite(data.maxStoryDistance)?data.maxStoryDistance:0;
+    ? THREE.MathUtils.clamp(data.storyStage,0,STORY.length-1)
+    : 0;
+  maxStoryDistance=Number.isFinite(data.maxStoryDistance)
+    ? data.maxStoryDistance
+    : 0;
   applyStoryStage(stage,false);
 
   const savedLevel=getSavedLevel(data);
-
   if(savedLevel==="apartment" && houseLoaded){
     setHouseMode(true,{announceFall:false});
   }else{
@@ -289,8 +584,12 @@ function showLobbyScreen(){
   const host=params.get("host")==="1";
   roomCode.textContent=code||"------";
   lobbyModeTitle.textContent=host?"CREATE LOBBY":"JOIN LOBBY";
-  startLobbyButton.textContent=host?"START GAME":"READY / START";
+  const save=getSavedGame(selectedSaveSlot);
+  startLobbyButton.textContent=host
+    ? (save ? `CONTINUE SLOT ${selectedSaveSlot}` : `START NEW SLOT ${selectedSaveSlot}`)
+    : "READY / START";
   startLobbyButton.style.display="block";
+  updateSaveSlotLabels();
 }
 
 function disposeHouseResources(){
@@ -372,7 +671,8 @@ function ensureHouseLoading(){
   }
 }
 
-function startGame(save=null){
+function startGame(save=null,saveSlot=selectedSaveSlot){
+  setSelectedSaveSlot(saveSlot,false);
   // New games begin in the apartment. Continue only loads the apartment when
   // the saved level says the player was actually there.
   const needsApartment=!save || getSavedLevel(save)==="apartment";
@@ -380,6 +680,7 @@ function startGame(save=null){
   if(needsApartment && (!houseLoaded || !houseCollisionReady)){
     pendingHouseStart=true;
     pendingSaveLoad=save;
+    pendingNewGameSlot=save ? null : normalizeSaveSlot(saveSlot);
     ensureHouseLoading();
 
     prompt.textContent=houseLoadFailed
@@ -398,6 +699,7 @@ function startGame(save=null){
 
   pendingHouseStart=false;
   pendingSaveLoad=null;
+  pendingNewGameSlot=null;
 
   if(save){
     applySavedGame(save);
@@ -406,36 +708,84 @@ function startGame(save=null){
   }
 
   player.lock();
+
+  // Creating a new slot immediately writes an initial checkpoint instead of
+  // leaving the slot empty until the 20-second autosave.
+  if(!save){
+    saveGame(saveSlot);
+  }
+
   return true;
 }
 
-function continueGame(){
-  const save=getSavedGame();
+function continueGame(slot=selectedSaveSlot){
+  setSelectedSaveSlot(slot,false);
+  const save=getSavedGame(slot);
   if(!save) return;
 
   if(save.seed!==SEED){
     const params=new URLSearchParams(location.search);
     params.set("seed",String(save.seed));
-    params.delete("save");
-    location.href=location.pathname+"?"+params.toString()+"&save=1";
+    params.set("save","1");
+    params.set("saveSlot",String(slot));
+    location.href=location.pathname+"?"+params.toString();
     return;
   }
 
-  startGame(save);
+  startGame(save,slot);
 }
 
-function resetForNewGame(){
+function resetForNewGame(slot=selectedSaveSlot){
+  const targetSlot=normalizeSaveSlot(slot);
+
+  // A NEW slot must always be a fresh run, even when another game or
+  // an unfinished apartment load is still active.
+  setSelectedSaveSlot(targetSlot,false);
+  pendingHouseStart=false;
+  pendingSaveLoad=null;
+  houseIntroMessageShown=false;
+  lastAutoSave=0;
+
+  backroomsFallTimer=0;
+  backroomsFallElapsed=0;
+  backroomsFallStartAt=0;
+  fallCameraOffset=0;
+
+  spiderActive=false;
+  spiderJumpscareTimer=0;
+  spiderBehaviorState="idle";
+  spiderBehaviorTime=0;
+  spiderEntity.visible=false;
+
+  gameStarted=false;
+
   player.pos.set(32,EYE,32);
   player.yaw=0;
   player.pitch=0;
   player.vel.set(0,0,0);
+  player.keys.clear();
+  player.jumpY=0;
+  player.jumpVelocity=0;
   battery=100;
   flashlightOn=true;
   player.setFlashlightVisual(true);
   maxStoryDistance=0;
-  setHouseMode(false);
+
+  // Reset the level state without relying on the previous run's state.
+  if(houseMode){
+    setHouseMode(false,{announceFall:false});
+  }else{
+    world.root.visible=true;
+    houseRoot.visible=false;
+    player.ignoreWorldCollision=false;
+    player.extraCollisionBoxes=[];
+  }
+
   applyStoryStage(0,false);
-  startGame();
+  eventText.textContent=`STARTING NEW GAME · SLOT ${targetSlot}`;
+  eventText.style.opacity="1";
+
+  startGame(null,targetSlot);
 }
 
 function enterLobby(code,host){
@@ -489,7 +839,7 @@ const multiplayer=new Multiplayer({
   },
   onGameStart:()=>{
     if(!gameStarted){
-      startGame();
+      startGame(getSavedGame(selectedSaveSlot),selectedSaveSlot);
     }
   },
   onSharedFall:(startedAt)=>{
@@ -1134,6 +1484,14 @@ function ensureHouseCollisionSetup(){
 
       audio.start();
       player.lock();
+
+      // The pending new-game path bypasses startGame() while the apartment
+      // finishes loading, so create the slot checkpoint here too.
+      if(pendingNewGameSlot!==null){
+        const newSlot=pendingNewGameSlot;
+        pendingNewGameSlot=null;
+        saveGame(newSlot);
+      }
     }else if(gameStarted){
       if(pendingHouseStart){
         pendingHouseStart=false;
@@ -1353,8 +1711,12 @@ function setHouseMode(enabled,options={}){
 }
 
 const initialParams=new URLSearchParams(location.search);
+const querySaveSlot=initialParams.get("saveSlot");
+if(querySaveSlot!==null){
+  setSelectedSaveSlot(querySaveSlot,false);
+}
 if(initialParams.get("save")==="1"){
-  pendingSaveLoad=getSavedGame();
+  pendingSaveLoad=getSavedGame(selectedSaveSlot);
 }
 
 if(new URLSearchParams(location.search).get("lobby")==="1"){
@@ -1955,18 +2317,26 @@ function openDeepSeekerApp(){
   phone.classList.add("app-open");
 }
 
-if(saveGameButton){
-  saveGameButton.addEventListener("click",()=>{
-    saveGame();
+const phoneSaveStatus=document.getElementById("phoneSaveStatus");
+document.querySelectorAll(".phoneSaveSlot").forEach(button=>{
+  button.addEventListener("click",()=>{
+    const slot=normalizeSaveSlot(button.dataset.slot);
+    const saved=saveGame(slot);
+    if(phoneSaveStatus){
+      phoneSaveStatus.textContent=saved
+        ? `SAVED TO SLOT ${slot}`
+        : `SAVE FAILED — SLOT ${slot}`;
+    }
   });
-}
+});
 
-newGameButton.addEventListener("click",()=>{
-  resetForNewGame();
+newGameButton.addEventListener("click",event=>{
+  event.preventDefault();
+  resetForNewGame(selectedSaveSlot);
 });
 
 continueButton.addEventListener("click",()=>{
-  continueGame();
+  continueGame(selectedSaveSlot);
 });
 
 createLobbyButton.addEventListener("click",()=>{
@@ -1983,8 +2353,9 @@ startLobbyButton.addEventListener("click",()=>{
   const params=new URLSearchParams(location.search);
   if(params.get("host")!=="1") return;
 
-  // startGame() handles lazy apartment loading for the host.
-  startGame();
+  // A populated slot resumes that personal snapshot; an empty slot starts fresh.
+  // Every player keeps their own slot, so solo and multiplayer saves are independent.
+  startGame(getSavedGame(selectedSaveSlot),selectedSaveSlot);
 
   // Then tell everyone else in the room to start too.
   multiplayer.startGameRoom();
@@ -2406,7 +2777,7 @@ window.addEventListener("beforeunload",()=>{
 if(pendingSaveLoad){
   const save=pendingSaveLoad;
   pendingSaveLoad=null;
-  setTimeout(()=>startGame(save),0);
+  setTimeout(()=>startGame(save,selectedSaveSlot),0);
 }
 
 window.__deepseeker={

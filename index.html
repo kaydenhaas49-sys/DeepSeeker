@@ -105,8 +105,23 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 #phoneCardTitle{font-size:11px;letter-spacing:2px;color:#aaa477;margin-bottom:8px}
 #phoneCardText{font-size:13px;line-height:1.55;color:#c6c5b6}
 #phoneSignal{margin-top:18px;font-size:9px;letter-spacing:2px;color:#67695b}
-#saveGameButton{margin-top:12px;width:100%;padding:10px;border:1px solid #ffffff14;border-radius:9px;background:#ffffff06;color:#aaa477;font:inherit;font-size:9px;letter-spacing:2px;cursor:pointer}
-#saveGameButton:hover{background:#ffffff10}
+#phoneSaveSlots{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+#phoneSaveStatus{grid-column:1/-1;font-size:8px;letter-spacing:1.2px;color:#817d6c;text-align:center;min-height:12px}
+.phoneSaveSlot{padding:9px 6px;border:1px solid #ffffff14;border-radius:9px;background:#ffffff06;color:#aaa477;font:inherit;font-size:8px;letter-spacing:1px;cursor:pointer}
+.phoneSaveSlot:hover{background:#ffffff10;border-color:#d8c98a44}
+#saveSlots{width:min(420px,88vw);display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.saveSlotCard{min-width:0;padding:12px 9px;border:1px solid rgba(229,218,170,.14);border-radius:11px;background:#ffffff05;color:#c5bea4;text-align:left;transition:border-color .15s,background .15s,transform .15s}
+.saveSlotCard:hover{background:#ffffff09;transform:translateY(-1px)}
+.saveSlotCard.selected{border-color:rgba(216,201,138,.6);background:rgba(216,201,138,.09);box-shadow:0 0 20px rgba(216,201,138,.06)}
+.saveSlotHeader{display:flex;align-items:center;justify-content:space-between;gap:5px}
+.saveSlotTitle{display:block;font-size:9px;letter-spacing:1.8px;color:#e5dfc0}
+.saveSlotDetail{display:block;margin-top:7px;font-size:9px;line-height:1.35;color:#918c78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.saveSlotMode{display:block;font-size:8px;letter-spacing:1.4px;color:#b9b092;white-space:nowrap}
+.saveSlotActions{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}
+.saveSlotActions button{width:100%;padding:7px 4px;border:1px solid #ffffff14;border-radius:7px;background:#ffffff06;color:#aaa477;font:inherit;font-size:8px;letter-spacing:1px;cursor:pointer}
+.saveSlotActions button:hover{background:#ffffff10;border-color:#d8c98a44}
+.saveSlotActions button:disabled{opacity:.35;cursor:not-allowed}
+.lobbySaveChoice{margin-top:8px;font-size:9px;letter-spacing:1.4px;color:#aaa477}
 #phoneStory{margin-top:18px;max-height:235px;overflow:auto;padding-right:3px}
 #phoneStory::-webkit-scrollbar{width:3px}
 #phoneStory::-webkit-scrollbar-thumb{background:#ffffff18;border-radius:9px}
@@ -164,7 +179,12 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
       </div>
       <div id="phoneStory"></div>
       <div id="phoneSignal">GPS UNAVAILABLE · NETWORK UNAVAILABLE</div>
-      <button id="saveGameButton" type="button">SAVE GAME</button>
+      <div id="phoneSaveSlots">
+        <div id="phoneSaveStatus">SELECT A SLOT TO SAVE</div>
+        <button class="phoneSaveSlot" data-slot="1" type="button">SAVE 1</button>
+        <button class="phoneSaveSlot" data-slot="2" type="button">SAVE 2</button>
+        <button class="phoneSaveSlot" data-slot="3" type="button">SAVE 3</button>
+      </div>
       <button id="phoneHome" type="button" aria-label="Return to phone home"></button>
     </div>
   </div>
@@ -238,8 +258,9 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
       <div class="houseLoaderTrack"><div class="houseLoaderFill" id="houseLoadFillHome"></div></div>
       <div class="houseLoaderStatus" id="houseLoadStatusHome">APARTMENT IS LOADING — YOU CAN'T START THE GAME YET.</div>
     </div>
-    <button id="newGameButton" class="menuButton" disabled>NEW GAME</button>
-    <button id="continueButton" class="menuButton">CONTINUE</button>
+    <div id="saveSlots" aria-label="Save slots"></div>
+    <button id="newGameButton" class="menuButton" disabled>NEW GAME IN SELECTED SLOT</button>
+    <button id="continueButton" class="menuButton"><span id="continueSlotLabel">CONTINUE SLOT 1</span></button>
     <button id="createLobbyButton" class="menuButton">CREATE LOBBY</button>
     <button id="joinLobbyButton" class="menuButton secondary">JOIN LOBBY</button>
     <div class="menuInfo" id="saveInfo">NO SAVE DATA</div>
@@ -256,6 +277,7 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
           <div class="usernameRow" style="width:min(340px,54vw);margin-top:8px">
             <input id="lobbyUsernameInput" class="usernameInput" maxlength="20" autocomplete="nickname" placeholder="USERNAME">
           </div>
+          <div id="lobbySaveChoice" class="lobbySaveChoice"></div>
         </div>
         <div style="text-align:right">
           <div class="lobbyHeaderLabel">ROOM CODE</div>
@@ -297,6 +319,6 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
   }
 }
 </script>
-<script type="module" src="./main.js"></script>
+<script type="module" src="./main.js?v=20261002-savefix9"></script>
 </body>
 </html>
