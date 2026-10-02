@@ -343,7 +343,21 @@ export class World {
       for (let cz = minCz; cz <= maxCz; cz++) {
         const entry = this.chunks.get(cellKey(cx, cz));
         if (!entry) continue;
-        this.wallQueryScratch.push(...entry.wallBounds);
+
+        for (const wall of entry.wallBounds) {
+          // Broad-phase filter: only return walls whose AABB is actually
+          // within the query radius. This keeps Player collision from testing
+          // every wall in the surrounding chunks on every movement sample.
+          if(
+            wall.maxX < px-radius ||
+            wall.minX > px+radius ||
+            wall.maxZ < pz-radius ||
+            wall.minZ > pz+radius
+          ){
+            continue;
+          }
+          this.wallQueryScratch.push(wall);
+        }
       }
     }
 
