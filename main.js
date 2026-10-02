@@ -924,7 +924,24 @@ function ensureHouseCollisionSetup(){
 
     console.log("[DeepSeeker] house collision ready in",Math.round(performance.now()-started),"ms");
 
-    if(gameStarted){
+    // A start request may have been queued while the GLB or collision setup
+    // was loading. Only enter the playable level after both are ready.
+    if(pendingHouseStart && !gameStarted){
+      pendingHouseStart=false;
+      gameStarted=true;
+      overlay.classList.add("hidden");
+
+      if(pendingSaveLoad){
+        const queuedSave=pendingSaveLoad;
+        pendingSaveLoad=null;
+        applySavedGame(queuedSave);
+      }else{
+        setHouseMode(true);
+      }
+
+      audio.start();
+      player.lock();
+    }else if(gameStarted){
       if(pendingHouseStart){
         pendingHouseStart=false;
         setHouseMode(true);
