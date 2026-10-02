@@ -2783,12 +2783,12 @@ document.addEventListener("keydown",e=>{
     }
   }else if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
-  }else if(e.code==="KeyN" && !e.repeat){
+  else if(e.code==="KeyN" && !e.repeat){
     if(gameStarted && !phoneOpen && !controlsOpen){
       e.preventDefault();
       toggleMultiplayerMap();
     }
-    else if(e.code==="KeyP" && !e.repeat){
+  }else if(e.code==="KeyP" && !e.repeat){
     if(controlsOpen) hideControls();
     else togglePhone();
   }else if(e.code==="Tab"){
