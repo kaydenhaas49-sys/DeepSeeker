@@ -337,6 +337,27 @@ export class Multiplayer {
     return false;
   }
 
+  getClosestBackroomsPlayerPosition(x,z){
+    let closest=null;
+    let closestDistance=Infinity;
+
+    for(const remote of this.players.values()){
+      const state=remote.current || remote.target;
+      if(!state || state.level!=="backrooms") continue;
+
+      const dx=state.x-x;
+      const dz=state.z-z;
+      const distance=dx*dx+dz*dz;
+
+      if(distance<closestDistance){
+        closestDistance=distance;
+        closest={x:state.x,z:state.z};
+      }
+    }
+
+    return closest;
+  }
+
   startGameRoom() {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
 

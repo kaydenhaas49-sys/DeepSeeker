@@ -1518,30 +1518,53 @@ function startSpiderJumpscare(){
   eventText.style.opacity="1";
 }
 
-function finishSpiderJumpscare(){
-  const retreatDirection=new THREE.Vector3(
-    Math.sin(player.yaw),
-    0,
-    Math.cos(player.yaw)
+function resetPlayerAfterSpiderCatch(){
+  const teammate=multiplayer.getClosestBackroomsPlayerPosition(
+    player.pos.x,
+    player.pos.z
   );
-  const retreat=player.pos.clone().addScaledVector(retreatDirection,2.8);
 
-  if(!isSpiderBlocked(retreat.x,retreat.z)){
-    spiderEntity.position.x=retreat.x;
-    spiderEntity.position.z=retreat.z;
+  if(teammate){
+    const dx=player.pos.x-teammate.x;
+    const dz=player.pos.z-teammate.z;
+    const distance=Math.hypot(dx,dz);
+    const inv=1/Math.max(distance,.001);
+    const spawnX=teammate.x+(distance>.001?dx*inv:1)*2.2;
+    const spawnZ=teammate.z+(distance>.001?dz*inv:0)*2.2;
+
+    if(!isSpiderBlocked(spawnX,spawnZ)){
+      player.pos.set(spawnX,EYE,spawnZ);
+    }else{
+      player.pos.set(teammate.x,EYE,teammate.z);
+    }
+
+    eventText.textContent="YOU GOT CAUGHT — RESET TO YOUR TEAMMATE.";
+  }else{
+    player.pos.set(32,EYE,32);
+    eventText.textContent="YOU GOT CAUGHT — RESET TO THE START OF THE LEVEL.";
   }
 
-  spiderEntity.position.y=SPIDER_GROUND_OFFSET;
-  spiderEntity.scale.setScalar(1);
+  player.vel.set(0,0,0);
+  player.keys.clear();
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  player.yaw=0;
+  player.pitch=0;
+
   spiderJumpscareTimer=0;
   spiderJumpscareScale=1;
   spiderBehaviorState="chase";
   spiderBehaviorTime=0;
+  spiderEntity.scale.setScalar(1);
+  spiderEntity.position.y=SPIDER_GROUND_OFFSET;
   setSpiderAnimation("chase");
+  spiderEntity.visible=true;
+  pulse=1;
+  eventText.style.opacity="1";
+}
 
-  if(eventText.textContent==="CAUGHT"){
-    eventText.style.opacity="0";
-  }
+function finishSpiderJumpscare(){
+  resetPlayerAfterSpiderCatch();
 }
 
 function spawnSpiderAtPlayer(){
