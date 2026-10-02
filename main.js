@@ -1361,6 +1361,33 @@ function setBacteriaAnimation(name){
   bacteriaState=actualName;
 }
 
+function groundBacteriaEntity(){
+  if(!figure.visible) return;
+
+  let activeModel=null;
+  for(const [,item] of bacteriaModels){
+    if(item.model.visible){
+      activeModel=item.model;
+      break;
+    }
+  }
+
+  if(!activeModel && fallbackFigure.visible) activeModel=fallbackFigure;
+  if(!activeModel) return;
+
+  activeModel.updateMatrixWorld(true);
+
+  const box=new THREE.Box3().setFromObject(activeModel);
+  if(!Number.isFinite(box.min.y)) return;
+
+  // Animation clips can move the rendered feet relative to the entity root.
+  // Pin the actual visible mesh bottom to a tiny offset above floor level.
+  const correction=ENTITY_GROUND_OFFSET-box.min.y;
+  if(Math.abs(correction)>.0005){
+    figure.position.y+=correction;
+  }
+}
+
 function isEntityBlocked(x,z){
   const walls=world.getNearbyWallBounds(x,z,ENTITY_RADIUS+.35);
   for(const wall of walls){
@@ -1969,6 +1996,8 @@ function animate(){
       mixer.update(dt);
     }
   }
+
+  groundBacteriaEntity();
 
   if(figureLife>0 && !houseMode){
     figureAge+=dt;
