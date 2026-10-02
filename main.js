@@ -1835,8 +1835,7 @@ function animate(){
   multiplayer.update(dt);
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
-  flashlight.target.position.set(0,0,-80);
-  if(!houseMode) updateStoryProgress();
+    if(!houseMode) updateStoryProgress();
 
   if(gameStarted){
     if(t-lastAutoSave>20){
@@ -1863,7 +1862,9 @@ function animate(){
 
   const flicker=flashlightFlicker(t);
   flashlight.intensity=flashlightOn ? 27.0*flicker : 0;
-  playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
+  if(!houseMode){
+    playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
+  }
 
   if(!houseMode){
     for(const mixer of bacteriaMixers.values()){
