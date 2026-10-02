@@ -578,11 +578,9 @@ function buildHouseCollisionProxies(root){
     // surprisingly large area; treating those as walls is what caused the
     // player to spawn/move trapped.
     const architecturalWall =
-      vertical >= 1.0 &&
-      thin <= 2.25 &&
-      horizontal >= 0.9 &&
-      size.x <= 30 &&
-      size.z <= 30;
+      vertical >= 0.6 &&
+      horizontal >= 0.45 &&
+      !(size.x > 35 && size.z > 35);
 
     if(!architecturalWall) return;
 
