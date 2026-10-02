@@ -302,6 +302,15 @@ export class Multiplayer {
     }
   }
 
+  hasPlayerInHouse(){
+    for(const remote of this.players.values()){
+      if(remote.target?.level==="house" || remote.current?.level==="house"){
+        return true;
+      }
+    }
+    return false;
+  }
+
   startGameRoom() {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
 
