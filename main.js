@@ -1330,6 +1330,7 @@ let bacteriaLoaded=false;
 const bacteriaModels=new Map();
 const bacteriaMixers=new Map();
 let bacteriaState="";
+let bacteriaRequestedState="";
 let generatedBacteriaFailures=0;
 const debugSpawnBacteria=false;
 
@@ -1353,36 +1354,6 @@ function fitBacteriaModel(model){
     -center.z*scale
   );
   model.scale.set(scale*1.65,scale,scale*1.65);
-}
-
-function setBacteriaAnimation(name){
-  const actualName=bacteriaModels.has(name)
-    ? name
-    : bacteriaModels.has("idle")
-      ? "idle"
-      : bacteriaModels.keys().next().value;
-
-  if(!actualName || bacteriaState===actualName) return;
-
-  const entry=bacteriaModels.get(actualName);
-  if(!entry) return;
-
-  for(const [key,item] of bacteriaModels){
-    item.model.visible=key===actualName;
-  }
-
-  for(const [key,mixer] of bacteriaMixers){
-    const action=mixer._bacteriaAction;
-    if(!action) continue;
-    if(key===actualName){
-      action.reset();
-      action.play();
-    }else{
-      action.stop();
-    }
-  }
-
-  bacteriaState=actualName;
 }
 
 function spawnBacteriaAtPlayer(){
@@ -1470,8 +1441,8 @@ function loadBacteriaAnimation(name){
       bacteriaModels.set(name,{model,gltf});
       bacteriaLoaded=true;
 
-      if(bacteriaState){
-        setBacteriaAnimation(bacteriaState);
+      if(bacteriaRequestedState){
+        setBacteriaAnimation(bacteriaRequestedState);
       }else if(name==="stalk"){
         setBacteriaAnimation("stalk");
       }
@@ -1488,33 +1459,23 @@ function loadBacteriaAnimation(name){
 }
 
 function setBacteriaAnimation(name){
-  const actualName=bacteriaModels.has(name)
-    ? name
-    : bacteriaModels.has("idle")
-      ? "idle"
-      : bacteriaModels.has("stalk")
-        ? "stalk"
-        : null;
+  bacteriaRequestedState=name;
 
-  // Lazy-load later animation states instead of keeping all four GLBs resident.
-  if(!actualName){
+  if(!bacteriaModels.has(name)){
     loadBacteriaAnimation(name);
     return;
   }
 
-  if(bacteriaState===actualName) return;
-
-  const entry=bacteriaModels.get(actualName);
-  if(!entry) return;
+  if(bacteriaState===name) return;
 
   for(const [key,item] of bacteriaModels){
-    item.model.visible=key===actualName;
+    item.model.visible=key===name;
   }
 
   for(const [key,mixer] of bacteriaMixers){
     const action=mixer._bacteriaAction;
     if(!action) continue;
-    if(key===actualName){
+    if(key===name){
       action.reset();
       action.play();
     }else{
@@ -1522,7 +1483,7 @@ function setBacteriaAnimation(name){
     }
   }
 
-  bacteriaState=actualName;
+  bacteriaState=name;
 }
 
 // Only keep the first encounter animation resident up front. Chase/attack are
