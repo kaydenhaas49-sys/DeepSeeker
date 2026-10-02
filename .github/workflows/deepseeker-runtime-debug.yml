@@ -1,0 +1,52 @@
+name: DeepSeeker runtime debug
+
+on:
+  push:
+    branches: [debug-load-20261002]
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check
+        run: |
+          set -e
+          for f in *.js; do node --check "$f"; done
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Run game
+        run: |
+          python3 -m http.server 8123 >/tmp/http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          node > /tmp/test-output.txt <<'NODE'
+          const { chromium } = require('playwright');
+          (async()=>{
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage();
+            const errors=[];
+            const failed=[];
+            page.on('console',m=>{ if(m.type()==='error') errors.push(m.text()); });
+            page.on('pageerror',e=>errors.push('PAGEERROR: '+e.message));
+            page.on('requestfailed',r=>failed.push(r.url()+' :: '+(r.failure()?.errorText||'failed')));
+            await page.goto('http://127.0.0.1:8123/index.html',{waitUntil:'domcontentloaded'});
+            await page.waitForTimeout(12000);
+            console.log('TITLE='+await page.title());
+            console.log('PROMPT='+await page.locator('#prompt').textContent());
+            console.log('HOUSE='+await page.locator('#houseLoadStatusHome').textContent());
+            console.log('PERCENT='+await page.locator('#houseLoadPercentHome').textContent());
+            console.log('NEW_DISABLED='+await page.locator('#newGameButton').isDisabled());
+            console.log('ERRORS='+JSON.stringify(errors));
+            console.log('FAILED='+JSON.stringify(failed));
+            await browser.close();
+            if(errors.length || failed.length) process.exitCode=1;
+          })();
+          NODE
+          cat /tmp/test-output.txt
