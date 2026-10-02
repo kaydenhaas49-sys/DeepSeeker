@@ -736,17 +736,25 @@ function chooseHousePositions(){
   const spawn=samples[0];
   houseSpawn.set(spawn.x,EYE,spawn.z);
 
-  // Never place the teleporter at/near the spawn. Prefer a spot at least
-  // 8 m away, then bias toward a wall/corner so it feels hidden.
-  const MIN_PORTAL_DISTANCE=8;
+  // Put the teleporter as far from spawn as the house allows. This avoids
+  // ever spawning inside/next to it, even when the house is small.
+  const MIN_PORTAL_DISTANCE=12;
   const portalCandidates=samples.filter(sample=>{
     return Math.hypot(sample.x-spawn.x,sample.z-spawn.z)>=MIN_PORTAL_DISTANCE;
   });
 
-  const candidates=portalCandidates.length ? portalCandidates : samples;
+  let candidates=portalCandidates.length ? portalCandidates : samples.filter(sample=>{
+    return Math.hypot(sample.x-spawn.x,sample.z-spawn.z)>=8;
+  });
+  if(!candidates.length) candidates=samples;
+
+  // Farthest point from spawn wins. On ties, prefer the perimeter so the
+  // teleporter naturally ends up tucked away instead of in the main room.
   candidates.sort((a,b)=>{
     const da=Math.hypot(a.x-spawn.x,a.z-spawn.z);
     const db=Math.hypot(b.x-spawn.x,b.z-spawn.z);
+    if(Math.abs(db-da)>.25) return db-da;
+
     const ea=Math.min(
       Math.abs(a.x-bounds.min.x),
       Math.abs(bounds.max.x-a.x),
@@ -759,8 +767,7 @@ function chooseHousePositions(){
       Math.abs(b.z-bounds.min.z),
       Math.abs(bounds.max.z-b.z)
     );
-    // Distance from spawn matters most; edge distance makes it less obvious.
-    return (db - eb*.5) - (da - ea*.5);
+    return ea-eb;
   });
 
   const portal=candidates[0];
