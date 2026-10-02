@@ -1310,6 +1310,10 @@ let spiderBehaviorState="idle";
 let spiderBehaviorTime=0;
 let spiderAttackPlayed=false;
 let spiderActive=false;
+let spiderJumpscareTimer=0;
+let spiderJumpscareStartY=0;
+let spiderJumpscareDirection=new THREE.Vector3();
+let spiderJumpscareScale=1;
 
 const SPIDER_STALK_TIME=1.4;
 const SPIDER_ATTACK_RANGE=1.45;
@@ -1482,6 +1486,62 @@ function moveSpiderTowardPlayer(dt){
   }
 
   return distance;
+}
+
+function startSpiderJumpscare(){
+  spiderBehaviorState="jumpscare";
+  spiderBehaviorTime=0;
+  spiderJumpscareTimer=.9;
+  spiderJumpscareStartY=camera.position.y;
+  spiderJumpscareDirection.set(0,0,-1);
+  camera.getWorldDirection(spiderJumpscareDirection);
+
+  const scarePosition=camera.position.clone().add(
+    spiderJumpscareDirection.multiplyScalar(.82)
+  );
+  spiderEntity.position.copy(scarePosition);
+  spiderEntity.position.y=camera.position.y-.75;
+  spiderEntity.rotation.y=Math.atan2(
+    camera.position.x-spiderEntity.position.x,
+    camera.position.z-spiderEntity.position.z
+  );
+  spiderJumpscareScale=1.65;
+  spiderEntity.scale.setScalar(spiderJumpscareScale);
+  spiderEntity.visible=true;
+
+  setSpiderAnimation("attack");
+  player.keys.clear();
+  player.vel.set(0,0,0);
+  pulse=1;
+
+  eventText.textContent="CAUGHT";
+  eventText.style.opacity="1";
+}
+
+function finishSpiderJumpscare(){
+  const retreatDirection=new THREE.Vector3(
+    Math.sin(player.yaw),
+    0,
+    Math.cos(player.yaw)
+  );
+  const retreat=player.pos.clone().addScaledVector(retreatDirection,2.8);
+
+  if(!isSpiderBlocked(retreat.x,retreat.z)){
+    spiderEntity.position.x=retreat.x;
+    spiderEntity.position.z=retreat.z;
+  }
+
+  spiderEntity.position.y=SPIDER_GROUND_OFFSET;
+  spiderEntity.scale.setScalar(1);
+  spiderJumpscareTimer=0;
+  spiderJumpscareScale=1;
+  spiderBehaviorState="chase";
+  spiderBehaviorTime=0;
+  setSpiderAnimation("chase");
+
+  if(eventText.textContent==="CAUGHT"){
+    eventText.style.opacity="0";
+  }
 }
 
 function spawnSpiderAtPlayer(){
@@ -2102,9 +2162,36 @@ function animate(){
     spiderMixer.update(dt);
   }
 
-  groundSpiderEntity();
+  if(spiderJumpscareTimer<=0){
+    groundSpiderEntity();
+  }
 
   if(spiderActive && !houseMode){
+    if(spiderJumpscareTimer>0){
+      spiderJumpscareTimer=Math.max(0,spiderJumpscareTimer-dt);
+      spiderBehaviorTime+=dt;
+
+      spiderEntity.position.copy(camera.position).addScaledVector(
+        spiderJumpscareDirection,
+        .76 + spiderBehaviorTime*.08
+      );
+      spiderEntity.position.y=camera.position.y-.75;
+      spiderEntity.scale.setScalar(
+        spiderJumpscareScale + Math.sin(spiderBehaviorTime*42)*.06
+      );
+      spiderEntity.rotation.y=Math.atan2(
+        camera.position.x-spiderEntity.position.x,
+        camera.position.z-spiderEntity.position.z
+      );
+      setSpiderAnimation("attack");
+
+      player.keys.clear();
+      player.vel.set(0,0,0);
+
+      if(spiderJumpscareTimer<=0){
+        finishSpiderJumpscare();
+      }
+    }else{
     spiderBehaviorTime+=dt;
 
     const targetDistance=Math.hypot(
@@ -2126,12 +2213,9 @@ function animate(){
       const distance=moveSpiderTowardPlayer(dt);
 
       if(distance<=SPIDER_ATTACK_RANGE){
-        spiderBehaviorState="attack";
-        spiderBehaviorTime=0;
         spiderAttackPlayed=false;
-        setSpiderAnimation("attack");
-        pulse=1;
         audio.scare();
+        startSpiderJumpscare();
       }
     }else if(spiderBehaviorState==="attack"){
       setSpiderAnimation("attack");
@@ -2153,6 +2237,7 @@ function animate(){
       player.pos.z-spiderEntity.position.z
     );
     spiderEntity.visible=true;
+    }
   }else{
     spiderEntity.visible=false;
     spiderBehaviorState="idle";
