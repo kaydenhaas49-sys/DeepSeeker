@@ -2004,13 +2004,14 @@ player.hands.visible=true;
 const spiderEntity=new THREE.Group();
 spiderEntity.name="SpiderEntity";
 spiderEntity.visible=false;
-const spiderRevealLight=new THREE.PointLight(0xf0d49a,0,12,2);
+const spiderRevealLight=new THREE.PointLight(0xff7a38,0,18,1.6);
 spiderRevealLight.position.set(0,1.2,0);
 spiderEntity.add(spiderRevealLight);
 scene.add(spiderEntity);
 
 let spiderLoaded=false;
 let spiderModel=null;
+let spiderFallbackVisual=null;
 let spiderMixer=null;
 const spiderActions=new Map();
 let spiderAnimationState="";
@@ -2064,15 +2065,15 @@ function createFallbackSpiderVisual(){
   root.name="SpiderVisualFallback";
 
   const bodyMat=new THREE.MeshStandardMaterial({
-    color:0x151515,
-    roughness:.82,
-    metalness:.05
+    color:0x252020,
+    roughness:.72,
+    metalness:.08
   });
   const accentMat=new THREE.MeshStandardMaterial({
-    color:0x5f4d35,
-    emissive:0x171108,
-    emissiveIntensity:.45,
-    roughness:.7
+    color:0x72503d,
+    emissive:0x2f140a,
+    emissiveIntensity:.85,
+    roughness:.62
   });
 
   const abdomen=new THREE.Mesh(
@@ -2107,10 +2108,10 @@ function createFallbackSpiderVisual(){
   }
 
   const eyeMat=new THREE.MeshStandardMaterial({
-    color:0x8f7a4b,
-    emissive:0x6e4b16,
-    emissiveIntensity:2.5,
-    roughness:.3
+    color:0xffb36a,
+    emissive:0xff5a18,
+    emissiveIntensity:4.5,
+    roughness:.24
   });
   for(let i=0;i<2;i++){
     const eye=new THREE.Mesh(
@@ -2176,7 +2177,7 @@ function setSpiderAnimation(name){
 function groundSpiderEntity(){
   if(!spiderEntity.visible) return;
 
-  const activeModel=spiderModel;
+  const activeModel=spiderFallbackVisual || spiderModel;
   if(!activeModel) return;
 
   activeModel.updateMatrixWorld(true);
@@ -2208,8 +2209,8 @@ function findSpiderSpawnPosition(){
   const rightZ=-Math.sin(player.yaw);
 
   const candidates=[
-    [9,0],[12,0],[10,3],[10,-3],
-    [13,4],[13,-4],[16,2],[16,-2]
+    [6,0],[8,0],[7,3],[7,-3],
+    [10,4],[10,-4],[12,2],[12,-2]
   ];
 
   for(const [distance,side] of candidates){
@@ -2439,6 +2440,13 @@ async function loadSpiderFromPack(){
     spiderEntity.add(model);
     spiderLoaded=true;
 
+    if(!spiderFallbackVisual){
+      spiderFallbackVisual=createFallbackSpiderVisual();
+      spiderFallbackVisual.name="SpiderVisualSafety";
+      spiderEntity.add(spiderFallbackVisual);
+    }
+    spiderFallbackVisual.visible=true;
+
     const sourceClip=model.animations?.[0] || null;
     if(sourceClip){
       const sourceFPS=329/Math.max(sourceClip.duration,.001);
@@ -2490,9 +2498,13 @@ async function loadSpiderFromPack(){
     spiderAnimationState="";
     spiderWantedState="idle";
 
-    const fallback=createFallbackSpiderVisual();
-    spiderModel=fallback;
-    spiderEntity.add(fallback);
+    if(!spiderFallbackVisual){
+      spiderFallbackVisual=createFallbackSpiderVisual();
+      spiderFallbackVisual.name="SpiderVisualSafety";
+      spiderEntity.add(spiderFallbackVisual);
+    }
+    spiderFallbackVisual.visible=true;
+    spiderModel=spiderFallbackVisual;
     spiderLoaded=true;
 
     eventText.textContent="SPIDER VISUAL FALLBACK";
@@ -2504,6 +2516,11 @@ async function loadSpiderFromPack(){
     },1600);
   }
 }
+
+spiderFallbackVisual=createFallbackSpiderVisual();
+spiderFallbackVisual.name="SpiderVisualSafety";
+spiderFallbackVisual.visible=true;
+spiderEntity.add(spiderFallbackVisual);
 
 loadSpiderFromPack();
 player.onStep=({intensity})=>audio.step(intensity);
@@ -3072,7 +3089,7 @@ function animate(){
   }
 
   spiderRevealLight.intensity=(!houseMode && spiderActive)
-    ? (spiderJumpscareTimer>0 ? 3.8 : 2.1)
+    ? (spiderJumpscareTimer>0 ? 9.5 : 6.5)
     : 0;
 
   if(spiderActive && !houseMode){
