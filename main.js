@@ -590,9 +590,9 @@ function buildHouseCollisionProxies(root){
     // rotated/angled walls still qualify without their world AABBs becoming
     // giant solid barriers.
     const wallLike =
-      vertical >= 0.75 &&
-      hMax >= 0.9 &&
-      hMin <= Math.min(0.6,hMax*0.45);
+      vertical >= 1.15 &&
+      hMax >= 1.0 &&
+      hMin <= Math.min(1.25,hMax*0.38);
 
     if(!wallLike) return;
 
@@ -601,19 +601,6 @@ function buildHouseCollisionProxies(root){
     // the classified set is now restricted to actual wall-shaped meshes.
     const box=new THREE.Box3().setFromObject(obj);
     if(!Number.isFinite(box.min.x) || !Number.isFinite(box.min.z)) return;
-
-    // Never let a proxy that already contains the intended spawn point
-    // trap the player before they get a chance to move. These are usually
-    // oversized AABBs from angled/compound meshes, not a real wall crossing
-    // the middle of the living room.
-    const spawnPad=.65;
-    const overlapsSpawn =
-      houseSpawn.x >= box.min.x-spawnPad &&
-      houseSpawn.x <= box.max.x+spawnPad &&
-      houseSpawn.z >= box.min.z-spawnPad &&
-      houseSpawn.z <= box.max.z+spawnPad;
-
-    if(overlapsSpawn) return;
 
     const geometryCenter=localBox.getCenter(new THREE.Vector3());
     const worldCenter=geometryCenter.clone().applyMatrix4(obj.matrixWorld);
