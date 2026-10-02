@@ -482,6 +482,9 @@ const multiplayer=new Multiplayer({
       startGame();
     }
   },
+  onSharedFall:(startedAt)=>{
+    startBackroomsFall(startedAt,false);
+  },
   onRoster:(players)=>{
     const params=new URLSearchParams(location.search);
     if(params.get("lobby")!=="1") return;
@@ -1010,14 +1013,7 @@ function useHouseReturnTeleporter(){
 
   player.keys.clear();
   player.vel.set(0,0,0);
-  backroomsFallTimer=BACKROOMS_FALL_DURATION;
-  backroomsFallElapsed=0;
-  backroomsFallStartY=camera.position.y;
-  pulse=.35;
-
-  eventText.textContent="THE FLOOR GAVE WAY.";
-  eventText.style.opacity="1";
-  return true;
+  return startBackroomsFall(Date.now(),true);
 }
 
 function ensureHouseCollisionSetup(){
@@ -1611,7 +1607,37 @@ const BACKROOMS_FALL_DURATION=1.8;
 let backroomsFallTimer=0;
 let backroomsFallElapsed=0;
 let backroomsFallStartY=0;
+let backroomsFallStartAt=0;
 let fallCameraOffset=0;
+
+function startBackroomsFall(sharedStartAt=Date.now(),broadcast=false){
+  if(!gameStarted || !houseMode || backroomsFallTimer>0) return false;
+
+  const startAt=Number.isFinite(Number(sharedStartAt))
+    ? Number(sharedStartAt)
+    : Date.now();
+  const elapsed=Math.max(0,(Date.now()-startAt)/1000);
+
+  if(elapsed>=BACKROOMS_FALL_DURATION){
+    setHouseMode(false,{announceFall:true,forceBackroomsSpawn:true});
+    return true;
+  }
+
+  backroomsFallStartAt=startAt;
+  backroomsFallElapsed=elapsed;
+  backroomsFallTimer=BACKROOMS_FALL_DURATION-elapsed;
+  backroomsFallStartY=camera.position.y;
+  fallCameraOffset=0;
+  pulse=.35;
+
+  if(broadcast){
+    multiplayer.broadcastFall(startAt);
+  }
+
+  eventText.textContent="THE FLOOR GAVE WAY.";
+  eventText.style.opacity="1";
+  return true;
+}
 
 let flashlightOn=true;
 let battery=100;
@@ -2004,7 +2030,9 @@ function animate(){
   updateHouseMemoryState(dt);
 
   if(backroomsFallTimer>0){
-    backroomsFallElapsed+=dt;
+    backroomsFallElapsed=backroomsFallStartAt
+      ? Math.max(0,(Date.now()-backroomsFallStartAt)/1000)
+      : backroomsFallElapsed+dt;
     backroomsFallTimer=Math.max(0,BACKROOMS_FALL_DURATION-backroomsFallElapsed);
 
     player.keys.clear();

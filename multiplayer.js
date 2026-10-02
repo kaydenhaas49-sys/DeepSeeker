@@ -11,7 +11,7 @@ const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
 
 export class Multiplayer {
-  constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart }) {
+  constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart, onSharedFall }) {
     this.scene = scene;
     this.player = player;
     this.getLevel = getLevel;
@@ -20,6 +20,7 @@ export class Multiplayer {
     this.onCount = onCount || (() => {});
     this.onRoster = onRoster || (() => {});
     this.onGameStart = onGameStart || (() => {});
+    this.onSharedFall = onSharedFall || (() => {});
 
     this.socket = null;
     this.room = this.getRoomName();
@@ -33,6 +34,9 @@ export class Multiplayer {
     this.closedManually = false;
     this.lastStatus = "";
     this.elapsedTime = 0;
+    this.fallSequence = 0;
+    this.fallStartedAt = 0;
+    this.lastSharedFallSequence = 0;
 
     this.connect();
   }
@@ -162,6 +166,16 @@ export class Multiplayer {
     }
   }
 
+  checkSharedFall(state) {
+    const normalized = this.normalizeState(state || {});
+    const sequence = normalized.fallSequence;
+
+    if(sequence <= this.lastSharedFallSequence) return;
+
+    this.lastSharedFallSequence = sequence;
+    this.onSharedFall(normalized.fallStartedAt);
+  }
+
   handleMessage(raw) {
     let data;
 
@@ -178,6 +192,7 @@ export class Multiplayer {
         for (const player of data.players || []) {
           if (!player?.id || player.id === this.playerId) continue;
           this.addOrUpdatePlayer(player);
+          this.checkSharedFall(player.state);
         }
         this.updateCount();
         break;
@@ -186,6 +201,7 @@ export class Multiplayer {
       case "player_updated":
         if (data.player?.id && data.player.id !== this.playerId) {
           this.addOrUpdatePlayer(data.player);
+          this.checkSharedFall(data.player.state);
           this.updateCount();
         }
         break;
@@ -193,16 +209,21 @@ export class Multiplayer {
       case "state": {
         if (!data.id || data.id === this.playerId) return;
 
-        const remote = this.players.get(data.id);
+        const nextState = this.normalizeState(data.state);
+        let remote = this.players.get(data.id);
+
         if (!remote) {
           this.addOrUpdatePlayer({
             id: data.id,
             name: "Player",
             state: data.state || {},
           });
+          remote = this.players.get(data.id);
         } else {
-          remote.target = this.normalizeState(data.state);
+          remote.target = nextState;
         }
+
+        this.checkSharedFall(nextState);
         break;
       }
 
@@ -242,6 +263,9 @@ export class Multiplayer {
     const z = Number(state?.z);
     const yaw = Number(state?.yaw);
 
+    const fallSequence = Number(state?.fallSequence);
+    const fallStartedAt = Number(state?.fallStartedAt);
+
     return {
       x: Number.isFinite(x) ? x : 0,
       z: Number.isFinite(z) ? z : 0,
@@ -250,6 +274,8 @@ export class Multiplayer {
       level: state?.level === "house" ? "house" : "backrooms",
       crouched: Boolean(state?.crouched),
       flashlight: state?.flashlight !== false,
+      fallSequence: Number.isFinite(fallSequence) ? fallSequence : 0,
+      fallStartedAt: Number.isFinite(fallStartedAt) ? fallStartedAt : 0,
     };
   }
 
@@ -322,6 +348,12 @@ export class Multiplayer {
     }
   }
 
+  broadcastFall(startedAt = Date.now()) {
+    this.fallSequence += 1;
+    this.fallStartedAt = Number.isFinite(startedAt) ? startedAt : Date.now();
+    this.sendState(true);
+  }
+
   sendState(force = false) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
 
@@ -333,6 +365,8 @@ export class Multiplayer {
       level: this.getLevel() ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
       flashlight: Boolean(this.getFlashlightOn()),
+      fallSequence: this.fallSequence,
+      fallStartedAt: this.fallStartedAt,
     };
 
     const changed =
@@ -343,7 +377,9 @@ export class Multiplayer {
       Math.abs(state.pitch - this.lastSent.pitch) > 0.03 ||
       state.level !== this.lastSent.level ||
       state.crouched !== this.lastSent.crouched ||
-      state.flashlight !== this.lastSent.flashlight;
+      state.flashlight !== this.lastSent.flashlight ||
+      state.fallSequence !== this.lastSent.fallSequence ||
+      state.fallStartedAt !== this.lastSent.fallStartedAt;
 
     const heartbeat = this.heartbeatTimer >= 1.0;
 
