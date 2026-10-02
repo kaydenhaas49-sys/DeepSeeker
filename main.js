@@ -2053,11 +2053,6 @@ function hideControls(){
   controls.classList.add("hidden");
 }
 
-function newSeed(){
-  const seed=Math.floor(Math.random()*2147483647);
-  location.href=location.pathname+"?seed="+seed;
-}
-
 player.attach();
 prompt.textContent="READY — START A GAME";
 applyStoryStage(0,false);
@@ -2124,7 +2119,6 @@ document.addEventListener("keydown",e=>{
     }
   }else if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
-  else if(e.code==="KeyN" && !phoneOpen && !controlsOpen){ newSeed(); }
   else if(e.code==="KeyP" && !e.repeat){
     if(controlsOpen) hideControls();
     else togglePhone();

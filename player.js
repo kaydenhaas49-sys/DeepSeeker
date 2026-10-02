@@ -48,6 +48,14 @@ export class Player {
     this.setupHands();
 
     this.onKeyDown = (e) => {
+      const target=e.target;
+      const typingTarget=
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+
+      if(typingTarget) return;
+
       if (
         e.code.startsWith("Arrow") ||
         e.code === "KeyW" ||
