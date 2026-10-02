@@ -109,6 +109,8 @@ let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
+let houseReturnPosition=new THREE.Vector3(0,0,0);
+let pendingHouseStart=false;
 let houseLoadFailed=false;
 let houseLoadStarted=false;
 let houseCollisionReady=false;
@@ -247,7 +249,18 @@ function startGame(save=null){
   overlay.classList.add("hidden");
   audio.start();
   ensureHouseLoading();
-  if(save) applySavedGame(save);
+
+  if(save){
+    pendingHouseStart=false;
+    applySavedGame(save);
+  }else{
+    pendingHouseStart=true;
+    if(houseLoaded && houseCollisionReady){
+      pendingHouseStart=false;
+      setHouseMode(true);
+    }
+  }
+
   player.lock();
 }
 
@@ -417,6 +430,7 @@ houseReturnGroup.visible=false;
 
 const houseReturn=housePortal.clone();
 const houseReturnLight=housePortalLight.clone();
+houseReturnLight.position.set(0,.5,-.4);
 houseReturnGroup.add(houseReturn,houseReturnLight);
 scene.add(houseReturnGroup);
 
@@ -675,6 +689,78 @@ function toggleHouseDoor(){
   return true;
 }
 
+function chooseHousePositions(){
+  if(!houseModel || !houseCollisionBoxes.length) return false;
+
+  const bounds=new THREE.Box3().setFromObject(houseModel);
+  const margin=1.15;
+  const minX=bounds.min.x+margin;
+  const maxX=bounds.max.x-margin;
+  const minZ=bounds.min.z+margin;
+  const maxZ=bounds.max.z-margin;
+  if(minX>=maxX || minZ>=maxZ) return false;
+
+  const collides=(x,z,radius=.55)=>{
+    for(const box of houseCollisionBoxes){
+      if(
+        x>=box.minX-radius &&
+        x<=box.maxX+radius &&
+        z>=box.minZ-radius &&
+        z<=box.maxZ+radius
+      ) return true;
+    }
+    return false;
+  };
+
+  const samples=[];
+  const step=Math.max(.6,Math.min(1.0,Math.max(maxX-minX,maxZ-minZ)/28));
+  for(let x=minX;x<=maxX;x+=step){
+    for(let z=minZ;z<=maxZ;z+=step){
+      if(!collides(x,z)) samples.push({x,z});
+    }
+  }
+  if(!samples.length) return false;
+
+  const center=new THREE.Vector3(
+    (bounds.min.x+bounds.max.x)*.5,
+    EYE,
+    (bounds.min.z+bounds.max.z)*.5
+  );
+
+  // Spawn near the middle of the house, but only on actual walkable space.
+  samples.sort((a,b)=>{
+    const da=Math.hypot(a.x-center.x,a.z-center.z);
+    const db=Math.hypot(b.x-center.x,b.z-center.z);
+    return da-db;
+  });
+  const spawn=samples[0];
+  houseSpawn.set(spawn.x,EYE,spawn.z);
+
+  // Put the return teleporter on the far side of the house, tucked toward
+  // the perimeter rather than directly in the player's initial sightline.
+  samples.sort((a,b)=>{
+    const da=Math.hypot(a.x-spawn.x,a.z-spawn.z);
+    const db=Math.hypot(b.x-spawn.x,b.z-spawn.z);
+    const ea=Math.min(
+      Math.abs(a.x-bounds.min.x),
+      Math.abs(bounds.max.x-a.x),
+      Math.abs(a.z-bounds.min.z),
+      Math.abs(bounds.max.z-a.z)
+    );
+    const eb=Math.min(
+      Math.abs(b.x-bounds.min.x),
+      Math.abs(bounds.max.x-b.x),
+      Math.abs(b.z-bounds.min.z),
+      Math.abs(bounds.max.z-b.z)
+    );
+    return (db + eb*.65) - (da + ea*.65);
+  });
+
+  const portal=samples[0];
+  houseReturnPosition.set(portal.x,0,portal.z);
+  return true;
+}
+
 function ensureHouseCollisionSetup(){
   if(!houseLoaded || houseCollisionReady || houseCollisionBuildStarted || !houseModel) return;
 
@@ -689,6 +775,7 @@ function ensureHouseCollisionSetup(){
       });
     }
     buildHouseCollisionProxies(houseModel);
+    chooseHousePositions();
 
     houseCollisionReady=true;
     houseCollisionBuildStarted=false;
@@ -696,9 +783,14 @@ function ensureHouseCollisionSetup(){
     console.log("[DeepSeeker] house collision ready in",Math.round(performance.now()-started),"ms");
 
     if(gameStarted){
-      eventText.textContent="HOUSE READY";
-      eventText.style.opacity="1";
-      setTimeout(()=>{eventText.style.opacity="0";},1000);
+      if(pendingHouseStart){
+        pendingHouseStart=false;
+        setHouseMode(true);
+      }else{
+        eventText.textContent="HOUSE READY";
+        eventText.style.opacity="1";
+        setTimeout(()=>{eventText.style.opacity="0";},1000);
+      }
     }
   };
 
@@ -881,9 +973,9 @@ function setHouseMode(enabled){
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    houseReturnGroup.position.set(0,0,0);
+    houseReturnGroup.position.copy(houseReturnPosition);
 
-    objective.textContent="Explore the house. Press E at the return pad.";
+    objective.textContent="Explore the house. Find the hidden teleporter.";
     eventText.textContent="HOUSE LEVEL";
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},1400);
