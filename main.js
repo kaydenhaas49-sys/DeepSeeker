@@ -1439,11 +1439,19 @@ const bacteriaAnimationPaths={
   chase:"./assets/bacteria/generated/bacteria_chase.glb",
   attack:"./assets/bacteria/generated/bacteria_attack.glb"
 };
+const bacteriaLoading=new Set();
 
-for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
+function loadBacteriaAnimation(name){
+  if(!bacteriaAnimationPaths[name]) return;
+  if(bacteriaModels.has(name) || bacteriaLoading.has(name)) return;
+
+  bacteriaLoading.add(name);
+
   bacteriaLoader.load(
-    path,
+    bacteriaAnimationPaths[name],
     (gltf)=>{
+      bacteriaLoading.delete(name);
+
       const model=gltf.scene;
       model.name="BacteriaModel_"+name;
       fitBacteriaModel(model);
@@ -1462,28 +1470,65 @@ for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
       bacteriaModels.set(name,{model,gltf});
       bacteriaLoaded=true;
 
-      if(name==="stalk"){
+      if(bacteriaState){
+        setBacteriaAnimation(bacteriaState);
+      }else if(name==="stalk"){
         setBacteriaAnimation("stalk");
-        if(debugSpawnBacteria) spawnBacteriaAtPlayer();
-      }else if(!bacteriaState){
-        setBacteriaAnimation("idle");
-      }
-
-      if(bacteriaModels.size===Object.keys(bacteriaAnimationPaths).length){
-        eventText.textContent="BACTERIA ANIMATIONS READY";
-        eventText.style.opacity="1";
-        setTimeout(()=>{eventText.style.opacity="0";},2200);
       }
     },
     undefined,
     ()=>{
-      generatedBacteriaFailures++;
-      if(generatedBacteriaFailures===Object.keys(bacteriaAnimationPaths).length){
+      bacteriaLoading.delete(name);
+      console.warn("[DeepSeeker] bacteria animation failed:",name);
+      if(name==="stalk" && bacteriaModels.size===0){
         loadStaticFallback();
       }
     }
   );
 }
+
+function setBacteriaAnimation(name){
+  const actualName=bacteriaModels.has(name)
+    ? name
+    : bacteriaModels.has("idle")
+      ? "idle"
+      : bacteriaModels.has("stalk")
+        ? "stalk"
+        : null;
+
+  // Lazy-load later animation states instead of keeping all four GLBs resident.
+  if(!actualName){
+    loadBacteriaAnimation(name);
+    return;
+  }
+
+  if(bacteriaState===actualName) return;
+
+  const entry=bacteriaModels.get(actualName);
+  if(!entry) return;
+
+  for(const [key,item] of bacteriaModels){
+    item.model.visible=key===actualName;
+  }
+
+  for(const [key,mixer] of bacteriaMixers){
+    const action=mixer._bacteriaAction;
+    if(!action) continue;
+    if(key===actualName){
+      action.reset();
+      action.play();
+    }else{
+      action.stop();
+    }
+  }
+
+  bacteriaState=actualName;
+}
+
+// Only keep the first encounter animation resident up front. Chase/attack are
+// loaded on demand when the entity actually transitions into those states.
+loadBacteriaAnimation("stalk");
+
 let figureLife=0;
 player.onStep=({intensity})=>audio.step(intensity);
 
