@@ -103,7 +103,7 @@ player.hands.visible=true;
 // House level — the GLB itself is the level.
 // ---------------------------------------------------------------------------
 const HOUSE_MODEL_PATH="./assets/house_interior.glb";
-const HOUSE_TARGET_HEIGHT=4.2;
+const HOUSE_TARGET_HEIGHT=7.2;
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
@@ -486,44 +486,15 @@ function attachHouseDoor(obj,index){
 function setupHouseDoors(root){
   houseDoors.length=0;
 
-  const candidates=[];
-  const excluded=/window|wall|frame|cabinet|wardrobe|closet|table|chair|bed|shelf|counter|stairs?|rail|column|floor|ceiling/i;
-
   root.traverse((obj)=>{
     if(obj===root || !obj.isMesh) return;
-
     if(obj.name && houseDoorPattern.test(obj.name)){
-      candidates.push(obj);
-      return;
-    }
-
-    if(obj.name && excluded.test(obj.name)) return;
-    if(!obj.geometry) return;
-
-    if(!obj.geometry.boundingBox) obj.geometry.computeBoundingBox();
-    const box=obj.geometry.boundingBox;
-    if(!box) return;
-
-    const size=box.getSize(new THREE.Vector3());
-    const vertical=size.y>=1.55 && size.y<=3.1;
-    const width=Math.max(size.x,size.z);
-    const depth=Math.min(size.x,size.z);
-
-    // Generic-name fallback for common game-ready door panels.
-    if(vertical && width>=.55 && width<=1.55 && depth>=.04 && depth<=.42){
-      candidates.push(obj);
+      attachHouseDoor(obj,houseDoors.length);
     }
   });
 
-  const unique=[];
-  for(const obj of candidates){
-    if(!unique.includes(obj)) unique.push(obj);
-  }
-
-  unique.forEach((obj,index)=>attachHouseDoor(obj,index));
-
   console.log(
-    "[DeepSeeker] doors found:",
+    "[DeepSeeker] explicitly named doors found:",
     houseDoors.map((d,i)=>({
       index:i,
       name:d.pivot.name,
@@ -531,6 +502,7 @@ function setupHouseDoors(root){
     }))
   );
 }
+
 function updateHouseDoors(dt){
   let changed=false;
 
@@ -554,74 +526,40 @@ function updateHouseDoors(dt){
 
 function buildHouseCollisionProxies(root){
   houseCollisionBoxes.length=0;
-
-  // The house export uses generic mesh names, so classify geometry by its
-  // LOCAL shape instead of its rotated world-space AABB. This keeps real
-  // walls/partitions while avoiding furniture-sized collision boxes.
   root.updateMatrixWorld(true);
 
   root.traverse((obj)=>{
     if(!obj.isMesh || !obj.geometry) return;
     if(obj.userData.houseCollisionDoor) return;
 
-    if(!obj.geometry.boundingBox){
-      obj.geometry.computeBoundingBox();
-    }
-
-    const localBox=obj.geometry.boundingBox;
-    if(!localBox) return;
-
-    const localSize=localBox.getSize(new THREE.Vector3());
-    const worldScale=new THREE.Vector3();
-    obj.getWorldScale(worldScale);
-
-    const size=new THREE.Vector3(
-      Math.abs(localSize.x*worldScale.x),
-      Math.abs(localSize.y*worldScale.y),
-      Math.abs(localSize.z*worldScale.z)
-    );
+    const box=new THREE.Box3().setFromObject(obj);
+    const size=box.getSize(new THREE.Vector3());
 
     const vertical=size.y;
-    const hMin=Math.min(size.x,size.z);
-    const hMax=Math.max(size.x,size.z);
+    const thin=Math.min(size.x,size.z);
+    const horizontal=Math.max(size.x,size.z);
 
-    // Real architectural walls are usually tall and much thinner in one
-    // horizontal axis than the other. Using the local mesh shape means
-    // rotated/angled walls still qualify without their world AABBs becoming
-    // giant solid barriers.
-    const wallLike =
-      vertical >= 1.15 &&
-      hMax >= 1.0 &&
-      hMin <= Math.min(1.25,hMax*0.38);
+    // Only tall, thin architectural pieces are solid. This intentionally
+    // ignores furniture/decorative meshes so they cannot create invisible
+    // barriers across rooms.
+    const architecturalWall =
+      vertical >= 1.2 &&
+      thin <= 1.25 &&
+      horizontal >= 0.9 &&
+      size.x <= 18 &&
+      size.z <= 18;
 
-    if(!wallLike) return;
-
-    // Collision is still an AABB because Player supports lightweight box
-    // tests. For angled walls this remains a conservative approximation, but
-    // the classified set is now restricted to actual wall-shaped meshes.
-    const box=new THREE.Box3().setFromObject(obj);
-    if(!Number.isFinite(box.min.x) || !Number.isFinite(box.min.z)) return;
-
-    const geometryCenter=localBox.getCenter(new THREE.Vector3());
-    const worldCenter=geometryCenter.clone().applyMatrix4(obj.matrixWorld);
-    const worldQuaternion=new THREE.Quaternion();
-    obj.getWorldQuaternion(worldQuaternion);
-    const worldEuler=new THREE.Euler().setFromQuaternion(worldQuaternion,"YXZ");
+    if(!architecturalWall) return;
 
     houseCollisionBoxes.push({
       minX:box.min.x,
       maxX:box.max.x,
       minZ:box.min.z,
-      maxZ:box.max.z,
-      centerX:worldCenter.x,
-      centerZ:worldCenter.z,
-      halfX:size.x*.5,
-      halfZ:size.z*.5,
-      rotationY:worldEuler.y
+      maxZ:box.max.z
     });
   });
 
-  console.log("[DeepSeeker] house collision proxies:",houseCollisionBoxes.length);
+  console.log("[DeepSeeker] house wall collision proxies:",houseCollisionBoxes.length);
 }
 
 function prepareHouseRenderCulling(root){
@@ -739,83 +677,51 @@ function toggleHouseDoor(){
 function chooseSafeHouseSpawn(root){
   if(!root) return false;
 
-  // Keep the intended spawn in the living room near the model center, but
-  // never start the player inside a collision proxy. Search outward only a
-  // few metres so we stay in the same room.
-  const targetX=0;
-  const targetZ=0;
-  const radius=.48;
-
-  const isBlocked=(x,z)=>{
+  const blocked=(x,z,radius=.55)=>{
     for(const box of houseCollisionBoxes){
-      if(
-        Number.isFinite(box.centerX) &&
-        Number.isFinite(box.centerZ) &&
-        Number.isFinite(box.halfX) &&
-        Number.isFinite(box.halfZ) &&
-        Number.isFinite(box.rotationY)
-      ){
-        const c=Math.cos(box.rotationY);
-        const sn=Math.sin(box.rotationY);
-        const dx=x-box.centerX;
-        const dz=z-box.centerZ;
-        const localX=dx*c+dz*sn;
-        const localZ=-dx*sn+dz*c;
-        const nx=Math.max(-box.halfX,Math.min(localX,box.halfX));
-        const nz=Math.max(-box.halfZ,Math.min(localZ,box.halfZ));
-        const ox=localX-nx;
-        const oz=localZ-nz;
-        if(ox*ox+oz*oz < radius*radius) return true;
-      }else{
-        const nx=Math.max(box.minX,Math.min(x,box.maxX));
-        const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
-        const dx=x-nx;
-        const dz=z-nz;
-        if(dx*dx+dz*dz < radius*radius) return true;
-      }
+      const nx=Math.max(box.minX,Math.min(x,box.maxX));
+      const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
+      const dx=x-nx;
+      const dz=z-nz;
+      if(dx*dx+dz*dz<radius*radius) return true;
     }
 
     const wp=new THREE.Vector3();
     for(const door of houseDoors){
       door.pivot.getWorldPosition(wp);
-      if(Math.hypot(wp.x-x,wp.z-z)<1.0) return true;
+      if(Math.hypot(wp.x-x,wp.z-z)<1.15) return true;
     }
 
     return false;
   };
 
-  let best={x:targetX,z:targetZ};
-  if(isBlocked(best.x,best.z)){
-    let bestDistance=Infinity;
+  // The normalized model is centered on X/Z, so this is the intended
+  // living-room anchor. Only search a small local area if a wall happens to
+  // overlap the exact center.
+  const candidates=[
+    [0,0],
+    [.75,0],[-.75,0],[0,.75],[0,-.75],
+    [1.5,0],[-1.5,0],[0,1.5],[0,-1.5],
+    [2.25,0],[-2.25,0],[0,2.25],[0,-2.25],
+    [1.5,1.5],[-1.5,1.5],[1.5,-1.5],[-1.5,-1.5],
+    [3,0],[-3,0],[0,3],[0,-3]
+  ];
 
-    for(let r=0.5;r<=7.5;r+=0.5){
-      const samples=Math.max(12,Math.ceil(r*Math.PI*4));
-
-      for(let i=0;i<samples;i++){
-        const angle=(i/samples)*Math.PI*2;
-        const x=targetX+Math.cos(angle)*r;
-        const z=targetZ+Math.sin(angle)*r;
-
-        if(isBlocked(x,z)) continue;
-
-        if(r<bestDistance){
-          bestDistance=r;
-          best={x,z};
-        }
-      }
-
-      if(bestDistance<Infinity) break;
+  for(const [x,z] of candidates){
+    if(!blocked(x,z,.55)){
+      houseSpawn.set(x,EYE,z);
+      console.log("[DeepSeeker] living-room spawn:",{
+        x:Number(x.toFixed(2)),
+        z:Number(z.toFixed(2))
+      });
+      return true;
     }
   }
 
-  houseSpawn.set(best.x,EYE,best.z);
-
-  console.log("[DeepSeeker] living-room spawn:",{
-    x:Number(best.x.toFixed(2)),
-    z:Number(best.z.toFixed(2)),
-    offset:Number(Math.hypot(best.x,best.z).toFixed(2))
-  });
-
+  // Even in a malformed export, keep the player in the model center rather
+  // than sending them outside the house.
+  houseSpawn.set(0,EYE,0);
+  console.warn("[DeepSeeker] center is blocked; using exact living-room origin");
   return true;
 }
 
@@ -1032,115 +938,13 @@ function loadHouse(){
       houseModel.updateMatrixWorld(true);
 
       box=new THREE.Box3().setFromObject(houseModel);
+      const center=box.getCenter(new THREE.Vector3());
 
-      // Do not use the outer bounding-box center as the world origin. House
-      // GLBs often include exterior walls, porches, yards, or offset pieces,
-      // which can put (0,0) outside the actual living area.
-      //
-      // Find a large horizontal floor surface that also has nearby enclosing
-      // geometry above/around it. That gives us a real interior-room origin.
-      const normalizedMeshes=[];
-      houseModel.traverse(obj=>{
-        if(obj.isMesh && obj.geometry) normalizedMeshes.push(obj);
-      });
-
-      const modelCenter=box.getCenter(new THREE.Vector3());
-      const modelSize=box.getSize(new THREE.Vector3());
-      const floorCandidates=[];
-
-      for(const mesh of normalizedMeshes){
-        const meshBox=new THREE.Box3().setFromObject(mesh);
-        const meshSize=meshBox.getSize(new THREE.Vector3());
-        const area=meshSize.x*meshSize.z;
-
-        // Floors are broad and very thin vertically compared with walls.
-        if(meshSize.y>0.32 || area<3) continue;
-
-        const candidateCenter=new THREE.Vector3(
-          (meshBox.min.x+meshBox.max.x)*.5,
-          meshBox.max.y,
-          (meshBox.min.z+meshBox.max.z)*.5
-        );
-
-        let ceilingDistance=0;
-        houseFloorRaycaster.set(
-          new THREE.Vector3(candidateCenter.x,candidateCenter.y+0.15,candidateCenter.z),
-          new THREE.Vector3(0,1,0)
-        );
-        const ceilingHits=houseFloorRaycaster.intersectObjects(normalizedMeshes,true);
-        const ceilingHit=ceilingHits.find(hit=>hit.point.y-candidateCenter.y>1.5);
-        if(ceilingHit){
-          ceilingDistance=THREE.MathUtils.clamp(
-            ceilingHit.point.y-candidateCenter.y,
-            0,
-            4.5
-          );
-        }
-
-        let nearbyWalls=0;
-        const probeDirections=[
-          new THREE.Vector3(1,0,0),
-          new THREE.Vector3(-1,0,0),
-          new THREE.Vector3(0,0,1),
-          new THREE.Vector3(0,0,-1)
-        ];
-
-        for(const dir of probeDirections){
-          houseFloorRaycaster.set(
-            new THREE.Vector3(candidateCenter.x,candidateCenter.y+1.15,candidateCenter.z),
-            dir
-          );
-          houseFloorRaycaster.near=.8;
-          houseFloorRaycaster.far=10;
-          const wallHits=houseFloorRaycaster.intersectObjects(normalizedMeshes,true);
-          if(wallHits.length) nearbyWalls++;
-        }
-
-        const centeredPenalty=Math.hypot(
-          candidateCenter.x-modelCenter.x,
-          candidateCenter.z-modelCenter.z
-        )/(Math.max(modelSize.x,modelSize.z,1));
-
-        const score=
-          Math.min(area,120)*1.2+
-          ceilingDistance*18+
-          nearbyWalls*20-
-          centeredPenalty*12;
-
-        floorCandidates.push({
-          center:candidateCenter,
-          bottomY:meshBox.min.y,
-          score,
-          area
-        });
-      }
-
-      floorCandidates.sort((a,b)=>b.score-a.score);
-      const mainFloor=floorCandidates[0] || null;
-
-      if(mainFloor){
-        houseModel.position.set(
-          -mainFloor.center.x,
-          -mainFloor.bottomY,
-          -mainFloor.center.z
-        );
-        console.log("[DeepSeeker] house origin anchored to interior floor:",{
-          x:Number(mainFloor.center.x.toFixed(2)),
-          y:Number(mainFloor.bottomY.toFixed(2)),
-          z:Number(mainFloor.center.z.toFixed(2)),
-          area:Number(mainFloor.area.toFixed(2)),
-          score:Number(mainFloor.score.toFixed(1))
-        });
-      }else{
-        const center=box.getCenter(new THREE.Vector3());
-        houseModel.position.set(
-          -center.x,
-          -box.min.y,
-          -center.z
-        );
-        console.warn("[DeepSeeker] no floor candidate found; using model center");
-      }
-
+      houseModel.position.set(
+        -center.x,
+        -box.min.y,
+        -center.z
+      );
       houseModel.updateMatrixWorld(true);
 
       // Add a few interior lights based on the normalized house bounds.
