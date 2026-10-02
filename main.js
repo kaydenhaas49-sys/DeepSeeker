@@ -1248,6 +1248,12 @@ function setHouseMode(enabled){
     player.jumpVelocity=0;
 
     objective.textContent=STORY[storyStage].objective;
+    spawnBacteriaAtPlayer();
+    eventText.textContent="YOU FELL.";
+    eventText.style.opacity="1";
+    setTimeout(()=>{
+      if(eventText.textContent==="YOU FELL.") eventText.style.opacity="0";
+    },1600);
   }
 }
 
@@ -1299,6 +1305,7 @@ const ENTITY_MAX_CHASE_TIME=8.0;
 const ENTITY_ATTACK_RANGE=1.45;
 const ENTITY_CHASE_SPEED=5.8;
 const ENTITY_RADIUS=.55;
+const ENTITY_GROUND_OFFSET=.12;
 
 function fitBacteriaModel(model){
   model.traverse((obj)=>{
@@ -1393,7 +1400,7 @@ function findEntitySpawnPosition(){
 
 function spawnBacteriaAtPlayer(){
   const spawn=findEntitySpawnPosition();
-  figure.position.set(spawn.x,0,spawn.z);
+  figure.position.set(spawn.x,ENTITY_GROUND_OFFSET,spawn.z);
   figure.rotation.y=Math.atan2(
     player.pos.x-spawn.x,
     player.pos.z-spawn.z
@@ -1430,7 +1437,7 @@ function loadStaticFallback(){
       fallbackFigure.visible=true;
       const dx=-Math.sin(player.yaw);
       const dz=-Math.cos(player.yaw);
-      figure.position.set(player.pos.x+dx*5,0,player.pos.z+dz*5);
+      figure.position.set(player.pos.x+dx*5,ENTITY_GROUND_OFFSET,player.pos.z+dz*5);
       figure.rotation.y=player.yaw+Math.PI;
       figureLife=Infinity;
       figure.visible=true;
