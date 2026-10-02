@@ -817,8 +817,14 @@ function chooseSafeHouseSpawn(root){
 
       let wallCount=0;
       let wallScore=0;
+      let hitPosX=false;
+      let hitNegX=false;
+      let hitPosZ=false;
+      let hitNegZ=false;
 
-      for(const d of directions){
+      for(let i=0;i<directions.length;i++){
+        const d=directions[i];
+
         origin.set(x,1.25,z);
         dir.copy(d);
         ray.set(origin,dir);
@@ -831,13 +837,23 @@ function chooseSafeHouseSpawn(root){
         if(!wallHit) continue;
 
         wallCount++;
-        // Closer walls give stronger evidence that this is a room, while
-        // avoiding a hard preference for tiny cramped spaces.
         wallScore += Math.max(0,wallSearch-wallHit.distance);
+
+        if(i===0) hitPosX=true;
+        else if(i===1) hitNegX=true;
+        else if(i===2) hitPosZ=true;
+        else if(i===3) hitNegZ=true;
       }
 
-      // 3+ surrounding vertical surfaces is the important discriminator.
-      if(wallCount<3) continue;
+      // A covered outdoor space can still have three surrounding walls.
+      // Require an opposing pair plus at least one wall on the other axis.
+      const hasOppositePair=(hitPosX&&hitNegX)||(hitPosZ&&hitNegZ);
+      if(!hasOppositePair || wallCount<3) continue;
+
+      // Prefer genuinely room-like spaces: at least one wall on both axes,
+      // and preferably all four sides. This sharply rejects porches/yards.
+      const hasBothAxes=(hitPosX||hitNegX)&&(hitPosZ||hitNegZ);
+      if(!hasBothAxes) continue;
 
       let clearance=8;
       for(const box of houseCollisionBoxes){
@@ -852,9 +868,10 @@ function chooseSafeHouseSpawn(root){
       const roomHeight=ceilingHit.point.y-floorHit.point.y;
 
       const score =
-        wallCount*60 +
-        wallScore*3 +
-        Math.min(clearance,4)*10 +
+        wallCount*70 +
+        wallScore*4 +
+        (wallCount===4 ? 90 : 0) +
+        Math.min(clearance,4)*12 +
         Math.min(roomHeight,3.5)*4 -
         centerDistance*.04;
 
