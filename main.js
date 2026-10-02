@@ -1438,11 +1438,19 @@ const bacteriaAnimationPaths={
   chase:"./assets/bacteria/generated/bacteria_chase.glb",
   attack:"./assets/bacteria/generated/bacteria_attack.glb"
 };
+const bacteriaLoading=new Set();
+let bacteriaRequestedState="";
 
-for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
+function loadBacteriaAnimation(name){
+  if(!bacteriaAnimationPaths[name]) return;
+  if(bacteriaModels.has(name) || bacteriaLoading.has(name)) return;
+
+  bacteriaLoading.add(name);
   bacteriaLoader.load(
-    path,
+    bacteriaAnimationPaths[name],
     (gltf)=>{
+      bacteriaLoading.delete(name);
+
       const model=gltf.scene;
       model.name="BacteriaModel_"+name;
       fitBacteriaModel(model);
@@ -1461,28 +1469,54 @@ for(const [name,path] of Object.entries(bacteriaAnimationPaths)){
       bacteriaModels.set(name,{model,gltf});
       bacteriaLoaded=true;
 
-      if(name==="stalk"){
+      if(bacteriaRequestedState){
+        setBacteriaAnimation(bacteriaRequestedState);
+      }else if(name==="stalk"){
         setBacteriaAnimation("stalk");
-        if(debugSpawnBacteria) spawnBacteriaAtPlayer();
-      }else if(!bacteriaState){
-        setBacteriaAnimation("idle");
-      }
-
-      if(bacteriaModels.size===Object.keys(bacteriaAnimationPaths).length){
-        eventText.textContent="BACTERIA ANIMATIONS READY";
-        eventText.style.opacity="1";
-        setTimeout(()=>{eventText.style.opacity="0";},2200);
       }
     },
     undefined,
     ()=>{
-      generatedBacteriaFailures++;
-      if(generatedBacteriaFailures===Object.keys(bacteriaAnimationPaths).length){
+      bacteriaLoading.delete(name);
+      console.warn("[DeepSeeker] bacteria animation failed:",name);
+      if(name==="stalk" && bacteriaModels.size===0){
         loadStaticFallback();
       }
     }
   );
 }
+
+function setBacteriaAnimation(name){
+  bacteriaRequestedState=name;
+
+  if(!bacteriaModels.has(name)){
+    loadBacteriaAnimation(name);
+    return;
+  }
+
+  if(bacteriaState===name) return;
+
+  for(const [key,item] of bacteriaModels){
+    item.model.visible=key===name;
+  }
+
+  for(const [key,mixer] of bacteriaMixers){
+    const action=mixer._bacteriaAction;
+    if(!action) continue;
+    if(key===name){
+      action.reset();
+      action.play();
+    }else{
+      action.stop();
+    }
+  }
+
+  bacteriaState=name;
+}
+
+// Load only the first encounter state. Later states are fetched on demand.
+loadBacteriaAnimation("stalk");
+
 let figureLife=0;
 player.onStep=({intensity})=>audio.step(intensity);
 
@@ -1905,10 +1939,9 @@ function animate(){
   flashlight.intensity=flashlightOn ? 27.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
-  if(!houseMode){
-    for(const mixer of bacteriaMixers.values()){
-      mixer.update(dt);
-    }
+  if(!houseMode && figure.visible && bacteriaState){
+    const activeMixer=bacteriaMixers.get(bacteriaState);
+    if(activeMixer) activeMixer.update(dt);
   }
 
   if(Number.isFinite(figureLife) && figureLife>0 && bacteriaLoaded){

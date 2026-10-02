@@ -107,7 +107,7 @@ export class Player {
     const worldRoot = this.camera.parent || this.camera;
     worldRoot.add(this.worldAvatar);
 
-    this.loadCharacterModel();
+    // First-person gameplay never renders this local world avatar.\n    // Avoid downloading/decoding the hazmat GLB during startup.
   }
 
   async loadCharacterModel() {

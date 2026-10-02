@@ -343,7 +343,18 @@ export class World {
       for (let cz = minCz; cz <= maxCz; cz++) {
         const entry = this.chunks.get(cellKey(cx, cz));
         if (!entry) continue;
-        this.wallQueryScratch.push(...entry.wallBounds);
+
+        for(const wall of entry.wallBounds){
+          if(
+            wall.maxX < px-radius ||
+            wall.minX > px+radius ||
+            wall.maxZ < pz-radius ||
+            wall.minZ > pz+radius
+          ){
+            continue;
+          }
+          this.wallQueryScratch.push(wall);
+        }
       }
     }
 
