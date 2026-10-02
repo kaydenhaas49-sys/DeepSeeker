@@ -147,12 +147,12 @@ function updateHouseLoadingUI(progress=null,status=null){
 
   const message=status || (
     houseLoadFailed
-      ? "HOUSE FAILED TO LOAD."
+      ? "APARTMENT FAILED TO LOAD."
       : houseCollisionReady
-        ? "HOUSE LOADED — GAME READY."
+        ? "APARTMENT LOADED — READY WHEN NEEDED."
         : houseLoaded
-          ? "PROCESSING HOUSE — BUILDING COLLISION."
-          : "HOUSE IS LOADING — YOU CAN'T START THE GAME YET."
+          ? "PROCESSING APARTMENT — BUILDING COLLISION."
+          : "APARTMENT LOADS ONLY WHEN THIS LEVEL IS NEEDED."
   );
 
   for(const fill of [houseLoadFillHome,houseLoadFillLobby]){
@@ -165,10 +165,13 @@ function updateHouseLoadingUI(progress=null,status=null){
     if(label) label.textContent=message;
   }
 
-  const ready=houseLoaded && houseCollisionReady;
-  if(newGameButton) newGameButton.disabled=!ready;
-  if(continueButton) continueButton.disabled=!ready || !getSavedGame();
-  if(startLobbyButton) startLobbyButton.disabled=!ready;
+  const save=getSavedGame();
+  if(newGameButton) newGameButton.disabled=false;
+  if(continueButton) continueButton.disabled=!save;
+  // Lobby roster logic decides whether this is enabled for the host.
+  if(startLobbyButton && !new URLSearchParams(location.search).has("lobby")){
+    startLobbyButton.disabled=false;
+  }
 
   for(const button of [newGameButton,continueButton,startLobbyButton]){
     if(!button) continue;
@@ -185,21 +188,28 @@ function getSavedGame(){
   }
 }
 
+function getSavedLevel(data){
+  if(!data) return "apartment";
+  if(data.level==="backrooms" || data.level==="apartment") return data.level;
+  return data.houseMode ? "apartment" : "backrooms";
+}
+
 function refreshSaveInfo(){
   const save=getSavedGame();
   if(!save){
     saveInfo.textContent="NO SAVE DATA";
   }else{
     const when=save.savedAt ? new Date(save.savedAt).toLocaleString() : "UNKNOWN";
-    saveInfo.textContent=`SAVE FOUND · ${when}`;
+    saveInfo.textContent=`SAVE FOUND · ${when} · ${getSavedLevel(save).toUpperCase()}`;
   }
   updateHouseLoadingUI();
 }
 
 function saveGame(){
   const data={
-    version:1,
+    version:2,
     seed:SEED,
+    level:houseMode ? "apartment" : "backrooms",
     savedAt:Date.now(),
     x:player.pos.x,
     z:player.pos.z,
@@ -251,10 +261,12 @@ function applySavedGame(data){
   maxStoryDistance=Number.isFinite(data.maxStoryDistance)?data.maxStoryDistance:0;
   applyStoryStage(stage,false);
 
-  if(data.houseMode && houseLoaded){
-    setHouseMode(true);
+  const savedLevel=getSavedLevel(data);
+
+  if(savedLevel==="apartment" && houseLoaded){
+    setHouseMode(true,{announceFall:false});
   }else{
-    setHouseMode(false);
+    setHouseMode(false,{announceFall:false});
   }
 }
 
@@ -361,25 +373,22 @@ function ensureHouseLoading(){
 }
 
 function startGame(save=null){
-  // Never enter the playable game before the house asset is actually loaded.
-  // Keep the menu/overlay in place while the GLB is downloading.
-  if(!houseLoaded){
+  // New games begin in the apartment. Continue only loads the apartment when
+  // the saved level says the player was actually there.
+  const needsApartment=!save || getSavedLevel(save)==="apartment";
+
+  if(needsApartment && (!houseLoaded || !houseCollisionReady)){
     pendingHouseStart=true;
-    if(save) pendingSaveLoad=save;
+    pendingSaveLoad=save;
     ensureHouseLoading();
+
     prompt.textContent=houseLoadFailed
-      ? "HOUSE FAILED TO LOAD"
-      : "PLEASE WAIT — HOUSE LOADING";
+      ? "APARTMENT FAILED TO LOAD"
+      : "LOADING APARTMENT…";
     eventText.textContent=houseLoadFailed
-      ? "HOUSE FAILED TO LOAD"
-      : "HOUSE STILL LOADING...";
+      ? "APARTMENT FAILED TO LOAD"
+      : "APARTMENT STILL LOADING...";
     eventText.style.opacity="1";
-    setTimeout(()=>{
-      if(eventText.textContent==="HOUSE STILL LOADING..." ||
-         eventText.textContent==="HOUSE FAILED TO LOAD"){
-        eventText.style.opacity="0";
-      }
-    },1400);
     return false;
   }
 
@@ -387,15 +396,13 @@ function startGame(save=null){
   overlay.classList.add("hidden");
   audio.start();
 
+  pendingHouseStart=false;
+  pendingSaveLoad=null;
+
   if(save){
-    pendingHouseStart=false;
     applySavedGame(save);
   }else{
-    pendingHouseStart=true;
-    if(houseCollisionReady){
-      pendingHouseStart=false;
-      setHouseMode(true);
-    }
+    setHouseMode(true,{announceFall:false});
   }
 
   player.lock();
@@ -992,7 +999,7 @@ function placeHouseMagazineTeleporter(root){
 }
 
 function useHouseReturnTeleporter(){
-  if(!houseMode) return false;
+  if(!houseMode || backroomsFallTimer>0) return false;
 
   const d=Math.hypot(
     player.pos.x-houseReturnPortal.position.x,
@@ -1001,10 +1008,15 @@ function useHouseReturnTeleporter(){
 
   if(d>2.2) return false;
 
-  setHouseMode(false);
-  eventText.textContent="RETURNED TO THE BACKROOMS";
+  player.keys.clear();
+  player.vel.set(0,0,0);
+  backroomsFallTimer=BACKROOMS_FALL_DURATION;
+  backroomsFallElapsed=0;
+  backroomsFallStartY=camera.position.y;
+  pulse=.35;
+
+  eventText.textContent="THE FLOOR GAVE WAY.";
   eventText.style.opacity="1";
-  setTimeout(()=>{eventText.style.opacity="0";},1200);
   return true;
 }
 
@@ -1192,7 +1204,7 @@ function loadHouse(){
   );
 }
 
-function setHouseMode(enabled){
+function setHouseMode(enabled,options={}){
   if(enabled && !houseLoaded){
     ensureHouseLoading();
     eventText.textContent="HOUSE STILL LOADING...";
@@ -1209,6 +1221,7 @@ function setHouseMode(enabled){
     return;
   }
 
+  const houseModeWasActive=houseMode;
   houseMode=enabled;
   houseUnloadTimer=0;
 
@@ -1244,18 +1257,23 @@ function setHouseMode(enabled){
     flashlight.castShadow=ENABLE_SHADOWS;
     playerLight.intensity=0;
 
-    player.pos.set(32,EYE,32);
+    if(options.forceBackroomsSpawn || houseModeWasActive){
+      player.pos.set(32,EYE,32);
+    }
     player.vel.set(0,0,0);
     player.jumpY=0;
     player.jumpVelocity=0;
 
     objective.textContent=STORY[storyStage].objective;
-    spawnBacteriaAtPlayer();
-    eventText.textContent="YOU FELL.";
-    eventText.style.opacity="1";
-    setTimeout(()=>{
-      if(eventText.textContent==="YOU FELL.") eventText.style.opacity="0";
-    },1600);
+
+    if(options.announceFall){
+      spawnBacteriaAtPlayer();
+      eventText.textContent="YOU FELL.";
+      eventText.style.opacity="1";
+      setTimeout(()=>{
+        if(eventText.textContent==="YOU FELL.") eventText.style.opacity="0";
+      },1600);
+    }
   }
 }
 
@@ -1270,7 +1288,8 @@ if(new URLSearchParams(location.search).get("lobby")==="1"){
   showHomeScreen();
 }
 
-setTimeout(()=>ensureHouseLoading(),900);
+// Apartment loading is now lazy: only start it for a new game or an
+// apartment-level Continue save.
 
 player.hands.visible=true;
 
@@ -1588,6 +1607,12 @@ loadSpiderFromPack();
 let figureLife=0;
 player.onStep=({intensity})=>audio.step(intensity);
 
+const BACKROOMS_FALL_DURATION=1.8;
+let backroomsFallTimer=0;
+let backroomsFallElapsed=0;
+let backroomsFallStartY=0;
+let fallCameraOffset=0;
+
 let flashlightOn=true;
 let battery=100;
 let controlsOpen=false;
@@ -1768,20 +1793,10 @@ if(saveGameButton){
 }
 
 newGameButton.addEventListener("click",()=>{
-  if(!houseLoaded){
-    updateHouseLoadingUI(null,"HOUSE IS STILL LOADING — YOU CAN'T START THE GAME YET.");
-    ensureHouseLoading();
-    return;
-  }
   resetForNewGame();
 });
 
 continueButton.addEventListener("click",()=>{
-  if(!houseLoaded){
-    updateHouseLoadingUI(null,"HOUSE IS STILL LOADING — YOU CAN'T START THE GAME YET.");
-    ensureHouseLoading();
-    return;
-  }
   continueGame();
 });
 
@@ -1799,13 +1814,7 @@ startLobbyButton.addEventListener("click",()=>{
   const params=new URLSearchParams(location.search);
   if(params.get("host")!=="1") return;
 
-  if(!houseLoaded){
-    updateHouseLoadingUI(null,"HOUSE IS STILL LOADING — YOU CAN'T START THE GAME YET.");
-    ensureHouseLoading();
-    return;
-  }
-
-  // Start the host immediately so the button can never appear dead.
+  // startGame() handles lazy apartment loading for the host.
   startGame();
 
   // Then tell everyone else in the room to start too.
@@ -1854,15 +1863,15 @@ function newSeed(){
 }
 
 player.attach();
-prompt.textContent="LOADING HOUSE…";
+prompt.textContent="READY — START A GAME";
 applyStoryStage(0,false);
 
 overlay.addEventListener("click",(e)=>{
   if(e.target!==overlay) return;
-  if(!houseLoaded){
+  if(!houseLoaded && !gameStarted){
     prompt.textContent=houseLoadFailed
-      ? "HOUSE FAILED TO LOAD"
-      : "PLEASE WAIT — HOUSE LOADING";
+      ? "APARTMENT FAILED TO LOAD"
+      : "START A GAME TO LOAD THE APARTMENT";
     return;
   }
   if(gameStarted){
@@ -1872,8 +1881,7 @@ overlay.addEventListener("click",(e)=>{
 });
 
 renderer.domElement.addEventListener("click",()=>{
-  if(!houseLoaded) return;
-  if(!phoneOpen && !controlsOpen && document.pointerLockElement!==renderer.domElement){
+  if(gameStarted && !phoneOpen && !controlsOpen && document.pointerLockElement!==renderer.domElement){
     audio.start();
     player.lock();
   }
@@ -1995,6 +2003,29 @@ function animate(){
 
   updateHouseMemoryState(dt);
 
+  if(backroomsFallTimer>0){
+    backroomsFallElapsed+=dt;
+    backroomsFallTimer=Math.max(0,BACKROOMS_FALL_DURATION-backroomsFallElapsed);
+
+    player.keys.clear();
+    player.vel.set(0,0,0);
+
+    const progress=Math.min(1,backroomsFallElapsed/BACKROOMS_FALL_DURATION);
+    const eased=progress*progress*(3-2*progress);
+    const fallDistance=3.8*eased;
+
+    if(gameStarted && houseMode){
+      // Let the apartment remain visible while the camera sinks through its
+      // floor, then switch levels at the end of the fall.
+      fallCameraOffset=-fallDistance;
+    }
+
+    if(backroomsFallTimer<=0){
+      fallCameraOffset=0;
+      setHouseMode(false,{announceFall:true});
+    }
+  }
+
   if(houseMode){
     updateHouseDoors(dt);
 
@@ -2015,6 +2046,11 @@ function animate(){
   }
 
   player.update(dt);
+
+  if(backroomsFallTimer>0 && gameStarted && houseMode){
+    camera.position.y+=fallCameraOffset;
+  }
+
   multiplayer.update(dt);
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
