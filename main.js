@@ -115,6 +115,8 @@ let houseCollisionReady=false;
 let houseCollisionBuildStarted=false;
 const houseCollisionBoxes=[];
 const houseRenderMeshes=[];
+const houseCollisionRoot=new THREE.Group();
+houseCollisionRoot.name="HouseCollisionGeometry";
 const houseMeshes=[];
 
 
@@ -562,6 +564,34 @@ function buildHouseCollisionProxies(root){
   console.log("[DeepSeeker] house wall collision proxies:",houseCollisionBoxes.length);
 }
 
+
+function buildHouseCollisionOctree(root){
+  // Use the actual GLB triangles for collision instead of guessing which
+  // meshes are walls from their bounding-box dimensions. Door meshes are
+  // excluded here because their moving collision is handled separately.
+  houseCollisionRoot.clear();
+  root.updateMatrixWorld(true);
+
+  root.traverse((obj)=>{
+    if(!obj.isMesh || !obj.geometry) return;
+    if(obj.userData.houseCollisionDoor) return;
+
+    const collisionMesh=new THREE.Mesh(obj.geometry);
+    collisionMesh.matrixAutoUpdate=false;
+    collisionMesh.matrix.copy(obj.matrixWorld);
+    collisionMesh.matrixWorld.copy(obj.matrixWorld);
+    houseCollisionRoot.add(collisionMesh);
+  });
+
+  houseCollisionRoot.updateMatrixWorld(true);
+  houseOctree.fromGraphNode(houseCollisionRoot);
+
+  console.log(
+    "[DeepSeeker] house triangle collision ready:",
+    houseOctree.triangles.length
+  );
+}
+
 function prepareHouseRenderCulling(root){
   houseRenderMeshes.length=0;
 
@@ -864,6 +894,7 @@ function ensureHouseCollisionSetup(){
     }
 
     buildHouseCollisionProxies(houseModel);
+    buildHouseCollisionOctree(houseModel);
     chooseSafeHouseSpawn(houseModel);
     chooseHouseReturnPortalPosition(houseModel);
     houseCollisionReady=true;
@@ -1036,7 +1067,7 @@ function setHouseMode(enabled){
   houseReturnPortal.visible=houseMode && houseReturnPortal.userData.active;
 
   player.ignoreWorldCollision=houseMode;
-  player.houseOctree=null;
+  player.houseOctree=houseMode ? houseOctree : null;
   player.extraCollisionBoxes=[];
   houseDoorCollisionDirty=true;
   houseCollisionTimer=0;
