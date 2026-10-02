@@ -119,6 +119,7 @@ const houseMeshes=[];
 const houseFloorRaycaster=new THREE.Raycaster();
 let houseCullTimer=0;
 let houseDoorCollisionDirty=true;
+let houseCollisionTimer=0;
 let gameStarted=false;
 let lastAutoSave=0;
 let pendingSaveLoad=null;
@@ -587,11 +588,27 @@ function updateHouseRenderCulling(x,z){
 }
 
 function updateHouseDoorCollisions(){
-  if(!houseDoorCollisionDirty) return;
+  // Do not give the player every house collider at once. The GLB contains
+  // furniture-sized AABBs as well as walls, and checking all of them every
+  // movement sample can trap the player against distant geometry.
+  //
+  // Refresh this small local list a few times per second. Collision itself
+  // then checks only nearby boxes every frame.
+  const boxes=[];
+  const px=player.pos.x;
+  const pz=player.pos.z;
+  const range=9;
+  const rangeSq=range*range;
 
-  // Static house proxies are cheap enough to keep in the player's collision
-  // list. Only animated door bounds need to be recomputed.
-  const boxes=houseCollisionBoxes.slice();
+  for(const box of houseCollisionBoxes){
+    const nx=Math.max(box.minX,Math.min(px,box.maxX));
+    const nz=Math.max(box.minZ,Math.min(pz,box.maxZ));
+    const dx=px-nx;
+    const dz=pz-nz;
+    if(dx*dx+dz*dz<=rangeSq){
+      boxes.push(box);
+    }
+  }
 
   for(const door of houseDoors){
     const open=door.pivot.userData.openProgress||0;
@@ -601,6 +618,14 @@ function updateHouseDoorCollisions(){
 
     door.pivot.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(door.pivot);
+
+    const doorX=door.collisionBox;
+    const doorCenterX=(doorX.minX+doorX.maxX)*.5;
+    const doorCenterZ=(doorX.minZ+doorX.maxZ)*.5;
+    const doorDx=doorCenterX-px;
+    const doorDz=doorCenterZ-pz;
+
+    if(doorDx*doorDx+doorDz*doorDz>rangeSq) continue;
 
     // A small horizontal padding prevents squeezing through door geometry.
     const pad=.08;
@@ -705,7 +730,27 @@ function chooseSafeHouseSpawn(root){
 
   if(!best) return false;
 
-  houseSpawn.set(best.x,EYE,best.z);
+  // Final safety pass. Keep trying nearby candidates if the best score lands
+  // on an animated-door footprint or another proxy edge.
+  const fallbackOffsets=[
+    [0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2],
+    [2.4,0],[-2.4,0],[0,2.4],[0,-2.4]
+  ];
+
+  let finalBest=null;
+  for(const [ox,oz] of fallbackOffsets){
+    const x=best.x+ox;
+    const z=best.z+oz;
+    if(x<minX || x>maxX || z<minZ || z>maxZ) continue;
+    if(!blocked(x,z,.75)){
+      finalBest={x,z};
+      break;
+    }
+  }
+
+  if(!finalBest) finalBest=best;
+
+  houseSpawn.set(finalBest.x,EYE,finalBest.z);
   console.log("[DeepSeeker] safe house spawn:",{
     x:Number(best.x.toFixed(2)),
     z:Number(best.z.toFixed(2))
@@ -901,6 +946,7 @@ function setHouseMode(enabled){
   player.houseOctree=null;
   player.extraCollisionBoxes=[];
   houseDoorCollisionDirty=true;
+  houseCollisionTimer=0;
 
   figure.visible=false;
   figureLife=0;
@@ -1475,7 +1521,12 @@ function animate(){
 
   if(houseMode){
     updateHouseDoors(dt);
-    updateHouseDoorCollisions();
+
+    houseCollisionTimer-=dt;
+    if(houseCollisionTimer<=0 || houseDoorCollisionDirty){
+      houseCollisionTimer=0.15;
+      updateHouseDoorCollisions();
+    }
 
     houseCullTimer+=dt;
     if(houseCullTimer>=0.25){
