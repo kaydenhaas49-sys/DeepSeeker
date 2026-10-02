@@ -59,6 +59,7 @@ const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-per
 renderer.setSize(innerWidth,innerHeight);
 
 const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,1.25);
+const HOUSE_PIXEL_RATIO=0.85;
 let currentPixelRatio=BASE_PIXEL_RATIO;
 let perfElapsed=0;
 let perfFrames=0;
@@ -117,6 +118,7 @@ const houseRenderMeshes=[];
 const houseMeshes=[];
 const houseFloorRaycaster=new THREE.Raycaster();
 let houseCullTimer=0;
+let houseDoorCollisionDirty=true;
 let gameStarted=false;
 let lastAutoSave=0;
 let pendingSaveLoad=null;
@@ -472,6 +474,8 @@ function setupHouseDoors(root){
   );
 }
 function updateHouseDoors(dt){
+  let changed=false;
+
   for(const door of houseDoors){
     const current=door.pivot.userData.openProgress||0;
     const next=THREE.MathUtils.lerp(
@@ -479,9 +483,14 @@ function updateHouseDoors(dt){
       door.pivot.userData.target||0,
       Math.min(1,dt*6)
     );
+
+    if(Math.abs(next-current)>0.0005) changed=true;
+
     door.pivot.userData.openProgress=next;
     door.pivot.rotation.y=door.angle*next;
   }
+
+  if(changed) houseDoorCollisionDirty=true;
 }
 
 
@@ -546,7 +555,7 @@ function prepareHouseRenderCulling(root){
 }
 
 function updateHouseRenderCulling(x,z){
-  const maxDistance=18;
+  const maxDistance=16;
   const candidates=[];
 
   for(const mesh of houseRenderMeshes){
@@ -571,14 +580,18 @@ function updateHouseRenderCulling(x,z){
   candidates.sort((a,b)=>a.distanceSq-b.distanceSq);
 
   // Keep the active house draw budget bounded.
-  const limit=180;
+  const limit=100;
   for(let i=0;i<Math.min(limit,candidates.length);i++){
     candidates[i].mesh.visible=true;
   }
 }
 
 function updateHouseDoorCollisions(){
-  const boxes=[];
+  if(!houseDoorCollisionDirty) return;
+
+  // Static house proxies are cheap enough to keep in the player's collision
+  // list. Only animated door bounds need to be recomputed.
+  const boxes=houseCollisionBoxes.slice();
 
   for(const door of houseDoors){
     const open=door.pivot.userData.openProgress||0;
@@ -600,6 +613,7 @@ function updateHouseDoorCollisions(){
   }
 
   player.extraCollisionBoxes=boxes;
+  houseDoorCollisionDirty=false;
 }
 
 function toggleHouseDoor(){
@@ -627,6 +641,7 @@ function toggleHouseDoor(){
   }
 
   best.pivot.userData.target=(best.pivot.userData.target||0)>0.5?0:1;
+  houseDoorCollisionDirty=true;
   eventText.textContent=best.pivot.userData.target ? "DOOR OPENING" : "DOOR CLOSING";
   eventText.style.opacity="1";
   setTimeout(()=>{eventText.style.opacity="0";},700);
@@ -805,18 +820,14 @@ function loadHouse(){
       const min=houseBox.min;
       const max=houseBox.max;
 
-      const lightPositions=[
-        new THREE.Vector3((min.x+max.x)*.5,Math.min(max.y-1.0,2.8),(min.z+max.z)*.5),
-        new THREE.Vector3(min.x+houseSize.x*.22,Math.min(max.y-1.2,2.4),min.z+houseSize.z*.28),
-        new THREE.Vector3(max.x-houseSize.x*.22,Math.min(max.y-1.2,2.4),min.z+houseSize.z*.72),
-        new THREE.Vector3(min.x+houseSize.x*.74,Math.min(max.y-1.2,2.4),max.z-houseSize.z*.24)
-      ];
-
-      for(const position of lightPositions){
-        const light=new THREE.PointLight(0xffd7a1,1.35,11,1.8);
-        light.position.copy(position);
-        houseLights.add(light);
-      }
+      // One local fill light is enough with the hemisphere + flashlight.
+      // Avoid several extra point lights; imported PBR meshes get much more
+      // expensive when every fragment evaluates many dynamic lights.
+      houseFill.position.set(
+        (min.x+max.x)*.5,
+        Math.min(max.y-1.0,2.8),
+        (min.z+max.z)*.5
+      );
 
       prepareHouseRenderCulling(houseModel);
 
@@ -889,14 +900,15 @@ function setHouseMode(enabled){
   player.ignoreWorldCollision=houseMode;
   player.houseOctree=null;
   player.extraCollisionBoxes=[];
+  houseDoorCollisionDirty=true;
 
   figure.visible=false;
   figureLife=0;
 
   if(houseMode){
-    renderer.setPixelRatio(Math.min(currentPixelRatio,1.0));
+    renderer.setPixelRatio(HOUSE_PIXEL_RATIO);
     flashlight.castShadow=false;
-    playerLight.intensity=1.0;
+    playerLight.intensity=0.6;
 
     player.pos.copy(houseSpawn);
     updateHouseRenderCulling(houseSpawn.x,houseSpawn.z);
@@ -1490,8 +1502,10 @@ function animate(){
     }
   }
 
-  world.update(player.pos.x,player.pos.z);
-  world.updateFlicker(t);
+  if(!houseMode){
+    world.update(player.pos.x,player.pos.z);
+    world.updateFlicker(t);
+  }
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
 
   if(flashlightOn && battery>0){
@@ -1508,8 +1522,10 @@ function animate(){
   flashlight.intensity=flashlightOn ? 27.0*flicker : 0;
   playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
 
-  for(const mixer of bacteriaMixers.values()){
-    mixer.update(dt);
+  if(!houseMode){
+    for(const mixer of bacteriaMixers.values()){
+      mixer.update(dt);
+    }
   }
 
   if(Number.isFinite(figureLife) && figureLife>0 && bacteriaLoaded){
