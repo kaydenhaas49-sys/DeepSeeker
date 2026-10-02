@@ -720,7 +720,7 @@ function chooseSafeHouseSpawn(root){
   root.updateMatrixWorld(true);
 
   const bounds=new THREE.Box3().setFromObject(root);
-  const margin=.75;
+  const margin=1.5;
   const minX=bounds.min.x+margin;
   const maxX=bounds.max.x-margin;
   const minZ=bounds.min.z+margin;
@@ -736,87 +736,92 @@ function chooseSafeHouseSpawn(root){
       const dz=z-nz;
       if(dx*dx+dz*dz<radius*radius) return true;
     }
+
+    const wp=new THREE.Vector3();
+    for(const door of houseDoors){
+      door.pivot.getWorldPosition(wp);
+      if(Math.hypot(wp.x-x,wp.z-z)<1.15) return true;
+    }
+
     return false;
   };
 
   const ray=new THREE.Raycaster();
   const origin=new THREE.Vector3();
-  const dir=new THREE.Vector3();
   const hits=[];
-  const dedupeHits=(items)=>{
-    if(items.length<2) return items.length;
-    items.sort((a,b)=>a.distance-b.distance);
-    let count=0;
-    let last=-Infinity;
-    for(const hit of items){
-      if(hit.distance-last>.08){
-        count++;
-        last=hit.distance;
-      }
-    }
-    return count;
-  };
-
-  const directions=[
+  const sideDirs=[
     new THREE.Vector3(1,0,0),
+    new THREE.Vector3(-1,0,0),
     new THREE.Vector3(0,0,1),
-    new THREE.Vector3(0,1,0)
+    new THREE.Vector3(0,0,-1)
   ];
 
-  const isInside=(x,y,z)=>{
-    let votes=0;
+  const probeY=1.35;
+  const floorY=6.5;
+  const sideRange=14;
+  const ceilingRange=5.5;
+  const step=.55;
 
-    for(const d of directions){
-      origin.set(x,y,z);
-      ray.set(origin,d);
-      ray.near=.02;
-      ray.far=120;
-      hits.length=0;
-      ray.intersectObjects(houseMeshes,true,hits);
-      const crossings=dedupeHits(hits);
-
-      // Odd crossings along a ray are the standard point-in-solid test.
-      if(crossings%2===1) votes++;
-    }
-
-    return votes>=2;
-  };
-
-  // First get the actual floor at each candidate. Then test the point slightly
-  // above it for real model enclosure. This avoids outdoor void/porch points.
-  const down=new THREE.Vector3(0,-1,0);
-  const floorOrigin=new THREE.Vector3();
   let best=null;
   let bestScore=-Infinity;
 
-  // Coarse first pass.
-  const step=.6;
-  const floorHits=[];
-
+  // Search the actual model footprint. A valid point needs a floor, a
+  // ceiling, and enclosing geometry on all four sides. This identifies a
+  // real room instead of an exterior patio/yard.
   for(let x=minX;x<=maxX;x+=step){
     for(let z=minZ;z<=maxZ;z+=step){
-      if(blocked(x,z,.75)) continue;
+      if(blocked(x,z,.72)) continue;
 
-      floorOrigin.set(x,EYE+1.0,z);
-      ray.set(floorOrigin,down);
-      ray.near=.05;
-      ray.far=EYE+1.5;
-      floorHits.length=0;
-      ray.intersectObjects(houseMeshes,true,floorHits);
+      origin.set(x,floorY,z);
+      ray.set(origin,new THREE.Vector3(0,-1,0));
+      ray.near=0;
+      ray.far=floorY+.5;
+      hits.length=0;
+      ray.intersectObjects(houseMeshes,true,hits);
 
-      const floorHit=floorHits.find(hit=>{
-        if(!hit.face) return false;
-        const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-        return n.y>.65 && hit.point.y>=-.1 && hit.point.y<=.3;
-      });
-
+      const floorHit=hits.find(hit=>hit.point.y>=-0.25 && hit.point.y<=0.35);
       if(!floorHit) continue;
 
-      const y=Math.max(EYE,floorHit.point.y+EYE);
+      origin.set(x,probeY,z);
+      ray.set(origin,new THREE.Vector3(0,1,0));
+      ray.near=0;
+      ray.far=ceilingRange;
+      hits.length=0;
+      ray.intersectObjects(houseMeshes,true,hits);
 
-      if(!isInside(x,y,z)) continue;
+      const ceilingHit=hits.find(hit=>hit.point.y>=probeY+1.9);
+      if(!ceilingHit) continue;
 
-      // More clearance + nearer to model center = better spawn.
+      let wallCount=0;
+      let wallScore=0;
+      const wallDistances=[];
+
+      for(const dir of sideDirs){
+        origin.set(x,probeY,z);
+        ray.set(origin,dir);
+        ray.near=.85;
+        ray.far=sideRange;
+        hits.length=0;
+        ray.intersectObjects(houseMeshes,true,hits);
+
+        // Count the nearest piece of actual geometry in this direction.
+        const hit=hits.find(item=>item.point.y>-0.05 && item.point.y<4.5);
+        if(hit){
+          wallCount++;
+          wallDistances.push(hit.distance);
+          wallScore+=Math.max(0,sideRange-hit.distance);
+        }
+      }
+
+      if(wallCount<4) continue;
+
+      // Prefer a spacious room rather than a tiny closet.
+      const shortestWall=Math.min(...wallDistances);
+      const roomSpan=Math.min(
+        wallDistances[0]+wallDistances[1],
+        wallDistances[2]+wallDistances[3]
+      );
+
       let clearance=8;
       for(const box of houseCollisionBoxes){
         const nx=Math.max(box.minX,Math.min(x,box.maxX));
@@ -824,11 +829,17 @@ function chooseSafeHouseSpawn(root){
         clearance=Math.min(clearance,Math.hypot(x-nx,z-nz));
       }
 
-      const cx=(minX+maxX)*.5;
-      const cz=(minZ+maxZ)*.5;
-      const centerDistance=Math.hypot(x-cx,z-cz);
+      const centerX=(minX+maxX)*.5;
+      const centerZ=(minZ+maxZ)*.5;
+      const centerDistance=Math.hypot(x-centerX,z-centerZ);
 
-      const score=Math.min(clearance,6)*12-centerDistance*.08;
+      const score=
+        wallCount*100+
+        wallScore*5+
+        Math.min(roomSpan,18)*6+
+        Math.min(shortestWall,4)*8+
+        Math.min(clearance,4)*12-
+        centerDistance*.04;
 
       if(score>bestScore){
         bestScore=score;
@@ -838,17 +849,15 @@ function chooseSafeHouseSpawn(root){
   }
 
   if(!best){
-    console.warn("[DeepSeeker] no enclosed floor point found; using model center");
-    best={
-      x:(minX+maxX)*.5,
-      z:(minZ+maxZ)*.5
-    };
+    console.warn("[DeepSeeker] could not find enclosed main-room spawn");
+    return false;
   }
 
   houseSpawn.set(best.x,EYE,best.z);
-  console.log("[DeepSeeker] verified interior spawn:",{
+  console.log("[DeepSeeker] main-room house spawn:",{
     x:Number(best.x.toFixed(2)),
-    z:Number(best.z.toFixed(2))
+    z:Number(best.z.toFixed(2)),
+    score:Number(bestScore.toFixed(1))
   });
   return true;
 }
