@@ -1881,7 +1881,6 @@ function animate(){
 
   if(!houseMode){
     world.update(player.pos.x,player.pos.z);
-    world.updateFlicker(t);
   }
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
 

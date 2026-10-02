@@ -169,10 +169,6 @@ const QUALITY_PARAM=new URLSearchParams(location.search).get("quality");
 const LOW_END_DEVICE=QUALITY_PARAM!=="high";
 const R_GENERATE = LOW_END_DEVICE ? 1 : 2;
 const R_DISPOSE = LOW_END_DEVICE ? 1 : 3;
-const PANEL_W = 2.2; // light fixture size (m)
-const PANEL_D = 0.5;
-const PANEL_SPACING = 22; // m between fixtures; enough lights to read the architecture
-
 // BoxGeometry face order: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z (4 verts each).
 // Scale the U coordinate of a face so the wallpaper repeats every CELL meters.
 function scaleFaceU(geo, face, s) {
@@ -222,9 +218,6 @@ export class World {
       wall: new THREE.MeshStandardMaterial({ map: tex.wall, roughness: 0.92 }),
       floor: new THREE.MeshStandardMaterial({ map: tex.floor, roughness: 1.0 }),
       ceiling: new THREE.MeshStandardMaterial({ map: tex.ceiling, roughness: 0.95 }),
-      panel: new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x8f8a78 }),
-      panelOff: new THREE.MeshBasicMaterial({ color: 0x2b2921 }),
-      flicker: [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ map: tex.panel, color: 0x969081 })),
     };
 
     // Shared per-chunk geometry templates (never disposed per chunk).
@@ -232,8 +225,6 @@ export class World {
     this.floorGeo.rotateX(-Math.PI / 2);
     this.ceilGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE);
     this.ceilGeo.rotateX(Math.PI / 2); // face down
-    this.panelGeo = new THREE.PlaneGeometry(PANEL_W, PANEL_D);
-    this.panelGeo.rotateX(Math.PI / 2); // face down
   }
 
   // -- chunk lifecycle -------------------------------------------------------
@@ -381,49 +372,7 @@ export class World {
       group.add(new THREE.Mesh(merged, this.materials.wall));
     }
 
-    this.buildPanels(group, data, ox, oz);
     return group;
   }
 
-  buildPanels(group, data, ox, oz) {
-    // Regular-but-imperfect fixture grid: the repeated rhythm helps sell a
-    // believable ceiling while the randomized failures keep it unsettling.
-    const prng = mulberry32(hashSeed(data.cx * 3 + 7, data.cz * 3 + 13, this.seed ^ 0x9e3779b9));
-    const on = [];
-    const off = [];
-    const flick = [[], [], []];
-    for (let j = 0; j < 2; j++) {
-      for (let i = 0; i < 2; i++) {
-        const r = prng();
-        const x = ox + 18 + i * PANEL_SPACING;
-        const z = oz + 18 + j * PANEL_SPACING;
-        const geo = this.panelGeo.clone();
-        geo.translate(x, WALL_H - 0.03, z);
-        if (r < 0.15) off.push(geo);
-        else if (r < 0.25) flick[Math.floor(prng() * 3)].push(geo);
-        else on.push(geo);
-      }
-    }
-    const addMerged = (geos, mat) => {
-      if (!geos.length) return;
-      const merged = mergeGeometries(geos, false);
-      for (const g of geos) g.dispose();
-      group.add(new THREE.Mesh(merged, mat));
-    };
-    addMerged(on, this.materials.panel);
-    addMerged(off, this.materials.panelOff);
-    for (let i = 0; i < 3; i++) addMerged(flick[i], this.materials.flicker[i]);
-  }
-
-  // Animate the three shared flicker materials (called every frame).
-  updateFlicker(t) {
-    for (let i = 0; i < 3; i++) {
-      const ph = i * 2.7;
-      const n =
-        Math.sin(t * 11.3 + ph) * Math.sin(t * 5.7 + ph * 1.7) +
-        Math.sin(t * 23.7 + ph * 0.9);
-      const v = n > 1.2 ? 0.18 : n > 0.8 ? 0.48 : 0.78;
-      this.materials.flicker[i].color.setScalar(v);
-    }
-  }
 }
