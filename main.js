@@ -119,6 +119,7 @@ let houseLoadFailed=false;
 let houseLoadStarted=false;
 let houseCollisionReady=false;
 let houseCollisionBuildStarted=false;
+let houseUnloadTimer=0;
 const houseCollisionBoxes=[];
 const houseRenderMeshes=[];
 const houseCollisionRoot=new THREE.Group();
@@ -275,6 +276,75 @@ function showLobbyScreen(){
   lobbyModeTitle.textContent=host?"CREATE LOBBY":"JOIN LOBBY";
   startLobbyButton.textContent=host?"START GAME":"READY / START";
   startLobbyButton.style.display="block";
+}
+
+function disposeHouseResources(){
+  if(!houseModel) return;
+
+  houseRoot.remove(houseModel);
+
+  houseModel.traverse(obj=>{
+    if(!obj.isMesh) return;
+
+    if(obj.geometry){
+      obj.geometry.dispose();
+    }
+
+    const materials=Array.isArray(obj.material)
+      ? obj.material
+      : [obj.material];
+
+    for(const material of materials){
+      if(!material) continue;
+      material.dispose();
+    }
+  });
+
+  houseModel=null;
+  houseMeshes.length=0;
+  houseRenderMeshes.length=0;
+  houseCollisionBoxes.length=0;
+
+  if(typeof houseOctree.clear==="function"){
+    houseOctree.clear();
+  }else{
+    houseOctree.triangles=[];
+  }
+
+  houseCollisionRoot.clear();
+  houseReturnPortal.visible=false;
+  houseReturnPortal.userData.active=false;
+
+  houseLoaded=false;
+  houseCollisionReady=false;
+  houseCollisionBuildStarted=false;
+  houseLoadStarted=false;
+  houseDoorCollisionDirty=true;
+  houseCollisionTimer=0;
+
+  updateHouseLoadingUI(0,"HOUSE UNLOADED — WILL RELOAD WHEN NEEDED.");
+  console.log("[DeepSeeker] house fully unloaded from memory");
+}
+
+function shouldKeepHouseLoaded(){
+  return houseMode || multiplayer.hasPlayerInHouse();
+}
+
+function updateHouseMemoryState(dt){
+  if(!gameStarted) return;
+
+  if(shouldKeepHouseLoaded()){
+    houseUnloadTimer=0;
+    return;
+  }
+
+  // Give the level a small grace period after leaving so a rapid return does
+  // not immediately destroy and rebuild the GLB.
+  houseUnloadTimer+=dt;
+  if(houseUnloadTimer>=1.5 && houseLoaded && !houseLoadStarted){
+    disposeHouseResources();
+    houseUnloadTimer=0;
+  }
 }
 
 function ensureHouseLoading(){
@@ -1179,6 +1249,7 @@ function setHouseMode(enabled){
   }
 
   houseMode=enabled;
+  houseUnloadTimer=0;
 
   // Only switch the two level roots. The procedural Backrooms is otherwise untouched.
   world.root.visible=!houseMode;
@@ -1781,6 +1852,8 @@ function animate(){
       }
     }
   }
+
+  updateHouseMemoryState(dt);
 
   if(houseMode){
     updateHouseDoors(dt);
