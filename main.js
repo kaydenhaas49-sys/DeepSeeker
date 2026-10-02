@@ -324,6 +324,12 @@ function getSavedGame(slot=selectedSaveSlot){
   return saveCache[normalizeSaveSlot(slot)] || null;
 }
 
+function getSavedLevel(data){
+  return data?.level==="apartment" || data?.houseMode===true
+    ? "apartment"
+    : "backrooms";
+}
+
 function persistSaveSlot(slot,data){
   const targetSlot=normalizeSaveSlot(slot);
   const serialized=JSON.stringify(data);
