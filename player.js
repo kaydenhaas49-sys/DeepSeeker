@@ -325,6 +325,35 @@ export class Player {
     }
 
     for (const box of this.extraCollisionBoxes) {
+      // House wall colliders keep their real orientation. Testing them as
+      // world-aligned AABBs was creating giant invisible barriers around
+      // angled/rotated walls.
+      if(
+        Number.isFinite(box.centerX) &&
+        Number.isFinite(box.centerZ) &&
+        Number.isFinite(box.halfX) &&
+        Number.isFinite(box.halfZ) &&
+        Number.isFinite(box.rotationY)
+      ){
+        const c=Math.cos(box.rotationY);
+        const s=Math.sin(box.rotationY);
+
+        const dx=x-box.centerX;
+        const dz=z-box.centerZ;
+
+        // Transform the player point into the collider's local X/Z space.
+        const localX= dx*c + dz*s;
+        const localZ=-dx*s + dz*c;
+
+        const nx=Math.max(-box.halfX,Math.min(localX,box.halfX));
+        const nz=Math.max(-box.halfZ,Math.min(localZ,box.halfZ));
+        const ox=localX-nx;
+        const oz=localZ-nz;
+
+        if(ox*ox + oz*oz < r*r) return true;
+        continue;
+      }
+
       const nx = Math.max(box.minX, Math.min(x, box.maxX));
       const nz = Math.max(box.minZ, Math.min(z, box.maxZ));
       const dx = x - nx;
