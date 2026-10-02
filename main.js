@@ -116,6 +116,37 @@ let houseCollisionBuildStarted=false;
 const houseCollisionBoxes=[];
 const houseRenderMeshes=[];
 const houseMeshes=[];
+
+const houseReturnPortal=new THREE.Group();
+houseReturnPortal.name="HouseHiddenReturnTeleporter";
+const housePortalBody=new THREE.Mesh(
+  new THREE.CylinderGeometry(.55,.55,.12,24),
+  new THREE.MeshStandardMaterial({
+    color:0xd8bd68,
+    emissive:0xa78328,
+    emissiveIntensity:3.2,
+    roughness:.35,
+    metalness:.15
+  })
+);
+housePortalBody.rotation.x=0;
+housePortalBody.position.y=.06;
+
+const housePortalRing=new THREE.Mesh(
+  new THREE.TorusGeometry(.72,.065,10,32),
+  new THREE.MeshBasicMaterial({color:0xffdf78})
+);
+housePortalRing.rotation.x=Math.PI/2;
+housePortalRing.position.y=.085;
+
+houseReturnPortal.add(housePortalBody,housePortalRing);
+houseReturnPortal.visible=false;
+houseRoot.add(houseReturnPortal);
+
+const housePortalLight=new THREE.PointLight(0xffd36a,1.2,7,2);
+housePortalLight.position.set(0,.8,0);
+housePortalLight.visible=false;
+houseRoot.add(housePortalLight);
 const houseFloorRaycaster=new THREE.Raycaster();
 let houseCullTimer=0;
 let houseDoorCollisionDirty=true;
@@ -542,46 +573,19 @@ function buildHouseCollisionProxies(root){
 
 function prepareHouseRenderCulling(root){
   houseRenderMeshes.length=0;
+
+  // Do not distance-cull the imported house. Its 126 meshes are already a
+  // manageable draw set, while per-mesh culling caused walls/floors/furniture
+  // to pop out as the player moved through the building.
   root.traverse((obj)=>{
     if(!obj.isMesh) return;
-    obj.userData.houseCullCenter=new THREE.Vector3();
-    obj.getWorldPosition(obj.userData.houseCullCenter);
-    obj.userData.houseCullRadius=new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()).length()*0.5;
     houseRenderMeshes.push(obj);
-    obj.visible=false;
+    obj.visible=true;
   });
 }
 
-function updateHouseRenderCulling(x,z){
-  const maxDistance=16;
-  const candidates=[];
-
-  for(const mesh of houseRenderMeshes){
-    const p=mesh.userData.houseCullCenter;
-    if(!p){
-      mesh.visible=false;
-      continue;
-    }
-
-    const dx=p.x-x;
-    const dz=p.z-z;
-    const r=mesh.userData.houseCullRadius||0;
-    const distanceSq=dx*dx+dz*dz;
-
-    if(distanceSq <= (maxDistance+r)*(maxDistance+r)){
-      candidates.push({mesh,distanceSq});
-    }
-
-    mesh.visible=false;
-  }
-
-  candidates.sort((a,b)=>a.distanceSq-b.distanceSq);
-
-  // Keep the active house draw budget bounded.
-  const limit=100;
-  for(let i=0;i<Math.min(limit,candidates.length);i++){
-    candidates[i].mesh.visible=true;
-  }
+function updateHouseRenderCulling(){
+  // Intentionally disabled for the house level. See prepareHouseRenderCulling.
 }
 
 function updateHouseDoorCollisions(){
@@ -753,6 +757,85 @@ function chooseSafeHouseSpawn(root){
   return true;
 }
 
+function chooseHouseReturnPortalPosition(root){
+  const bounds=new THREE.Box3().setFromObject(root);
+  const margin=2.0;
+  const minX=bounds.min.x+margin;
+  const maxX=bounds.max.x-margin;
+  const minZ=bounds.min.z+margin;
+  const maxZ=bounds.max.z-margin;
+
+  const minSpawnDistance=12;
+  const step=1.0;
+
+  let best=null;
+  let bestScore=-Infinity;
+
+  const blocked=(x,z,radius=.85)=>{
+    for(const box of houseCollisionBoxes){
+      const nx=Math.max(box.minX,Math.min(x,box.maxX));
+      const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
+      const dx=x-nx;
+      const dz=z-nz;
+      if(dx*dx+dz*dz<radius*radius) return true;
+    }
+    return false;
+  };
+
+  if(minX>=maxX || minZ>=maxZ) return false;
+
+  for(let x=minX;x<=maxX;x+=step){
+    for(let z=minZ;z<=maxZ;z+=step){
+      const fromSpawn=Math.hypot(x-houseSpawn.x,z-houseSpawn.z);
+      if(fromSpawn<minSpawnDistance) continue;
+      if(blocked(x,z)) continue;
+
+      const edgeClearance=Math.min(
+        x-minX,maxX-x,z-minZ,maxZ-z
+      );
+
+      // Far from spawn first, then slightly favor a perimeter location so it
+      // feels hidden instead of landing in the middle of the room.
+      const score=fromSpawn*10 + (12-Math.min(edgeClearance,12))*1.5;
+      if(score>bestScore){
+        bestScore=score;
+        best={x,z};
+      }
+    }
+  }
+
+  if(!best) return false;
+
+  const y=Math.max(0.05,houseSpawn.y-EYE+0.05);
+  houseReturnPortal.position.set(best.x,y,best.z);
+  housePortalLight.position.set(best.x,y+.7,best.z);
+
+  console.log("[DeepSeeker] hidden house teleporter:",{
+    x:Number(best.x.toFixed(2)),
+    z:Number(best.z.toFixed(2)),
+    distanceFromSpawn:Number(Math.hypot(best.x-houseSpawn.x,best.z-houseSpawn.z).toFixed(2))
+  });
+
+  return true;
+}
+
+function useHouseReturnTeleporter(){
+  if(!houseMode) return false;
+
+  const d=Math.hypot(
+    player.pos.x-houseReturnPortal.position.x,
+    player.pos.z-houseReturnPortal.position.z
+  );
+
+  if(d>2.2) return false;
+
+  setHouseMode(false);
+  eventText.textContent="RETURNED TO THE BACKROOMS";
+  eventText.style.opacity="1";
+  setTimeout(()=>{eventText.style.opacity="0";},1200);
+  return true;
+}
+
 function ensureHouseCollisionSetup(){
   if(!houseLoaded || houseCollisionReady || houseCollisionBuildStarted || !houseModel) return;
 
@@ -769,6 +852,7 @@ function ensureHouseCollisionSetup(){
 
     buildHouseCollisionProxies(houseModel);
     chooseSafeHouseSpawn(houseModel);
+    chooseHouseReturnPortalPosition(houseModel);
     houseCollisionReady=true;
     houseCollisionBuildStarted=false;
 
@@ -936,6 +1020,8 @@ function setHouseMode(enabled){
   // Only switch the two level roots. The procedural Backrooms is otherwise untouched.
   world.root.visible=!houseMode;
   houseRoot.visible=houseMode;
+  houseReturnPortal.visible=houseMode;
+  housePortalLight.visible=houseMode;
 
   player.ignoreWorldCollision=houseMode;
   player.houseOctree=null;
@@ -952,12 +1038,12 @@ function setHouseMode(enabled){
     playerLight.intensity=0;
 
     player.pos.copy(houseSpawn);
-    updateHouseRenderCulling(houseSpawn.x,houseSpawn.z);
+    updateHouseRenderCulling();
     player.vel.set(0,0,0);
     player.jumpY=0;
     player.jumpVelocity=0;
 
-    objective.textContent="Explore the house.";
+    objective.textContent="Explore the house. Find the hidden return teleporter.";
     eventText.textContent="HOUSE LEVEL";
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},1400);
@@ -1437,7 +1523,9 @@ document.addEventListener("pointerlockchange",()=>{
 });
 
 document.addEventListener("keydown",e=>{
-  if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
+  if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen){
+    useHouseReturnTeleporter();
+  }else if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !phoneOpen && !controlsOpen){ newSeed(); }
   else if(e.code==="KeyP" && !e.repeat){
@@ -1523,11 +1611,7 @@ function animate(){
       updateHouseDoorCollisions();
     }
 
-    houseCullTimer+=dt;
-    if(houseCullTimer>=0.25){
-      houseCullTimer=0;
-      updateHouseRenderCulling(player.pos.x,player.pos.z);
-    }
+    houseCullTimer=0;
   }else{
     houseCullTimer=0;
     player.houseOctree=null;
