@@ -1,0 +1,88 @@
+name: Temporary house geometry inspection
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/house_interior.glb"
+      - ".github/workflows/temp-house-door-inspection.yml"
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect GLB geometry
+        shell: bash
+        run: |
+          python -m pip install -q trimesh pygltflib
+          python - <<'PY'
+          import json, math
+          import trimesh
+
+          path = "assets/house_interior.glb"
+          scene = trimesh.load(path, force="scene", process=False)
+
+          rows = []
+          for name, geom in scene.geometry.items():
+              try:
+                  tf = scene.graph.get(name)
+              except Exception:
+                  tf = None
+
+              if tf is not None:
+                  try:
+                      transform = tf[0] if isinstance(tf, tuple) else tf
+                      geom_world = geom.copy()
+                      geom_world.apply_transform(transform)
+                  except Exception:
+                      geom_world = geom
+              else:
+                  geom_world = geom
+
+              bounds = geom_world.bounds
+              size = bounds[1] - bounds[0]
+              dims = sorted(size.tolist())
+              vertical = float(size[1])
+              horizontal = float(max(size[0], size[2]))
+              depth = float(min(size[0], size[2]))
+              thin = float(min(size))
+              center = ((bounds[0] + bounds[1]) / 2).tolist()
+
+              if vertical > 0 and horizontal > 0:
+                  score = 0.0
+                  score += max(0.0, 1.0 - abs(vertical - 2.05) / 0.9) * 4
+                  width = min(float(size[0]), float(size[2]))
+                  score += max(0.0, 1.0 - abs(width - 0.85) / 0.55) * 3
+                  score += max(0.0, 1.0 - abs(thin - 0.10) / 0.25) * 2
+                  if 1.6 <= vertical <= 2.6 and 0.55 <= width <= 1.5 and thin <= 0.35 and horizontal <= 1.6:
+                      score += 5
+
+              rows.append({
+                  "name": str(name),
+                  "size": [round(float(x),4) for x in size],
+                  "center": [round(float(x),4) for x in center],
+                  "vertices": int(len(getattr(geom, "vertices", []))),
+                  "faces": int(len(getattr(geom, "faces", []))),
+                  "door_score": round(float(score),4),
+              })
+
+          rows.sort(key=lambda r: r["door_score"], reverse=True)
+
+          with open("/tmp/house_geometry_report.txt", "w") as f:
+              f.write(f"geometry_count={len(rows)}\\n")
+              f.write("TOP DOOR CANDIDATES\\n")
+              for r in rows[:50]:
+                  f.write(json.dumps(r) + "\\n")
+              f.write("\\nALL GEOMETRY\\n")
+              for r in sorted(rows, key=lambda r: r["name"]):
+                  f.write(json.dumps(r) + "\\n")
+
+          print(open("/tmp/house_geometry_report.txt").read())
+          PY
+      - name: Upload inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: house-door-geometry-inspection
+          path: /tmp/house_geometry_report.txt
