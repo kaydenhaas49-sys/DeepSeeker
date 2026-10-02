@@ -546,7 +546,7 @@ function prepareHouseRenderCulling(root){
 }
 
 function updateHouseRenderCulling(x,z){
-  const maxDistance=22;
+  const maxDistance=18;
   const candidates=[];
 
   for(const mesh of houseRenderMeshes){
@@ -571,7 +571,7 @@ function updateHouseRenderCulling(x,z){
   candidates.sort((a,b)=>a.distanceSq-b.distanceSq);
 
   // Keep the active house draw budget bounded.
-  const limit=450;
+  const limit=180;
   for(let i=0;i<Math.min(limit,candidates.length);i++){
     candidates[i].mesh.visible=true;
   }
@@ -634,7 +634,7 @@ function toggleHouseDoor(){
 }
 
 function chooseSafeHouseSpawn(root){
-  if(!root || !houseOctree) return false;
+  if(!root || !houseCollisionBoxes.length) return false;
 
   const bounds=new THREE.Box3().setFromObject(root);
   const margin=1.5;
@@ -645,52 +645,34 @@ function chooseSafeHouseSpawn(root){
 
   if(minX>=maxX || minZ>=maxZ) return false;
 
-  const center=bounds.getCenter(new THREE.Vector3());
-  const capsule=player.houseCollisionCapsule;
-
-  const floorAt=(x,z)=>{
-    houseFloorRaycaster.set(
-      new THREE.Vector3(x,bounds.max.y+2,z),
-      new THREE.Vector3(0,-1,0)
-    );
-
-    const hits=houseFloorRaycaster.intersectObjects(houseMeshes,false);
-    for(const hit of hits){
-      // Prefer the main lower-floor range. This avoids selecting the roof or
-      // high furniture as a spawn surface.
-      if(
-        hit.point.y>=bounds.min.y-.05 &&
-        hit.point.y<=bounds.min.y+1.5
-      ){
-        return hit.point.y;
-      }
+  const blocked=(x,z,radius=.55)=>{
+    for(const box of houseCollisionBoxes){
+      const nx=Math.max(box.minX,Math.min(x,box.maxX));
+      const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
+      const dx=x-nx;
+      const dz=z-nz;
+      if(dx*dx+dz*dz<radius*radius) return true;
     }
 
-    return null;
+    const wp=new THREE.Vector3();
+    for(const door of houseDoors){
+      door.pivot.getWorldPosition(wp);
+      if(Math.hypot(wp.x-x,wp.z-z)<1.15) return true;
+    }
+
+    return false;
   };
 
-  const blocked=(x,y,z)=>{
-    capsule.start.set(x,0.4+y-EYE,z);
-    capsule.end.set(x,Math.max(0.8,EYE-0.2+y-EYE),z);
-    capsule.radius=0.4;
-
-    const hit=houseOctree.capsuleIntersect(capsule);
-    return Boolean(hit && hit.normal && Math.abs(hit.normal.y)<0.65);
-  };
-
+  const center=bounds.getCenter(new THREE.Vector3());
+  const step=.8;
   let best=null;
   let bestScore=-Infinity;
 
-  const step=.8;
   for(let x=minX;x<=maxX;x+=step){
     for(let z=minZ;z<=maxZ;z+=step){
-      const floorY=floorAt(x,z);
-      if(floorY===null) continue;
+      if(blocked(x,z)) continue;
 
-      if(blocked(x,floorY+EYE,z)) continue;
-
-      // Favor a roomy position rather than a corner/alcove.
-      let clearance=Infinity;
+      let clearance=8;
       for(const box of houseCollisionBoxes){
         const nx=Math.max(box.minX,Math.min(x,box.maxX));
         const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
@@ -699,20 +681,18 @@ function chooseSafeHouseSpawn(root){
 
       const centerDistance=Math.hypot(x-center.x,z-center.z);
       const score=Math.min(clearance,8)*8-centerDistance;
-
       if(score>bestScore){
         bestScore=score;
-        best={x,y:floorY+EYE,z};
+        best={x,z};
       }
     }
   }
 
   if(!best) return false;
 
-  houseSpawn.set(best.x,best.y,best.z);
+  houseSpawn.set(best.x,EYE,best.z);
   console.log("[DeepSeeker] safe house spawn:",{
     x:Number(best.x.toFixed(2)),
-    y:Number(best.y.toFixed(2)),
     z:Number(best.z.toFixed(2))
   });
   return true;
@@ -732,22 +712,7 @@ function ensureHouseCollisionSetup(){
       });
     }
 
-    const detachedDoors=[];
-    for(const door of houseDoors){
-      const parent=door.pivot.parent;
-      if(!parent) continue;
-      detachedDoors.push({pivot:door.pivot,parent});
-      parent.remove(door.pivot);
-    }
-
-    houseOctree.clear();
-    houseOctree.fromGraphNode(houseModel);
-
-    for(const item of detachedDoors){
-      item.parent.add(item.pivot);
-    }
-
-    houseModel.updateMatrixWorld(true);
+    buildHouseCollisionProxies(houseModel);
     chooseSafeHouseSpawn(houseModel);
     houseCollisionReady=true;
     houseCollisionBuildStarted=false;
@@ -859,7 +824,7 @@ function loadHouse(){
       houseLoadFailed=false;
       houseRoot.visible=false;
 
-      // Door discovery and house mesh collision are prepared off the main
+      // Door discovery and lightweight house collision are prepared off the
       // startup path so the menu stays responsive.
       ensureHouseCollisionSetup();
 
@@ -922,7 +887,7 @@ function setHouseMode(enabled){
   houseRoot.visible=houseMode;
 
   player.ignoreWorldCollision=houseMode;
-  player.houseOctree=houseMode ? houseOctree : null;
+  player.houseOctree=null;
   player.extraCollisionBoxes=[];
 
   figure.visible=false;
