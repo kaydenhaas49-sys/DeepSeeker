@@ -386,34 +386,58 @@ scene.add(houseRoot);
 
 const houseReturnPortal=new THREE.Group();
 houseReturnPortal.name="HouseHiddenReturnTeleporter";
-const housePortalBody=new THREE.Mesh(
-  new THREE.CylinderGeometry(.55,.55,.12,24),
+
+// The return point is disguised as an ordinary electrical/service panel.
+// No big ring, beam, portal glow, or floor pad.
+const housePanelFrame=new THREE.Mesh(
+  new THREE.BoxGeometry(.92,1.22,.13),
   new THREE.MeshStandardMaterial({
-    color:0xd8bd68,
-    emissive:0xa78328,
-    emissiveIntensity:3.2,
-    roughness:.35,
-    metalness:.15
+    color:0x5b5848,
+    roughness:.86,
+    metalness:.04
   })
 );
-housePortalBody.rotation.x=0;
-housePortalBody.position.y=.06;
+housePanelFrame.position.y=.02;
 
-const housePortalRing=new THREE.Mesh(
-  new THREE.TorusGeometry(.72,.065,10,32),
-  new THREE.MeshBasicMaterial({color:0xffdf78})
+const housePanelFace=new THREE.Mesh(
+  new THREE.BoxGeometry(.72,1.02,.035),
+  new THREE.MeshStandardMaterial({
+    color:0x8b866d,
+    roughness:.78,
+    metalness:.02
+  })
 );
-housePortalRing.rotation.x=Math.PI/2;
-housePortalRing.position.y=.085;
+housePanelFace.position.set(0,.02,.08);
 
-houseReturnPortal.add(housePortalBody,housePortalRing);
+const housePanelInset=new THREE.Mesh(
+  new THREE.BoxGeometry(.52,.52,.022),
+  new THREE.MeshStandardMaterial({
+    color:0x38382f,
+    roughness:.9
+  })
+);
+housePanelInset.position.set(0,.12,.11);
+
+const housePanelIndicator=new THREE.Mesh(
+  new THREE.SphereGeometry(.035,10,8),
+  new THREE.MeshStandardMaterial({
+    color:0x5d5b4e,
+    emissive:0x4d4a39,
+    emissiveIntensity:.5,
+    roughness:.7
+  })
+);
+housePanelIndicator.position.set(.22,-.28,.13);
+
+houseReturnPortal.add(
+  housePanelFrame,
+  housePanelFace,
+  housePanelInset,
+  housePanelIndicator
+);
 houseReturnPortal.visible=false;
+houseReturnPortal.userData.active=false;
 houseRoot.add(houseReturnPortal);
-
-const housePortalLight=new THREE.PointLight(0xffd36a,1.2,7,2);
-housePortalLight.position.set(0,.8,0);
-housePortalLight.visible=false;
-houseRoot.add(housePortalLight);
 
 // Warm interior illumination so the house is readable without killing the horror mood.
 const houseLights=new THREE.Group();
@@ -554,11 +578,11 @@ function buildHouseCollisionProxies(root){
     // surprisingly large area; treating those as walls is what caused the
     // player to spawn/move trapped.
     const architecturalWall =
-      vertical >= 1.2 &&
-      thin <= 1.25 &&
+      vertical >= 1.0 &&
+      thin <= 2.25 &&
       horizontal >= 0.9 &&
-      size.x <= 18 &&
-      size.z <= 18;
+      size.x <= 30 &&
+      size.z <= 30;
 
     if(!architecturalWall) return;
 
@@ -761,19 +785,14 @@ function chooseSafeHouseSpawn(root){
 
 function chooseHouseReturnPortalPosition(root){
   const bounds=new THREE.Box3().setFromObject(root);
-  const margin=2.0;
+  const margin=1.5;
   const minX=bounds.min.x+margin;
   const maxX=bounds.max.x-margin;
   const minZ=bounds.min.z+margin;
   const maxZ=bounds.max.z-margin;
-
   const minSpawnDistance=12;
-  const step=1.0;
 
-  let best=null;
-  let bestScore=-Infinity;
-
-  const blocked=(x,z,radius=.85)=>{
+  const blocked=(x,z,radius=.72)=>{
     for(const box of houseCollisionBoxes){
       const nx=Math.max(box.minX,Math.min(x,box.maxX));
       const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
@@ -784,38 +803,88 @@ function chooseHouseReturnPortalPosition(root){
     return false;
   };
 
-  if(minX>=maxX || minZ>=maxZ) return false;
+  let best=null;
+  let bestScore=-Infinity;
 
-  for(let x=minX;x<=maxX;x+=step){
-    for(let z=minZ;z<=maxZ;z+=step){
-      const fromSpawn=Math.hypot(x-houseSpawn.x,z-houseSpawn.z);
-      if(fromSpawn<minSpawnDistance) continue;
-      if(blocked(x,z)) continue;
+  // Put the panel on an actual structural wall, on the side facing the house
+  // interior. This makes the teleporter visible/reachable and keeps it from
+  // randomly landing in the middle of furniture or outside the building.
+  for(const wall of houseCollisionBoxes){
+    const wx=(wall.minX+wall.maxX)*.5;
+    const wz=(wall.minZ+wall.maxZ)*.5;
+    const sx=wall.maxX-wall.minX;
+    const sz=wall.maxZ-wall.minZ;
 
-      const edgeClearance=Math.min(
-        x-minX,maxX-x,z-minZ,maxZ-z
-      );
+    if(Math.min(sx,sz)>2.25) continue;
+    if(Math.max(sx,sz)<1.2) continue;
 
-      // Far from spawn first, then slightly favor a perimeter location so it
-      // feels hidden instead of landing in the middle of the room.
-      const score=fromSpawn*10 + (12-Math.min(edgeClearance,12))*1.5;
-      if(score>bestScore){
-        bestScore=score;
-        best={x,z};
+    const distanceFromSpawn=Math.hypot(wx-houseSpawn.x,wz-houseSpawn.z);
+    if(distanceFromSpawn<minSpawnDistance) continue;
+
+    let x=wx;
+    let z=wz;
+    let rotationY=0;
+
+    if(sx<=sz){
+      // Wall is thin on X; panel faces toward the interior side.
+      const towardPositiveX=houseSpawn.x>=wx;
+      x=towardPositiveX ? wall.maxX+.08 : wall.minX-.08;
+      rotationY=Math.PI/2;
+    }else{
+      // Wall is thin on Z; panel faces toward the interior side.
+      const towardPositiveZ=houseSpawn.z>=wz;
+      z=towardPositiveZ ? wall.maxZ+.08 : wall.minZ-.08;
+      rotationY=0;
+    }
+
+    if(x<minX || x>maxX || z<minZ || z>maxZ) continue;
+    if(blocked(x,z)) continue;
+
+    const edgeClearance=Math.min(
+      x-minX,maxX-x,z-minZ,maxZ-z
+    );
+
+    const score=distanceFromSpawn*10 + Math.min(edgeClearance,8);
+    if(score>bestScore){
+      bestScore=score;
+      best={x,z,rotationY};
+    }
+  }
+
+  // Fallback: a safe floor position far from spawn, should a wall collider
+  // not be found in a malformed/changed asset.
+  if(!best){
+    const fallbackOffsets=[
+      [8,0],[-8,0],[0,8],[0,-8],
+      [10,4],[-10,4],[10,-4],[-10,-4]
+    ];
+
+    for(const [ox,oz] of fallbackOffsets){
+      const x=THREE.MathUtils.clamp(houseSpawn.x+ox,minX,maxX);
+      const z=THREE.MathUtils.clamp(houseSpawn.z+oz,minZ,maxZ);
+      const d=Math.hypot(x-houseSpawn.x,z-houseSpawn.z);
+      if(d>=minSpawnDistance && !blocked(x,z)){
+        best={x,z,rotationY:0};
+        break;
       }
     }
   }
 
   if(!best) return false;
 
-  const y=Math.max(0.05,houseSpawn.y-EYE+0.05);
+  // Panel center sits roughly at chest height on the wall.
+  const y=1.35;
   houseReturnPortal.position.set(best.x,y,best.z);
-  housePortalLight.position.set(best.x,y+.7,best.z);
+  houseReturnPortal.rotation.y=best.rotationY;
+  houseReturnPortal.userData.active=true;
 
   console.log("[DeepSeeker] hidden house teleporter:",{
     x:Number(best.x.toFixed(2)),
     z:Number(best.z.toFixed(2)),
-    distanceFromSpawn:Number(Math.hypot(best.x-houseSpawn.x,best.z-houseSpawn.z).toFixed(2))
+    distanceFromSpawn:Number(
+      Math.hypot(best.x-houseSpawn.x,best.z-houseSpawn.z).toFixed(2)
+    ),
+    wallMounted:true
   });
 
   return true;
@@ -1022,8 +1091,7 @@ function setHouseMode(enabled){
   // Only switch the two level roots. The procedural Backrooms is otherwise untouched.
   world.root.visible=!houseMode;
   houseRoot.visible=houseMode;
-  houseReturnPortal.visible=houseMode;
-  housePortalLight.visible=houseMode;
+  houseReturnPortal.visible=houseMode && houseReturnPortal.userData.active;
 
   player.ignoreWorldCollision=houseMode;
   player.houseOctree=null;
@@ -1526,7 +1594,9 @@ document.addEventListener("pointerlockchange",()=>{
 
 document.addEventListener("keydown",e=>{
   if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen){
-    useHouseReturnTeleporter();
+    if(useHouseReturnTeleporter()){
+      return;
+    }
   }else if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !phoneOpen && !controlsOpen){ newSeed(); }
