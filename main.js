@@ -718,78 +718,91 @@ function installMainMenuRedesign(){
 }
 .menuLogo{
   position:absolute;
-  left:clamp(28px,4vw,62px);
-  top:clamp(24px,4vh,48px);
-  color:#f2ebcf;
-  text-shadow:0 3px 20px rgba(0,0,0,.85);
+  left:clamp(34px,4vw,64px);
+  top:clamp(28px,5vh,54px);
+  color:#f3edd5;
+  text-shadow:0 4px 24px rgba(0,0,0,.9);
 }
 .menuLogoMain{
-  font-size:clamp(24px,3vw,44px);
-  line-height:1;
-  letter-spacing:clamp(5px,.7vw,10px);
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  line-height:.92;
+  letter-spacing:clamp(4px,.55vw,8px);
   font-weight:600;
 }
+.menuLogoMain span{
+  font-size:clamp(24px,2.8vw,43px);
+  color:#f4efd9;
+}
+.menuLogoMain strong{
+  font-size:clamp(34px,4.2vw,64px);
+  font-weight:600;
+  color:#d9b65c;
+  letter-spacing:clamp(5px,.7vw,11px);
+}
 .menuLogoSub{
-  margin-top:8px;
+  margin-top:12px;
   font-size:8px;
-  letter-spacing:4px;
-  color:#a8a18a;
+  letter-spacing:3.5px;
+  color:#9f987f;
 }
 .menuNav{
   position:absolute;
-  left:clamp(20px,3vw,52px);
-  top:clamp(155px,25vh,250px);
-  width:min(340px,31vw);
+  left:clamp(28px,4vw,58px);
+  top:clamp(210px,29vh,300px);
+  width:min(360px,31vw);
   display:flex;
   flex-direction:column;
-  gap:2px;
+  gap:3px;
 }
 .menuNavButton{
   position:relative;
   width:100%;
-  min-height:48px;
-  padding:0 18px 0 20px;
+  min-height:52px;
+  padding:0 18px 0 22px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   border:0;
   border-left:3px solid transparent;
-  border-radius:0;
-  background:transparent;
-  color:#ddd8ca;
+  border-radius:0 2px 2px 0;
+  background:linear-gradient(90deg,rgba(5,7,6,.12),transparent);
+  color:#d7d1bd;
   font:inherit;
   text-align:left;
   font-size:clamp(13px,1vw,16px);
-  letter-spacing:1.3px;
+  letter-spacing:1.5px;
   cursor:pointer;
   transition:background .16s,color .16s,border-color .16s,transform .16s;
-  text-shadow:0 2px 9px rgba(0,0,0,.85);
+  text-shadow:0 2px 10px rgba(0,0,0,.9);
 }
 .menuNavButton:hover{
-  background:rgba(0,0,0,.22);
-  color:#fff9df;
-  transform:translateX(3px);
+  background:linear-gradient(90deg,rgba(223,173,69,.10),transparent);
+  color:#fff7dc;
+  transform:translateX(4px);
 }
 .menuNavButton.active,
 .menuNavButton:focus-visible{
-  background:linear-gradient(90deg,rgba(225,179,71,.20),rgba(225,179,71,.035));
+  background:linear-gradient(90deg,rgba(223,173,69,.21),rgba(223,173,69,.035) 70%,transparent);
   border-left-color:#dfad45;
   color:#fff4cf;
   outline:none;
 }
 .menuNavButton:disabled{opacity:.42;cursor:not-allowed;transform:none!important}
 .menuNavArrow{
-  font-size:18px;
-  color:#7d796a;
+  font-size:20px;
+  color:#767264;
   transition:transform .16s,color .16s;
 }
-.menuNavButton:hover .menuNavArrow{transform:translateX(3px);color:#edc269}
+.menuNavButton:hover .menuNavArrow{transform:translateX(4px);color:#edc269}
 .menuNavButton.active .menuNavArrow{color:#e4b75c}
+
 .menuSlotBar{
   position:absolute;
-  left:clamp(20px,3vw,52px);
-  top:calc(clamp(155px,25vh,250px) + 295px);
-  width:min(400px,34vw);
+  left:clamp(28px,4vw,58px);
+  bottom:clamp(74px,8vh,104px);
+  width:min(540px,46vw);
   color:#989381;
   text-shadow:0 2px 8px #000;
 }
@@ -798,6 +811,7 @@ function installMainMenuRedesign(){
   justify-content:space-between;
   align-items:center;
   margin-bottom:8px;
+  padding:0 1px;
   font-size:8px;
   letter-spacing:2.4px;
 }
@@ -805,25 +819,30 @@ function installMainMenuRedesign(){
 .menuHomeRedesign #saveSlots{
   width:100%;
   display:grid;
-  grid-template-columns:1fr;
-  gap:6px;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:104px;
-  padding:14px 13px;
-  border:1px solid rgba(231,220,171,.14);
+  min-height:106px;
+  padding:13px 12px;
+  border:1px solid rgba(231,220,171,.13);
   border-radius:2px;
-  background:rgba(4,6,5,.38);
+  background:linear-gradient(180deg,rgba(7,9,8,.56),rgba(3,5,4,.30));
   color:#bbb5a1;
   display:flex;
   flex-direction:column;
   justify-content:center;
+  box-shadow:inset 0 1px rgba(255,255,255,.025);
 }
-.menuHomeRedesign .saveSlotCard:hover{background:rgba(235,218,164,.07);border-color:rgba(231,220,171,.22)}
+.menuHomeRedesign .saveSlotCard:hover{
+  background:linear-gradient(180deg,rgba(223,173,69,.09),rgba(223,173,69,.025));
+  border-color:rgba(231,220,171,.24);
+}
 .menuHomeRedesign .saveSlotCard.selected{
-  border-color:rgba(223,173,69,.68);
-  background:rgba(223,173,69,.11);
+  border-color:rgba(223,173,69,.72);
+  background:linear-gradient(180deg,rgba(223,173,69,.15),rgba(223,173,69,.045));
+  box-shadow:0 0 22px rgba(223,173,69,.06),inset 0 1px rgba(255,237,180,.08);
 }
 .menuHomeRedesign .saveSlotTitle{
   font-size:8px;
@@ -858,24 +877,26 @@ function installMainMenuRedesign(){
 .menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.09);color:#e9dec0}
 .menuHomeRedesign .saveSlotActions button:disabled{opacity:.35;cursor:not-allowed}
 .menuSaveStatus{
-  margin-top:8px;
+  margin-top:7px;
   font-size:8px;
   letter-spacing:1.4px;
   color:#777466;
 }
 .menuRightPanel{
   position:absolute;
-  left:clamp(20px,3vw,52px);
-  bottom:clamp(16px,2.5vh,32px);
-  width:min(400px,34vw);
-  min-height:320px;
-  padding:30px 24px;
-  border-left:3px solid rgba(223,173,69,.34);
-  border-right:0;
-  background:linear-gradient(90deg,rgba(5,7,6,.44),rgba(5,7,6,.10));
-  backdrop-filter:blur(5px);
+  top:clamp(110px,15vh,150px);
+  right:clamp(24px,4vw,62px);
+  bottom:clamp(72px,8vh,104px);
+  width:min(365px,28vw);
+  min-height:0;
+  padding:26px 24px;
+  border-left:2px solid rgba(223,173,69,.34);
+  border-right:1px solid rgba(231,220,171,.07);
+  background:linear-gradient(90deg,rgba(4,6,5,.17),rgba(5,7,6,.48));
+  backdrop-filter:blur(6px);
   color:#9a9581;
   text-shadow:0 2px 8px #000;
+  overflow:auto;
 }
 .menuRightHeader{
   display:flex;
@@ -884,15 +905,43 @@ function installMainMenuRedesign(){
   font-size:8px;
   letter-spacing:2px;
   color:#b9b198;
-  margin-bottom:10px;
+  margin-bottom:16px;
+}
+.menuSignalState{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:14px;
+  font-size:18px;
+  letter-spacing:3px;
+  color:#e4d4aa;
+}
+.menuSignalDot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#d3a43f;
+  box-shadow:0 0 12px rgba(223,173,69,.55);
+  animation:menuSignalPulse 2.2s ease-in-out infinite;
+}
+@keyframes menuSignalPulse{
+  0%,100%{opacity:.35;box-shadow:0 0 6px rgba(223,173,69,.25)}
+  50%{opacity:1;box-shadow:0 0 15px rgba(223,173,69,.70)}
 }
 .menuRightLead{
-  margin:0 0 13px;
+  margin:0 0 16px;
+  max-width:290px;
   font-size:10px;
-  line-height:1.6;
+  line-height:1.75;
   color:#8d8a79;
 }
-.menuRightRule{height:1px;background:rgba(226,211,164,.10);margin:10px 0}
+.menuRightRule{height:1px;background:rgba(226,211,164,.10);margin:13px 0 16px}
+.menuRightSectionLabel{
+  font-size:8px;
+  letter-spacing:2px;
+  color:#b5ae96;
+  margin-bottom:7px;
+}
 .menuHomeRedesign .usernameRow{width:100%;margin:0}
 .menuHomeRedesign .usernameInput{
   width:100%;
@@ -908,7 +957,7 @@ function installMainMenuRedesign(){
   border-radius:2px;
   color:#c4b894;
 }
-.menuHomeRedesign .houseLoader{width:100%;margin:10px 0 0;text-align:left}
+.menuHomeRedesign .houseLoader{width:100%;margin:12px 0 0;text-align:left}
 .menuHomeRedesign .houseLoaderTop{color:#96907d}
 .menuHomeRedesign .houseLoaderStatus{color:#777466;min-height:14px}
 .menuNameGate{
@@ -974,8 +1023,10 @@ function installMainMenuRedesign(){
 .menuFooter{
   position:absolute;
   left:clamp(22px,3vw,52px);
-  bottom:clamp(18px,3vh,34px);
+  right:clamp(22px,3vw,52px);
+  bottom:clamp(18px,3vh,28px);
   display:flex;
+  justify-content:space-between;
   gap:22px;
   font-size:7px;
   line-height:1.6;
@@ -983,17 +1034,20 @@ function installMainMenuRedesign(){
   color:#68655a;
   text-shadow:0 2px 8px #000;
 }
-.menuFooter span:last-child{text-align:left}
-@media(max-width:900px){
-  .menuNav{width:min(320px,45vw)}
-  .menuSlotBar{width:min(380px,58vw)}
-  .menuRightPanel{width:min(380px,58vw);left:20px}
+.menuFooter span:last-child{text-align:right}
+@media(max-width:1000px){
+  .menuNav{width:min(330px,38vw)}
+  .menuSlotBar{width:min(510px,52vw)}
+  .menuRightPanel{right:20px;width:min(330px,32vw)}
 }
-@media(max-width:650px){
-  .menuNav{top:145px;width:min(320px,82vw)}
-  .menuSlotBar{top:auto;bottom:92px;left:20px;width:calc(100vw - 40px)}
+@media(max-width:750px){
+  .menuLogoMain span{font-size:24px}
+  .menuLogoMain strong{font-size:32px}
+  .menuNav{top:172px;left:20px;width:min(320px,82vw)}
+  .menuSlotBar{left:20px;bottom:64px;width:calc(100vw - 40px)}
+  .menuHomeRedesign #saveSlots{grid-template-columns:1fr}
   .menuRightPanel{display:none}
-  .menuFooter{left:20px;right:20px;bottom:20px;justify-content:space-between}
+  .menuFooter{left:20px;right:20px;bottom:17px}
   .menuFooter span:last-child{display:none}
   .menuLogo{left:20px;top:22px}
 }
@@ -1023,8 +1077,8 @@ function installMainMenuRedesign(){
   const logo=document.createElement("div");
   logo.className="menuLogo";
   logo.innerHTML=`
-    <div class="menuLogoMain">BACKROOMS: LOST SIGNAL</div>
-    <div class="menuLogoSub">LIMINAL EXPLORATION // DS-01</div>
+    <div class="menuLogoMain"><span>BACKROOMS</span><strong>LOST SIGNAL</strong></div>
+    <div class="menuLogoSub">LIMINAL HORROR // SIGNAL NODE 01</div>
   `;
 
   const nav=document.createElement("nav");
@@ -1067,9 +1121,10 @@ function installMainMenuRedesign(){
   right.className="menuRightPanel";
   right.innerHTML=`
     <div class="menuRightHeader"><span>FIELD TERMINAL</span><span>BUILD ${new Date().getFullYear()}</span></div>
+    <div class="menuSignalState"><span class="menuSignalDot"></span><span>SIGNAL: LOST</span></div>
     <p class="menuRightLead">The apartment is only the entrance. Something is waiting in the halls beyond it.</p>
     <div class="menuRightRule"></div>
-    <div style="font-size:8px;letter-spacing:2px;color:#b5ae96;margin-bottom:8px">PLAYER</div>
+    <div class="menuRightSectionLabel">SYSTEM STATUS</div>
   `;
   if(houseLoader){
     const loaderLabel=document.createElement("div");
