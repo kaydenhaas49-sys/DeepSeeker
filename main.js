@@ -6,6 +6,7 @@ import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { flashlightFlicker } from "./character.js";
 
@@ -296,113 +297,127 @@ function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotation
   return mesh;
 }
 
-// Main room: large, open, and clearly Backrooms rather than a corridor.
-addMenuBox("Floor",new THREE.Vector3(58,.20,76),new THREE.Vector3(0,-.10,-20),menuFloorMaterial);
-addMenuBox("Ceiling",new THREE.Vector3(58,.20,76),new THREE.Vector3(0,9.25,-20),menuCeilingMaterial);
-addMenuBox("LeftWall",new THREE.Vector3(.25,9.25,76),new THREE.Vector3(-29,4.62,-20),menuWallMaterial);
-addMenuBox("RightWall",new THREE.Vector3(.25,9.25,76),new THREE.Vector3(29,4.62,-20),menuWallMaterial);
-addMenuBox("FarWall",new THREE.Vector3(58,9.25,.25),new THREE.Vector3(0,4.62,-58),menuWallMaterial);
+// Main room: a wide ruined Level-0-style expanse with a strong right-side focal point.
+// The left side stays visually quiet for the menu UI while the room opens up toward the spider.
+addMenuBox("Floor",new THREE.Vector3(66,.20,84),new THREE.Vector3(0,-.10,-18),menuFloorMaterial);
+addMenuBox("Ceiling",new THREE.Vector3(66,.20,84),new THREE.Vector3(0,9.25,-18),menuCeilingMaterial);
+addMenuBox("LeftWall",new THREE.Vector3(.25,9.25,84),new THREE.Vector3(-33,4.62,-18),menuWallMaterial);
+addMenuBox("RightWall",new THREE.Vector3(.25,9.25,84),new THREE.Vector3(33,4.62,-18),menuWallMaterial);
+addMenuBox("FarWall",new THREE.Vector3(66,9.25,.25),new THREE.Vector3(0,4.62,-60),menuWallMaterial);
 
-// Distant partial walls create the repeating liminal geometry.
-for(const [x,z,w,d,h] of [
-  [-18,-4,14,.30,6.8],
-  [15,-6,9,.30,6.4],
-  [-8,-20,.30,16,7.0],
-  [10,-24,.30,13,6.7],
-  [-16,-39,13,.30,6.4],
-  [9,-42,.30,14,6.2]
+// Broken partitions make the room feel like a once-open floorplan that has collapsed.
+for(const [x,z,w,d,h,rot] of [
+  [-19,-4,15,.35,6.9,-.02],
+  [-6,-11,6.5,.35,7.3,.00],
+  [17,-7,11,.35,6.2,.02],
+  [8,-22,.35,15,6.8,-.03],
+  [-15,-28,10,.35,6.4,.03],
+  [15,-35,7,.35,5.6,-.02],
+  [-5,-43,.35,16,6.2,.04]
 ]){
-  addMenuBox("RoomDivider",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuWallMaterial);
+  addMenuBox("RuinedPartition",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuWallMaterial,rot);
 }
 
-// A monumental broken opening straight ahead.
-addMenuBox("OpeningLeft",new THREE.Vector3(3.4,6.8,.35),new THREE.Vector3(-6,3.4,-56.9),menuRuinMaterial);
-addMenuBox("OpeningRight",new THREE.Vector3(3.4,6.8,.35),new THREE.Vector3(6,3.4,-56.9),menuRuinMaterial);
-addMenuBox("OpeningTop",new THREE.Vector3(16,1.9,.35),new THREE.Vector3(0,7.65,-56.9),menuRuinMaterial);
-addMenuBox("OpeningVoid",new THREE.Vector3(8.4,5.8,.08),new THREE.Vector3(0,2.9,-56.7),menuDarkMaterial);
+// A collapsed central section leaves a dark break in the ceiling and wall line.
+addMenuBox("CollapseLeft",new THREE.Vector3(8.6,.42,1.2),new THREE.Vector3(-4.8,7.45,-12.5),menuRuinMaterial,-.18,.15,.08);
+addMenuBox("CollapseRight",new THREE.Vector3(7.2,.42,1.2),new THREE.Vector3(6.2,7.05,-13.8),menuRuinMaterial,.24,-.12,-.06);
+addMenuBox("BrokenHeader",new THREE.Vector3(15,.8,.55),new THREE.Vector3(0,6.65,-49.5),menuRuinMaterial,-.04,.05,.02);
 
-// Large ceiling voids expose the dark structure above.
-for(const [x,z,w,d,rx] of [
-  [-14,-2,5.8,3.0,.05],
-  [4,-10,4.4,2.8,-.04],
-  [13,-29,5.6,3.1,.06],
-  [-8,-38,4.8,2.7,-.07],
-  [12,-49,5.0,2.9,.04]
+// Deep black openings: one huge break at the far end and one closer side void.
+// The spider is staged in the brighter edge of the right-side void.
+addMenuBox("FarOpeningLeft",new THREE.Vector3(3.6,6.9,.35),new THREE.Vector3(-6.8,3.45,-59.2),menuRuinMaterial);
+addMenuBox("FarOpeningRight",new THREE.Vector3(3.6,6.9,.35),new THREE.Vector3(7.0,3.45,-59.2),menuRuinMaterial);
+addMenuBox("FarOpeningTop",new THREE.Vector3(17.4,1.5,.35),new THREE.Vector3(.1,7.85,-59.2),menuRuinMaterial);
+addMenuBox("FarOpeningVoid",new THREE.Vector3(9.8,6.0,.08),new THREE.Vector3(.1,2.95,-59.0),menuDarkMaterial);
+
+addMenuBox("RightVoidColumn",new THREE.Vector3(2.6,7.2,.55),new THREE.Vector3(24.5,3.6,-18.5),menuRuinMaterial,-.02);
+addMenuBox("RightVoidTop",new THREE.Vector3(11.5,1.5,.55),new THREE.Vector3(27.5,7.1,-18.5),menuRuinMaterial,-.02);
+addMenuBox("RightVoid",new THREE.Vector3(8.0,5.6,.08),new THREE.Vector3(27.5,2.9,-18.3),menuDarkMaterial);
+
+// Ceiling gaps reveal the black space above instead of a perfectly intact grid.
+for(const [x,z,w,d,rx,rz] of [
+  [-14,-3,6.4,3.0,.04,.02],
+  [5,-14,5.4,3.3,-.08,.05],
+  [18,-27,6.2,3.1,.07,-.04],
+  [-10,-33,5.0,2.8,.10,.03],
+  [9,-47,6.6,3.2,-.05,-.06]
 ]){
-  addMenuBox("CeilingVoid",new THREE.Vector3(w,.12,d),new THREE.Vector3(x,9.10,z),menuDarkMaterial,0,rx,.03);
+  addMenuBox("CeilingVoid",new THREE.Vector3(w,.12,d),new THREE.Vector3(x,9.08,z),menuDarkMaterial,0,rx,rz);
 }
 
-// Ceiling grid beams.
-for(let x=-24;x<=24;x+=6){
-  addMenuBox("CeilingGridX",new THREE.Vector3(.10,.12,74),new THREE.Vector3(x,9.11,-20),menuTrimMaterial);
+// Remaining ceiling frame + some pieces hanging at unsafe angles.
+for(let x=-27;x<=27;x+=6){
+  addMenuBox("CeilingGridX",new THREE.Vector3(.10,.12,81),new THREE.Vector3(x,9.11,-18),menuTrimMaterial);
 }
-for(let z=-55;z<=15;z+=6){
-  addMenuBox("CeilingGridZ",new THREE.Vector3(56,.12,.10),new THREE.Vector3(0,9.11,z),menuTrimMaterial);
+for(let z=-57;z<=21;z+=6){
+  addMenuBox("CeilingGridZ",new THREE.Vector3(64,.12,.10),new THREE.Vector3(0,9.11,z),menuTrimMaterial);
 }
 
-// Collapsed beams and tiles.
-for(const [x,z,len,rot,y] of [
-  [-12,-4,6.5,.18,8.05],
-  [8,-16,5.2,-.14,8.15],
-  [-6,-28,7.4,.12,7.70],
-  [14,-44,6.0,-.17,7.90]
+for(const [x,z,len,rot,y,rz] of [
+  [-16,-8,7.2,.18,8.00,.03],
+  [7,-17,5.6,-.22,7.78,-.06],
+  [-4,-24,8.1,.13,7.45,.05],
+  [18,-34,6.8,.26,7.92,-.04],
+  [-13,-48,7.4,-.16,7.55,.06]
 ]){
-  addMenuBox("FallenBeam",new THREE.Vector3(len,.28,.34),new THREE.Vector3(x,y,z),menuRuinMaterial,rot,.10,.02);
+  addMenuBox("FallenBeam",new THREE.Vector3(len,.30,.38),new THREE.Vector3(x,y,z),menuRuinMaterial,rot,.10,rz);
 }
 
 for(const [x,z,w,d,rx,rz] of [
-  [-18,-7,3.5,2.2,.09,.06],
-  [16,-23,4.2,2.4,-.10,-.04],
-  [-12,-42,4.5,2.6,.12,.06],
-  [10,-53,3.7,2.2,-.08,-.05]
+  [-20,-9,3.7,2.2,.11,.06],
+  [12,-25,4.6,2.5,-.09,-.05],
+  [-7,-37,4.4,2.6,.13,.07],
+  [15,-51,4.2,2.4,-.10,-.06]
 ]){
-  addMenuBox("FallenCeilingTile",new THREE.Vector3(w,.13,d),new THREE.Vector3(x,7.88,z),menuRuinMaterial,0,rx,rz);
+  addMenuBox("FallenCeilingTile",new THREE.Vector3(w,.14,d),new THREE.Vector3(x,7.78,z),menuRuinMaterial,0,rx,rz);
 }
 
-// Wall water damage: thicker strips and large dark patches.
+// Water damage, darkened wallpaper, and stripped sections.
 for(const [x,z,w,h,ry] of [
-  [-28,-7,.20,4.7,.01],
-  [-28,-29,.15,3.0,-.02],
-  [28,-17,.18,4.4,.01],
-  [28,-42,.14,3.5,-.02]
+  [-32,-6,.22,5.2,.01],
+  [-32,-28,.16,3.4,-.03],
+  [-32,-49,.18,4.1,.04],
+  [32,-12,.18,4.5,-.02],
+  [32,-39,.16,3.2,.02]
 ]){
-  addMenuBox("WaterStreak",new THREE.Vector3(w,h,.035),new THREE.Vector3(x,3.0,z),menuStainMaterial,ry);
+  addMenuBox("WaterStreak",new THREE.Vector3(w,h,.04),new THREE.Vector3(x,3.1,z),menuStainMaterial,ry);
+}
+for(const [x,z,w,h,rx,rz] of [
+  [-32,-16,1.2,2.9,.02,.05],
+  [32,-25,1.4,3.0,-.02,-.08],
+  [-32,-55,1.0,2.3,.05,.10],
+  [32,-50,1.1,2.2,-.04,-.06]
+]){
+  addMenuBox("PeelingWallpaper",new THREE.Vector3(w,h,.05),new THREE.Vector3(x,4.05,z),menuRuinMaterial,0,rx,rz);
 }
 
-for(const [x,z,w,h,rx] of [
-  [-28,-15,1.0,2.7,.02],
-  [28,-30,1.2,3.2,-.02],
-  [-28,-51,.9,2.1,.04]
-]){
-  addMenuBox("PeelingWallpaper",new THREE.Vector3(w,h,.05),new THREE.Vector3(x,4.15,z),menuRuinMaterial,0,rx,.10);
-}
-
-// Wet carpet and a few glossy puddles.
+// Damp carpet and reflective puddles pull the eye toward the darker end of the room.
 for(const [x,z,w,d,ry] of [
-  [-8,-3,4.6,1.5,.20],
-  [11,-10,4.2,1.5,-.18],
-  [-12,-22,3.7,1.2,.38],
-  [5,-31,5.0,1.6,-.24],
-  [15,-45,3.7,1.2,.28]
+  [-10,-4,5.6,1.6,.18],
+  [16,-10,4.8,1.5,-.20],
+  [-15,-19,4.2,1.3,.30],
+  [4,-30,5.8,1.7,-.18],
+  [18,-43,4.2,1.4,.28],
+  [-4,-53,6.0,1.5,-.16]
 ]){
   addMenuBox("DampCarpet",new THREE.Vector3(w,.028,d),new THREE.Vector3(x,.016,z),menuStainMaterial,ry);
   addMenuBox("Puddle",new THREE.Vector3(w*.58,.012,d*.50),new THREE.Vector3(x,.035,z),menuWetMaterial,ry);
 }
 
-// Sparse debris, mostly visible on the right side of the menu.
+// Small debris stays mostly off the UI side and makes the floor feel disturbed.
 for(const [x,z,sx,sy,sz,ry,rx] of [
-  [10,1,1.3,.18,.45,.35,.12],
-  [20,-7,.9,.15,.35,-.50,.08],
-  [6,-17,1.2,.17,.32,.18,.07],
-  [20,-29,1.5,.18,.36,-.28,.08],
-  [-3,-34,.8,.13,.28,.55,.12],
-  [11,-40,1.1,.16,.33,-.42,.10],
-  [-18,-50,1.0,.15,.30,.24,.08]
+  [9,2,1.4,.18,.45,.35,.12],
+  [20,-4,1.0,.16,.36,-.50,.08],
+  [9,-14,1.2,.17,.34,.18,.07],
+  [22,-27,1.5,.18,.38,-.28,.08],
+  [2,-36,.85,.13,.30,.55,.12],
+  [20,-41,1.1,.16,.34,-.42,.10],
+  [-17,-52,1.0,.15,.30,.24,.08]
 ]){
   addMenuBox("Debris",new THREE.Vector3(sx,sy,sz),new THREE.Vector3(x,sy*.5+.02,z),menuRuinMaterial,ry,rx,.04);
 }
 
-// Exposed cables hanging from the damaged ceiling.
+// Exposed cables hang at different depths, framing the spider without hiding it.
 function addHangingCable(x,z,length,sway){
   const curve=new THREE.CatmullRomCurve3([
     new THREE.Vector3(x,9.05,z),
@@ -414,27 +429,28 @@ function addHangingCable(x,z,length,sway){
   const mesh=new THREE.Mesh(geometry,menuRuinMaterial);
   menuSet.add(mesh);
 }
-addHangingCable(-12,-1,3.1,-.9);
-addHangingCable(9,-13,3.6,.8);
-addHangingCable(-7,-29,2.8,-.7);
-addHangingCable(14,-47,3.4,.9);
+addHangingCable(-11,-3,3.4,-.9);
+addHangingCable(4,-12,3.0,.7);
+addHangingCable(20,-19,4.2,-.75);
+addHangingCable(-8,-31,2.7,-.65);
+addHangingCable(16,-48,3.8,.85);
 
-// Fluorescent fixtures with uneven intensity.
+// Fluorescents are intentionally uneven; the brightest surviving fixture sits near the spider.
 const menuLightData=[
-  [-10,2,8,.2],
-  [6,-4,14,1.0],
-  [-2,-14,6,1.8],
-  [14,-22,10,2.7],
-  [-11,-30,12,3.5],
-  [5,-38,7,4.1],
-  [-15,-51,6,4.8],
-  [12,-54,4,5.6]
+  [-10,3,7,.2],
+  [7,-2,13,.9],
+  [-4,-12,6,1.7],
+  [16,-20,14,2.5],
+  [-13,-28,10,3.4],
+  [4,-37,8,4.0],
+  [-17,-48,5,4.9],
+  [16,-52,4,5.7]
 ];
 
 for(const [x,z,power,phase] of menuLightData){
   const fixture=addMenuBox(
     "Fluorescent",
-    new THREE.Vector3(3.2,.10,.90),
+    new THREE.Vector3(3.4,.10,.90),
     new THREE.Vector3(x,9.02,z),
     menuLightMaterial
   );
@@ -448,19 +464,45 @@ for(const [x,z,power,phase] of menuLightData){
   menuSet.add(point);
 }
 
-const menuAmbient=new THREE.HemisphereLight(0xd0c28b,0x11120f,.62);
+// Spider hero staging. This is populated from the same GLB used in gameplay.
+const menuSpiderEntity=new THREE.Group();
+menuSpiderEntity.name="MenuSpider";
+menuSpiderEntity.visible=false;
+menuSpiderEntity.position.set(8.7,0.08,-18.8);
+menuSpiderEntity.rotation.y=.12;
+
+const menuSpiderGround=new THREE.Mesh(
+  new THREE.CircleGeometry(1.55,48),
+  menuWetMaterial
+);
+menuSpiderGround.rotation.x=-Math.PI/2;
+menuSpiderGround.scale.set(1.25,.55,1);
+menuSpiderGround.position.set(8.7,.028,-18.8);
+menuSpiderGround.name="MenuSpiderShadow";
+menuSet.add(menuSpiderGround);
+
+const menuSpiderLight=new THREE.PointLight(0xff6330,.90,8.5,2);
+menuSpiderLight.position.set(8.7,1.45,-19.1);
+menuSet.add(menuSpiderLight);
+menuSet.add(menuSpiderEntity);
+
+let menuSpiderModel=null;
+let menuSpiderMixer=null;
+let menuSpiderAction=null;
+
+const menuAmbient=new THREE.HemisphereLight(0xd0c28b,0x11120f,.58);
 menuSet.add(menuAmbient);
 
-const menuFill=new THREE.PointLight(0xd0b86d,3.3,38,2);
+const menuFill=new THREE.PointLight(0xd0b86d,2.8,38,2);
 menuFill.position.set(10,4,-6);
 menuSet.add(menuFill);
 
-const menuFarLight=new THREE.PointLight(0xc5a85e,2.0,32,2);
-menuFarLight.position.set(0,3,-47);
+const menuFarLight=new THREE.PointLight(0xc5a85e,1.8,32,2);
+menuFarLight.position.set(-1,3,-47);
 menuSet.add(menuFarLight);
 
-const menuCameraStart=new THREE.Vector3(11.5,2.18,10.8);
-const menuCameraTarget=new THREE.Vector3(2.0,2.65,-25.0);
+const menuCameraStart=new THREE.Vector3(12.9,2.25,10.2);
+const menuCameraTarget=new THREE.Vector3(1.4,2.70,-26.8);
 menuCamera.fov=68;
 menuCamera.updateProjectionMatrix();
 
@@ -503,6 +545,13 @@ function updateMenuScene(t,dt){
     menuCameraTarget.y,
     menuCameraTarget.z
   );
+
+  if(menuSpiderMixer && menuSpiderEntity.visible){
+    menuSpiderMixer.update(dt);
+    menuSpiderEntity.position.y=.08+Math.sin(t*.72)*.012;
+    menuSpiderEntity.rotation.y=.12+Math.sin(t*.23)*.045;
+    menuSpiderLight.intensity=.82+Math.sin(t*1.15)*.10;
+  }
 
   menuSet.traverse(node=>{
     if(node.userData?.basePower===undefined) return;
@@ -3528,6 +3577,31 @@ async function loadSpiderFromPack(){
       spiderAnimationState="";
 
       const sourceClip=gltf.animations?.[0] || null;
+
+      if(!menuSpiderModel){
+        menuSpiderModel=SkeletonUtils.clone(model);
+        menuSpiderModel.name="MenuSpiderVisual";
+        menuSpiderModel.scale.multiplyScalar(.96);
+        menuSpiderEntity.add(menuSpiderModel);
+
+        if(sourceClip){
+          const sourceFPS=329/Math.max(sourceClip.duration,.001);
+          menuSpiderMixer=new THREE.AnimationMixer(menuSpiderModel);
+          const menuClip=THREE.AnimationUtils.subclip(
+            sourceClip,
+            "menu_spider_stalk",
+            SPIDER_ANIMATION_RANGES.idle2[0],
+            SPIDER_ANIMATION_RANGES.idle2[1]+1,
+            sourceFPS
+          );
+          menuSpiderAction=menuSpiderMixer.clipAction(menuClip);
+          menuSpiderAction.setLoop(THREE.LoopRepeat,Infinity);
+          menuSpiderAction.play();
+        }
+
+        menuSpiderEntity.visible=true;
+      }
+
       if(sourceClip){
         const sourceFPS=329/Math.max(sourceClip.duration,.001);
         spiderMixer=new THREE.AnimationMixer(model);
@@ -3596,6 +3670,9 @@ function ensureSpiderLoading(){
   spiderLoadStarted=true;
   loadSpiderFromPack();
 }
+
+// Load the shared spider during the title screen so it can appear in the menu.
+if(!gameStarted) ensureSpiderLoading();
 
 player.onStep=({intensity})=>audio.step(intensity);
 
