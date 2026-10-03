@@ -99,81 +99,283 @@ scene.add(playerLight);
 // Dedicated title-screen camera and lighting. The actual procedural Backrooms
 // remains visible behind the menu, so the title screen uses real geometry,
 // textures, fog and depth instead of a flat CSS illustration.
-const menuCamera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.08,180);
-const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x1d2117,0.54);
-const menuKeyLight=new THREE.PointLight(0xffe7a5,38,38,1.75);
-const menuFillLight=new THREE.PointLight(0xcbd6b4,10,30,1.9);
+const menuCamera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.05,160);
 
-const MENU_WORLD_X=32;
-const MENU_WORLD_Z=30;
+function makeMenuTexture(kind){
+  const canvas=document.createElement("canvas");
+  canvas.width=512;
+  canvas.height=512;
+  const ctx=canvas.getContext("2d");
 
-// Lightweight floating dust used only on the title screen. It gives the
-// distant fluorescent light a little depth without adding another asset.
-const menuDustCount=420;
-const menuDustPositions=new Float32Array(menuDustCount*3);
-for(let i=0;i<menuDustCount;i++){
-  menuDustPositions[i*3+0]=MENU_WORLD_X+(Math.random()-.5)*34;
-  menuDustPositions[i*3+1]=1.2+Math.random()*7.2;
-  menuDustPositions[i*3+2]=MENU_WORLD_Z-18+Math.random()*38;
+  if(kind==="wall"){
+    ctx.fillStyle="#a39d6b";
+    ctx.fillRect(0,0,512,512);
+
+    // Old vinyl/paper wallpaper with a very subtle repeating pattern.
+    for(let x=0;x<512;x+=42){
+      ctx.fillStyle="rgba(65,62,40,.10)";
+      ctx.fillRect(x,0,2,512);
+      ctx.fillStyle="rgba(232,225,180,.10)";
+      ctx.fillRect(x+3,0,1,512);
+    }
+    for(let y=0;y<512;y+=58){
+      ctx.fillStyle="rgba(56,53,35,.06)";
+      ctx.fillRect(0,y,512,2);
+    }
+
+    for(let i=0;i<1500;i++){
+      const x=Math.random()*512;
+      const y=Math.random()*512;
+      const tone=Math.random()>.5?"rgba(55,52,34,.10)":"rgba(237,229,182,.08)";
+      ctx.fillStyle=tone;
+      ctx.fillRect(x,y,1+Math.random()*2,1+Math.random()*2);
+    }
+  }else if(kind==="carpet"){
+    ctx.fillStyle="#4d4935";
+    ctx.fillRect(0,0,512,512);
+
+    for(let i=0;i<26000;i++){
+      const x=Math.random()*512;
+      const y=Math.random()*512;
+      const r=Math.random();
+      ctx.fillStyle=r>.52
+        ?"rgba(119,111,77,.13)"
+        :"rgba(20,21,17,.16)";
+      ctx.fillRect(x,y,1,1);
+    }
+
+    for(let y=0;y<512;y+=8){
+      ctx.fillStyle="rgba(180,169,118,.025)";
+      ctx.fillRect(0,y,512,1);
+    }
+  }else{
+    ctx.fillStyle="#777560";
+    ctx.fillRect(0,0,512,512);
+    for(let y=0;y<512;y+=64){
+      for(let x=0;x<512;x+=64){
+        ctx.strokeStyle="rgba(35,35,30,.28)";
+        ctx.lineWidth=3;
+        ctx.strokeRect(x+1,y+1,62,62);
+        ctx.fillStyle="rgba(212,205,169,.035)";
+        ctx.fillRect(x+4,y+4,56,56);
+      }
+    }
+    for(let i=0;i<900;i++){
+      ctx.fillStyle="rgba(30,30,25,.07)";
+      ctx.fillRect(Math.random()*512,Math.random()*512,1,1);
+    }
+  }
+
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.wrapS=THREE.RepeatWrapping;
+  texture.wrapT=THREE.RepeatWrapping;
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),4);
+  return texture;
 }
-const menuDustGeometry=new THREE.BufferGeometry();
-menuDustGeometry.setAttribute(
-  "position",
-  new THREE.BufferAttribute(menuDustPositions,3)
-);
-const menuDustMaterial=new THREE.PointsMaterial({
-  color:0xd8d1b1,
-  size:.035,
-  transparent:true,
-  opacity:.24,
-  depthWrite:false,
-  sizeAttenuation:true
-});
-const menuDust=new THREE.Points(menuDustGeometry,menuDustMaterial);
-menuDust.frustumCulled=false;
-menuDust.visible=false;
 
-scene.add(menuAmbient,menuKeyLight,menuFillLight,menuDust);
-const MENU_CAMERA_HEIGHT=2.28;
-const MENU_LOOK_HEIGHT=2.65;
+const menuWallTexture=makeMenuTexture("wall");
+menuWallTexture.repeat.set(3.2,2.2);
+
+const menuFloorTexture=makeMenuTexture("carpet");
+menuFloorTexture.repeat.set(7,7);
+
+const menuCeilingTexture=makeMenuTexture("ceiling");
+menuCeilingTexture.repeat.set(6,6);
+
+const menuSet=new THREE.Group();
+menuSet.name="LostSignalMenuSet";
+menuSet.visible=false;
+scene.add(menuSet);
+
+const menuWallMaterial=new THREE.MeshStandardMaterial({
+  map:menuWallTexture,
+  color:0xb0a86f,
+  roughness:0.94,
+  metalness:0
+});
+
+const menuFloorMaterial=new THREE.MeshStandardMaterial({
+  map:menuFloorTexture,
+  color:0x5b5640,
+  roughness:1,
+  metalness:0
+});
+
+const menuCeilingMaterial=new THREE.MeshStandardMaterial({
+  map:menuCeilingTexture,
+  color:0x85836d,
+  roughness:0.96,
+  metalness:0
+});
+
+const menuTrimMaterial=new THREE.MeshStandardMaterial({
+  color:0x6c6748,
+  roughness:.9
+});
+
+const menuDarkMaterial=new THREE.MeshStandardMaterial({
+  color:0x25261d,
+  roughness:1
+});
+
+const menuLightMaterial=new THREE.MeshStandardMaterial({
+  color:0xfff4c9,
+  emissive:0xffe7a2,
+  emissiveIntensity:1.8,
+  roughness:.35
+});
+
+function addMenuBox(name,size,position,material,rotationY=0){
+  const mesh=new THREE.Mesh(
+    new THREE.BoxGeometry(size.x,size.y,size.z),
+    material
+  );
+  mesh.name=name;
+  mesh.position.copy(position);
+  mesh.rotation.y=rotationY;
+  mesh.castShadow=false;
+  mesh.receiveShadow=true;
+  menuSet.add(mesh);
+  return mesh;
+}
+
+// Large open room. The important part is that the player sees several
+// overlapping spaces rather than one perfect corridor.
+addMenuBox(
+  "MenuFloor",
+  new THREE.Vector3(48,.18,62),
+  new THREE.Vector3(0,-.09,-10),
+  menuFloorMaterial
+);
+
+addMenuBox(
+  "MenuCeiling",
+  new THREE.Vector3(48,.18,62),
+  new THREE.Vector3(0,8.1,-10),
+  menuCeilingMaterial
+);
+
+addMenuBox(
+  "MenuLeftWall",
+  new THREE.Vector3(.18,8.1,62),
+  new THREE.Vector3(-24,4.05,-10),
+  menuWallMaterial
+);
+
+addMenuBox(
+  "MenuRightWall",
+  new THREE.Vector3(.18,8.1,62),
+  new THREE.Vector3(24,4.05,-10),
+  menuWallMaterial
+);
+
+addMenuBox(
+  "MenuBackWall",
+  new THREE.Vector3(48,8.1,.18),
+  new THREE.Vector3(0,4.05,-41),
+  menuWallMaterial
+);
+
+// Low trim around the room.
+addMenuBox(
+  "MenuLeftTrim",
+  new THREE.Vector3(.22,.18,62),
+  new THREE.Vector3(-23.84,.38,-10),
+  menuTrimMaterial
+);
+addMenuBox(
+  "MenuRightTrim",
+  new THREE.Vector3(.22,.18,62),
+  new THREE.Vector3(23.84,.38,-10),
+  menuTrimMaterial
+);
+
+// Partial walls / pillars. Their irregular placement is what stops the set
+// from looking like a generated hallway straight out of a tunnel.
+const partials=[
+  [-12,-5,7.2,4.8,2.2],
+  [10,-10,5.4,4.5,-1.4],
+  [-7,-18,3.8,5.7,.8],
+  [12,-24,6.6,4.2,-.5],
+  [-1.5,-30,5.0,4.0,.2]
+];
+
+for(let i=0;i<partials.length;i++){
+  const [x,z,w,d,yaw]=partials[i];
+  addMenuBox(
+    "MenuPartialWall"+i,
+    new THREE.Vector3(w,6.6,d),
+    new THREE.Vector3(x,3.3,z),
+    menuWallMaterial,
+    yaw
+  );
+}
+
+// A couple of narrow vertical pillars provide the classic broken-up Level 0
+// rhythm without putting anything directly in the menu's text area.
+for(const [x,z] of [[-17,-16],[17,-6],[-14,-32],[15,-34]]){
+  addMenuBox(
+    "MenuPillar",
+    new THREE.Vector3(1.4,8.0,1.4),
+    new THREE.Vector3(x,4,z),
+    menuWallMaterial
+  );
+}
+
+// Dark ceiling gaps above a few lights.
+for(const [x,z] of [[-10,1],[3,-7],[14,-18],[-9,-27],[7,-34],[-17,-1]]){
+  addMenuBox(
+    "MenuCeilingGap",
+    new THREE.Vector3(3.2,.08,1.45),
+    new THREE.Vector3(x,8.0,z),
+    menuDarkMaterial
+  );
+}
+
+const menuLights=[
+  {x:-10,z:1,power:11},
+  {x:3,z:-7,power:13},
+  {x:14,z:-18,power:9},
+  {x:-9,z:-27,power:12},
+  {x:7,z:-34,power:10},
+  {x:-17,z:-1,power:7},
+  {x:18,z:-31,power:5}
+];
+
+for(let i=0;i<menuLights.length;i++){
+  const light=menuLights[i];
+
+  addMenuBox(
+    "MenuFluorescent",
+    new THREE.Vector3(2.9,.08,1.2),
+    new THREE.Vector3(light.x,7.96,light.z),
+    menuLightMaterial
+  );
+
+  const point=new THREE.PointLight(0xffe7ae,light.power,13,1.8);
+  point.position.set(light.x,7.45,light.z);
+  point.userData.basePower=light.power;
+  point.userData.phase=i*.91;
+  menuSet.add(point);
+}
+
+const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x28281d,.75);
+const menuFill=new THREE.PointLight(0xd4c694,5.5,24,2);
+menuFill.position.set(-4,4,-4);
+menuSet.add(menuAmbient,menuFill);
+
+const menuCameraStart=new THREE.Vector3(0,2.05,10.8);
+const menuCameraTarget=new THREE.Vector3(-1.2,2.45,-15.5);
+
 let menuSceneReady=false;
 let menuBackdropWasActive=false;
-const menuSpiderBase=new THREE.Vector3(40,0.08,18);
-let menuSpiderPhase=0;
-
-function updateMenuSpider(t,dt){
-  if(gameStarted || !spiderLoaded || !spiderEntity) return;
-
-  menuSpiderPhase=t*.22;
-  const x=menuSpiderBase.x+Math.sin(menuSpiderPhase)*2.1;
-  const z=menuSpiderBase.z+Math.cos(menuSpiderPhase*.78)*1.15;
-
-  spiderEntity.visible=true;
-  spiderEntity.position.set(x,SPIDER_GROUND_OFFSET,z);
-
-  // Keep it watching the camera while it slowly patrols the distant room.
-  const dx=menuCamera.position.x-x;
-  const dz=menuCamera.position.z-z;
-  spiderEntity.rotation.y=Math.atan2(dx,dz);
-
-  spiderEntity.scale.setScalar(1.08+Math.sin(t*.45)*.025);
-  spiderRevealLight.intensity=4.2+Math.sin(t*1.4)*.7;
-  spiderRevealLight.distance=15;
-
-  setSpiderAnimation("walk");
-  if(spiderMixer) spiderMixer.update(dt);
-}
 
 function updateMenuScene(t,dt){
   if(gameStarted || !homeScreen || homeScreen.classList.contains("hidden")){
     if(menuBackdropWasActive){
       menuBackdropWasActive=false;
-      menuAmbient.intensity=0;
-      menuKeyLight.intensity=0;
-      menuFillLight.intensity=0;
-      menuDust.visible=false;
-      spiderRevealLight.intensity=0;
-      scene.background.set(0x000100);
+      menuSet.visible=false;
       scene.fog.color.set(0x030302);
       scene.fog.near=14;
       scene.fog.far=62;
@@ -183,18 +385,44 @@ function updateMenuScene(t,dt){
 
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
-    menuAmbient.intensity=0;
-    menuKeyLight.intensity=0;
-    menuFillLight.intensity=0;
-    menuDust.visible=false;
-    spiderRevealLight.intensity=0;
+    menuSet.visible=true;
+
+    // Keep the gameplay world and apartment out of the menu render.
+    world.root.visible=false;
+    if(typeof houseRoot!=="undefined") houseRoot.visible=false;
+
+    scene.background.set(0x17170f);
+    scene.fog.color.set(0x27271d);
+    scene.fog.near=11;
+    scene.fog.far=48;
   }
 
-  // The title screen now has its own CSS/HTML liminal environment. Do not
-  // stream procedural chunks or animate the gameplay spider just for the menu.
-  // This keeps startup lighter and makes the menu independent of game assets.
+  const sway=Math.sin(t*.105)*.16+Math.sin(t*.043)*.08;
+  const zDrift=Math.sin(t*.075+1.2)*.26;
+  const yDrift=Math.sin(t*.17)*.018;
+
+  menuCamera.position.set(
+    menuCameraStart.x+sway,
+    menuCameraStart.y+yDrift,
+    menuCameraStart.z+zDrift
+  );
+
+  menuCamera.lookAt(
+    menuCameraTarget.x+Math.sin(t*.09)*.35,
+    menuCameraTarget.y,
+    menuCameraTarget.z
+  );
+
+  for(const child of menuSet.children){
+    if(!child.isPointLight) continue;
+    const base=child.userData.basePower||0;
+    const phase=child.userData.phase||0;
+    const flicker=.96+Math.sin(t*3.2+phase)*.02+Math.sin(t*11.5+phase)*.025;
+    child.intensity=base*flicker;
+  }
+
   menuSceneReady=true;
-  return false;
+  return true;
 }
 
 const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
@@ -659,70 +887,24 @@ function installMainMenuRedesign(){
 #menuBackdrop{
   position:absolute;
   inset:0;
-  overflow:hidden;
   pointer-events:none;
   z-index:0;
-  background:
-    linear-gradient(90deg,rgba(0,0,0,.74) 0%,rgba(0,0,0,.48) 22%,rgba(0,0,0,.08) 51%,rgba(0,0,0,.20) 100%),
-    linear-gradient(180deg,rgba(0,0,0,.20),transparent 35%,rgba(0,0,0,.46) 100%),
-    url("./assets/menu-backrooms.svg") center center / cover no-repeat;
-  background-color:#17170f;
+  background:transparent;
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 58% 48%,transparent 0 23%,rgba(0,0,0,.14) 58%,rgba(0,0,0,.48) 100%),
-    linear-gradient(90deg,transparent 50%,rgba(210,194,140,.025) 72%,transparent 90%);
+    linear-gradient(90deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.30) 22%,transparent 52%,rgba(0,0,0,.16) 100%),
+    linear-gradient(180deg,rgba(0,0,0,.16),transparent 38%,rgba(0,0,0,.40) 100%);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
-  background:repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.006) 7px,transparent 8px);
-  opacity:.34;
-}
-.menuCorridor{display:none}
-.menuBackGlow,
-.menuBackdropHaze,
-.menuBackdropScan,
-.menuSignalNoise{
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-}
-.menuBackGlow{
-  background:radial-gradient(circle at 70% 34%,rgba(242,229,185,.07),transparent 24%);
-  filter:blur(18px);
-  animation:menuGlow 10s ease-in-out infinite alternate;
-}
-.menuBackdropHaze{
-  background:linear-gradient(90deg,transparent 42%,rgba(239,227,184,.025) 60%,transparent 78%);
-  filter:blur(12px);
-  animation:menuHaze 14s ease-in-out infinite alternate;
-}
-.menuBackdropScan{
-  background:linear-gradient(90deg,transparent 0 48%,rgba(226,214,166,.018) 50%,transparent 52%);
-  opacity:.25;
-  animation:menuSweep 18s linear infinite;
-}
-.menuSignalNoise{
-  background:repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.006) 7px,transparent 8px);
-  opacity:.3;
-}
-@keyframes menuGlow{
-  from{transform:scale(.99);opacity:.4}
-  to{transform:scale(1.03);opacity:.75}
-}
-@keyframes menuSweep{
-  0%,100%{transform:translateX(-3%);opacity:0}
-  25%{opacity:.25}
-  60%{transform:translateX(3%);opacity:.08}
-}
-@keyframes menuHaze{
-  from{transform:translateX(-.5%)}
-  to{transform:translateX(.8%)}
+  background:repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.005) 7px,transparent 8px);
+  opacity:.28;
 }
 
 #homeScreen.menuHomeRedesign{
@@ -992,20 +1174,7 @@ function installMainMenuRedesign(){
     const backdrop=document.createElement("div");
     backdrop.id="menuBackdrop";
     backdrop.innerHTML=`
-      <div class="menuCorridor">
-        <div class="menuCeiling"></div>
-        <div class="menuWallLeft"></div>
-        <div class="menuWallRight"></div>
-        <div class="menuFloor"></div>
-        <div class="menuHall"></div>
-        <div class="menuDoor"></div>
-        <div class="menuLightBar one"></div>
-        <div class="menuLightBar two"></div>
-      </div>
-      <div class="menuBackGlow"></div>
       <div class="menuSignalNoise"></div>
-      <div class="menuBackdropScan"></div>
-      <div class="menuBackdropHaze"></div>
     `;
     overlay.insertBefore(backdrop,homeScreen);
   }
