@@ -1343,167 +1343,138 @@ function installMainMenuRedesign(){
   backdrop.innerHTML=`
     <svg class="menuBGRuined" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs>
-        <pattern id="cin-wall" width="64" height="46" patternUnits="userSpaceOnUse">
-          <rect width="64" height="46" fill="#aaa364"/>
-          <path d="M0 23 16 7 32 23 48 7 64 23" fill="none" stroke="#5c603d" stroke-width="3.3" opacity=".48"/>
-          <path d="M0 23 16 39 32 23 48 39 64 23" fill="none" stroke="#d2c985" stroke-width="2" opacity=".22"/>
-          <path d="M0 4 64 4" stroke="#6c6a45" opacity=".16"/>
+        <pattern id="redo-wall" width="58" height="42" patternUnits="userSpaceOnUse">
+          <rect width="58" height="42" fill="#aaa666"/>
+          <path d="M0 21 14.5 7 29 21 43.5 7 58 21" fill="none" stroke="#5d603f" stroke-width="3.1" opacity=".52"/>
+          <path d="M0 21 14.5 35 29 21 43.5 35 58 21" fill="none" stroke="#d5cc8e" stroke-width="2" opacity=".24"/>
+          <path d="M0 3 58 3" stroke="#656545" stroke-width="2" opacity=".16"/>
+          <path d="M7 0 7 42 M50 0 50 42" stroke="#817f55" stroke-width="1" opacity=".12"/>
         </pattern>
-
-        <linearGradient id="cin-floor" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#625d43"/>
-          <stop offset=".36" stop-color="#504c39"/>
-          <stop offset="1" stop-color="#191a16"/>
+        <linearGradient id="redo-floor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#6e694c"/><stop offset=".28" stop-color="#57533e"/><stop offset=".66" stop-color="#323328"/><stop offset="1" stop-color="#121410"/>
         </linearGradient>
-        <linearGradient id="cin-ceil" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#8d8978"/>
-          <stop offset=".64" stop-color="#59584f"/>
-          <stop offset="1" stop-color="#25261f"/>
+        <linearGradient id="redo-ceil" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#96927e"/><stop offset=".55" stop-color="#68675c"/><stop offset="1" stop-color="#32342c"/>
         </linearGradient>
-        <linearGradient id="cin-shadow" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="#030403" stop-opacity=".78"/>
-          <stop offset=".48" stop-color="#030403" stop-opacity=".12"/>
-          <stop offset="1" stop-color="#030403" stop-opacity=".34"/>
+        <linearGradient id="redo-shadow-left" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#030402" stop-opacity=".82"/><stop offset=".55" stop-color="#030402" stop-opacity=".30"/><stop offset="1" stop-color="#030402" stop-opacity="0"/>
         </linearGradient>
-        <radialGradient id="cin-light">
-          <stop offset="0" stop-color="#fff5c9" stop-opacity=".72"/>
-          <stop offset=".28" stop-color="#f5df9a" stop-opacity=".26"/>
-          <stop offset="1" stop-color="#f5df9a" stop-opacity="0"/>
+        <linearGradient id="redo-shadow-right" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#050603" stop-opacity="0"/><stop offset=".72" stop-color="#050603" stop-opacity=".20"/><stop offset="1" stop-color="#050603" stop-opacity=".68"/>
+        </linearGradient>
+        <linearGradient id="redo-depth" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#151711" stop-opacity=".04"/><stop offset=".58" stop-color="#0b0d09" stop-opacity=".20"/><stop offset="1" stop-color="#030403" stop-opacity=".78"/>
+        </linearGradient>
+        <radialGradient id="redo-lamp">
+          <stop offset="0" stop-color="#fff7d1" stop-opacity=".84"/><stop offset=".24" stop-color="#f8e6a9" stop-opacity=".32"/><stop offset="1" stop-color="#eed58e" stop-opacity="0"/>
         </radialGradient>
-        <radialGradient id="cin-wet">
-          <stop offset="0" stop-color="#c6bd81" stop-opacity=".22"/>
-          <stop offset=".5" stop-color="#70684a" stop-opacity=".10"/>
-          <stop offset="1" stop-color="#10110e" stop-opacity="0"/>
+        <radialGradient id="redo-puddle">
+          <stop offset="0" stop-color="#ddd092" stop-opacity=".18"/><stop offset=".42" stop-color="#8d8355" stop-opacity=".08"/><stop offset="1" stop-color="#11130f" stop-opacity="0"/>
         </radialGradient>
-        <radialGradient id="cin-vignette">
-          <stop offset=".40" stop-color="#000" stop-opacity="0"/>
-          <stop offset=".77" stop-color="#000" stop-opacity=".18"/>
-          <stop offset="1" stop-color="#000" stop-opacity=".76"/>
+        <radialGradient id="redo-vignette">
+          <stop offset=".38" stop-color="#000" stop-opacity="0"/><stop offset=".76" stop-color="#000" stop-opacity=".20"/><stop offset="1" stop-color="#000" stop-opacity=".82"/>
         </radialGradient>
-        <filter id="cin-noise">
-          <feTurbulence type="fractalNoise" baseFrequency=".72" numOctaves="3" seed="27"/>
-          <feColorMatrix type="saturate" values="0"/>
-          <feComponentTransfer><feFuncA type="table" tableValues="0 .075"/></feComponentTransfer>
-        </filter>
-        <filter id="cin-soft"><feGaussianBlur stdDeviation="13"/></filter>
+        <filter id="redo-noise"><feTurbulence type="fractalNoise" baseFrequency=".72" numOctaves="4" seed="41"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .075"/></feComponentTransfer></filter>
+        <filter id="redo-soft"><feGaussianBlur stdDeviation="14"/></filter>
       </defs>
 
-      <!-- Broad open room with an off-center vanishing point. -->
-      <polygon points="0,0 1600,0 1190,355 430,355" fill="url(#cin-ceil)"/>
-      <polygon points="0,0 430,355 430,900 0,900" fill="url(#cin-wall)"/>
-      <polygon points="1600,0 1190,355 1190,900 1600,900" fill="url(#cin-wall)"/>
-      <polygon points="0,900 430,355 1190,355 1600,900" fill="url(#cin-floor)"/>
+      <!-- Huge open room with the vanishing point pushed right for a cinematic composition. -->
+      <polygon points="0,0 1600,0 1135,390 400,390" fill="url(#redo-ceil)"/>
+      <polygon points="0,0 400,390 400,900 0,900" fill="url(#redo-wall)"/>
+      <polygon points="1600,0 1135,390 1135,900 1600,900" fill="url(#redo-wall)"/>
+      <polygon points="0,900 400,390 1135,390 1600,900" fill="url(#redo-floor)"/>
 
-      <!-- Strong architectural perspective. -->
-      <g stroke="#474637" stroke-width="4" opacity=".62">
-        <line x1="125" y1="0" x2="520" y2="355"/>
-        <line x1="420" y1="0" x2="660" y2="355"/>
-        <line x1="720" y1="0" x2="810" y2="355"/>
-        <line x1="1020" y1="0" x2="925" y2="355"/>
-        <line x1="1315" y1="0" x2="1055" y2="355"/>
-        <line x1="0" y1="685" x2="430" y2="520"/>
-        <line x1="1600" y1="684" x2="1190" y2="520"/>
+      <!-- Receding ceiling grid, deliberately uneven. -->
+      <g fill="none" stroke="#4a493f" stroke-width="5" opacity=".64">
+        <path d="M120 0 500 390"/><path d="M380 0 640 390"/><path d="M670 0 760 390"/>
+        <path d="M960 0 880 390"/><path d="M1250 0 1010 390"/><path d="M1510 0 1100 390"/>
       </g>
 
-      <!-- Giant damaged ceiling cavity. -->
-      <polygon points="545,0 940,0 1030,208 760,292 525,210" fill="#171914"/>
-      <polygon points="585,15 906,15 956,122 755,205 550,160" fill="#070806"/>
-      <path d="M570 24 690 145 648 278" fill="none" stroke="#2d2f28" stroke-width="10"/>
-      <path d="M928 22 840 112 916 257" fill="none" stroke="#3b3b30" stroke-width="7"/>
+      <!-- Collapsed ceiling with exposed structure behind it. -->
+      <polygon points="575,0 1070,0 1000,230 725,300 520,195" fill="#242620"/>
+      <polygon points="620,18 1032,14 976,178 748,250 570,170" fill="#080a07"/>
+      <polygon points="654,27 1000,22 944,132 748,205 604,154" fill="#151813"/>
+      <path d="M575 42 690 158 646 286" fill="none" stroke="#555548" stroke-width="17" opacity=".58"/>
+      <path d="M1047 28 926 120 975 255" fill="none" stroke="#3f4036" stroke-width="12" opacity=".78"/>
+      <path d="M621 170 758 298 952 250" fill="none" stroke="#6b6856" stroke-width="4" opacity=".34"/>
 
-      <!-- Sagging fluorescent grid around the hole. -->
-      <g stroke="#565548" stroke-width="6" opacity=".82">
-        <line x1="220" y1="0" x2="510" y2="350"/>
-        <line x1="1110" y1="0" x2="1000" y2="350"/>
-        <line x1="1420" y1="0" x2="1105" y2="350"/>
+      <!-- Black void beyond the ruined back wall. -->
+      <polygon points="900,330 1135,390 1202,655 790,655" fill="#716d4c"/>
+      <polygon points="950,360 1100,398 1158,635 838,635" fill="#060806"/>
+      <polygon points="991,387 1070,408 1110,630 878,630" fill="#12150f"/>
+      <path d="M965 365 948 635 M1092 399 1110 635" stroke="#454538" stroke-width="6" opacity=".42"/>
+
+      <!-- Broken partitions make several spaces visible without becoming a hallway. -->
+      <polygon points="270,375 346,385 316,650 205,688" fill="#77734d"/>
+      <polygon points="1282,374 1194,386 1226,650 1370,690" fill="#6d6948"/>
+      <polygon points="470,388 530,390 520,548 454,553" fill="#55533f"/>
+      <polygon points="1165,385 1100,388 1114,542 1180,549" fill="#4f4d3b"/>
+
+      <!-- Water damage and peeled wallpaper. -->
+      <g opacity=".76">
+        <path d="M52 172 214 199 187 352 70 380Z" fill="#d1c77e"/>
+        <path d="M80 231 205 249 174 321 95 309Z" fill="#e0d7a5"/>
+        <path d="M1425 182 1550 161 1581 318 1460 344Z" fill="#c8bc72"/>
+        <path d="M1395 472 1516 449 1545 548 1419 585Z" fill="#b8aa63"/>
+      </g>
+      <g fill="#3d3f2e" opacity=".56">
+        <path d="M95 376 220 397 180 510 74 488Z"/><path d="M1457 340 1546 327 1580 445 1470 468Z"/>
+        <path d="M170 594 322 558 351 636 190 682Z"/><path d="M1417 603 1278 567 1250 639 1410 680Z"/>
       </g>
 
-      <!-- Hanging wires from the collapsed bay. -->
-      <g fill="none" stroke="#22251e" stroke-width="10">
-        <path d="M660 12 C640 72 690 115 651 198 C628 246 648 283 610 334"/>
-        <path d="M812 8 C840 78 791 118 826 186 C850 232 830 283 858 331"/>
-        <path d="M935 28 C896 92 916 141 882 206 C858 252 889 294 858 348"/>
+      <!-- Hanging wires over the collapsed bay. -->
+      <g fill="none" stroke="#22251e" stroke-width="12" opacity=".96">
+        <path d="M690 18 C650 77 720 116 679 184 C648 235 676 274 636 339"/>
+        <path d="M820 10 C854 70 796 118 838 180 C868 224 833 286 869 347"/>
+        <path d="M948 20 C908 83 936 134 902 198 C876 248 908 294 887 354"/>
       </g>
-      <g fill="none" stroke="#958861" stroke-width="2.2" opacity=".9">
-        <path d="M660 12 C640 72 690 115 651 198 C628 246 648 283 610 334"/>
-        <path d="M812 8 C840 78 791 118 826 186 C850 232 830 283 858 331"/>
-        <path d="M935 28 C896 92 916 141 882 206 C858 252 889 294 858 348"/>
-      </g>
-
-      <!-- Broken wall slabs. -->
-      <polygon points="270,368 338,377 300,650 208,678" fill="#676341" opacity=".95"/>
-      <polygon points="1325,371 1254,376 1292,646 1392,675" fill="#676341" opacity=".95"/>
-      <polygon points="468,359 525,359 514,505 456,510" fill="#49483a"/>
-      <polygon points="1130,358 1078,360 1090,500 1144,507" fill="#4a4839"/>
-
-      <!-- Far wall opens into a huge black space. -->
-      <polygon points="690,355 970,355 1080,620 580,620" fill="#74704e"/>
-      <polygon points="748,390 912,390 970,615 642,615" fill="#0a0c09"/>
-      <polygon points="786,414 874,414 912,615 700,615" fill="#171914"/>
-      <path d="M782 413 760 620 M874 414 888 620" stroke="#36362b" stroke-width="5" opacity=".55"/>
-
-      <!-- Broken floor transition into the opening. -->
-      <polygon points="560,620 1080,620 1210,900 385,900" fill="#24261e" opacity=".64"/>
-      <ellipse cx="808" cy="690" rx="285" ry="105" fill="url(#cin-wet)"/>
-
-      <!-- Large wet patches / puddles. -->
-      <ellipse cx="475" cy="730" rx="205" ry="48" fill="#11130f" opacity=".45"/>
-      <ellipse cx="1090" cy="742" rx="235" ry="53" fill="#11130f" opacity=".48"/>
-      <ellipse cx="825" cy="835" rx="290" ry="60" fill="#10110e" opacity=".42"/>
-      <ellipse cx="1080" cy="706" rx="92" ry="28" fill="url(#cin-light)" opacity=".55"/>
-      <ellipse cx="575" cy="655" rx="80" ry="23" fill="url(#cin-light)" opacity=".36"/>
-
-      <!-- Torn carpet / rubble. -->
-      <g fill="#22241c" opacity=".92">
-        <path d="M150 825 300 770 356 796 188 854Z"/>
-        <path d="M1170 817 1325 772 1395 800 1210 858Z"/>
-        <path d="M1020 868 1102 828 1172 850 1082 884Z"/>
-        <rect x="364" y="812" width="104" height="18" rx="3" transform="rotate(-7 364 812)"/>
-        <rect x="1240" y="694" width="116" height="19" rx="3" transform="rotate(9 1240 694)"/>
+      <g fill="none" stroke="#9b8d62" stroke-width="2" opacity=".8">
+        <path d="M690 18 C650 77 720 116 679 184 C648 235 676 274 636 339"/>
+        <path d="M820 10 C854 70 796 118 838 180 C868 224 833 286 869 347"/>
+        <path d="M948 20 C908 83 936 134 902 198 C876 248 908 294 887 354"/>
       </g>
 
-      <!-- Peeling wallpaper and heavy water streaks. -->
-      <g opacity=".86">
-        <path d="M46 178 210 208 175 332 72 354Z" fill="#d1c77f"/>
-        <path d="M94 242 205 251 170 312 82 300Z" fill="#ded6a2"/>
-        <path d="M1512 206 1370 226 1404 356 1519 332Z" fill="#d0c47c"/>
-        <path d="M1467 495 1335 474 1310 578 1444 606Z" fill="#c7bb73"/>
+      <!-- Fluorescent fixtures at different depths. -->
+      <g class="fixture"><ellipse cx="798" cy="353" rx="245" ry="92" fill="url(#redo-lamp)" filter="url(#redo-soft)"/><rect x="650" y="337" width="296" height="18" rx="4" fill="#d9d4b9"/><rect x="700" y="342" width="194" height="7" fill="#fff5c8"/></g>
+      <g class="fixture delay"><ellipse cx="796" cy="256" rx="165" ry="58" fill="url(#redo-lamp)" filter="url(#redo-soft)"/><rect x="710" y="245" width="172" height="12" rx="3" fill="#bdb9a2"/><rect x="746" y="248" width="100" height="4" fill="#eee5bd"/></g>
+      <g class="fixture"><ellipse cx="805" cy="156" rx="98" ry="38" fill="url(#redo-lamp)" filter="url(#redo-soft)"/><rect x="756" y="146" width="98" height="9" rx="2" fill="#98988e"/></g>
+      <g class="fixture delay"><ellipse cx="1298" cy="432" rx="110" ry="46" fill="url(#redo-lamp)" filter="url(#redo-soft)"/><rect x="1247" y="421" width="102" height="9" rx="2" fill="#aaa792"/></g>
+
+      <!-- Floor depth lines and filthy wet carpet. -->
+      <g fill="none" stroke="#777050" opacity=".23">
+        <path d="M92 900 460 390"/><path d="M352 900 610 390"/><path d="M1545 900 1092 390"/><path d="M1280 900 1018 390"/>
       </g>
-      <g fill="#424332" opacity=".66">
-        <path d="M106 352 214 377 177 470 92 446Z"/>
-        <path d="M1490 342 1382 368 1417 465 1502 442Z"/>
-        <path d="M175 610 318 578 348 646 184 690Z"/>
-        <path d="M1424 616 1284 579 1254 649 1416 692Z"/>
+      <ellipse cx="520" cy="720" rx="250" ry="62" fill="#11130f" opacity=".50"/>
+      <ellipse cx="1115" cy="735" rx="260" ry="66" fill="#0e100d" opacity=".57"/>
+      <ellipse cx="825" cy="838" rx="350" ry="72" fill="#0b0d0a" opacity=".48"/>
+      <ellipse cx="1007" cy="690" rx="162" ry="48" fill="url(#redo-puddle)"/>
+      <ellipse cx="625" cy="690" rx="116" ry="33" fill="url(#redo-puddle)"/>
+
+      <!-- Puddle highlights and reflected fluorescent strips. -->
+      <g opacity=".18" fill="#f4e8b1">
+        <path d="M932 674 1068 669 1120 681 987 688Z"/><path d="M486 692 592 684 650 696 541 705Z"/><path d="M702 818 945 808 1004 820 756 832Z"/>
       </g>
 
-      <!-- Fluorescents at multiple depths. -->
-      <g class="fixture">
-        <ellipse cx="810" cy="346" rx="230" ry="88" fill="url(#cin-light)" filter="url(#cin-soft)"/>
-        <rect x="673" y="331" width="274" height="17" rx="4" fill="#d8d4bb"/>
-        <rect x="720" y="336" width="180" height="6" fill="#fff4c4"/>
+      <!-- Foreground rubble and torn carpet. -->
+      <g fill="#1b1d17" opacity=".94">
+        <path d="M80 820 284 753 375 784 164 866Z"/><path d="M1180 836 1352 776 1450 812 1220 882Z"/>
+        <path d="M972 882 1084 834 1170 857 1049 900Z"/>
+        <rect x="352" y="801" width="126" height="20" rx="3" transform="rotate(-8 352 801)"/>
+        <rect x="1220" y="698" width="134" height="19" rx="3" transform="rotate(8 1220 698)"/>
+        <path d="M1038 745 1118 720 1168 741 1080 767Z"/>
       </g>
-      <g class="fixture delay">
-        <ellipse cx="802" cy="260" rx="153" ry="56" fill="url(#cin-light)" filter="url(#cin-soft)"/>
-        <rect x="723" y="249" width="158" height="11" rx="3" fill="#bebaa1"/>
-        <rect x="755" y="252" width="92" height="4" fill="#eee4bc"/>
-      </g>
-      <g class="fixture">
-        <ellipse cx="802" cy="152" rx="94" ry="35" fill="url(#cin-light)" filter="url(#cin-soft)"/>
-        <rect x="755" y="143" width="94" height="8" rx="2" fill="#9d9b90"/>
-      </g>
-      <g class="fixture delay">
-        <ellipse cx="1265" cy="420" rx="105" ry="44" fill="url(#cin-light)" filter="url(#cin-soft)"/>
-        <rect x="1214" y="412" width="102" height="8" rx="2" fill="#aaa794"/>
-      </g>
+      <g fill="#8e865f" opacity=".24"><path d="M115 816 290 766 334 784 164 844Z"/><path d="M1211 824 1351 784 1408 807 1238 860Z"/></g>
 
-      <!-- One broken wall light barely hanging on. -->
-      <path d="M1218 342 1238 408" stroke="#25271f" stroke-width="8"/>
-      <rect x="1214" y="402" width="92" height="10" rx="3" fill="#8b8873" transform="rotate(7 1214 402)"/>
+      <!-- Subtle mist catching the fluorescent light. -->
+      <path d="M330 480 C560 430 830 460 1120 505" fill="none" stroke="#d6c98d" stroke-width="70" opacity=".035" filter="url(#redo-soft)"/>
+      <path d="M440 560 C670 525 890 545 1190 585" fill="none" stroke="#bdb27d" stroke-width="58" opacity=".028" filter="url(#redo-soft)"/>
 
-      <!-- Final atmospheric overlay. -->
-      <rect width="1600" height="900" fill="url(#cin-shadow)"/>
-      <rect width="1600" height="900" filter="url(#cin-noise)" opacity=".52"/>
-      <rect width="1600" height="900" fill="url(#cin-vignette)"/>
+      <!-- Cinematic grading and UI-safe darkness. -->
+      <rect width="1600" height="900" fill="url(#redo-shadow-left)"/>
+      <rect width="1600" height="900" fill="url(#redo-shadow-right)"/>
+      <rect width="1600" height="900" fill="url(#redo-depth)"/>
+      <rect width="1600" height="900" filter="url(#redo-noise)" opacity=".54"/>
+      <rect width="1600" height="900" fill="url(#redo-vignette)"/>
     </svg>
   `;
   overlay.insertBefore(backdrop,homeScreen);
