@@ -4004,6 +4004,45 @@ function animate(){
   const dt=Math.min(clock.getDelta(),.05);
   const t=clock.elapsedTime;
 
+  // The title screen is independent of gameplay. Render it before the
+  // gameplay simulation so an unrelated gameplay error cannot black out the menu.
+  const menuIsVisible=!gameStarted && !homeScreen.classList.contains("hidden");
+  if(menuIsVisible){
+    try{
+      const usingMenuCamera=updateMenuScene(t,dt);
+      renderer.render(
+        usingMenuCamera ? menuScene : scene,
+        usingMenuCamera ? menuCamera : camera
+      );
+    }catch(error){
+      console.error("[DeepSeeker] Menu render error:",error);
+
+      let errorBox=document.getElementById("menuRuntimeError");
+      if(!errorBox){
+        errorBox=document.createElement("div");
+        errorBox.id="menuRuntimeError";
+        errorBox.style.cssText=[
+          "position:fixed",
+          "left:16px",
+          "right:16px",
+          "bottom:16px",
+          "z-index:9999",
+          "padding:12px 14px",
+          "border:1px solid rgba(255,120,120,.45)",
+          "border-radius:8px",
+          "background:rgba(18,5,5,.92)",
+          "color:#ffd7d7",
+          "font:12px/1.4 monospace",
+          "white-space:pre-wrap",
+          "pointer-events:none"
+        ].join(";");
+        document.body.appendChild(errorBox);
+      }
+      errorBox.textContent="MENU RENDER ERROR\\n"+String(error?.stack||error);
+    }
+    return;
+  }
+
   perfElapsed+=dt;
   perfFrames++;
   perfCooldown=Math.max(0,perfCooldown-dt);
@@ -4306,13 +4345,7 @@ function animate(){
   batteryValue.textContent=Math.round(battery)+"%";
   batteryBar.style.opacity=flashlightOn?1:.45;
 
-  const menuIsVisible=!gameStarted && !homeScreen.classList.contains("hidden");
-  const usingMenuCamera=menuIsVisible && updateMenuScene(t,dt);
-
-  renderer.render(
-    usingMenuCamera ? menuScene : scene,
-    usingMenuCamera ? menuCamera : camera
-  );
+  renderer.render(scene,camera);
 }
 animate();
 
