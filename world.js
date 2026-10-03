@@ -220,6 +220,19 @@ export class World {
       ceiling: new THREE.MeshStandardMaterial({ map: tex.ceiling, roughness: 0.95 }),
     };
 
+    // Shared fluorescent materials. Fixture meshes are per-chunk so they are
+    // disposed with the chunk, while these materials are reused everywhere.
+    this.fixtureMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfff4ca,
+      emissive: 0xffe2a0,
+      emissiveIntensity: 2.35,
+      roughness: 0.28,
+    });
+    this.fixtureBlackMaterial = new THREE.MeshStandardMaterial({
+      color: 0x10100e,
+      roughness: 0.96,
+    });
+
     // Shared per-chunk geometry templates (never disposed per chunk).
     this.floorGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE);
     this.floorGeo.rotateX(-Math.PI / 2);
@@ -372,7 +385,107 @@ export class World {
       group.add(new THREE.Mesh(merged, this.materials.wall));
     }
 
+    this.buildCeilingFixtures(group, cx, cz);
+
     return group;
+  }
+
+  buildCeilingFixtures(group, cx, cz) {
+    const fixturePositions = [
+      [12,12],
+      [32,12],
+      [52,12],
+      [12,40],
+      [32,40],
+      [52,40],
+    ];
+    const rng = mulberry32(hashSeed(cx, cz, this.seed) ^ 0x6f31a9);
+
+    const crackedPattern = [
+      [
+        {w:1.02,x:-1.16,y:.012,z:.01,rx:-.030,rz:-.018},
+        {w:.78,x:-.08,y:-.020,z:-.02,rx:.015,rz:.035,black:true},
+        {w:1.12,x:1.00,y:.016,z:.02,rx:-.022,rz:-.028},
+      ],
+      [
+        {w:.72,x:-1.28,y:-.012,z:-.03,rx:.020,rz:.045},
+        {w:1.22,x:-.18,y:.010,z:.015,rx:-.010,rz:-.020},
+        {w:.86,x:1.13,y:-.026,z:-.018,rx:.030,rz:.065},
+      ],
+      [
+        {w:.92,x:-1.12,y:.018,z:.025,rx:-.035,rz:.020,black:true},
+        {w:1.04,x:-.02,y:-.010,z:-.012,rx:.020,rz:-.040},
+        {w:.62,x:1.05,y:.022,z:.030,rx:-.050,rz:.080},
+      ],
+      [
+        {w:1.30,x:-1.02,y:-.018,z:-.015,rx:.012,rz:-.050},
+        {w:.58,x:.16,y:.028,z:.035,rx:-.040,rz:.070},
+        {w:.98,x:1.10,y:-.008,z:-.020,rx:.030,rz:-.015},
+      ],
+      [
+        {w:.80,x:-1.24,y:.020,z:.005,rx:-.025,rz:-.075,black:true},
+        {w:.90,x:-.16,y:-.030,z:-.028,rx:.040,rz:.050},
+        {w:1.25,x:1.05,y:.014,z:.018,rx:-.018,rz:-.030},
+      ],
+      [
+        {w:1.10,x:-1.10,y:-.008,z:-.025,rx:.018,rz:.025},
+        {w:.68,x:-.08,y:.024,z:.030,rx:-.045,rz:-.080},
+        {w:.96,x:1.02,y:-.022,z:-.012,rx:.050,rz:.060},
+      ],
+    ];
+
+    for(let index=0; index<fixturePositions.length; index++){
+      const [localX, localZ] = fixturePositions[index];
+      const cracked = rng() < .78;
+      const phase = rng() * Math.PI * 2;
+      const power = 1.4 + rng() * .9;
+      const x = cx * CHUNK_SIZE + localX;
+      const z = cz * CHUNK_SIZE + localZ;
+      const y = WALL_H - .055;
+      const fixtureGroup = new THREE.Group();
+
+      fixtureGroup.name = cracked ? "FluorescentCracked" : "Fluorescent";
+      fixtureGroup.position.set(x, y, z);
+      fixtureGroup.userData.cracked = cracked;
+      fixtureGroup.userData.phase = phase;
+      fixtureGroup.userData.basePower = cracked ? power * .24 : power;
+
+      if(cracked){
+        const pieces = crackedPattern[index % crackedPattern.length];
+        for(const piece of pieces){
+          const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(piece.w, .065, .84),
+            piece.black ? this.fixtureBlackMaterial : this.fixtureMaterial
+          );
+          mesh.position.set(piece.x, piece.y, piece.z);
+          mesh.rotation.set(piece.rx, 0, piece.rz);
+          mesh.name = piece.black ? "CrackedBlackSection" : "CrackedDiffuserPiece";
+          fixtureGroup.add(mesh);
+        }
+      }else{
+        const mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(3.5, .10, .95),
+          this.fixtureMaterial
+        );
+        mesh.name = "FluorescentDiffuser";
+        fixtureGroup.add(mesh);
+      }
+
+      group.add(fixtureGroup);
+
+      const point = new THREE.PointLight(
+        0xffe6a8,
+        fixtureGroup.userData.basePower,
+        cracked ? 11 : 14,
+        2
+      );
+      point.position.set(x, y - .78, z);
+      point.userData.cracked = cracked;
+      point.userData.basePower = fixtureGroup.userData.basePower;
+      point.userData.phase = phase;
+      point.name = cracked ? "CrackedFluorescentLight" : "FluorescentLight";
+      group.add(point);
+    }
   }
 
 }

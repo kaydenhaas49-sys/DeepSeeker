@@ -2965,6 +2965,7 @@ function ensureHouseCollisionSetup(){
     if(pendingHouseStart && !gameStarted){
       pendingHouseStart=false;
       gameStarted=true;
+      ensureSpiderLoading();
       overlay.classList.add("hidden");
 
       if(pendingSaveLoad){
@@ -2988,6 +2989,7 @@ function ensureHouseCollisionSetup(){
     }else if(gameStarted){
       if(pendingHouseStart){
         pendingHouseStart=false;
+        ensureSpiderLoading();
         setHouseMode(true);
       }else{
         eventText.textContent="APARTMENT READY";
@@ -3621,11 +3623,106 @@ function spawnSpiderAtPlayer(){
   return true;
 }
 
-async function loadSpiderFromPack(){
-  const spiderUrl="./assets/Spider-Psionic-runtime/spider.glb";
+async function extractFirstGlbFromZip(zipUrl){
+  const response=await fetch(zipUrl,{cache:"no-store"});
+  if(!response.ok){
+    throw new Error(`Spider pack request failed: ${response.status} ${response.statusText}`);
+  }
 
-  gltfLoader.load(
-    spiderUrl,
+  const buffer=await response.arrayBuffer();
+  const view=new DataView(buffer);
+  const minOffset=Math.max(0,buffer.byteLength-65558);
+  let eocdOffset=-1;
+
+  for(let offset=buffer.byteLength-22;offset>=minOffset;offset--){
+    if(view.getUint32(offset,true)===0x06054b50){
+      eocdOffset=offset;
+      break;
+    }
+  }
+
+  if(eocdOffset<0){
+    throw new Error("Spider ZIP has no end-of-central-directory record.");
+  }
+
+  const centralSize=view.getUint32(eocdOffset+12,true);
+  const centralOffset=view.getUint32(eocdOffset+16,true);
+  const decoder=new TextDecoder();
+  let offset=centralOffset;
+
+  while(offset<centralOffset+centralSize){
+    if(view.getUint32(offset,true)!==0x02014b50){
+      throw new Error("Spider ZIP central directory is invalid.");
+    }
+
+    const compression=view.getUint16(offset+10,true);
+    const compressedSize=view.getUint32(offset+20,true);
+    const fileNameLength=view.getUint16(offset+28,true);
+    const extraLength=view.getUint16(offset+30,true);
+    const commentLength=view.getUint16(offset+32,true);
+    const localHeaderOffset=view.getUint32(offset+42,true);
+    const fileName=decoder.decode(
+      new Uint8Array(buffer,offset+46,fileNameLength)
+    );
+
+    if(fileName.toLowerCase().endsWith(".glb")){
+      if(view.getUint32(localHeaderOffset,true)!==0x04034b50){
+        throw new Error(`Spider GLB local header is invalid: ${fileName}`);
+      }
+
+      const localNameLength=view.getUint16(localHeaderOffset+26,true);
+      const localExtraLength=view.getUint16(localHeaderOffset+28,true);
+      const dataOffset=
+        localHeaderOffset+
+        30+
+        localNameLength+
+        localExtraLength;
+
+      const compressedData=new Uint8Array(
+        buffer,
+        dataOffset,
+        compressedSize
+      );
+
+      let glbBytes;
+      if(compression===0){
+        glbBytes=compressedData;
+      }else if(compression===8){
+        if(typeof DecompressionStream!=="function"){
+          throw new Error("This browser cannot decompress the Spider ZIP.");
+        }
+
+        const stream=new Blob([compressedData])
+          .stream()
+          .pipeThrough(new DecompressionStream("deflate-raw"));
+        glbBytes=new Uint8Array(await new Response(stream).arrayBuffer());
+      }else{
+        throw new Error(`Unsupported Spider ZIP compression method: ${compression}`);
+      }
+
+      return {
+        name:fileName,
+        url:URL.createObjectURL(
+          new Blob([glbBytes],{type:"model/gltf-binary"})
+        )
+      };
+    }
+
+    offset+=46+fileNameLength+extraLength+commentLength;
+  }
+
+  throw new Error("Spider ZIP contains no GLB model.");
+}
+
+async function loadSpiderFromPack(){
+  const packUrl="./assets/Spider-Psionic.zip";
+
+  try{
+    const extracted=await extractFirstGlbFromZip(packUrl);
+    const spiderUrl=extracted.url;
+
+    gltfLoader.load(
+      spiderUrl,
     gltf=>{
       const model=gltf.scene;
       model.name="SpiderVisual";
@@ -3696,12 +3793,16 @@ async function loadSpiderFromPack(){
       }
 
       console.log(
-        "[DeepSeeker] exact uploaded Spider-Psionic model loaded as GLB",
+        "[DeepSeeker] exact uploaded Spider-Psionic model loaded from ZIP",
         {
+          source:extracted.name,
           animations:gltf.animations?.map(animation=>animation.name)||[],
           meshCount
         }
       );
+
+      URL.revokeObjectURL(spiderUrl);
+      spiderLoadStarted=false;
 
       eventText.textContent=sourceClip ? "SPIDER READY" : "SPIDER READY (STATIC)";
       eventText.style.opacity="1";
@@ -3721,7 +3822,9 @@ async function loadSpiderFromPack(){
       spiderMixer=null;
       spiderActions.clear();
       spiderAnimationState="";
-      console.error("[DeepSeeker] converted Spider-Psionic GLB failed:",error);
+      spiderLoadStarted=false;
+      URL.revokeObjectURL(spiderUrl);
+      console.error("[DeepSeeker] Spider-Psionic GLB failed to load from ZIP:",error);
       // A missing entity is a gameplay asset problem, not a menu problem.
       // Only surface the message after a run has actually started.
       if(gameStarted){
@@ -3729,7 +3832,21 @@ async function loadSpiderFromPack(){
         eventText.style.opacity="1";
       }
     }
-  );
+    );
+  }catch(error){
+    spiderLoaded=false;
+    spiderModel=null;
+    spiderMixer=null;
+    spiderActions.clear();
+    spiderAnimationState="";
+    spiderLoadStarted=false;
+    console.error("[DeepSeeker] Spider-Psionic ZIP extraction failed:",error);
+
+    if(gameStarted){
+      eventText.textContent="SPIDER PACK FAILED TO LOAD";
+      eventText.style.opacity="1";
+    }
+  }
 }
 
 function ensureSpiderLoading(){
