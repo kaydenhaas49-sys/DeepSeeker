@@ -1150,11 +1150,9 @@ function installMainMenuRedesign(){
         <div class="menuWallRight"></div>
         <div class="menuFloor"></div>
         <div class="menuHall"></div>
-        <div class="menuFluorescent one"></div>
-        <div class="menuFluorescent two"></div>
-        <div class="menuPanelLight"></div>
-        <div class="menuPerspectiveLine"></div>
-        <div class="menuPerspectiveLine two"></div>
+        <div class="menuDoor"></div>
+        <div class="menuLightBar one"></div>
+        <div class="menuLightBar two"></div>
       </div>
       <div class="menuBackGlow"></div>
       <div class="menuSignalNoise"></div>
