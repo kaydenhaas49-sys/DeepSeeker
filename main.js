@@ -3437,12 +3437,14 @@ function rotatePlayerTowardSpider(dt){
   const horizontal=Math.hypot(dx,dz);
   if(horizontal<.001) return;
 
-  const targetYaw=Math.atan2(dx,dz);
+  // Player forward is (-sin(yaw), -cos(yaw)), so the target angles must
+  // use the opposite signs of the raw world-space delta.
+  const targetYaw=Math.atan2(-dx,-dz);
   let yawDelta=targetYaw-player.yaw;
   while(yawDelta>Math.PI) yawDelta-=Math.PI*2;
   while(yawDelta<-Math.PI) yawDelta+=Math.PI*2;
 
-  const targetPitch=-Math.atan2(dy,horizontal);
+  const targetPitch=Math.atan2(dy,horizontal);
   const pitchDelta=targetPitch-player.pitch;
   const turnSpeed=7.5;
 
@@ -3818,6 +3820,18 @@ function finishSpiderModel(model,animations,sourceName){
       material.depthTest=true;
       material.depthWrite=true;
       material.side=THREE.DoubleSide;
+
+      // Keep the spider readable during the chase even when the Backrooms are
+      // nearly black. This is a subtle material lift, not a visible glow.
+      if("emissive" in material){
+        material.emissive=new THREE.Color(0x2b170f);
+        material.emissiveIntensity=.42;
+      }
+
+      if("flatShading" in material){
+        material.flatShading=false;
+      }
+
       material.needsUpdate=true;
     }
   });
@@ -4618,14 +4632,14 @@ function animate(){
     );
     const dimmedStrength=THREE.MathUtils.lerp(
       flashlightStrength,
-      7.0*flicker,
+      18.0*flicker,
       proximity*proximity
     );
 
     flashlightStrength=dimmedStrength;
 
     if(spiderJumpscareTimer>0){
-      flashlightStrength=4.0*flicker;
+      flashlightStrength=10.0*flicker;
     }
   }
 
@@ -4643,7 +4657,7 @@ function animate(){
   }
 
   spiderRevealLight.intensity=(!houseMode && spiderActive)
-    ? (spiderJumpscareTimer>0 ? 9.5 : 6.5)
+    ? (spiderJumpscareTimer>0 ? 5.8 : 3.6)
     : 0;
 
   if(spiderActive && !houseMode){
