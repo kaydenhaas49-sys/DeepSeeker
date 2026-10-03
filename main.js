@@ -3538,17 +3538,17 @@ function startSpiderJumpscare(){
   // Keep the spider in a simple, stable position directly in front of the
   // camera. The old bounding-box recentering caused the model to jump/glitch
   // whenever the animated pose changed.
-  const offsetX=-spiderJumpscareDirection.x*.75;
-  const offsetZ=-spiderJumpscareDirection.z*.75;
+  const offsetX=-spiderJumpscareDirection.x*5;
+  const offsetZ=-spiderJumpscareDirection.z*5;
 
   player.pos.x+=offsetX;
   player.pos.z+=offsetZ;
-  player.jumpY=Math.max(player.jumpY,.18);
-  player.jumpVelocity=.9;
+  player.jumpY=2;
+  player.jumpVelocity=0;
 
   camera.position.x+=offsetX;
   camera.position.z+=offsetZ;
-  camera.position.y+=.18;
+  camera.position.y+=2;
 
   const scarePosition=camera.position.clone().add(
     spiderJumpscareDirection.clone().multiplyScalar(1.15)
