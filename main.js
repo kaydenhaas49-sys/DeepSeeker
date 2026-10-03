@@ -111,14 +111,41 @@ const MENU_CAMERA_HEIGHT=2.28;
 const MENU_LOOK_HEIGHT=2.65;
 let menuSceneReady=false;
 let menuBackdropWasActive=false;
+const menuSpiderBase=new THREE.Vector3(40,SPIDER_GROUND_OFFSET,18);
+let menuSpiderPhase=0;
 
-function updateMenuScene(t){
+function updateMenuSpider(t,dt){
+  if(gameStarted || !spiderLoaded || !spiderEntity) return;
+
+  menuSpiderPhase=t*.22;
+  const x=menuSpiderBase.x+Math.sin(menuSpiderPhase)*2.1;
+  const z=menuSpiderBase.z+Math.cos(menuSpiderPhase*.78)*1.15;
+
+  spiderEntity.visible=true;
+  spiderEntity.position.set(x,SPIDER_GROUND_OFFSET,z);
+
+  // Keep it watching the camera while it slowly patrols the distant room.
+  const dx=menuCamera.position.x-x;
+  const dz=menuCamera.position.z-z;
+  spiderEntity.rotation.y=Math.atan2(dx,dz);
+
+  spiderEntity.scale.setScalar(1.08+Math.sin(t*.45)*.025);
+  spiderRevealLight.intensity=4.2+Math.sin(t*1.4)*.7;
+  spiderRevealLight.distance=15;
+
+  setSpiderAnimation("walk");
+  if(spiderMixer) spiderMixer.update(dt);
+}
+
+function updateMenuScene(t,dt){
   if(gameStarted || !homeScreen || homeScreen.classList.contains("hidden")){
     if(menuBackdropWasActive){
       menuBackdropWasActive=false;
       menuAmbient.intensity=0;
       menuKeyLight.intensity=0;
       menuFillLight.intensity=0;
+      spiderRevealLight.intensity=0;
+      spiderEntity.visible=false;
       scene.background.set(0x000100);
     }
     return false;
@@ -134,6 +161,7 @@ function updateMenuScene(t){
 
   // Keep the nearby Backrooms chunks streamed while the title screen is open.
   world.update(MENU_WORLD_X,MENU_WORLD_Z);
+  updateMenuSpider(t,dt);
 
   const sway=Math.sin(t*0.12)*0.65;
   const drift=Math.sin(t*0.08+1.1)*0.32;
@@ -3545,7 +3573,7 @@ document.addEventListener("keydown",e=>{
     if(useHouseReturnTeleporter()){
       return;
     }
-  }else if(e.code==="KeyF" && !phoneOpen && !controlsOpen) toggleFlashlight();
+  }else if(e.code==="KeyF" && gameStarted && !phoneOpen && !controlsOpen) toggleFlashlight();
   else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !e.repeat){
     if(gameStarted && !phoneOpen && !controlsOpen){
@@ -3905,7 +3933,7 @@ function animate(){
   batteryBar.style.opacity=flashlightOn?1:.45;
 
   const menuIsVisible=!gameStarted && !homeScreen.classList.contains("hidden");
-  const usingMenuCamera=menuIsVisible && updateMenuScene(t);
+  const usingMenuCamera=menuIsVisible && updateMenuScene(t,dt);
 
   renderer.render(
     scene,
