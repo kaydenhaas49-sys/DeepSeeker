@@ -662,95 +662,228 @@ function installMainMenuRedesign(){
   overflow:hidden;
   pointer-events:none;
   z-index:0;
-  background:transparent;
+  background:
+    radial-gradient(ellipse at 76% 31%,rgba(229,207,133,.13),transparent 17%),
+    linear-gradient(180deg,#0d0d09 0%,#161811 43%,#080907 100%);
+  filter:saturate(.84) contrast(1.08);
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 71% 42%,transparent 0 17%,rgba(0,0,0,.06) 38%,rgba(0,0,0,.48) 100%),
-    linear-gradient(90deg,rgba(0,0,0,.06),transparent 43%,rgba(0,0,0,.06));
+    radial-gradient(ellipse at 78% 45%,transparent 0 12%,rgba(0,0,0,.04) 30%,rgba(0,0,0,.66) 100%),
+    linear-gradient(90deg,rgba(0,0,0,.30),transparent 47%,rgba(0,0,0,.08));
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
   background:
-    repeating-linear-gradient(180deg,
-      transparent 0 5px,
-      rgba(255,255,255,.008) 6px,
-      transparent 7px);
-  opacity:.42;
+    repeating-linear-gradient(180deg,transparent 0 5px,rgba(255,255,255,.009) 6px,transparent 7px),
+    radial-gradient(ellipse at 78% 40%,transparent 0 33%,rgba(0,0,0,.34) 100%);
+  opacity:.62;
 }
-#menuBackdrop{
-  filter:saturate(.9) contrast(1.05);
+.menuCorridor{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
 }
-#menuBackdrop .menuBackdropGlow{
+.menuCeiling{
+  position:absolute;
+  left:42%;
+  right:-8%;
+  top:-5%;
+  height:51%;
+  background:
+    linear-gradient(170deg,rgba(209,203,174,.12),rgba(42,43,35,.03) 58%,transparent 100%),
+    repeating-linear-gradient(90deg,
+      transparent 0 11%,
+      rgba(226,218,181,.055) 11.2% 11.55%,
+      transparent 11.8% 22%);
+  transform:skewX(-16deg);
+  transform-origin:top right;
+}
+.menuCeiling::after{
+  content:"";
+  position:absolute;
+  left:20%;
+  top:14%;
+  width:69%;
+  height:18%;
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0 15%,
+      rgba(247,238,194,.17) 15.2% 21%,
+      transparent 21.4% 34%);
+  filter:blur(1px);
+  opacity:.75;
+}
+.menuWallLeft{
+  position:absolute;
+  left:-2%;
+  top:25%;
+  width:62%;
+  height:82%;
+  background:
+    linear-gradient(90deg,rgba(30,31,24,.92),rgba(137,132,94,.13) 78%,transparent),
+    repeating-linear-gradient(0deg,
+      transparent 0 17.2%,
+      rgba(210,201,154,.05) 17.3% 17.7%);
+  clip-path:polygon(0 0,100% 8%,72% 100%,0 100%);
+}
+.menuWallRight{
+  position:absolute;
+  right:-6%;
+  top:23%;
+  width:57%;
+  height:85%;
+  background:
+    linear-gradient(270deg,rgba(15,16,13,.93),rgba(119,116,82,.11) 73%,transparent),
+    repeating-linear-gradient(0deg,
+      transparent 0 15.4%,
+      rgba(217,207,160,.04) 15.5% 16%);
+  clip-path:polygon(12% 8%,100% 0,100% 100%,32% 100%);
+}
+.menuFloor{
+  position:absolute;
+  left:37%;
+  right:-5%;
+  bottom:-8%;
+  height:63%;
+  background:
+    linear-gradient(180deg,rgba(105,100,74,.10),rgba(13,14,11,.90) 72%),
+    repeating-linear-gradient(90deg,
+      transparent 0 13.7%,
+      rgba(196,188,143,.04) 13.8% 14%),
+    repeating-linear-gradient(0deg,
+      transparent 0 11.5%,
+      rgba(196,188,143,.028) 11.6% 11.9%);
+  transform:perspective(850px) rotateX(61deg);
+  transform-origin:bottom center;
+}
+.menuHall{
+  position:absolute;
+  right:17%;
+  top:25%;
+  width:28%;
+  height:47%;
+  background:
+    radial-gradient(ellipse at 52% 46%,rgba(216,205,155,.08),transparent 34%),
+    linear-gradient(180deg,rgba(31,32,25,.28),rgba(1,2,1,.92));
+  clip-path:polygon(29% 0,71% 0,100% 100%,0 100%);
+  box-shadow:0 0 80px rgba(0,0,0,.85);
+}
+.menuHall::before{
+  content:"";
+  position:absolute;
+  inset:7% 31% 0;
+  border-left:1px solid rgba(227,216,173,.05);
+  border-right:1px solid rgba(227,216,173,.04);
+  background:linear-gradient(180deg,rgba(231,218,170,.07),transparent 45%);
+}
+.menuFluorescent{
+  position:absolute;
+  top:19%;
+  width:min(220px,18vw);
+  height:8px;
+  border-radius:8px;
+  background:rgba(238,229,179,.82);
+  box-shadow:
+    0 0 10px rgba(235,220,155,.7),
+    0 0 42px rgba(235,220,155,.28),
+    0 0 86px rgba(235,220,155,.12);
+  filter:blur(.25px);
+  transform:rotate(-8deg);
+  animation:menuFluoro 4.7s ease-in-out infinite;
+}
+.menuFluorescent.one{right:26%}
+.menuFluorescent.two{
+  right:8%;
+  top:34%;
+  width:min(135px,11vw);
+  opacity:.56;
+  animation-delay:1.9s;
+}
+.menuPanelLight{
+  position:absolute;
+  right:39%;
+  top:10%;
+  width:130px;
+  height:17px;
+  background:rgba(239,230,184,.64);
+  box-shadow:0 0 26px rgba(239,230,184,.34),0 0 62px rgba(239,230,184,.11);
+  transform:skewX(-17deg);
+}
+.menuPerspectiveLine{
+  position:absolute;
+  left:43%;
+  top:26%;
+  width:1px;
+  height:76%;
+  background:linear-gradient(180deg,rgba(236,225,175,.16),rgba(236,225,175,0));
+  transform:skewY(25deg);
+}
+.menuPerspectiveLine.two{
+  left:73%;
+  opacity:.45;
+  transform:skewY(-15deg);
+}
+.menuBackGlow{
+  position:absolute;
+  right:19%;
+  top:24%;
+  width:min(420px,34vw);
+  height:min(420px,34vw);
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(235,216,153,.11),rgba(235,216,153,.022) 37%,transparent 72%);
+  filter:blur(17px);
+  animation:menuGlow 8s ease-in-out infinite alternate;
   mix-blend-mode:screen;
 }
-.menuBackdropGlow{
+.menuSignalNoise{
   position:absolute;
-  right:9vw;
-  top:10vh;
-  width:min(35vw,560px);
-  height:min(35vw,560px);
-  border-radius:50%;
-  background:radial-gradient(circle,
-    rgba(245,225,160,.10) 0,
-    rgba(245,225,160,.025) 32%,
-    transparent 70%);
-  filter:blur(18px);
-  animation:menuGlow 9s ease-in-out infinite alternate;
+  inset:0;
+  background:
+    linear-gradient(90deg,transparent 0 72%,rgba(218,202,152,.025) 72.1% 72.25%,transparent 72.4%),
+    linear-gradient(180deg,transparent 0 47%,rgba(218,202,152,.02) 47.2% 47.4%,transparent 47.6%);
+  opacity:.7;
 }
-.menuBackdropScan,
-.menuBackdropArchitecture,
-.menuBackdropTower,
-.menuBackdropPipe,
-.menuBackdropLight,
 .menuBackdropHaze{
-  opacity:.10;
-  pointer-events:none;
+  position:absolute;
+  inset:-10%;
+  background:radial-gradient(ellipse at 78% 49%,rgba(219,200,139,.045),transparent 31%);
+  filter:blur(30px);
+  animation:menuHaze 16s ease-in-out infinite alternate;
 }
 .menuBackdropScan{
   position:absolute;
-  inset:0;
-  background:linear-gradient(90deg,transparent,rgba(223,209,160,.035),transparent);
-  width:22vw;
-  transform:translateX(-28vw) skewX(-10deg);
-  animation:menuSweep 15s ease-in-out infinite;
-}
-.menuBackdropArchitecture{
-  position:absolute;
-  inset:0;
-  background:linear-gradient(90deg,transparent 62%,rgba(230,216,173,.035) 62.1%,transparent 62.4%);
-}
-.menuBackdropTower,
-.menuBackdropPipe,
-.menuBackdropLight{
-  display:none;
-}
-.menuBackdropHaze{
-  position:absolute;
-  inset:0;
-  background:radial-gradient(ellipse at 72% 44%,rgba(219,200,139,.035),transparent 28%);
-  filter:blur(28px);
-  animation:menuHaze 16s ease-in-out infinite alternate;
+  inset:-10% auto -10% -25%;
+  width:24vw;
+  background:linear-gradient(90deg,transparent,rgba(223,209,160,.05),transparent);
+  transform:skewX(-12deg);
+  animation:menuSweep 18s ease-in-out infinite;
 }
 @keyframes menuGlow{
-  from{transform:translate3d(-1%,1%,0) scale(.96);opacity:.48}
-  to{transform:translate3d(2%,-2%,0) scale(1.07);opacity:.9}
+  from{transform:translate3d(-1%,1%,0) scale(.96);opacity:.42}
+  to{transform:translate3d(2%,-2%,0) scale(1.06);opacity:.9}
 }
 @keyframes menuSweep{
-  0%{transform:translateX(-30vw) skewX(-10deg);opacity:0}
+  0%{transform:translateX(-12vw) skewX(-12deg);opacity:0}
   18%{opacity:.35}
-  50%,100%{transform:translateX(145vw) skewX(-10deg);opacity:0}
+  48%,100%{transform:translateX(150vw) skewX(-12deg);opacity:0}
 }
 @keyframes menuHaze{
   from{transform:translate3d(-1%,0,0) scale(1)}
   to{transform:translate3d(2%,-1%,0) scale(1.035)}
 }
-
+@keyframes menuFluoro{
+  0%,100%{opacity:.75;filter:blur(.25px)}
+  46%{opacity:.88}
+  49%{opacity:.42}
+  51%{opacity:.80}
+  73%{opacity:.68}
+}
 #homeScreen.menuHomeRedesign{
   position:absolute;
   inset:0;
@@ -1018,13 +1151,21 @@ function installMainMenuRedesign(){
     const backdrop=document.createElement("div");
     backdrop.id="menuBackdrop";
     backdrop.innerHTML=`
-      <div class="menuBackdropGlow"></div>
+      <div class="menuCorridor">
+        <div class="menuCeiling"></div>
+        <div class="menuWallLeft"></div>
+        <div class="menuWallRight"></div>
+        <div class="menuFloor"></div>
+        <div class="menuHall"></div>
+        <div class="menuFluorescent one"></div>
+        <div class="menuFluorescent two"></div>
+        <div class="menuPanelLight"></div>
+        <div class="menuPerspectiveLine"></div>
+        <div class="menuPerspectiveLine two"></div>
+      </div>
+      <div class="menuBackGlow"></div>
+      <div class="menuSignalNoise"></div>
       <div class="menuBackdropScan"></div>
-      <div class="menuBackdropArchitecture"></div>
-      <div class="menuBackdropTower"></div>
-      <div class="menuBackdropPipe"></div>
-      <div class="menuBackdropLight"></div>
-      <div class="menuBackdropLight secondary"></div>
       <div class="menuBackdropHaze"></div>
     `;
     overlay.insertBefore(backdrop,homeScreen);
