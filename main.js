@@ -101,198 +101,46 @@ scene.add(playerLight);
 // textures, fog and depth instead of a flat CSS illustration.
 const menuCamera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.05,160);
 
-function makeMenuTexture(kind){
-  const canvas=document.createElement("canvas");
-  canvas.width=768;
-  canvas.height=768;
-  const ctx=canvas.getContext("2d");
-
-  if(kind==="wall"){
-    ctx.fillStyle="#9f965f";
-    ctx.fillRect(0,0,768,768);
-
-    // Faded repeating wallpaper with uneven aging.
-    for(let y=0;y<768;y+=96){
-      for(let x=0;x<768;x+=96){
-        ctx.strokeStyle="rgba(69,67,39,.28)";
-        ctx.lineWidth=4;
-        ctx.beginPath();
-        ctx.moveTo(x+6,y+48);
-        ctx.lineTo(x+28,y+20);
-        ctx.lineTo(x+50,y+48);
-        ctx.lineTo(x+72,y+20);
-        ctx.stroke();
-
-        ctx.strokeStyle="rgba(216,204,144,.15)";
-        ctx.lineWidth=2;
-        ctx.beginPath();
-        ctx.moveTo(x+6,y+52);
-        ctx.lineTo(x+28,y+80);
-        ctx.lineTo(x+50,y+52);
-        ctx.lineTo(x+72,y+80);
-        ctx.stroke();
-      }
-    }
-
-    for(let i=0;i<4300;i++){
-      const x=Math.random()*768;
-      const y=Math.random()*768;
-      const dark=Math.random()<.62;
-      ctx.fillStyle=dark
-        ? `rgba(48,48,34,${(.035+Math.random()*.09).toFixed(3)})`
-        : `rgba(235,225,170,${(.025+Math.random()*.055).toFixed(3)})`;
-      ctx.fillRect(x,y,1+Math.random()*2.4,1+Math.random()*2.4);
-    }
-
-    for(let i=0;i<30;i++){
-      const x=Math.random()*768;
-      const y=Math.random()*768;
-      const rx=18+Math.random()*70;
-      const ry=24+Math.random()*105;
-      const g=ctx.createRadialGradient(x,y,2,x,y,Math.max(rx,ry));
-      g.addColorStop(0,"rgba(48,46,32,.18)");
-      g.addColorStop(.5,"rgba(74,68,42,.08)");
-      g.addColorStop(1,"rgba(74,68,42,0)");
-      ctx.fillStyle=g;
-      ctx.beginPath();
-      ctx.ellipse(x,y,rx,ry,Math.random()*.5,0,Math.PI*2);
-      ctx.fill();
-    }
-  }else if(kind==="carpet"){
-    ctx.fillStyle="#4b4937";
-    ctx.fillRect(0,0,768,768);
-
-    for(let i=0;i<56000;i++){
-      const x=Math.random()*768;
-      const y=Math.random()*768;
-      const light=Math.random()>.66;
-      ctx.fillStyle=light
-        ? `rgba(132,124,85,${(.035+Math.random()*.07).toFixed(3)})`
-        : `rgba(18,19,15,${(.08+Math.random()*.15).toFixed(3)})`;
-      ctx.fillRect(x,y,1,1);
-    }
-
-    for(let y=0;y<768;y+=13){
-      ctx.fillStyle="rgba(220,207,151,.018)";
-      ctx.fillRect(0,y,768,1);
-    }
-
-    for(let i=0;i<34;i++){
-      const x=Math.random()*768;
-      const y=Math.random()*768;
-      const rx=12+Math.random()*70;
-      const ry=6+Math.random()*30;
-      const g=ctx.createRadialGradient(x,y,1,x,y,Math.max(rx,ry));
-      g.addColorStop(0,"rgba(8,9,7,.34)");
-      g.addColorStop(.58,"rgba(8,9,7,.10)");
-      g.addColorStop(1,"rgba(8,9,7,0)");
-      ctx.fillStyle=g;
-      ctx.beginPath();
-      ctx.ellipse(x,y,rx,ry,Math.random()*Math.PI,0,Math.PI*2);
-      ctx.fill();
-    }
-  }else{
-    ctx.fillStyle="#7e7d71";
-    ctx.fillRect(0,0,768,768);
-
-    for(let y=0;y<768;y+=96){
-      for(let x=0;x<768;x+=96){
-        ctx.strokeStyle="rgba(42,43,37,.27)";
-        ctx.lineWidth=3;
-        ctx.strokeRect(x+2,y+2,92,92);
-        ctx.fillStyle="rgba(230,224,197,.035)";
-        ctx.fillRect(x+8,y+8,78,78);
-      }
-    }
-
-    for(let i=0;i<36;i++){
-      const x=25+Math.random()*718;
-      const y=25+Math.random()*718;
-      const r=8+Math.random()*35;
-      const g=ctx.createRadialGradient(x,y,1,x,y,r);
-      g.addColorStop(0,"rgba(39,39,34,.28)");
-      g.addColorStop(1,"rgba(39,39,34,0)");
-      ctx.fillStyle=g;
-      ctx.beginPath();
-      ctx.arc(x,y,r,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
-
-  const texture=new THREE.CanvasTexture(canvas);
-  texture.wrapS=THREE.RepeatWrapping;
-  texture.wrapT=THREE.RepeatWrapping;
-  texture.colorSpace=THREE.SRGBColorSpace;
-  texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),4);
-  return texture;
-}
-
-const menuWallTexture=makeMenuTexture("wall");
-menuWallTexture.repeat.set(4.5,3.0);
-
-const menuFloorTexture=makeMenuTexture("carpet");
-menuFloorTexture.repeat.set(9,9);
-
-const menuCeilingTexture=makeMenuTexture("ceiling");
-menuCeilingTexture.repeat.set(8,8);
-
 const menuScene=new THREE.Scene();
-menuScene.background=new THREE.Color(0x57533c);
-menuScene.fog=new THREE.Fog(0x5d5942,18,86);
+menuScene.background=new THREE.Color(0x514d37);
+menuScene.fog=new THREE.Fog(0x5b5742,18,82);
 
-const menuSet=new THREE.Group();
-menuSet.name="RuinedBackroomsMenuSet";
-menuSet.visible=false;
-menuScene.add(menuSet);
+// The menu now uses the same procedural world generator as the playable game.
+// This keeps the title screen visually consistent with the actual Backrooms.
+const menuWorld=new World(menuScene,SEED,renderer.capabilities.getMaxAnisotropy());
+const menuRuinSet=new THREE.Group();
+menuRuinSet.name="MenuRuinDressing";
+menuScene.add(menuRuinSet);
 
-const menuWallMaterial=new THREE.MeshStandardMaterial({
-  map:menuWallTexture,
-  color:0xb2a86b,
-  roughness:.97
-});
-const menuFloorMaterial=new THREE.MeshStandardMaterial({
-  map:menuFloorTexture,
-  color:0x5b5640,
-  roughness:1
-});
-const menuCeilingMaterial=new THREE.MeshStandardMaterial({
-  map:menuCeilingTexture,
-  color:0xaaa594,
-  roughness:.97
-});
-const menuTrimMaterial=new THREE.MeshStandardMaterial({
-  color:0x403f31,
-  roughness:1
+const menuRuinMaterial=new THREE.MeshStandardMaterial({
+  color:0x292a24,
+  roughness:.98
 });
 const menuDarkMaterial=new THREE.MeshStandardMaterial({
-  color:0x0f110e,
+  color:0x0b0d0a,
   roughness:1
 });
-const menuRuinMaterial=new THREE.MeshStandardMaterial({
-  color:0x2f3029,
-  roughness:.96
-});
-const menuStainMaterial=new THREE.MeshStandardMaterial({
-  color:0x4a4736,
-  roughness:1,
-  transparent:true,
-  opacity:.74
-});
-const menuPuddleMaterial=new THREE.MeshStandardMaterial({
-  color:0x282b27,
-  roughness:.20,
+const menuDampMaterial=new THREE.MeshStandardMaterial({
+  color:0x35372f,
+  roughness:.22,
   metalness:.08,
+  transparent:true,
+  opacity:.70
+});
+const menuDustMaterial=new THREE.MeshStandardMaterial({
+  color:0x575342,
+  roughness:1,
   transparent:true,
   opacity:.72
 });
 const menuLightMaterial=new THREE.MeshStandardMaterial({
-  color:0xfff7d0,
-  emissive:0xffe6a7,
-  emissiveIntensity:3.0,
+  color:0xfff4c5,
+  emissive:0xffe2a0,
+  emissiveIntensity:2.8,
   roughness:.25
 });
 
-function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotationZ=0){
+function addMenuRuin(name,size,position,material,rotationY=0,rotationX=0,rotationZ=0){
   const mesh=new THREE.Mesh(
     new THREE.BoxGeometry(size.x,size.y,size.z),
     material
@@ -302,194 +150,117 @@ function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotation
   mesh.rotation.set(rotationX,rotationY,rotationZ);
   mesh.castShadow=false;
   mesh.receiveShadow=true;
-  menuSet.add(mesh);
+  menuRuinSet.add(mesh);
   return mesh;
 }
 
-function addMenuLight(x,z,power,phase,width=3.2,depth=1.0,dead=false){
-  const fixture=addMenuBox(
+const menuRuins=[
+  [-3,25,4.5,.20,.30,.15,.08],
+  [8,11,3.2,.18,.26,-.20,.12],
+  [18,-2,4.8,.22,.32,.12,.08],
+  [-10,-13,3.8,.18,.28,-.16,.10],
+  [14,-24,5.0,.20,.32,.18,.06],
+  [-15,-31,3.5,.16,.28,-.28,.10]
+];
+for(const [x,z,len,h,d,ry,rx] of menuRuins){
+  addMenuRuin(
+    "MenuCollapsedBeam",
+    new THREE.Vector3(len,h,d),
+    new THREE.Vector3(x,7.35,z),
+    menuRuinMaterial,
+    ry,rx,.03
+  );
+}
+
+for(const [x,z,w,d,ry] of [
+  [1,29,3.6,1.4,.18],
+  [-13,17,4.5,1.5,-.24],
+  [16,8,3.8,1.2,.30],
+  [-6,-7,4.2,1.6,-.18],
+  [20,-18,3.4,1.2,.22],
+  [-17,-23,4.8,1.5,-.32]
+]){
+  addMenuRuin(
+    "MenuWetPatch",
+    new THREE.Vector3(w,.018,d),
+    new THREE.Vector3(x,.012,z),
+    menuDampMaterial,
+    ry
+  );
+}
+
+for(const [x,z,w,h] of [
+  [-17,23,3.4,4.8],
+  [16,13,3.0,4.6],
+  [-14,-8,3.6,5.1],
+  [19,-26,3.2,4.7]
+]){
+  addMenuRuin(
+    "MenuDarkRuinOpening",
+    new THREE.Vector3(w,h,.06),
+    new THREE.Vector3(x,2.5,z),
+    menuDarkMaterial
+  );
+}
+
+// A few ceiling panels are visibly displaced, while the real procedural
+// ceiling remains underneath them.
+for(const [x,z,w,d,rx,rz] of [
+  [-10,20,4.0,2.4,.08,.04],
+  [11,5,3.2,2.1,-.06,-.05],
+  [-7,-19,4.5,2.5,.11,.04],
+  [15,-30,3.7,2.3,-.09,-.06]
+]){
+  addMenuRuin(
+    "MenuBrokenCeilingPanel",
+    new THREE.Vector3(w,.10,d),
+    new THREE.Vector3(x,8.45,z),
+    menuRuinMaterial,
+    0,rx,rz
+  );
+}
+
+const menuLightData=[
+  [-8,30,8,.3],
+  [7,20,11,1.2],
+  [-3,6,7,2.0],
+  [17,-4,10,2.8],
+  [-11,-16,8,3.5],
+  [10,-28,6,4.1],
+  [-16,-32,5,4.8]
+];
+
+for(const [x,z,power,phase] of menuLightData){
+  const fixture=addMenuRuin(
     "MenuFluorescent",
-    new THREE.Vector3(width,.10,depth),
-    new THREE.Vector3(x,8.78,z),
+    new THREE.Vector3(3.0,.08,.9),
+    new THREE.Vector3(x,8.82,z),
     menuLightMaterial
   );
-  fixture.userData.baseEmissive=dead?0.12:3.0;
-  fixture.userData.basePower=dead?0.8:power;
-  fixture.userData.phase=phase;
-  fixture.userData.dead=dead;
+  fixture.userData.menuBasePower=power;
+  fixture.userData.menuPhase=phase;
 
-  const glow=new THREE.PointLight(0xffe7aa,dead?0.7:power,19,2.0);
-  glow.position.set(x,8.25,z);
-  glow.userData.basePower=dead?0.7:power;
-  glow.userData.phase=phase;
-  glow.userData.dead=dead;
-  menuSet.add(glow);
+  const point=new THREE.PointLight(0xffe6a8,power,18,2);
+  point.position.set(x,8.15,z);
+  point.userData.menuBasePower=power;
+  point.userData.menuPhase=phase;
+  menuRuinSet.add(point);
 }
 
-// Large open Level-0 room. The camera is deliberately off-center so the
-// menu occupies the dark left side while the ruined room dominates the right.
-addMenuBox("MenuFloor",new THREE.Vector3(64,.20,86),new THREE.Vector3(0,-.10,-25),menuFloorMaterial);
-addMenuBox("MenuCeiling",new THREE.Vector3(64,.20,86),new THREE.Vector3(0,8.95,-25),menuCeilingMaterial);
+const menuAmbient=new THREE.HemisphereLight(0xd3c58a,0x11120f,.70);
+menuRuinSet.add(menuAmbient);
 
-addMenuBox("MenuLeftWall",new THREE.Vector3(.24,9.0,86),new THREE.Vector3(-32,4.45,-25),menuWallMaterial);
-addMenuBox("MenuRightWall",new THREE.Vector3(.24,9.0,86),new THREE.Vector3(32,4.45,-25),menuWallMaterial);
-addMenuBox("MenuFarWall",new THREE.Vector3(64,9.0,.24),new THREE.Vector3(0,4.45,-67),menuWallMaterial);
+const menuWarmPool=new THREE.PointLight(0xc7ac64,2.5,38,2);
+menuWarmPool.position.set(7,4,5);
+menuRuinSet.add(menuWarmPool);
 
-// Long wall trim and upper shadow bands.
-addMenuBox("MenuLeftBase",new THREE.Vector3(.32,.24,86),new THREE.Vector3(-31.82,.42,-25),menuTrimMaterial);
-addMenuBox("MenuRightBase",new THREE.Vector3(.32,.24,86),new THREE.Vector3(31.82,.42,-25),menuTrimMaterial);
-addMenuBox("MenuLeftShadowBand",new THREE.Vector3(.28,.38,86),new THREE.Vector3(-31.82,7.1,-25),menuTrimMaterial);
-addMenuBox("MenuRightShadowBand",new THREE.Vector3(.28,.38,86),new THREE.Vector3(31.82,7.1,-25),menuTrimMaterial);
+const menuColdPool=new THREE.PointLight(0x68705c,1.8,34,2);
+menuColdPool.position.set(-12,3,-20);
+menuRuinSet.add(menuColdPool);
 
-// Repetitive room dividers create depth without making the background a hallway.
-for(const [x,z,w,d,h] of [
-  [-18,-1,11,.26,6.8],
-  [10,-3,8,.26,6.4],
-  [-10,-17,.26,14,6.9],
-  [15,-21,.26,13,6.7],
-  [-19,-39,12,.26,6.5],
-  [6,-43,.26,16,6.2],
-  [21,-56,8,.26,6.6]
-]){
-  addMenuBox("MenuDivider",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h*.5,z),menuWallMaterial);
-}
-
-// Broken upper divider chunks.
-for(const [x,z,w,d,y,ry] of [
-  [-18,-11,6.5,.30,6.95,.03],
-  [11,-16,5.5,.30,6.6,-.03],
-  [-17,-48,7.2,.30,6.55,.06],
-  [12,-53,5.8,.30,6.4,-.05]
-]){
-  addMenuBox("MenuBrokenDivider",new THREE.Vector3(w,1.15,d),new THREE.Vector3(x,y,z),menuRuinMaterial,ry,0,.02);
-}
-
-// Large black ceiling cavities.
-for(const [x,z,w,d,rot] of [
-  [-15,-4,6.0,3.0,.04],
-  [3,-12,4.8,2.7,-.03],
-  [15,-29,6.3,3.2,.06],
-  [-7,-36,5.0,2.8,-.05],
-  [12,-54,5.8,2.9,.04]
-]){
-  addMenuBox("MenuCeilingVoid",new THREE.Vector3(w,.11,d),new THREE.Vector3(x,8.82,z),menuDarkMaterial,rot);
-}
-
-// Sagging roof beams and collapsed panels.
-for(const [x,z,len,rot,y] of [
-  [-11,-2,7.0,.15,7.95],
-  [8,-14,5.7,-.12,8.1],
-  [-6,-29,8.0,.10,7.65],
-  [14,-48,6.2,-.16,7.85]
-]){
-  addMenuBox("MenuRuinBeam",new THREE.Vector3(len,.26,.34),new THREE.Vector3(x,y,z),menuRuinMaterial,rot,.10,.02);
-}
-for(const [x,z,w,d,rx,rz] of [
-  [-19,-8,3.6,2.4,.10,.05],
-  [16,-25,4.2,2.6,-.08,-.04],
-  [-13,-42,4.8,2.8,.12,.06],
-  [11,-58,4.0,2.3,-.10,-.05]
-]){
-  addMenuBox("MenuFallenCeilingPanel",new THREE.Vector3(w,.12,d),new THREE.Vector3(x,7.9,z),menuRuinMaterial,0,rx,rz);
-}
-
-// Dark broken wall mouths. These are openings, not doors.
-for(const [x,z,w,h] of [
-  [-22,-8,4.5,5.9],
-  [13,-12,4.2,5.4],
-  [-16,-27,4.8,6.0],
-  [18,-36,4.4,5.8],
-  [-6,-55,4.1,5.4]
-]){
-  addMenuBox("MenuBlackMouth",new THREE.Vector3(w,h,.08),new THREE.Vector3(x,2.95,z),menuDarkMaterial);
-  addMenuBox("MenuMouthTop",new THREE.Vector3(w+.25,.18,.16),new THREE.Vector3(x,6.0,z+.02),menuRuinMaterial);
-}
-
-// Water streaks and peeled wallpaper strips.
-for(const [x,z,w,h,ry] of [
-  [-31,-8,.18,4.6,.01],
-  [-30,-29,.13,2.9,-.02],
-  [30,-18,.16,4.2,.02],
-  [31,-45,.14,3.2,-.02],
-  [-18,-39,.12,2.8,.02],
-  [14,-3,.12,2.4,-.03]
-]){
-  addMenuBox("MenuWallStreak",new THREE.Vector3(w,h,.03),new THREE.Vector3(x,3.0,z),menuStainMaterial,ry);
-}
-for(const [x,z,w,h,ry] of [
-  [-30,-15,1.1,2.5,.02],
-  [30,-31,1.2,3.3,-.02],
-  [-31,-53,1.0,2.1,.02],
-  [31,-59,1.2,2.7,-.02]
-]){
-  addMenuBox("MenuPeel",new THREE.Vector3(w,h,.04),new THREE.Vector3(x,4.1,z),menuRuinMaterial,ry,0,.08);
-}
-
-// Wet carpet patches and reflective puddles.
-for(const [x,z,sx,sz,ry] of [
-  [-7,-5,5.0,1.8,.18],
-  [13,-8,4.6,1.6,-.20],
-  [-14,-20,3.8,1.3,.40],
-  [3,-30,5.4,1.9,-.26],
-  [17,-46,4.2,1.4,.24]
-]){
-  addMenuBox("MenuDampPatch",new THREE.Vector3(sx,.028,sz),new THREE.Vector3(x,.016,z),menuStainMaterial,ry);
-  addMenuBox("MenuPuddle",new THREE.Vector3(sx*.58,.012,sz*.52),new THREE.Vector3(x,.032,z),menuPuddleMaterial,ry);
-}
-
-// Small foreground debris, deliberately sparse.
-for(const [x,z,sx,sy,sz,ry,rx] of [
-  [8,-1,1.5,.18,.55,.28,.16],
-  [17,-10,.9,.20,.32,-.55,.10],
-  [-3,-14,1.1,.14,.42,.40,.08],
-  [20,-27,1.4,.16,.36,-.25,.06],
-  [-12,-33,.85,.16,.28,.75,.18],
-  [8,-39,1.3,.18,.34,-.45,.11],
-  [-18,-52,1.0,.14,.31,.18,.10]
-]){
-  addMenuBox("MenuDebris",new THREE.Vector3(sx,sy,sz),new THREE.Vector3(x,sy*.5+.02,z),menuRuinMaterial,ry,rx,.05);
-}
-
-// Fluorescent ceiling grid. A few lamps are weak/dead to keep the room uneasy.
-addMenuLight(-10,2,8,.4,3.2,1.0,false);
-addMenuLight(7,-2,12,1.2,3.4,1.0,false);
-addMenuLight(-3,-13,10,2.1,3.1,1.0,true);
-addMenuLight(17,-18,7,2.8,2.9,.92,false);
-addMenuLight(-12,-27,12,3.5,3.4,1.0,false);
-addMenuLight(7,-34,6,4.2,2.8,.95,true);
-addMenuLight(-16,-45,9,5.0,3.0,1.0,false);
-addMenuLight(12,-55,5,5.8,2.8,.92,false);
-
-// Long dark fixtures add the ceiling rhythm even where bulbs are dead.
-for(const [x,z,len] of [
-  [-24,-2,4.4],
-  [23,-15,4.0],
-  [-22,-31,3.8],
-  [21,-44,4.2],
-  [-8,-58,4.0]
-]){
-  addMenuBox("MenuDeadFixture",new THREE.Vector3(len,.08,.95),new THREE.Vector3(x,8.82,z),menuTrimMaterial);
-}
-
-// Cold shadow fill + dirty yellow pools of light.
-const menuAmbient=new THREE.HemisphereLight(0xd0c38a,0x12130f,.58);
-menuSet.add(menuAmbient);
-
-const menuFill=new THREE.PointLight(0xc8b26d,2.6,42,2);
-menuFill.position.set(10,4,-14);
-menuSet.add(menuFill);
-
-const menuDarkFill=new THREE.PointLight(0x4f5546,1.7,30,2);
-menuDarkFill.position.set(-14,2,-33);
-menuSet.add(menuDarkFill);
-
-const menuFarGlow=new THREE.PointLight(0xb6a05d,1.3,38,2);
-menuFarGlow.position.set(2,5,-56);
-menuSet.add(menuFarGlow);
-
-const menuCameraStart=new THREE.Vector3(10.8,2.35,8.4);
-const menuCameraTarget=new THREE.Vector3(5.0,2.65,-22.0);
-menuCamera.fov=68;
+const menuCameraStart=new THREE.Vector3(38,2.05,41);
+const menuCameraTarget=new THREE.Vector3(32,2.35,13);
+menuCamera.fov=67;
 menuCamera.updateProjectionMatrix();
 
 let menuBackdropWasActive=false;
@@ -500,7 +271,8 @@ function updateMenuScene(t,dt){
   if(gameStarted || !homeScreen || homeScreen.classList.contains("hidden")){
     if(menuBackdropWasActive){
       menuBackdropWasActive=false;
-      menuSet.visible=false;
+      menuRuinSet.visible=false;
+      menuWorld.root.visible=false;
       world.root.visible=true;
       scene.background.set(0x000100);
       scene.fog.color.set(0x030302);
@@ -513,41 +285,47 @@ function updateMenuScene(t,dt){
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
     if(menuBackdropElement) menuBackdropElement.style.display="none";
-    menuSet.visible=true;
+
+    menuRuinSet.visible=true;
+    menuWorld.root.visible=true;
     world.root.visible=false;
-    menuScene.background.set(0x57533c);
-    menuScene.fog.color.set(0x5d5942);
-    menuScene.fog.near=18;
-    menuScene.fog.far=86;
-    menuCamera.position.copy(menuCameraStart);
-    menuCamera.lookAt(menuCameraTarget);
+
+    menuWorld.lastStreamCX=null;
+    menuWorld.lastStreamCZ=null;
+    menuWorld.streamNeedsWork=true;
   }
 
-  menuCamera.position.x=menuCameraStart.x+Math.sin(t*.055)*.20;
-  menuCamera.position.y=menuCameraStart.y+Math.sin(t*.09)*.025;
-  menuCamera.position.z=menuCameraStart.z+Math.cos(t*.048)*.12;
+  // Keep the showcase world centered around the known open spawn area.
+  menuWorld.update(32,32);
+
+  menuScene.background.set(0x514d37);
+  menuScene.fog.color.set(0x5b5742);
+  menuScene.fog.near=18;
+  menuScene.fog.far=82;
+
+  menuCamera.position.x=menuCameraStart.x+Math.sin(t*.045)*.20;
+  menuCamera.position.y=menuCameraStart.y+Math.sin(t*.08)*.018;
+  menuCamera.position.z=menuCameraStart.z+Math.cos(t*.042)*.12;
   menuCamera.lookAt(
-    menuCameraTarget.x+Math.sin(t*.045)*.35,
-    menuCameraTarget.y+Math.sin(t*.035)*.02,
+    menuCameraTarget.x+Math.sin(t*.038)*.30,
+    menuCameraTarget.y,
     menuCameraTarget.z
   );
 
-  menuSet.traverse(node=>{
-    if(node.userData?.basePower!==undefined){
-      const phase=node.userData.phase||0;
-      const dead=node.userData.dead===true;
-      const wave=Math.sin(t*1.65+phase)*.06;
-      const glitch=Math.sin(t*4.9+phase*4.2)>0.988 ? -(dead?.35:.74) : 0;
-      const target=Math.max(0.12,node.userData.basePower*(1+wave+glitch));
-      node.intensity=target;
+  menuRuinSet.traverse(node=>{
+    const power=node.userData?.menuBasePower;
+    if(power===undefined) return;
 
-      if(node.material?.emissiveIntensity!==undefined && node.userData.baseEmissive!==undefined){
-        const lightWave=Math.sin(t*1.65+phase)*.07;
-        node.material.emissiveIntensity=Math.max(
-          .08,
-          node.userData.baseEmissive*(1+lightWave)
-        );
-      }
+    const phase=node.userData.menuPhase||0;
+    const wave=Math.sin(t*1.7+phase)*.07;
+    const dropout=Math.sin(t*4.8+phase*3.9)>.988 ? -.72 : 0;
+    node.intensity=Math.max(.3,power*(1+wave+dropout));
+
+    if(node.material?.emissiveIntensity!==undefined){
+      node.material.emissiveIntensity=Math.max(
+        .15,
+        2.8*(1+Math.sin(t*1.7+phase)*.06)
+      );
     }
   });
 
