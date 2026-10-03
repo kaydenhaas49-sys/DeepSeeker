@@ -907,6 +907,15 @@ function installMainMenuRedesign(){
   width:100%;
   height:100%;
 }
+.menuEditableElement{box-sizing:border-box}
+.menuHomeLayout.menuLayoutEditing .menuEditableElement{outline:1px dashed rgba(222,179,91,.58);outline-offset:4px;cursor:move}
+.menuHomeLayout.menuLayoutEditing .menuEditableElement:hover{outline-color:rgba(243,205,119,.90);z-index:15}
+.menuResizeHandle{display:none;position:absolute;right:-5px;bottom:-5px;width:14px;height:14px;border:1px solid rgba(235,219,163,.64);border-radius:2px;background:rgba(8,8,6,.92);box-shadow:0 2px 10px rgba(0,0,0,.38);cursor:nwse-resize;z-index:40}
+.menuResizeHandle::before,.menuResizeHandle::after{content:"";position:absolute;right:2px;bottom:2px;width:7px;height:1px;background:#d8b865;transform:rotate(-45deg);transform-origin:right center}
+.menuResizeHandle::after{right:2px;bottom:5px;width:5px;opacity:.65}
+.menuHomeLayout.menuLayoutEditing .menuResizeHandle{display:block}
+.menuLayoutHint{margin-top:12px;padding:9px 10px;border:1px solid rgba(231,220,171,.08);border-radius:4px;background:rgba(255,255,255,.025);color:#77705f;font-size:7px;line-height:1.7;letter-spacing:1px}
+.menuLayoutSelection{margin-top:8px;color:#bfb18d;min-height:12px}
 
 .menuHomeLayout::before{
   content:"";
@@ -1580,7 +1589,9 @@ function installMainMenuRedesign(){
   editor.className="menuEditor";
   editor.innerHTML=
     '<div class="menuEditorTitle">MENU EDITOR</div>'+
-    '<div class="menuEditorSub">Preview changes live. SAVE LOCAL remembers them on this browser. GITHUB EXPORT copies the values for committing to the repository.</div>'+
+    '<div class="menuEditorSub">Background + icons stay here. Open EDIT, then drag the outlined menu panels to move them or drag the corner handle to resize them.</div>'+
+    '<div class="menuLayoutHint">EDIT MODE: DRAG A PANEL TO MOVE IT · DRAG THE BOTTOM-RIGHT HANDLE TO RESIZE IT.</div>'+
+    '<div id="menuEditorLayoutSelection" class="menuLayoutSelection">Selected: NONE</div>'+
     '<div class="menuEditorGrid">'+
       '<div class="menuEditorRow"><label>BACKGROUND IMAGE URL</label><input id="menuEditorUrl" type="text" spellcheck="false"></div>'+
       '<div class="menuEditorRow"><label>HORIZONTAL POSITION</label><div class="menuEditorRange"><input id="menuEditorX" type="range" min="0" max="100" value="50"><output id="menuEditorXOut">50%</output></div></div>'+
@@ -1617,6 +1628,7 @@ function installMainMenuRedesign(){
   const saturationInput=editor.querySelector("#menuEditorSaturation");
   const sepiaInput=editor.querySelector("#menuEditorSepia");
   const status=editor.querySelector("#menuEditorStatus");
+  const layoutSelection=editor.querySelector("#menuEditorLayoutSelection");
   const iconInputs={
     continue:editor.querySelector("#menuIconContinue"),
     newGame:editor.querySelector("#menuIconNewGame"),
@@ -1630,6 +1642,15 @@ function installMainMenuRedesign(){
   const outputS=editor.querySelector("#menuEditorSaturationOut");
   const outputP=editor.querySelector("#menuEditorSepiaOut");
 
+  const defaultMenuLayout={
+    logo:{x:3.0,y:3.0,w:34.0,h:18.0},
+    nav:{x:3.0,y:25.0,w:30.0,h:49.0},
+    saves:{x:3.0,y:72.0,w:46.0,h:21.0},
+    terminal:{x:30.5,y:23.0,w:25.0,h:44.0},
+    footer:{x:3.0,y:93.0,w:94.0,h:6.0}
+  };
+  let menuLayout=Object.fromEntries(Object.entries(defaultMenuLayout).map(([key,rect])=>[key,{...rect}]));
+
   const defaultMenuConfig={
     url:"https://images.unsplash.com/photo-1761251946420-8b65ad19f2e7?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400",
     x:50,
@@ -1637,12 +1658,16 @@ function installMainMenuRedesign(){
     brightness:72,
     saturation:118,
     sepia:38,
-    icons:{...defaultMenuIcons}
+    icons:{...defaultMenuIcons},
+    layout:menuLayout
   };
   let menuConfig={...defaultMenuConfig};
   try{
     const saved=JSON.parse(localStorage.getItem("deepseeker-menu-config")||"null");
-    if(saved && typeof saved==="object") menuConfig={...menuConfig,...saved};
+    if(saved && typeof saved==="object"){
+      menuConfig={...menuConfig,...saved,icons:{...defaultMenuIcons,...(saved.icons||{})},layout:{...menuLayout,...(saved.layout||{})}};
+      menuLayout={...menuLayout,...(saved.layout||{})};
+    }
   }catch{}
 
   function syncMenuEditor(){
@@ -1670,6 +1695,7 @@ function installMainMenuRedesign(){
       brightness:Number(brightnessInput.value),
       saturation:Number(saturationInput.value),
       sepia:Number(sepiaInput.value),
+      layout:Object.fromEntries(Object.entries(menuLayout).map(([key,rect])=>[key,{...rect}])),
       icons:Object.fromEntries(
         Object.entries(iconInputs).map(([key,input])=>[
           key,
@@ -1679,8 +1705,28 @@ function installMainMenuRedesign(){
     };
   }
 
+  const menuLayoutElements=()=>({logo,nav,saves:slotBar,terminal:right,footer});
+
+  function applyMenuLayout(nextLayout=menuLayout){
+    menuLayout=Object.fromEntries(Object.entries(defaultMenuLayout).map(([key,defaults])=>[key,{...defaults,...(nextLayout?.[key]||{})}]));
+    for(const [key,element] of Object.entries(menuLayoutElements())){
+      const rect=menuLayout[key];
+      if(!element||!rect) continue;
+      element.style.left=String(rect.x)+"%";
+      element.style.top=String(rect.y)+"%";
+      element.style.width=String(rect.w)+"%";
+      element.style.height=String(rect.h)+"%";
+      element.style.right="auto";
+      element.style.bottom="auto";
+      element.style.boxSizing="border-box";
+      if(key==="logo") element.style.maxWidth="none";
+    }
+  }
+
   function applyMenuEditor(config){
     menuConfig={...defaultMenuConfig,...config};
+    menuLayout={...menuLayout,...(config?.layout||{})};
+    applyMenuLayout(menuLayout);
     const safeUrl=String(menuConfig.url||defaultMenuConfig.url).replace(/"/g,"");
     backdrop.style.backgroundImage=
       "linear-gradient(90deg,rgba(5,6,4,.86) 0%,rgba(8,9,6,.54) 24%,rgba(12,11,7,.12) 55%,rgba(5,5,4,.28) 100%),"+
@@ -1715,7 +1761,8 @@ function installMainMenuRedesign(){
 
   resetButton.addEventListener("click",()=>{
     menuIcons={...defaultMenuIcons};
-    menuConfig={...defaultMenuConfig,icons:{...menuIcons}};
+    menuLayout=Object.fromEntries(Object.entries(defaultMenuLayout).map(([key,rect])=>[key,{...rect}]));
+    menuConfig={...defaultMenuConfig,icons:{...menuIcons},layout:menuLayout};
     applyMenuEditor(menuConfig);
     status.textContent="RESET";
   });
@@ -1742,7 +1789,8 @@ function installMainMenuRedesign(){
     menuConfig=readMenuEditor();
     const snippet=
       "const MENU_BACKGROUND_CONFIG="+JSON.stringify(menuConfig,null,2)+";\n"+
-      "const MENU_ICONS="+JSON.stringify(menuConfig.icons,null,2)+";";
+      "const MENU_ICONS="+JSON.stringify(menuConfig.icons,null,2)+";\n"+
+      "const MENU_LAYOUT="+JSON.stringify(menuConfig.layout,null,2)+";";
     try{
       await navigator.clipboard.writeText(snippet);
       status.textContent="GITHUB CONFIG COPIED";
@@ -1751,9 +1799,65 @@ function installMainMenuRedesign(){
     }
   });
 
+  let activeLayoutKey=null;
+  let layoutPointerState=null;
+  const setLayoutSelection=(key)=>{
+    activeLayoutKey=key;
+    for(const [name,element] of Object.entries(menuLayoutElements())) if(element) element.classList.toggle("menuLayoutSelected",name===key);
+    if(layoutSelection) layoutSelection.textContent=key ? "Selected: "+key.toUpperCase()+" · DRAG TO MOVE · CORNER TO RESIZE" : "Selected: NONE";
+  };
+  const clampLayoutRect=(rect)=>{
+    const w=Math.max(8,Math.min(100,Number(rect.w)||8));
+    const h=Math.max(4,Math.min(100,Number(rect.h)||4));
+    const x=Math.max(0,Math.min(100-w,Number(rect.x)||0));
+    const y=Math.max(0,Math.min(100-h,Number(rect.y)||0));
+    return {x,y,w,h};
+  };
+  const beginLayoutPointer=(event,key,mode)=>{
+    if(!editor.classList.contains("open")||event.button!==0) return;
+    event.preventDefault(); event.stopPropagation();
+    const rect=menuLayout[key]; if(!rect) return;
+    setLayoutSelection(key);
+    layoutPointerState={key,mode,startX:event.clientX,startY:event.clientY,base:{...rect}};
+  };
+  for(const [key,element] of Object.entries(menuLayoutElements())){
+    if(!element) continue;
+    element.classList.add("menuEditableElement");
+    const handle=document.createElement("span");
+    handle.className="menuResizeHandle";
+    handle.setAttribute("aria-label","Resize "+key);
+    element.appendChild(handle);
+    element.addEventListener("pointerdown",event=>{
+      if(event.target.closest(".menuResizeHandle")) return;
+      beginLayoutPointer(event,key,"move");
+    },true);
+    element.addEventListener("click",event=>{
+      if(editor.classList.contains("open")){event.preventDefault();event.stopPropagation();}
+    },true);
+    handle.addEventListener("pointerdown",event=>beginLayoutPointer(event,key,"resize"));
+  }
+  document.addEventListener("pointermove",event=>{
+    if(!layoutPointerState) return;
+    const bounds=layout.getBoundingClientRect();
+    if(!bounds.width||!bounds.height) return;
+    const dx=(event.clientX-layoutPointerState.startX)/bounds.width*100;
+    const dy=(event.clientY-layoutPointerState.startY)/bounds.height*100;
+    const base=layoutPointerState.base;
+    const next={...base};
+    if(layoutPointerState.mode==="move"){next.x=base.x+dx;next.y=base.y+dy;}
+    else{next.w=base.w+dx;next.h=base.h+dy;}
+    menuLayout[layoutPointerState.key]=clampLayoutRect(next);
+    applyMenuLayout(menuLayout);
+    menuConfig={...menuConfig,layout:menuLayout};
+  });
+  document.addEventListener("pointerup",()=>{layoutPointerState=null;});
+
   editButton.addEventListener("click",()=>{
-    editor.classList.toggle("open");
-    editButton.textContent=editor.classList.contains("open")?"CLOSE":"EDIT";
+    const open=!editor.classList.contains("open");
+    editor.classList.toggle("open",open);
+    layout.classList.toggle("menuLayoutEditing",open);
+    editButton.textContent=open?"CLOSE":"EDIT";
+    if(!open) setLayoutSelection(null);
   });
 
   layout.append(editButton,editor);
@@ -1762,8 +1866,13 @@ function installMainMenuRedesign(){
 
 
   homeScreen.appendChild(layout);
+  applyMenuLayout(menuLayout);
+  applyMenuEditor(menuConfig);
 
-  window.__deepseekerMenu={};
+  window.__deepseekerMenu={
+    getLayout:()=>JSON.parse(JSON.stringify(menuLayout)),
+    setLayout:(next)=>{menuLayout={...menuLayout,...(next||{})};applyMenuLayout(menuLayout);}
+  };
 }
 
 function updateHouseLoadingUI(progress=null,status=null){
