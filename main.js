@@ -3335,7 +3335,7 @@ const SPIDER_ANIMATION_RANGES={
 const SPIDER_ANIMATION_ALIAS={
   idle:"idle1",
   stalk:"idle2",
-  chase:"sidestep",
+  chase:"jump",
   attack:"attack1",
   hit:"hit1",
   death:"die1"
