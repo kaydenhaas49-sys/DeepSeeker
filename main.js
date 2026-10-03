@@ -1352,6 +1352,59 @@ function installMainMenuRedesign(){
 }
 .menuEditorActions button:hover{background:rgba(223,173,69,.10);border-color:rgba(223,173,69,.28)}
 .menuEditorStatus{min-height:13px;margin-top:9px;font-size:7px;letter-spacing:1px;color:#77705e}
+.menuEditorIconGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid rgba(231,220,171,.08);
+}
+.menuEditorIconRow{
+  display:grid;
+  grid-template-columns:1fr 58px;
+  align-items:center;
+  gap:7px;
+}
+.menuEditorIconRow label{
+  font-size:7px;
+  letter-spacing:1.2px;
+  color:#77705e;
+}
+.menuEditorIconRow input{
+  width:58px;
+  box-sizing:border-box;
+  padding:7px 4px;
+  border:1px solid rgba(231,220,171,.11);
+  border-radius:4px;
+  background:#020302;
+  color:#f0e5c5;
+  font:inherit;
+  font-size:16px;
+  line-height:1;
+  text-align:center;
+  outline:none;
+}
+.menuEditorIconRow input:focus{border-color:rgba(223,190,107,.42)}
+.menuNavIcon{
+  display:inline-grid;
+  place-items:center;
+  width:21px;
+  min-width:21px;
+  margin-right:10px;
+  font-size:15px;
+  line-height:1;
+  color:#9f956f;
+  opacity:.9;
+}
+.menuNavButton.active .menuNavIcon,
+.menuNavButton:hover .menuNavIcon{color:#e1b968}
+.menuNavLabel{
+  display:flex;
+  align-items:center;
+  min-width:0;
+  flex:1;
+}
 
 @media(max-width:1000px){
   .menuNav{width:min(320px,38vw)}
@@ -1397,14 +1450,52 @@ function installMainMenuRedesign(){
   nav.className="menuNav";
   nav.setAttribute("aria-label","Main menu");
 
+  const defaultMenuIcons={
+    continue:"▶",
+    newGame:"✦",
+    hostLobby:"◉",
+    joinLobby:"↗",
+    controls:"⚙"
+  };
+  let menuIcons={...defaultMenuIcons};
+  try{
+    const savedIcons=JSON.parse(localStorage.getItem("deepseeker-menu-icons")||"null");
+    if(savedIcons && typeof savedIcons==="object"){
+      menuIcons={...menuIcons,...savedIcons};
+    }
+  }catch{}
+
   const configureButton=(button,label,active=false)=>{
     button.className="menuNavButton"+(active?" active":"");
     button.type="button";
-    if(button===continueButton){
-      button.innerHTML=`<span id="continueSlotLabel">CONTINUE SLOT ${selectedSaveSlot}</span><span class="menuNavArrow">›</span>`;
-    }else{
-      button.innerHTML=`<span>${label}</span><span class="menuNavArrow">›</span>`;
-    }
+    const key=
+      button===continueButton ? "continue" :
+      button===newGameButton ? "newGame" :
+      button===createLobbyButton ? "hostLobby" :
+      button===joinLobbyButton ? "joinLobby" :
+      "controls";
+
+    const labelHtml=button===continueButton
+      ? '<span id="continueSlotLabel">CONTINUE SLOT '+selectedSaveSlot+'</span>'
+      : '<span>'+label+'</span>';
+
+    button.innerHTML=
+      '<span class="menuNavLabel">'+
+        '<span class="menuNavIcon" data-menu-icon="'+key+'">'+
+          String(menuIcons[key]||defaultMenuIcons[key])+
+        '</span>'+
+        labelHtml+
+      '</span>'+
+      '<span class="menuNavArrow">›</span>';
+  };
+
+  const refreshMenuIcons=()=>{
+    document.querySelectorAll("[data-menu-icon]").forEach(icon=>{
+      const key=icon.dataset.menuIcon;
+      if(key && menuIcons[key]!==undefined){
+        icon.textContent=String(menuIcons[key]);
+      }
+    });
   };
 
   const createNavGroup=(label)=>{
@@ -1498,6 +1589,13 @@ function installMainMenuRedesign(){
       '<div class="menuEditorRow"><label>SATURATION</label><div class="menuEditorRange"><input id="menuEditorSaturation" type="range" min="50" max="160" value="118"><output id="menuEditorSaturationOut">118%</output></div></div>'+
       '<div class="menuEditorRow"><label>SEPIA</label><div class="menuEditorRange"><input id="menuEditorSepia" type="range" min="0" max="100" value="38"><output id="menuEditorSepiaOut">38%</output></div></div>'+
     '</div>'+
+    '<div class="menuEditorIconGrid">'+
+      '<div class="menuEditorIconRow"><label>CONTINUE</label><input id="menuIconContinue" maxlength="2"></div>'+
+      '<div class="menuEditorIconRow"><label>NEW GAME</label><input id="menuIconNewGame" maxlength="2"></div>'+
+      '<div class="menuEditorIconRow"><label>HOST LOBBY</label><input id="menuIconHostLobby" maxlength="2"></div>'+
+      '<div class="menuEditorIconRow"><label>JOIN LOBBY</label><input id="menuIconJoinLobby" maxlength="2"></div>'+
+      '<div class="menuEditorIconRow"><label>CONTROLS</label><input id="menuIconControls" maxlength="2"></div>'+
+    '</div>'+
     '<div class="menuEditorActions">'+
       '<button id="menuEditorApply" type="button">APPLY</button>'+
       '<button id="menuEditorReset" type="button">RESET</button>'+
@@ -1519,6 +1617,13 @@ function installMainMenuRedesign(){
   const saturationInput=editor.querySelector("#menuEditorSaturation");
   const sepiaInput=editor.querySelector("#menuEditorSepia");
   const status=editor.querySelector("#menuEditorStatus");
+  const iconInputs={
+    continue:editor.querySelector("#menuIconContinue"),
+    newGame:editor.querySelector("#menuIconNewGame"),
+    hostLobby:editor.querySelector("#menuIconHostLobby"),
+    joinLobby:editor.querySelector("#menuIconJoinLobby"),
+    controls:editor.querySelector("#menuIconControls")
+  };
   const outputX=editor.querySelector("#menuEditorXOut");
   const outputY=editor.querySelector("#menuEditorYOut");
   const outputB=editor.querySelector("#menuEditorBrightnessOut");
@@ -1531,7 +1636,8 @@ function installMainMenuRedesign(){
     y:50,
     brightness:72,
     saturation:118,
-    sepia:38
+    sepia:38,
+    icons:{...defaultMenuIcons}
   };
   let menuConfig={...defaultMenuConfig};
   try{
@@ -1551,6 +1657,9 @@ function installMainMenuRedesign(){
     outputB.textContent=brightnessInput.value+"%";
     outputS.textContent=saturationInput.value+"%";
     outputP.textContent=sepiaInput.value+"%";
+    for(const [key,input] of Object.entries(iconInputs)){
+      if(input) input.value=String(menuIcons[key]||defaultMenuIcons[key]);
+    }
   }
 
   function readMenuEditor(){
@@ -1560,7 +1669,13 @@ function installMainMenuRedesign(){
       y:Number(yInput.value),
       brightness:Number(brightnessInput.value),
       saturation:Number(saturationInput.value),
-      sepia:Number(sepiaInput.value)
+      sepia:Number(sepiaInput.value),
+      icons:Object.fromEntries(
+        Object.entries(iconInputs).map(([key,input])=>[
+          key,
+          String(input?.value||defaultMenuIcons[key]).slice(0,2)
+        ])
+      )
     };
   }
 
@@ -1575,6 +1690,10 @@ function installMainMenuRedesign(){
     backdrop.style.backgroundSize="cover";
     backdrop.style.filter=
       "sepia("+String(menuConfig.sepia)+"%) saturate("+String(menuConfig.saturation)+"%) contrast(1.08) brightness("+String(menuConfig.brightness)+"%)";
+    if(menuConfig.icons && typeof menuConfig.icons==="object"){
+      menuIcons={...defaultMenuIcons,...menuConfig.icons};
+    }
+    refreshMenuIcons();
     syncMenuEditor();
   }
 
@@ -1595,15 +1714,18 @@ function installMainMenuRedesign(){
   });
 
   resetButton.addEventListener("click",()=>{
-    menuConfig={...defaultMenuConfig};
+    menuIcons={...defaultMenuIcons};
+    menuConfig={...defaultMenuConfig,icons:{...menuIcons}};
     applyMenuEditor(menuConfig);
     status.textContent="RESET";
   });
 
   localButton.addEventListener("click",()=>{
     menuConfig=readMenuEditor();
+    menuIcons={...defaultMenuIcons,...menuConfig.icons};
     applyMenuEditor(menuConfig);
     localStorage.setItem("deepseeker-menu-config",JSON.stringify(menuConfig));
+    localStorage.setItem("deepseeker-menu-icons",JSON.stringify(menuIcons));
     status.textContent="SAVED ON THIS BROWSER";
   });
 
@@ -1618,7 +1740,9 @@ function installMainMenuRedesign(){
 
   githubButton.addEventListener("click",async()=>{
     menuConfig=readMenuEditor();
-    const snippet="const MENU_BACKGROUND_CONFIG="+JSON.stringify(menuConfig,null,2)+";";
+    const snippet=
+      "const MENU_BACKGROUND_CONFIG="+JSON.stringify(menuConfig,null,2)+";\n"+
+      "const MENU_ICONS="+JSON.stringify(menuConfig.icons,null,2)+";";
     try{
       await navigator.clipboard.writeText(snippet);
       status.textContent="GITHUB CONFIG COPIED";
