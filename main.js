@@ -519,8 +519,8 @@ function installMainMenuRedesign(){
   if(!homeScreen || homeScreen.dataset.deepseekerMenu==="redesigned") return;
   homeScreen.dataset.deepseekerMenu="redesigned";
   homeScreen.classList.add("menuHomeRedesign");
+  overlay.classList.add("deepseekerMenuOverlay");
 
-  const menuTitle=homeScreen.querySelector(".menuTitle");
   const usernameRow=homeScreen.querySelector(".usernameRow");
   const houseLoader=homeScreen.querySelector("#houseLoaderHome");
   const saveSlots=document.getElementById("saveSlots");
@@ -528,78 +528,410 @@ function installMainMenuRedesign(){
   const style=document.createElement("style");
   style.id="deepseeker-menu-redesign";
   style.textContent=`
-#menuBackdrop{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;background:
-  radial-gradient(circle at 72% 34%,rgba(214,198,124,.17),transparent 18%),
-  radial-gradient(circle at 20% 78%,rgba(34,65,47,.30),transparent 30%),
-  radial-gradient(circle at 52% 44%,rgba(107,98,65,.08),transparent 34%),
-  linear-gradient(180deg,#070a08 0%,#030503 55%,#010201 100%)}
-#menuBackdrop::before{content:"";position:absolute;inset:-18%;opacity:.40;background:
-  linear-gradient(90deg,transparent 0 7%,rgba(223,211,162,.045) 7.1%,transparent 7.25% 18%,rgba(223,211,162,.028) 18.1%,transparent 18.25% 33%,rgba(223,211,162,.04) 33.1%,transparent 33.25% 51%,rgba(223,211,162,.022) 51.1%,transparent 51.25% 72%,rgba(223,211,162,.04) 72.1%,transparent 72.25%),
-  linear-gradient(180deg,transparent 0 15%,rgba(223,211,162,.028) 15.1%,transparent 15.25% 41%,rgba(223,211,162,.04) 41.1%,transparent 41.25% 68%,rgba(223,211,162,.028) 68.1%,transparent 68.25%);
-transform:perspective(900px) rotateX(61deg) translateY(12%);transform-origin:center bottom}
-#menuBackdrop::after{content:"";position:absolute;inset:0;background:
-  linear-gradient(90deg,rgba(1,3,2,.90) 0%,rgba(2,4,3,.58) 19%,rgba(0,0,0,.16) 49%,rgba(0,0,0,.34) 75%,rgba(0,0,0,.82) 100%),
-  linear-gradient(180deg,rgba(0,0,0,.66) 0%,transparent 20%,transparent 63%,rgba(0,0,0,.88) 100%),
-  radial-gradient(circle at 70% 40%,transparent 0 14%,rgba(0,0,0,.10) 33%,rgba(0,0,0,.72) 100%)}
-.menuBackdropGlow{position:absolute;width:52vw;height:52vw;min-width:480px;min-height:480px;right:-8vw;top:-17vw;border-radius:50%;background:radial-gradient(circle,rgba(221,205,136,.16),rgba(221,205,136,.045) 26%,rgba(221,205,136,0) 68%);filter:blur(14px);animation:menuGlow 8s ease-in-out infinite alternate}
-.menuBackdropScan{position:absolute;inset:0;background:
-  repeating-linear-gradient(180deg,transparent 0 4px,rgba(255,255,255,.012) 5px,transparent 6px),
-  radial-gradient(ellipse at 74% 70%,rgba(214,201,138,.075),transparent 32%);opacity:.48;mix-blend-mode:screen}
-#menuBackdrop .menuBackdropArchitecture{position:absolute;inset:0;opacity:.74;background:
-  linear-gradient(90deg,transparent 0 56%,rgba(210,198,151,.075) 56.15%,transparent 56.35% 67%,rgba(210,198,151,.05) 67.15%,transparent 67.35%),
-  linear-gradient(180deg,transparent 0 34%,rgba(210,198,151,.055) 34.15%,transparent 34.35% 68%,rgba(210,198,151,.045) 68.15%,transparent 68.35%);
-filter:blur(.2px)}
-#menuBackdrop .menuBackdropLight{position:absolute;right:11vw;top:12vh;width:min(38vw,520px);height:4px;background:linear-gradient(90deg,transparent,rgba(245,236,193,.18),rgba(245,236,193,.72),rgba(245,236,193,.12),transparent);box-shadow:0 0 34px rgba(233,219,161,.18),0 0 90px rgba(233,219,161,.08);transform:rotate(-2deg);opacity:.8;animation:menuLightPulse 5.5s ease-in-out infinite}
-#menuBackdrop .menuBackdropLight.secondary{top:22vh;right:24vw;width:min(26vw,360px);opacity:.34;animation-delay:-2s}
-#menuBackdrop .menuBackdropHaze{position:absolute;inset:0;background:
-  radial-gradient(ellipse at 72% 40%,rgba(214,201,138,.055),transparent 21%),
-  linear-gradient(90deg,transparent 48%,rgba(204,196,165,.035) 70%,transparent 100%);filter:blur(22px);animation:menuHaze 13s ease-in-out infinite alternate}
-@keyframes menuGlow{from{transform:translate3d(-2%,2%,0) scale(.94);opacity:.68}to{transform:translate3d(3%,-1%,0) scale(1.06);opacity:1}}
-@keyframes menuLightPulse{0%,100%{opacity:.55;filter:brightness(.86)}48%{opacity:.92;filter:brightness(1.16)}51%{opacity:.68;filter:brightness(.72)}54%{opacity:.9;filter:brightness(1.08)}}
-@keyframes menuHaze{from{transform:translate3d(-2%,0,0) scale(1)}to{transform:translate3d(2%,-1%,0) scale(1.04)}}
-#homeScreen.menuHomeRedesign{position:absolute;inset:0;z-index:2;display:block;width:100vw;height:100vh;padding:0;box-sizing:border-box;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;overflow:hidden}
+#overlay.deepseekerMenuOverlay{
+  justify-content:flex-start;
+  align-items:flex-start;
+  gap:0;
+  overflow:hidden;
+  background:transparent;
+  cursor:default;
+}
+#overlay.deepseekerMenuOverlay::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(90deg,rgba(2,4,3,.96) 0%,rgba(2,4,3,.83) 18%,rgba(2,4,3,.24) 42%,transparent 66%),
+    linear-gradient(180deg,rgba(0,0,0,.70) 0%,transparent 22%,transparent 70%,rgba(0,0,0,.72) 100%);
+  z-index:1;
+}
+#menuBackdrop{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:0;
+  background:
+    radial-gradient(circle at 73% 34%,rgba(216,194,118,.20),transparent 19%),
+    radial-gradient(circle at 63% 62%,rgba(72,89,67,.19),transparent 26%),
+    linear-gradient(180deg,#151a17 0%,#0b100d 50%,#040604 100%);
+}
+#menuBackdrop::before{
+  content:"";
+  position:absolute;
+  inset:-10%;
+  background:
+    linear-gradient(90deg,transparent 0 11%,rgba(230,222,183,.08) 11.15%,transparent 11.4% 28%,rgba(230,222,183,.035) 28.15%,transparent 28.4% 46%,rgba(230,222,183,.055) 46.15%,transparent 46.4% 70%,rgba(230,222,183,.045) 70.15%,transparent 70.4%),
+    linear-gradient(180deg,transparent 0 19%,rgba(230,222,183,.055) 19.15%,transparent 19.45% 48%,rgba(230,222,183,.035) 48.15%,transparent 48.45% 78%,rgba(230,222,183,.045) 78.15%,transparent 78.45%);
+  transform:perspective(900px) rotateX(62deg) translateY(10%);
+  transform-origin:center bottom;
+  opacity:.58;
+}
+#menuBackdrop::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(ellipse at 74% 44%,transparent 0 12%,rgba(0,0,0,.08) 30%,rgba(0,0,0,.70) 100%),
+    repeating-linear-gradient(180deg,transparent 0 5px,rgba(255,255,255,.012) 6px,transparent 7px);
+  mix-blend-mode:screen;
+  opacity:.56;
+}
+.menuBackdropGlow{
+  position:absolute;
+  width:48vw;
+  height:48vw;
+  min-width:480px;
+  min-height:480px;
+  right:-8vw;
+  top:-14vw;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(232,211,145,.18),rgba(232,211,145,.04) 30%,transparent 69%);
+  filter:blur(12px);
+  animation:menuGlow 8s ease-in-out infinite alternate;
+}
+.menuBackdropScan{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg,transparent,rgba(213,201,153,.06),transparent);
+  width:34vw;
+  transform:translateX(-40vw) skewX(-10deg);
+  animation:menuSweep 11s ease-in-out infinite;
+  opacity:.28;
+}
+.menuBackdropArchitecture{
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(90deg,transparent 53%,rgba(211,200,157,.08) 53.15%,transparent 53.4% 61%,rgba(211,200,157,.05) 61.15%,transparent 61.4%),
+    linear-gradient(180deg,transparent 28%,rgba(211,200,157,.06) 28.15%,transparent 28.45% 59%,rgba(211,200,157,.05) 59.15%,transparent 59.4%);
+  opacity:.62;
+}
+.menuBackdropTower{
+  position:absolute;
+  right:15vw;
+  bottom:7vh;
+  width:14vw;
+  height:50vh;
+  min-width:140px;
+  background:
+    linear-gradient(90deg,rgba(0,0,0,.2),rgba(220,209,162,.08),rgba(0,0,0,.28)),
+    repeating-linear-gradient(180deg,transparent 0 34px,rgba(231,220,177,.055) 35px 36px,transparent 37px);
+  border:1px solid rgba(226,215,171,.10);
+  transform:skewY(-4deg);
+  box-shadow:0 0 80px rgba(216,201,138,.06);
+  opacity:.44;
+}
+.menuBackdropTower::before,
+.menuBackdropTower::after{
+  content:"";
+  position:absolute;
+  top:-8vh;
+  width:3px;
+  height:66vh;
+  background:linear-gradient(180deg,transparent,rgba(230,218,171,.16),transparent);
+}
+.menuBackdropTower::before{left:22%}
+.menuBackdropTower::after{right:18%}
+.menuBackdropPipe{
+  position:absolute;
+  right:3vw;
+  bottom:18vh;
+  width:34vw;
+  max-width:520px;
+  height:4px;
+  background:linear-gradient(90deg,transparent,rgba(215,203,160,.08) 10%,rgba(234,222,178,.55) 45%,rgba(234,222,178,.15) 80%,transparent);
+  box-shadow:0 0 24px rgba(229,214,159,.11);
+  transform:rotate(-5deg);
+  opacity:.65;
+}
+.menuBackdropLight{
+  position:absolute;
+  right:12vw;
+  top:14vh;
+  width:min(31vw,480px);
+  height:5px;
+  background:linear-gradient(90deg,transparent,rgba(244,237,203,.20),rgba(244,237,203,.86),rgba(244,237,203,.15),transparent);
+  box-shadow:0 0 26px rgba(239,222,166,.22),0 0 88px rgba(239,222,166,.09);
+  transform:rotate(-2deg);
+  animation:menuLightPulse 5.8s ease-in-out infinite;
+  opacity:.85;
+}
+.menuBackdropLight.secondary{
+  top:25vh;
+  right:25vw;
+  width:min(23vw,350px);
+  opacity:.28;
+  animation-delay:-2.5s;
+}
+.menuBackdropHaze{
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(ellipse at 74% 42%,rgba(217,201,138,.06),transparent 22%),
+    linear-gradient(90deg,transparent 35%,rgba(206,197,164,.03) 73%,transparent);
+  filter:blur(24px);
+  animation:menuHaze 13s ease-in-out infinite alternate;
+}
+@keyframes menuGlow{
+  from{transform:translate3d(-2%,2%,0) scale(.94);opacity:.60}
+  to{transform:translate3d(3%,-1%,0) scale(1.06);opacity:1}
+}
+@keyframes menuLightPulse{
+  0%,100%{opacity:.48;filter:brightness(.84)}
+  46%{opacity:.92;filter:brightness(1.18)}
+  50%{opacity:.62;filter:brightness(.70)}
+  54%{opacity:.90;filter:brightness(1.08)}
+}
+@keyframes menuSweep{
+  0%{transform:translateX(-40vw) skewX(-10deg)}
+  46%,100%{transform:translateX(130vw) skewX(-10deg)}
+}
+@keyframes menuHaze{
+  from{transform:translate3d(-2%,0,0) scale(1)}
+  to{transform:translate3d(2%,-1%,0) scale(1.04)}
+}
+
+#homeScreen.menuHomeRedesign{
+  position:absolute;
+  inset:0;
+  z-index:3;
+  display:block;
+  width:100vw;
+  height:100vh;
+  padding:0;
+  box-sizing:border-box;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+  overflow:hidden;
+}
 #homeScreen.menuHomeRedesign.hidden{display:none}
-.menuShell{display:grid;grid-template-columns:minmax(250px,18vw) minmax(0,1fr);height:100%;min-height:0}
-.menuSidebar{display:flex;flex-direction:column;padding:clamp(24px,4vh,42px) 18px 18px;background:linear-gradient(180deg,rgba(6,10,8,.86),rgba(3,5,4,.72));border-right:1px solid rgba(231,220,171,.10);box-shadow:18px 0 60px rgba(0,0,0,.28);min-width:0;backdrop-filter:blur(10px)}
-.menuBrand{padding:2px 12px 26px;border-bottom:1px solid rgba(231,220,171,.09)}
-.menuBrandMark{width:34px;height:34px;display:grid;place-items:center;margin-bottom:13px;border:1px solid rgba(218,203,143,.34);border-radius:10px;color:#e8dfb8;font-size:12px;letter-spacing:2px;background:linear-gradient(145deg,rgba(216,201,138,.13),rgba(255,255,255,.025));box-shadow:0 0 28px rgba(216,201,138,.05)}
-.menuBrandName{font-size:23px;letter-spacing:5px;color:#f1e9c6;text-shadow:0 0 22px rgba(220,202,137,.12)}
-.menuBrandSub{margin-top:7px;font-size:8px;letter-spacing:2.3px;color:#817e6d}
-.menuNav{display:flex;flex-direction:column;gap:7px;margin-top:20px}
-.menuNavButton{position:relative;width:100%;min-height:52px;padding:0 13px;display:grid;grid-template-columns:28px 1fr 16px;align-items:center;gap:8px;border:1px solid transparent;border-radius:10px;background:transparent;color:#969482;font:inherit;text-align:left;font-size:10px;letter-spacing:1.9px;cursor:pointer;transition:background .18s,border-color .18s,color .18s,transform .18s}
-.menuNavButton:hover{background:rgba(216,201,138,.06);border-color:rgba(216,201,138,.12);color:#e0d8b5;transform:translateX(2px)}
-.menuNavButton.active,.menuNavButton:focus-visible{background:linear-gradient(90deg,rgba(216,201,138,.13),rgba(216,201,138,.03));border-color:rgba(216,201,138,.23);color:#f0e8c3;outline:none}
-.menuNavButton.active::before{content:"";position:absolute;left:-1px;top:9px;bottom:9px;width:2px;background:#d8c98a;box-shadow:0 0 15px rgba(216,201,138,.45)}
-.menuNavButton:disabled{opacity:.34;cursor:not-allowed;transform:none!important}
-.menuNavIndex{font-size:8px;letter-spacing:1px;color:#6f6d61}
-.menuNavArrow{font-size:14px;color:#59584e;transition:transform .18s,color .18s}
-.menuNavButton:hover .menuNavArrow{transform:translateX(3px);color:#d4c898}
-.menuSideStatus{margin-top:auto;padding:15px 12px;border-top:1px solid rgba(231,220,171,.08);font-size:8px;line-height:1.8;letter-spacing:1.5px;color:#66675d}
-.menuSideStatus strong{display:block;margin-bottom:3px;color:#98947d;font-weight:600}
-.menuMainPanel{position:relative;min-width:0;overflow:auto;padding:clamp(48px,7vh,82px) clamp(34px,5vw,78px) 38px;background:linear-gradient(90deg,rgba(3,5,4,.20),rgba(3,5,4,.05));}
-.menuMainPanel::before{content:"";position:absolute;top:0;right:0;width:54%;height:1px;background:linear-gradient(90deg,transparent,rgba(216,201,138,.24));opacity:.7}
-.menuMainEyebrow{display:flex;justify-content:space-between;gap:20px;font-size:8px;letter-spacing:2.8px;color:#777568;text-transform:uppercase}
-.menuMainTitle{margin:26px 0 10px;max-width:760px;font-size:clamp(42px,6vw,74px);font-weight:500;line-height:.95;letter-spacing:8px;color:#eee7c7;text-shadow:0 7px 35px rgba(0,0,0,.8)}
-.menuMainLead{max-width:620px;margin:0;color:#8d8b79;font-size:12px;line-height:1.75;letter-spacing:1.3px}
-.menuRule{height:1px;margin:28px 0;border-top:1px solid rgba(231,220,171,.08)}
-.menuInfoGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:14px}
-.menuPanelCard{min-width:0;padding:17px 17px 16px;border:1px solid rgba(231,220,171,.10);border-radius:13px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));box-shadow:inset 0 1px rgba(255,255,255,.025)}
-.menuSectionHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px;font-size:8px;letter-spacing:2.1px;color:#827f70}
-.menuSectionHeader strong{color:#c8c1a4;font-weight:600}
+.menuHomeLayout{
+  position:relative;
+  z-index:4;
+  width:100%;
+  height:100%;
+}
+.menuLogo{
+  position:absolute;
+  left:clamp(28px,4vw,62px);
+  top:clamp(24px,4vh,48px);
+  color:#f2ebcf;
+  text-shadow:0 3px 20px rgba(0,0,0,.85);
+}
+.menuLogoMain{
+  font-size:clamp(24px,3vw,44px);
+  line-height:1;
+  letter-spacing:clamp(5px,.7vw,10px);
+  font-weight:600;
+}
+.menuLogoSub{
+  margin-top:8px;
+  font-size:8px;
+  letter-spacing:4px;
+  color:#a8a18a;
+}
+.menuNav{
+  position:absolute;
+  left:clamp(20px,3vw,52px);
+  top:clamp(155px,25vh,250px);
+  width:min(340px,31vw);
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.menuNavButton{
+  position:relative;
+  width:100%;
+  min-height:48px;
+  padding:0 18px 0 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border:0;
+  border-left:3px solid transparent;
+  border-radius:0;
+  background:transparent;
+  color:#ddd8ca;
+  font:inherit;
+  text-align:left;
+  font-size:clamp(13px,1vw,16px);
+  letter-spacing:1.3px;
+  cursor:pointer;
+  transition:background .16s,color .16s,border-color .16s,transform .16s;
+  text-shadow:0 2px 9px rgba(0,0,0,.85);
+}
+.menuNavButton:hover{
+  background:rgba(0,0,0,.22);
+  color:#fff9df;
+  transform:translateX(3px);
+}
+.menuNavButton.active,
+.menuNavButton:focus-visible{
+  background:linear-gradient(90deg,rgba(225,179,71,.20),rgba(225,179,71,.035));
+  border-left-color:#dfad45;
+  color:#fff4cf;
+  outline:none;
+}
+.menuNavButton:disabled{opacity:.42;cursor:not-allowed;transform:none!important}
+.menuNavArrow{
+  font-size:18px;
+  color:#7d796a;
+  transition:transform .16s,color .16s;
+}
+.menuNavButton:hover .menuNavArrow{transform:translateX(3px);color:#edc269}
+.menuNavButton.active .menuNavArrow{color:#e4b75c}
+.menuSlotBar{
+  position:absolute;
+  left:clamp(20px,3vw,52px);
+  top:calc(clamp(155px,25vh,250px) + 255px);
+  width:min(470px,39vw);
+  color:#989381;
+  text-shadow:0 2px 8px #000;
+}
+.menuSlotHeader{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
+  font-size:8px;
+  letter-spacing:2.4px;
+}
+.menuSlotHeader strong{color:#d4cba9;font-weight:500}
+.menuHomeRedesign #saveSlots{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+}
+.menuHomeRedesign .saveSlotCard{
+  min-width:0;
+  padding:8px;
+  border:1px solid rgba(231,220,171,.12);
+  border-radius:2px;
+  background:rgba(4,6,5,.34);
+  color:#bbb5a1;
+}
+.menuHomeRedesign .saveSlotCard:hover{background:rgba(235,218,164,.07)}
+.menuHomeRedesign .saveSlotCard.selected{
+  border-color:rgba(223,173,69,.60);
+  background:rgba(223,173,69,.10);
+  box-shadow:none;
+}
+.menuHomeRedesign .saveSlotTitle{
+  font-size:8px;
+  letter-spacing:1.6px;
+  color:#e1d9bf;
+}
+.menuHomeRedesign .saveSlotMode{
+  font-size:7px;
+  color:#8e8979;
+}
+.menuHomeRedesign .saveSlotDetail{
+  display:block;
+  margin-top:5px;
+  font-size:8px;
+  color:#777466;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.menuHomeRedesign .saveSlotActions{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:7px}
+.menuHomeRedesign .saveSlotActions button{
+  padding:6px 3px;
+  border:1px solid rgba(231,220,171,.10);
+  border-radius:2px;
+  background:rgba(255,255,255,.025);
+  color:#a9a28d;
+  font:inherit;
+  font-size:7px;
+  letter-spacing:1.2px;
+  cursor:pointer;
+}
+.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.09);color:#e9dec0}
+.menuHomeRedesign .saveSlotActions button:disabled{opacity:.35;cursor:not-allowed}
+.menuSaveStatus{
+  margin-top:8px;
+  font-size:8px;
+  letter-spacing:1.4px;
+  color:#777466;
+}
+.menuRightPanel{
+  position:absolute;
+  right:clamp(24px,4vw,64px);
+  bottom:clamp(24px,5vh,56px);
+  width:min(360px,30vw);
+  padding:15px 16px;
+  border-left:1px solid rgba(226,211,164,.22);
+  background:linear-gradient(90deg,rgba(5,7,6,.10),rgba(5,7,6,.42));
+  backdrop-filter:blur(5px);
+  color:#9a9581;
+  text-shadow:0 2px 8px #000;
+}
+.menuRightHeader{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  font-size:8px;
+  letter-spacing:2px;
+  color:#b9b198;
+  margin-bottom:10px;
+}
+.menuRightLead{
+  margin:0 0 13px;
+  font-size:10px;
+  line-height:1.6;
+  color:#8d8a79;
+}
+.menuRightRule{height:1px;background:rgba(226,211,164,.10);margin:10px 0}
 .menuHomeRedesign .usernameRow{width:100%;margin:0}
-.menuHomeRedesign .usernameInput{background:rgba(2,4,3,.72);border-color:rgba(231,220,171,.10);border-radius:9px;color:#e2dcc0}
-.menuHomeRedesign .usernameButton{border-color:rgba(231,220,171,.13);background:rgba(255,255,255,.03);border-radius:9px;color:#bdb38f}
-.menuHomeRedesign .houseLoader{width:100%;margin:0;text-align:left}
-.menuHomeRedesign .houseLoaderTop{color:#8a8775}
-.menuHomeRedesign .houseLoaderStatus{color:#777566;min-height:14px}
-.menuHomeRedesign #saveSlots{width:100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-.menuHomeRedesign .saveSlotCard{padding:11px 9px;border-color:rgba(231,220,171,.09);background:rgba(255,255,255,.018)}
-.menuHomeRedesign .saveSlotCard.selected{border-color:rgba(216,201,138,.48);background:rgba(216,201,138,.065);box-shadow:0 0 25px rgba(216,201,138,.045)}
-.menuArchiveNote{margin-top:9px;font-size:8px;letter-spacing:1.35px;color:#66665a}
-.menuFooter{display:flex;justify-content:space-between;gap:20px;margin-top:16px;font-size:8px;line-height:1.7;letter-spacing:1.4px;color:#5f6056}
-.menuFooter span:last-child{text-align:right}
-@media(max-width:900px){#homeScreen.menuHomeRedesign{inset:0;width:100vw;height:100vh;border-radius:0}.menuShell{grid-template-columns:210px minmax(0,1fr)}.menuMainPanel{padding:34px 28px 28px}.menuMainTitle{font-size:clamp(34px,7vw,58px);letter-spacing:5px}.menuInfoGrid{grid-template-columns:1fr}.menuHomeRedesign #saveSlots{grid-template-columns:1fr}}
-@media(max-width:650px){#homeScreen.menuHomeRedesign{inset:0;width:100vw;height:100vh;border-radius:0}.menuShell{display:flex;flex-direction:column}.menuSidebar{flex:none;padding:14px 13px 9px;border-right:0;border-bottom:1px solid rgba(231,220,171,.09)}.menuBrand{display:flex;align-items:center;gap:11px;padding:0 4px 11px}.menuBrandMark{margin:0;width:30px;height:30px}.menuBrandSub{display:none}.menuBrandName{font-size:18px}.menuNav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px}.menuNavButton{min-height:38px;padding:0 6px;display:flex;justify-content:center;text-align:center}.menuNavButton .menuNavIndex,.menuNavButton .menuNavArrow{display:none}.menuNavButton.active::before{left:8px;right:8px;top:auto;bottom:-1px;width:auto;height:2px}.menuSideStatus{display:none}.menuMainPanel{padding:24px 18px 24px}.menuMainEyebrow{font-size:7px}.menuMainTitle{margin-top:17px}.menuMainLead{font-size:10px}}
+.menuHomeRedesign .usernameInput{
+  width:100%;
+  box-sizing:border-box;
+  background:rgba(2,4,3,.54);
+  border-color:rgba(231,220,171,.12);
+  border-radius:2px;
+  color:#e2dcc0;
+}
+.menuHomeRedesign .usernameButton{
+  border-color:rgba(231,220,171,.12);
+  background:rgba(255,255,255,.035);
+  border-radius:2px;
+  color:#c4b894;
+}
+.menuHomeRedesign .houseLoader{width:100%;margin:10px 0 0;text-align:left}
+.menuHomeRedesign .houseLoaderTop{color:#96907d}
+.menuHomeRedesign .houseLoaderStatus{color:#777466;min-height:14px}
+.menuFooter{
+  position:absolute;
+  left:clamp(22px,3vw,52px);
+  bottom:clamp(18px,3vh,34px);
+  display:flex;
+  gap:22px;
+  font-size:7px;
+  line-height:1.6;
+  letter-spacing:1.4px;
+  color:#68655a;
+  text-shadow:0 2px 8px #000;
+}
+.menuFooter span:last-child{text-align:left}
+@media(max-width:900px){
+  .menuNav{width:min(320px,45vw)}
+  .menuSlotBar{width:min(440px,58vw)}
+  .menuRightPanel{width:min(320px,34vw);right:24px}
+}
+@media(max-width:650px){
+  .menuNav{top:145px;width:min(320px,82vw)}
+  .menuSlotBar{top:auto;bottom:92px;left:20px;width:calc(100vw - 40px)}
+  .menuRightPanel{display:none}
+  .menuFooter{left:20px;right:20px;bottom:20px;justify-content:space-between}
+  .menuFooter span:last-child{display:none}
+  .menuLogo{left:20px;top:22px}
+}
 `;
   document.head.appendChild(style);
 
@@ -610,6 +942,8 @@ filter:blur(.2px)}
       <div class="menuBackdropGlow"></div>
       <div class="menuBackdropScan"></div>
       <div class="menuBackdropArchitecture"></div>
+      <div class="menuBackdropTower"></div>
+      <div class="menuBackdropPipe"></div>
       <div class="menuBackdropLight"></div>
       <div class="menuBackdropLight secondary"></div>
       <div class="menuBackdropHaze"></div>
@@ -617,116 +951,77 @@ filter:blur(.2px)}
     overlay.insertBefore(backdrop,homeScreen);
   }
 
-  const shell=document.createElement("div");
-  shell.className="menuShell";
+  homeScreen.innerHTML="";
+  const layout=document.createElement("div");
+  layout.className="menuHomeLayout";
 
-  const sidebar=document.createElement("aside");
-  sidebar.className="menuSidebar";
-
-  const brand=document.createElement("div");
-  brand.className="menuBrand";
-  brand.innerHTML=`
-    <div class="menuBrandMark">DS</div>
-    <div>
-      <div class="menuBrandName">DEEPSEEKER</div>
-      <div class="menuBrandSub">LIMINAL EXPLORATION TERMINAL</div>
-    </div>
+  const logo=document.createElement("div");
+  logo.className="menuLogo";
+  logo.innerHTML=`
+    <div class="menuLogoMain">DEEPSEEKER</div>
+    <div class="menuLogoSub">LIMINAL EXPLORATION // DS-01</div>
   `;
 
   const nav=document.createElement("nav");
   nav.className="menuNav";
   nav.setAttribute("aria-label","Main menu");
 
-  const configureButton=(button,index,label,active=false)=>{
+  const configureButton=(button,label,active=false)=>{
     button.className="menuNavButton"+(active?" active":"");
     button.type="button";
     if(button===continueButton){
-      button.innerHTML=`<span class="menuNavIndex">${index}</span><span id="continueSlotLabel">CONTINUE SLOT ${selectedSaveSlot}</span><span class="menuNavArrow">›</span>`;
+      button.innerHTML=`<span id="continueSlotLabel">CONTINUE SLOT ${selectedSaveSlot}</span><span class="menuNavArrow">›</span>`;
     }else{
-      button.innerHTML=`<span class="menuNavIndex">${index}</span><span>${label}</span><span class="menuNavArrow">›</span>`;
+      button.innerHTML=`<span>${label}</span><span class="menuNavArrow">›</span>`;
     }
   };
 
-  configureButton(newGameButton,"01","NEW GAME",true);
-  configureButton(continueButton,"02","CONTINUE");
-  configureButton(createLobbyButton,"03","HOST LOBBY");
-  configureButton(joinLobbyButton,"04","JOIN LOBBY");
+  configureButton(newGameButton,"NEW GAME",true);
+  configureButton(continueButton,"CONTINUE");
+  configureButton(createLobbyButton,"HOST LOBBY");
+  configureButton(joinLobbyButton,"JOIN LOBBY");
 
   menuControlsButton=document.createElement("button");
-  menuControlsButton.className="menuNavButton";
-  menuControlsButton.type="button";
-  menuControlsButton.innerHTML=`<span class="menuNavIndex">05</span><span>CONTROLS</span><span class="menuNavArrow">›</span>`;
-  menuControlsButton.addEventListener("click",()=>{
-    showControls();
-  });
+  configureButton(menuControlsButton,"CONTROLS");
+  menuControlsButton.addEventListener("click",()=>showControls());
 
   nav.append(newGameButton,continueButton,createLobbyButton,joinLobbyButton,menuControlsButton);
 
-  const sideStatus=document.createElement("div");
-  sideStatus.className="menuSideStatus";
-  sideStatus.innerHTML=`<strong>DEEPSEEKER SYSTEM</strong>PROCEDURAL BUILD · ONLINE READY<br>OBJECTIVE: FIND A WAY DEEPER`;
-
-  sidebar.append(brand,nav,sideStatus);
-
-  const main=document.createElement("main");
-  main.className="menuMainPanel";
-
-  const eyebrow=document.createElement("div");
-  eyebrow.className="menuMainEyebrow";
-  eyebrow.innerHTML=`<span>FIELD TERMINAL // DS-01</span><span>BUILD ${new Date().getFullYear()}</span>`;
-
-  const title=document.createElement("h1");
-  title.className="menuMainTitle";
-  title.textContent="DON'T LOOK BACK.";
-
-  const lead=document.createElement("p");
-  lead.className="menuMainLead";
-  lead.textContent="The apartment is only the entrance. Something is waiting in the halls beyond it.";
-
-  const rule=document.createElement("div");
-  rule.className="menuRule";
-
-  const infoGrid=document.createElement("div");
-  infoGrid.className="menuInfoGrid";
-
-  const profile=document.createElement("section");
-  profile.className="menuPanelCard";
-  profile.innerHTML=`
-    <div class="menuSectionHeader"><strong>PLAYER PROFILE</strong><span>LOCAL</span></div>
+  const slotBar=document.createElement("div");
+  slotBar.className="menuSlotBar";
+  slotBar.innerHTML=`
+    <div class="menuSlotHeader"><strong>LOCAL SAVES</strong><span>SELECT A SLOT</span></div>
   `;
-  if(usernameRow) profile.appendChild(usernameRow);
+  if(saveSlots) slotBar.appendChild(saveSlots);
 
-  const loaderCard=document.createElement("section");
-  loaderCard.className="menuPanelCard";
-  loaderCard.innerHTML=`
-    <div class="menuSectionHeader"><strong>APARTMENT ASSET</strong><span>LOAD STATUS</span></div>
+  const saveStatus=document.createElement("div");
+  saveStatus.className="menuSaveStatus";
+  saveStatus.appendChild(saveInfo);
+
+  const right=document.createElement("aside");
+  right.className="menuRightPanel";
+  right.innerHTML=`
+    <div class="menuRightHeader"><span>FIELD TERMINAL</span><span>BUILD ${new Date().getFullYear()}</span></div>
+    <p class="menuRightLead">The apartment is only the entrance. Something is waiting in the halls beyond it.</p>
+    <div class="menuRightRule"></div>
+    <div style="font-size:8px;letter-spacing:2px;color:#b5ae96;margin-bottom:8px">PLAYER</div>
   `;
-  if(houseLoader) loaderCard.appendChild(houseLoader);
-
-  infoGrid.append(profile,loaderCard);
-
-  const archive=document.createElement("section");
-  archive.className="menuPanelCard";
-  archive.innerHTML=`
-    <div class="menuSectionHeader"><strong>LOCAL ARCHIVE</strong><span>SAVE SLOTS</span></div>
-  `;
-  if(saveSlots) archive.appendChild(saveSlots);
-
-  const archiveNote=document.createElement("div");
-  archiveNote.className="menuArchiveNote";
-  archiveNote.appendChild(saveInfo);
-  archive.appendChild(archiveNote);
+  if(usernameRow) right.appendChild(usernameRow);
+  if(houseLoader){
+    const loaderLabel=document.createElement("div");
+    loaderLabel.style.cssText="margin-top:13px;font-size:8px;letter-spacing:2px;color:#b5ae96;";
+    loaderLabel.textContent="APARTMENT";
+    right.appendChild(loaderLabel);
+    right.appendChild(houseLoader);
+  }
+  right.appendChild(saveStatus);
 
   const footer=document.createElement("div");
   footer.className="menuFooter";
   footer.innerHTML=`<span>TAB · CONTROLS &nbsp;&nbsp; ESC · RELEASE MOUSE</span><span>STAY IN THE LIGHT. KEEP MOVING.</span>`;
 
-  main.append(eyebrow,title,lead,rule,infoGrid,archive,footer);
-  shell.append(sidebar,main);
-
-  if(menuTitle) menuTitle.remove();
-  homeScreen.innerHTML="";
-  homeScreen.appendChild(shell);
+  layout.append(logo,nav,slotBar,right,footer);
+  homeScreen.appendChild(layout);
 }
 
 function updateHouseLoadingUI(progress=null,status=null){
