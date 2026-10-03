@@ -481,6 +481,7 @@ function updateMenuScene(t,dt){
       menuBackdropWasActive=false;
       menuSet.visible=false;
       world.root.visible=true;
+      if(menuBackdropElement) menuBackdropElement.style.display="none";
       scene.background.set(0x000100);
       scene.fog.color.set(0x030302);
       scene.fog.near=14;
@@ -491,44 +492,21 @@ function updateMenuScene(t,dt){
 
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
-    if(menuBackdropElement) menuBackdropElement.style.display="none";
-    menuSet.visible=true;
-    world.root.visible=false;
-    menuScene.background.set(0x4d4a34);
-    menuScene.fog.color.set(0x55513a);
-    menuScene.fog.near=15;
-    menuScene.fog.far=76;
-    menuCamera.position.copy(menuCameraStart);
-    menuCamera.lookAt(menuCameraTarget);
+    menuSet.visible=false;
+    world.root.visible=true;
+    if(menuBackdropElement) menuBackdropElement.style.display="block";
   }
 
-  menuCamera.position.x=menuCameraStart.x+Math.sin(t*.052)*.22;
-  menuCamera.position.y=menuCameraStart.y+Math.sin(t*.085)*.022;
-  menuCamera.position.z=menuCameraStart.z+Math.cos(t*.047)*.13;
-  menuCamera.lookAt(
-    menuCameraTarget.x+Math.sin(t*.041)*.32,
-    menuCameraTarget.y,
-    menuCameraTarget.z
-  );
+  // The menu illustration is animated in CSS; keep a tiny camera-independent
+  // flicker on the SVG fixtures so the scene feels alive.
+  if(menuBackdropElement){
+    menuBackdropElement.style.filter=
+      "saturate(.90) contrast(1.06) brightness("+
+      (0.84+Math.sin(t*0.37)*0.015).toFixed(3)+")";
+  }
 
-  menuSet.traverse(node=>{
-    if(node.userData?.basePower===undefined) return;
-    const phase=node.userData.phase||0;
-    const wave=Math.sin(t*1.65+phase)*.07;
-    const dropout=Math.sin(t*4.7+phase*4.1)>.988 ? -.74 : 0;
-    node.intensity=Math.max(.25,node.userData.basePower*(1+wave+dropout));
-
-    if(node.material?.emissiveIntensity!==undefined){
-      node.material.emissiveIntensity=Math.max(
-        .12,
-        3.3*(1+Math.sin(t*1.65+phase)*.05)
-      );
-    }
-  });
-
-  return true;
+  return false;
 }
-
 const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
@@ -980,7 +958,7 @@ function installMainMenuRedesign(){
     linear-gradient(180deg,rgba(0,0,0,.16) 0%,transparent 35%,rgba(0,0,0,.54) 100%);
 }
 #menuBackdrop{
-  display:none!important;
+  display:block!important;
   position:absolute;
   inset:0;
   z-index:0;
@@ -1360,142 +1338,170 @@ function installMainMenuRedesign(){
 `;
   document.head.appendChild(style);
 
-  const backdrop=document.createElement("div");
-  backdrop.id="menuBackdrop";
-  backdrop.innerHTML=`
+`
     <svg class="menuBGRuined" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs>
-        <pattern id="rb-wallpaper" width="72" height="48" patternUnits="userSpaceOnUse">
-          <rect width="72" height="48" fill="#9e995f"/>
-          <path d="M0 24 L18 8 L36 24 L54 8 L72 24" fill="none" stroke="#696a42" stroke-width="4" opacity=".42"/>
-          <path d="M0 24 L18 40 L36 24 L54 40 L72 24" fill="none" stroke="#c1b979" stroke-width="2.5" opacity=".28"/>
+        <pattern id="cin-wall" width="64" height="46" patternUnits="userSpaceOnUse">
+          <rect width="64" height="46" fill="#aaa364"/>
+          <path d="M0 23 16 7 32 23 48 7 64 23" fill="none" stroke="#5c603d" stroke-width="3.3" opacity=".48"/>
+          <path d="M0 23 16 39 32 23 48 39 64 23" fill="none" stroke="#d2c985" stroke-width="2" opacity=".22"/>
+          <path d="M0 4 64 4" stroke="#6c6a45" opacity=".16"/>
         </pattern>
-        <linearGradient id="rb-floor" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#5e5942"/><stop offset=".52" stop-color="#4a4737"/><stop offset="1" stop-color="#1b1c17"/>
+
+        <linearGradient id="cin-floor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#625d43"/>
+          <stop offset=".36" stop-color="#504c39"/>
+          <stop offset="1" stop-color="#191a16"/>
         </linearGradient>
-        <linearGradient id="rb-ceil" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#8b8878"/><stop offset=".7" stop-color="#5b594e"/><stop offset="1" stop-color="#2e3027"/>
+        <linearGradient id="cin-ceil" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#8d8978"/>
+          <stop offset=".64" stop-color="#59584f"/>
+          <stop offset="1" stop-color="#25261f"/>
         </linearGradient>
-        <radialGradient id="rb-lamp">
-          <stop offset="0" stop-color="#fff5cc" stop-opacity=".46"/><stop offset=".5" stop-color="#fff0af" stop-opacity=".13"/><stop offset="1" stop-color="#fff0af" stop-opacity="0"/>
+        <linearGradient id="cin-shadow" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#030403" stop-opacity=".78"/>
+          <stop offset=".48" stop-color="#030403" stop-opacity=".12"/>
+          <stop offset="1" stop-color="#030403" stop-opacity=".34"/>
+        </linearGradient>
+        <radialGradient id="cin-light">
+          <stop offset="0" stop-color="#fff5c9" stop-opacity=".72"/>
+          <stop offset=".28" stop-color="#f5df9a" stop-opacity=".26"/>
+          <stop offset="1" stop-color="#f5df9a" stop-opacity="0"/>
         </radialGradient>
-        <radialGradient id="rb-vignette">
-          <stop offset=".42" stop-color="#000" stop-opacity="0"/>
-          <stop offset=".84" stop-color="#000" stop-opacity=".22"/>
-          <stop offset="1" stop-color="#000" stop-opacity=".78"/>
+        <radialGradient id="cin-wet">
+          <stop offset="0" stop-color="#c6bd81" stop-opacity=".22"/>
+          <stop offset=".5" stop-color="#70684a" stop-opacity=".10"/>
+          <stop offset="1" stop-color="#10110e" stop-opacity="0"/>
         </radialGradient>
-        <filter id="rb-noise">
-          <feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="3" seed="9"/>
+        <radialGradient id="cin-vignette">
+          <stop offset=".40" stop-color="#000" stop-opacity="0"/>
+          <stop offset=".77" stop-color="#000" stop-opacity=".18"/>
+          <stop offset="1" stop-color="#000" stop-opacity=".76"/>
+        </radialGradient>
+        <filter id="cin-noise">
+          <feTurbulence type="fractalNoise" baseFrequency=".72" numOctaves="3" seed="27"/>
           <feColorMatrix type="saturate" values="0"/>
-          <feComponentTransfer><feFuncA type="table" tableValues="0 .08"/></feComponentTransfer>
+          <feComponentTransfer><feFuncA type="table" tableValues="0 .075"/></feComponentTransfer>
         </filter>
-        <filter id="rb-blur"><feGaussianBlur stdDeviation="15"/></filter>
+        <filter id="cin-soft"><feGaussianBlur stdDeviation="13"/></filter>
       </defs>
-    
-      <!-- Large open Level-0-like room, not a tunnel. -->
-      <polygon points="0,0 1600,0 1190,348 410,348" fill="url(#rb-ceil)"/>
-      <polygon points="0,0 410,348 410,900 0,900" fill="url(#rb-wallpaper)"/>
-      <polygon points="1600,0 1190,348 1190,900 1600,900" fill="url(#rb-wallpaper)"/>
-      <polygon points="0,900 410,348 1190,348 1600,900" fill="url(#rb-floor)"/>
-    
-      <!-- stained, sagging ceiling -->
-      <g opacity=".7" stroke="#44443a" stroke-width="5">
-        <line x1="170" y1="0" x2="560" y2="348"/>
-        <line x1="440" y1="0" x2="700" y2="348"/>
-        <line x1="740" y1="0" x2="800" y2="348"/>
-        <line x1="1040" y1="0" x2="900" y2="348"/>
-        <line x1="1310" y1="0" x2="1020" y2="348"/>
+
+      <!-- Broad open room with an off-center vanishing point. -->
+      <polygon points="0,0 1600,0 1190,355 430,355" fill="url(#cin-ceil)"/>
+      <polygon points="0,0 430,355 430,900 0,900" fill="url(#cin-wall)"/>
+      <polygon points="1600,0 1190,355 1190,900 1600,900" fill="url(#cin-wall)"/>
+      <polygon points="0,900 430,355 1190,355 1600,900" fill="url(#cin-floor)"/>
+
+      <!-- Strong architectural perspective. -->
+      <g stroke="#474637" stroke-width="4" opacity=".62">
+        <line x1="125" y1="0" x2="520" y2="355"/>
+        <line x1="420" y1="0" x2="660" y2="355"/>
+        <line x1="720" y1="0" x2="810" y2="355"/>
+        <line x1="1020" y1="0" x2="925" y2="355"/>
+        <line x1="1315" y1="0" x2="1055" y2="355"/>
+        <line x1="0" y1="685" x2="430" y2="520"/>
+        <line x1="1600" y1="684" x2="1190" y2="520"/>
       </g>
-      <g fill="#3a3a31" opacity=".58">
-        <ellipse cx="365" cy="92" rx="85" ry="27"/>
-        <ellipse cx="1090" cy="78" rx="95" ry="31"/>
-        <ellipse cx="835" cy="238" rx="68" ry="23"/>
+
+      <!-- Giant damaged ceiling cavity. -->
+      <polygon points="545,0 940,0 1030,208 760,292 525,210" fill="#171914"/>
+      <polygon points="585,15 906,15 956,122 755,205 550,160" fill="#070806"/>
+      <path d="M570 24 690 145 648 278" fill="none" stroke="#2d2f28" stroke-width="10"/>
+      <path d="M928 22 840 112 916 257" fill="none" stroke="#3b3b30" stroke-width="7"/>
+
+      <!-- Sagging fluorescent grid around the hole. -->
+      <g stroke="#565548" stroke-width="6" opacity=".82">
+        <line x1="220" y1="0" x2="510" y2="350"/>
+        <line x1="1110" y1="0" x2="1000" y2="350"/>
+        <line x1="1420" y1="0" x2="1105" y2="350"/>
       </g>
-    
-      <!-- broken ceiling sections + exposed wires -->
-      <polygon points="285,20 452,20 510,100 345,96" fill="#20221c"/>
-      <polygon points="1110,14 1270,14 1210,102 1054,96" fill="#25261f"/>
-      <path d="M356 34 C415 92 420 130 386 188" fill="none" stroke="#2d2f28" stroke-width="9"/>
-      <path d="M357 34 C416 92 421 130 387 188" fill="none" stroke="#8b8060" stroke-width="2.5"/>
-      <path d="M1185 24 C1140 92 1155 140 1195 205" fill="none" stroke="#2c2f27" stroke-width="10"/>
-    
-      <!-- peeling sections of wallpaper -->
-      <g opacity=".82">
-        <path d="M70 210 l108 20 24 98-126 32z" fill="#d0c57d"/>
-        <path d="M101 244 l88 18-28 53-72-13z" fill="#d9d1a0"/>
-        <path d="M290 470 l106-25 16 101-98 24z" fill="#d0c37e"/>
-        <path d="M1530 230 l-116 22-22 104 128 24z" fill="#d0c57d"/>
-        <path d="M1406 474 l-106-27-15 100 99 26z" fill="#cec07a"/>
+
+      <!-- Hanging wires from the collapsed bay. -->
+      <g fill="none" stroke="#22251e" stroke-width="10">
+        <path d="M660 12 C640 72 690 115 651 198 C628 246 648 283 610 334"/>
+        <path d="M812 8 C840 78 791 118 826 186 C850 232 830 283 858 331"/>
+        <path d="M935 28 C896 92 916 141 882 206 C858 252 889 294 858 348"/>
       </g>
-      <g fill="#4d4a36" opacity=".7">
-        <path d="M148 320 l72 28-41 82-75-24z"/>
-        <path d="M1378 318 l-72 28 41 82 75-24z"/>
-        <path d="M252 618 l130-37 40 63-148 51z"/>
-        <path d="M1348 618 l-130-37-40 63 148 51z"/>
+      <g fill="none" stroke="#958861" stroke-width="2.2" opacity=".9">
+        <path d="M660 12 C640 72 690 115 651 198 C628 246 648 283 610 334"/>
+        <path d="M812 8 C840 78 791 118 826 186 C850 232 830 283 858 331"/>
+        <path d="M935 28 C896 92 916 141 882 206 C858 252 889 294 858 348"/>
       </g>
-    
-      <!-- low wall trim -->
-      <polygon points="0,724 410,540 1190,540 1600,724 1600,758 1190,575 410,575 0,758" fill="#35352a"/>
-    
-      <!-- open room breaks / pillars, keeping the space maze-like -->
-      <polygon points="305,365 385,373 360,635 265,662" fill="#696846" opacity=".9"/>
-      <polygon points="1295,365 1215,373 1240,635 1335,662" fill="#696846" opacity=".9"/>
-      <polygon points="530,350 575,350 560,520 510,520" fill="#4c4b39" opacity=".88"/>
-      <polygon points="1070,350 1025,350 1040,520 1090,520" fill="#4c4b39" opacity=".88"/>
-    
-      <!-- ruined floor: wet patches, torn carpet, debris -->
-      <g fill="#22231c" opacity=".42">
-        <ellipse cx="390" cy="700" rx="150" ry="38"/>
-        <ellipse cx="1210" cy="700" rx="140" ry="34"/>
-        <ellipse cx="760" cy="805" rx="180" ry="42"/>
-        <ellipse cx="1020" cy="640" rx="82" ry="22"/>
+
+      <!-- Broken wall slabs. -->
+      <polygon points="270,368 338,377 300,650 208,678" fill="#676341" opacity=".95"/>
+      <polygon points="1325,371 1254,376 1292,646 1392,675" fill="#676341" opacity=".95"/>
+      <polygon points="468,359 525,359 514,505 456,510" fill="#49483a"/>
+      <polygon points="1130,358 1078,360 1090,500 1144,507" fill="#4a4839"/>
+
+      <!-- Far wall opens into a huge black space. -->
+      <polygon points="690,355 970,355 1080,620 580,620" fill="#74704e"/>
+      <polygon points="748,390 912,390 970,615 642,615" fill="#0a0c09"/>
+      <polygon points="786,414 874,414 912,615 700,615" fill="#171914"/>
+      <path d="M782 413 760 620 M874 414 888 620" stroke="#36362b" stroke-width="5" opacity=".55"/>
+
+      <!-- Broken floor transition into the opening. -->
+      <polygon points="560,620 1080,620 1210,900 385,900" fill="#24261e" opacity=".64"/>
+      <ellipse cx="808" cy="690" rx="285" ry="105" fill="url(#cin-wet)"/>
+
+      <!-- Large wet patches / puddles. -->
+      <ellipse cx="475" cy="730" rx="205" ry="48" fill="#11130f" opacity=".45"/>
+      <ellipse cx="1090" cy="742" rx="235" ry="53" fill="#11130f" opacity=".48"/>
+      <ellipse cx="825" cy="835" rx="290" ry="60" fill="#10110e" opacity=".42"/>
+      <ellipse cx="1080" cy="706" rx="92" ry="28" fill="url(#cin-light)" opacity=".55"/>
+      <ellipse cx="575" cy="655" rx="80" ry="23" fill="url(#cin-light)" opacity=".36"/>
+
+      <!-- Torn carpet / rubble. -->
+      <g fill="#22241c" opacity=".92">
+        <path d="M150 825 300 770 356 796 188 854Z"/>
+        <path d="M1170 817 1325 772 1395 800 1210 858Z"/>
+        <path d="M1020 868 1102 828 1172 850 1082 884Z"/>
+        <rect x="364" y="812" width="104" height="18" rx="3" transform="rotate(-7 364 812)"/>
+        <rect x="1240" y="694" width="116" height="19" rx="3" transform="rotate(9 1240 694)"/>
       </g>
-      <g fill="#8a815f" opacity=".33">
-        <path d="M80 820 l145-66 70 28-165 74z"/>
-        <path d="M1330 816 l-148-56-68 31 167 67z"/>
+
+      <!-- Peeling wallpaper and heavy water streaks. -->
+      <g opacity=".86">
+        <path d="M46 178 210 208 175 332 72 354Z" fill="#d1c77f"/>
+        <path d="M94 242 205 251 170 312 82 300Z" fill="#ded6a2"/>
+        <path d="M1512 206 1370 226 1404 356 1519 332Z" fill="#d0c47c"/>
+        <path d="M1467 495 1335 474 1310 578 1444 606Z" fill="#c7bb73"/>
       </g>
-      <g fill="#25271f" opacity=".9">
-        <path d="M245 785 l82-22 43 19-91 31z"/>
-        <rect x="1255" y="748" width="108" height="19" rx="3" transform="rotate(9 1255 748)"/>
-        <path d="M1080 820 l60-28 50 22-75 31z"/>
-        <rect x="455" y="832" width="66" height="13" rx="2" transform="rotate(-8 455 832)"/>
+      <g fill="#424332" opacity=".66">
+        <path d="M106 352 214 377 177 470 92 446Z"/>
+        <path d="M1490 342 1382 368 1417 465 1502 442Z"/>
+        <path d="M175 610 318 578 348 646 184 690Z"/>
+        <path d="M1424 616 1284 579 1254 649 1416 692Z"/>
       </g>
-    
-      <!-- receding fluorescent lights across the ceiling -->
+
+      <!-- Fluorescents at multiple depths. -->
       <g class="fixture">
-        <ellipse cx="800" cy="335" rx="190" ry="95" fill="url(#rb-lamp)" filter="url(#rb-blur)"/>
-        <rect x="690" y="313" width="220" height="14" rx="3" fill="#ded8bc"/>
-        <rect x="730" y="317" width="140" height="5" fill="#fff4c8"/>
+        <ellipse cx="810" cy="346" rx="230" ry="88" fill="url(#cin-light)" filter="url(#cin-soft)"/>
+        <rect x="673" y="331" width="274" height="17" rx="4" fill="#d8d4bb"/>
+        <rect x="720" y="336" width="180" height="6" fill="#fff4c4"/>
       </g>
       <g class="fixture delay">
-        <ellipse cx="800" cy="238" rx="135" ry="64" fill="url(#rb-lamp)" filter="url(#rb-blur)"/>
-        <rect x="733" y="219" width="134" height="10" rx="3" fill="#bebba5"/>
-        <rect x="758" y="222" width="84" height="4" fill="#eee6c6"/>
+        <ellipse cx="802" cy="260" rx="153" ry="56" fill="url(#cin-light)" filter="url(#cin-soft)"/>
+        <rect x="723" y="249" width="158" height="11" rx="3" fill="#bebaa1"/>
+        <rect x="755" y="252" width="92" height="4" fill="#eee4bc"/>
       </g>
       <g class="fixture">
-        <ellipse cx="800" cy="145" rx="91" ry="42" fill="url(#rb-lamp)" filter="url(#rb-blur)"/>
-        <rect x="755" y="133" width="90" height="7" rx="2" fill="#a5a59a"/>
+        <ellipse cx="802" cy="152" rx="94" ry="35" fill="url(#cin-light)" filter="url(#cin-soft)"/>
+        <rect x="755" y="143" width="94" height="8" rx="2" fill="#9d9b90"/>
       </g>
-    
-      <!-- distant opening, not a traditional door -->
-      <polygon points="695,348 905,348 985,542 615,542" fill="#5a5842"/>
-      <rect x="735" y="388" width="130" height="154" fill="#131510"/>
-      <rect x="752" y="404" width="96" height="138" fill="#25271f"/>
-      <ellipse cx="800" cy="462" rx="78" ry="64" fill="#4c4a37" opacity=".18"/>
-    
-      <!-- hanging light/wire on the right -->
-      <path d="M1205 30 C1248 100 1257 160 1224 220 C1195 275 1194 332 1225 390" fill="none" stroke="#20221c" stroke-width="11"/>
-      <path d="M1204 30 C1247 100 1256 160 1223 220 C1194 275 1193 332 1224 390" fill="none" stroke="#8c8464" stroke-width="2.5"/>
-    
-      <!-- water damage on carpet -->
-      <g fill="#10120e" opacity=".28">
-        <ellipse cx="585" cy="590" rx="67" ry="14"/>
-        <ellipse cx="990" cy="575" rx="58" ry="13"/>
-        <ellipse cx="690" cy="690" rx="82" ry="18"/>
+      <g class="fixture delay">
+        <ellipse cx="1265" cy="420" rx="105" ry="44" fill="url(#cin-light)" filter="url(#cin-soft)"/>
+        <rect x="1214" y="412" width="102" height="8" rx="2" fill="#aaa794"/>
       </g>
-    
-      <rect width="1600" height="900" filter="url(#rb-noise)" opacity=".48"/>
-      <rect width="1600" height="900" fill="url(#rb-vignette)"/>
+
+      <!-- One broken wall light barely hanging on. -->
+      <path d="M1218 342 1238 408" stroke="#25271f" stroke-width="8"/>
+      <rect x="1214" y="402" width="92" height="10" rx="3" fill="#8b8873" transform="rotate(7 1214 402)"/>
+
+      <!-- Final atmospheric overlay. -->
+      <rect width="1600" height="900" fill="url(#cin-shadow)"/>
+      <rect width="1600" height="900" filter="url(#cin-noise)" opacity=".52"/>
+      <rect width="1600" height="900" fill="url(#cin-vignette)"/>
     </svg>
   `;
   overlay.insertBefore(backdrop,homeScreen);
