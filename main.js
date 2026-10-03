@@ -662,228 +662,221 @@ function installMainMenuRedesign(){
   overflow:hidden;
   pointer-events:none;
   z-index:0;
-  background:
-    radial-gradient(ellipse at 76% 31%,rgba(229,207,133,.13),transparent 17%),
-    linear-gradient(180deg,#0d0d09 0%,#161811 43%,#080907 100%);
-  filter:saturate(.84) contrast(1.08);
+  background:#17170f;
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 78% 45%,transparent 0 12%,rgba(0,0,0,.04) 30%,rgba(0,0,0,.66) 100%),
-    linear-gradient(90deg,rgba(0,0,0,.30),transparent 47%,rgba(0,0,0,.08));
+    linear-gradient(90deg,rgba(0,0,0,.58) 0 16%,transparent 34% 73%,rgba(0,0,0,.42) 100%),
+    linear-gradient(180deg,rgba(255,255,255,.02),transparent 28%,rgba(0,0,0,.48) 100%);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
-  background:
-    repeating-linear-gradient(180deg,transparent 0 5px,rgba(255,255,255,.009) 6px,transparent 7px),
-    radial-gradient(ellipse at 78% 40%,transparent 0 33%,rgba(0,0,0,.34) 100%);
-  opacity:.62;
+  background:radial-gradient(ellipse at 64% 48%,transparent 0 24%,rgba(0,0,0,.58) 82%);
+  opacity:.8;
 }
 .menuCorridor{
   position:absolute;
   inset:0;
   overflow:hidden;
-}
-.menuCeiling{
-  position:absolute;
-  left:42%;
-  right:-8%;
-  top:-5%;
-  height:51%;
-  background:
-    linear-gradient(170deg,rgba(209,203,174,.12),rgba(42,43,35,.03) 58%,transparent 100%),
-    repeating-linear-gradient(90deg,
-      transparent 0 11%,
-      rgba(226,218,181,.055) 11.2% 11.55%,
-      transparent 11.8% 22%);
-  transform:skewX(-16deg);
-  transform-origin:top right;
-}
-.menuCeiling::after{
-  content:"";
-  position:absolute;
-  left:20%;
-  top:14%;
-  width:69%;
-  height:18%;
-  background:
-    repeating-linear-gradient(90deg,
-      transparent 0 15%,
-      rgba(247,238,194,.17) 15.2% 21%,
-      transparent 21.4% 34%);
-  filter:blur(1px);
-  opacity:.75;
+  background:#27281e;
 }
 .menuWallLeft{
   position:absolute;
-  left:-2%;
-  top:25%;
-  width:62%;
-  height:82%;
+  left:-4%;
+  top:17%;
+  width:60%;
+  height:90%;
+  transform:perspective(900px) rotateY(8deg);
+  transform-origin:right center;
   background:
-    linear-gradient(90deg,rgba(30,31,24,.92),rgba(137,132,94,.13) 78%,transparent),
-    repeating-linear-gradient(0deg,
-      transparent 0 17.2%,
-      rgba(210,201,154,.05) 17.3% 17.7%);
-  clip-path:polygon(0 0,100% 8%,72% 100%,0 100%);
+    repeating-linear-gradient(90deg,rgba(210,204,155,.10) 0 1px,transparent 1px 15.8%),
+    repeating-linear-gradient(0deg,rgba(35,35,26,.08) 0 2px,transparent 2px 68px),
+    linear-gradient(180deg,#9a9568 0%,#827d55 56%,#57533a 100%);
+  box-shadow:inset -45px 0 70px rgba(0,0,0,.34);
+}
+.menuWallLeft::after{
+  content:"";
+  position:absolute;
+  right:0;
+  top:0;
+  width:4px;
+  height:100%;
+  background:rgba(44,43,32,.72);
+  box-shadow:0 0 18px rgba(0,0,0,.35);
 }
 .menuWallRight{
   position:absolute;
-  right:-6%;
-  top:23%;
-  width:57%;
-  height:85%;
+  right:-7%;
+  top:17%;
+  width:60%;
+  height:90%;
+  transform:perspective(900px) rotateY(-10deg);
+  transform-origin:left center;
   background:
-    linear-gradient(270deg,rgba(15,16,13,.93),rgba(119,116,82,.11) 73%,transparent),
-    repeating-linear-gradient(0deg,
-      transparent 0 15.4%,
-      rgba(217,207,160,.04) 15.5% 16%);
-  clip-path:polygon(12% 8%,100% 0,100% 100%,32% 100%);
+    repeating-linear-gradient(90deg,rgba(210,204,155,.08) 0 1px,transparent 1px 15.8%),
+    repeating-linear-gradient(0deg,rgba(35,35,26,.08) 0 2px,transparent 2px 68px),
+    linear-gradient(180deg,#8d885d 0%,#77724f 56%,#4e4a34 100%);
+  box-shadow:inset 45px 0 70px rgba(0,0,0,.30);
 }
+.menuWallRight::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:4px;
+  height:100%;
+  background:rgba(44,43,32,.62);
+}
+.menuCeiling{
+  position:absolute;
+  left:5%;
+  right:5%;
+  top:-10%;
+  height:48%;
+  transform:perspective(800px) rotateX(-52deg);
+  transform-origin:50% 100%;
+  background:
+    repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 2px,transparent 2px 13.5%),
+    repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 2px,transparent 2px 26%),
+    #77745c;
+  box-shadow:inset 0 -30px 55px rgba(0,0,0,.35);
+}
+.menuCeiling::before,.menuCeiling::after{
+  content:"";
+  position:absolute;
+  width:18%;
+  height:14px;
+  border-radius:2px;
+  background:#e9e1bd;
+  box-shadow:0 0 8px rgba(235,226,185,.85),0 0 28px rgba(235,226,185,.38),0 0 60px rgba(235,226,185,.16);
+  transform:rotate(-2deg);
+  animation:menuFluoro 5s ease-in-out infinite;
+}
+.menuCeiling::before{left:27%;top:29%}
+.menuCeiling::after{left:63%;top:37%;animation-delay:2.2s}
 .menuFloor{
   position:absolute;
-  left:37%;
-  right:-5%;
-  bottom:-8%;
-  height:63%;
+  left:0;
+  right:0;
+  bottom:-6%;
+  height:62%;
   background:
-    linear-gradient(180deg,rgba(105,100,74,.10),rgba(13,14,11,.90) 72%),
-    repeating-linear-gradient(90deg,
-      transparent 0 13.7%,
-      rgba(196,188,143,.04) 13.8% 14%),
-    repeating-linear-gradient(0deg,
-      transparent 0 11.5%,
-      rgba(196,188,143,.028) 11.6% 11.9%);
-  transform:perspective(850px) rotateX(61deg);
-  transform-origin:bottom center;
+    repeating-linear-gradient(90deg,rgba(0,0,0,.06) 0 2px,transparent 2px 12%),
+    repeating-linear-gradient(0deg,rgba(205,198,151,.035) 0 2px,transparent 2px 34px),
+    linear-gradient(180deg,#5d593f 0%,#3d3a2a 58%,#171814 100%);
+  transform:perspective(900px) rotateX(58deg);
+  transform-origin:center bottom;
 }
 .menuHall{
   position:absolute;
-  right:17%;
-  top:25%;
-  width:28%;
-  height:47%;
-  background:
-    radial-gradient(ellipse at 52% 46%,rgba(216,205,155,.08),transparent 34%),
-    linear-gradient(180deg,rgba(31,32,25,.28),rgba(1,2,1,.92));
-  clip-path:polygon(29% 0,71% 0,100% 100%,0 100%);
-  box-shadow:0 0 80px rgba(0,0,0,.85);
+  left:43%;
+  top:23%;
+  width:18%;
+  height:52%;
+  background:#0a0b09;
+  clip-path:polygon(25% 0,75% 0,100% 100%,0 100%);
+  box-shadow:0 0 80px rgba(0,0,0,.95);
 }
-.menuHall::before{
+.menuHall::after{
   content:"";
   position:absolute;
-  inset:7% 31% 0;
-  border-left:1px solid rgba(227,216,173,.05);
-  border-right:1px solid rgba(227,216,173,.04);
-  background:linear-gradient(180deg,rgba(231,218,170,.07),transparent 45%);
+  left:20%;
+  right:20%;
+  top:18%;
+  height:3px;
+  background:rgba(229,218,174,.22);
+  box-shadow:0 26px 0 rgba(229,218,174,.11),0 52px 0 rgba(229,218,174,.06);
 }
-.menuFluorescent{
+.menuDoor{
   position:absolute;
-  top:19%;
-  width:min(220px,18vw);
-  height:8px;
-  border-radius:8px;
-  background:rgba(238,229,179,.82);
-  box-shadow:
-    0 0 10px rgba(235,220,155,.7),
-    0 0 42px rgba(235,220,155,.28),
-    0 0 86px rgba(235,220,155,.12);
-  filter:blur(.25px);
-  transform:rotate(-8deg);
-  animation:menuFluoro 4.7s ease-in-out infinite;
+  left:56%;
+  top:31%;
+  width:9%;
+  height:30%;
+  background:linear-gradient(90deg,#1b1c16,#2a2b20 48%,#12130f);
+  border:2px solid rgba(42,41,31,.9);
+  box-shadow:0 16px 40px rgba(0,0,0,.68);
 }
-.menuFluorescent.one{right:26%}
-.menuFluorescent.two{
-  right:8%;
-  top:34%;
-  width:min(135px,11vw);
-  opacity:.56;
-  animation-delay:1.9s;
-}
-.menuPanelLight{
+.menuDoor::after{
+  content:"";
   position:absolute;
-  right:39%;
-  top:10%;
-  width:130px;
-  height:17px;
-  background:rgba(239,230,184,.64);
-  box-shadow:0 0 26px rgba(239,230,184,.34),0 0 62px rgba(239,230,184,.11);
-  transform:skewX(-17deg);
+  right:9%;
+  top:54%;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:#9e9566;
+  box-shadow:0 0 8px rgba(188,174,103,.38);
 }
-.menuPerspectiveLine{
+.menuLightBar{
   position:absolute;
-  left:43%;
-  top:26%;
-  width:1px;
-  height:76%;
-  background:linear-gradient(180deg,rgba(236,225,175,.16),rgba(236,225,175,0));
-  transform:skewY(25deg);
+  width:min(240px,19vw);
+  height:7px;
+  border-radius:2px;
+  background:#eee7c8;
+  box-shadow:0 0 9px rgba(239,232,198,.9),0 0 35px rgba(239,232,198,.34),0 0 70px rgba(239,232,198,.16);
+  transform:skewX(-13deg);
+  animation:menuFluoro 5.2s ease-in-out infinite;
 }
-.menuPerspectiveLine.two{
-  left:73%;
-  opacity:.45;
-  transform:skewY(-15deg);
-}
+.menuLightBar.one{right:24%;top:18%}
+.menuLightBar.two{right:6%;top:36%;width:min(150px,12vw);opacity:.62;animation-delay:1.8s}
 .menuBackGlow{
   position:absolute;
-  right:19%;
-  top:24%;
-  width:min(420px,34vw);
-  height:min(420px,34vw);
+  right:17%;
+  top:20%;
+  width:min(360px,30vw);
+  height:min(360px,30vw);
   border-radius:50%;
-  background:radial-gradient(circle,rgba(235,216,153,.11),rgba(235,216,153,.022) 37%,transparent 72%);
-  filter:blur(17px);
-  animation:menuGlow 8s ease-in-out infinite alternate;
-  mix-blend-mode:screen;
+  background:radial-gradient(circle,rgba(235,221,169,.10),transparent 68%);
+  filter:blur(18px);
+  animation:menuGlow 9s ease-in-out infinite alternate;
+}
+.menuBackdropHaze{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg,transparent 45%,rgba(228,216,166,.035) 62%,transparent 82%);
+  filter:blur(10px);
+  animation:menuHaze 14s ease-in-out infinite alternate;
+}
+.menuBackdropScan{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg,transparent 0 48%,rgba(226,214,166,.025) 50%,transparent 52%);
+  opacity:.35;
+  animation:menuSweep 18s linear infinite;
 }
 .menuSignalNoise{
   position:absolute;
   inset:0;
-  background:
-    linear-gradient(90deg,transparent 0 72%,rgba(218,202,152,.025) 72.1% 72.25%,transparent 72.4%),
-    linear-gradient(180deg,transparent 0 47%,rgba(218,202,152,.02) 47.2% 47.4%,transparent 47.6%);
-  opacity:.7;
-}
-.menuBackdropHaze{
-  position:absolute;
-  inset:-10%;
-  background:radial-gradient(ellipse at 78% 49%,rgba(219,200,139,.045),transparent 31%);
-  filter:blur(30px);
-  animation:menuHaze 16s ease-in-out infinite alternate;
-}
-.menuBackdropScan{
-  position:absolute;
-  inset:-10% auto -10% -25%;
-  width:24vw;
-  background:linear-gradient(90deg,transparent,rgba(223,209,160,.05),transparent);
-  transform:skewX(-12deg);
-  animation:menuSweep 18s ease-in-out infinite;
+  background:repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.008) 7px,transparent 8px);
+  opacity:.38;
 }
 @keyframes menuGlow{
-  from{transform:translate3d(-1%,1%,0) scale(.96);opacity:.42}
-  to{transform:translate3d(2%,-2%,0) scale(1.06);opacity:.9}
+  from{transform:translate3d(-1%,1%,0);opacity:.35}
+  to{transform:translate3d(2%,-2%,0);opacity:.75}
 }
 @keyframes menuSweep{
-  0%{transform:translateX(-12vw) skewX(-12deg);opacity:0}
-  18%{opacity:.35}
-  48%,100%{transform:translateX(150vw) skewX(-12deg);opacity:0}
+  0%,100%{transform:translateX(-7%);opacity:0}
+  18%{opacity:.32}
+  54%{transform:translateX(7%);opacity:.12}
 }
 @keyframes menuHaze{
-  from{transform:translate3d(-1%,0,0) scale(1)}
-  to{transform:translate3d(2%,-1%,0) scale(1.035)}
+  from{transform:translateX(-1%)}
+  to{transform:translateX(2%)}
 }
 @keyframes menuFluoro{
-  0%,100%{opacity:.75;filter:blur(.25px)}
-  46%{opacity:.88}
-  49%{opacity:.42}
-  51%{opacity:.80}
-  73%{opacity:.68}
+  0%,100%{opacity:.72}
+  47%{opacity:.82}
+  49%{opacity:.40}
+  51%{opacity:.77}
+  74%{opacity:.66}
 }
+
 #homeScreen.menuHomeRedesign{
   position:absolute;
   inset:0;
