@@ -1253,6 +1253,162 @@ function installMainMenuRedesign(){
   .menuRightMeta{grid-template-columns:1fr 1fr 1fr}
 }
 
+.menuHomeLayout.menuLayoutEditing .menuEditableElement{
+  outline:1px dashed rgba(222,179,91,.62);
+  outline-offset:4px;
+  cursor:move;
+}
+.menuHomeLayout.menuLayoutEditing .menuEditableElement:hover{
+  outline-color:rgba(243,205,119,.92);
+  z-index:15;
+}
+.menuResizeHandle{
+  display:none;
+  position:absolute;
+  right:-6px;
+  bottom:-6px;
+  width:14px;
+  height:14px;
+  border:1px solid rgba(235,219,163,.7);
+  border-radius:2px;
+  background:rgba(8,8,6,.94);
+  box-shadow:0 2px 10px rgba(0,0,0,.4);
+  cursor:nwse-resize;
+  z-index:40;
+}
+.menuResizeHandle::before,.menuResizeHandle::after{
+  content:"";
+  position:absolute;
+  right:2px;
+  bottom:2px;
+  width:8px;
+  height:1px;
+  background:#d8b865;
+  transform:rotate(-45deg);
+  transform-origin:right center;
+}
+.menuResizeHandle::after{
+  right:2px;
+  bottom:5px;
+  width:5px;
+  opacity:.6;
+}
+.menuHomeLayout.menuLayoutEditing .menuResizeHandle{display:block}
+.menuLayoutHint{
+  margin-top:12px;
+  padding:9px 10px;
+  border:1px solid rgba(231,220,171,.08);
+  border-radius:4px;
+  background:rgba(255,255,255,.025);
+  color:#77705f;
+  font-size:7px;
+  line-height:1.7;
+  letter-spacing:1px;
+}
+.menuLayoutSelection{
+  margin-top:8px;
+  color:#bfb18d;
+  min-height:12px;
+}
+.menuElementEditor{
+  margin-top:14px;
+  padding-top:13px;
+  border-top:1px solid rgba(231,220,171,.08);
+}
+.menuEditorSectionTitle{
+  font-size:8px;
+  letter-spacing:2px;
+  color:#c7b991;
+}
+.menuElementControlGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin-top:10px;
+}
+.menuElementControlGrid label{
+  display:grid;
+  gap:4px;
+  font-size:6px;
+  letter-spacing:1.2px;
+  color:#77705f;
+}
+.menuElementControlGrid input,
+.menuElementControlGrid select,
+.menuElementEditor textarea{
+  width:100%;
+  box-sizing:border-box;
+  padding:7px 8px;
+  border:1px solid rgba(231,220,171,.11);
+  border-radius:4px;
+  background:#020302;
+  color:#e4dbc0;
+  font:inherit;
+  font-size:8px;
+  outline:none;
+}
+.menuElementEditor textarea{
+  min-height:62px;
+  resize:vertical;
+  line-height:1.5;
+}
+.menuElementActions{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:6px;
+  margin-top:9px;
+}
+.menuElementActions button{
+  min-height:32px;
+  border:1px solid rgba(231,220,171,.11);
+  border-radius:4px;
+  background:rgba(255,255,255,.035);
+  color:#cfc5a8;
+  font:inherit;
+  font-size:7px;
+  letter-spacing:1px;
+  cursor:pointer;
+}
+.menuElementActions button:hover{
+  background:rgba(223,173,69,.10);
+  border-color:rgba(223,173,69,.28);
+}
+.menuElementSelected{
+  outline:1px solid rgba(245,205,116,.95)!important;
+  outline-offset:3px;
+  z-index:35;
+}
+.menuElementResizeHandle{
+  display:none;
+  position:absolute;
+  right:-7px;
+  bottom:-7px;
+  width:14px;
+  height:14px;
+  border:1px solid rgba(245,214,143,.9);
+  border-radius:2px;
+  background:#090a07;
+  box-shadow:0 3px 12px rgba(0,0,0,.5);
+  cursor:nwse-resize;
+  z-index:90;
+}
+.menuElementResizeHandle::before{
+  content:"";
+  position:absolute;
+  right:2px;
+  bottom:3px;
+  width:8px;
+  height:1px;
+  background:#d8b865;
+  transform:rotate(-45deg);
+  transform-origin:right center;
+  box-shadow:0 -3px 0 rgba(216,184,101,.7);
+}
+.menuHomeLayout.menuLayoutEditing .menuElementSelected .menuElementResizeHandle{
+  display:block;
+}
+.menuElementBeingEdited{box-sizing:border-box;}
+
 .menuEditButton{
   position:absolute;
   top:18px;
