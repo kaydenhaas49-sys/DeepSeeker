@@ -719,91 +719,92 @@ function installMainMenuRedesign(){
 .menuLogo{
   position:absolute;
   left:clamp(34px,4vw,64px);
-  top:clamp(28px,5vh,54px);
+  top:clamp(30px,5vh,56px);
   color:#f3edd5;
-  text-shadow:0 4px 24px rgba(0,0,0,.9);
+  text-shadow:0 4px 25px rgba(0,0,0,.92);
 }
 .menuLogoMain{
   display:flex;
   flex-direction:column;
-  gap:1px;
-  line-height:.92;
-  letter-spacing:clamp(4px,.55vw,8px);
+  line-height:.9;
+  letter-spacing:clamp(4px,.58vw,9px);
   font-weight:600;
 }
 .menuLogoMain span{
-  font-size:clamp(24px,2.8vw,43px);
-  color:#f4efd9;
+  font-size:clamp(22px,2.5vw,40px);
+  color:#e9e2cb;
 }
 .menuLogoMain strong{
-  font-size:clamp(34px,4.2vw,64px);
+  font-size:clamp(35px,4.4vw,67px);
   font-weight:600;
-  color:#d9b65c;
-  letter-spacing:clamp(5px,.7vw,11px);
+  color:#d7b45a;
+  letter-spacing:clamp(5px,.72vw,11px);
 }
 .menuLogoSub{
-  margin-top:12px;
+  margin-top:13px;
   font-size:8px;
-  letter-spacing:3.5px;
-  color:#9f987f;
+  letter-spacing:3.6px;
+  color:#938c76;
 }
+
 .menuNav{
   position:absolute;
   left:clamp(28px,4vw,58px);
-  top:clamp(210px,29vh,300px);
+  top:clamp(235px,31vh,315px);
   width:min(360px,31vw);
   display:flex;
   flex-direction:column;
-  gap:3px;
+  gap:0;
 }
 .menuNavButton{
   position:relative;
   width:100%;
-  min-height:52px;
-  padding:0 18px 0 22px;
+  min-height:50px;
+  padding:0 20px 0 22px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   border:0;
-  border-left:3px solid transparent;
-  border-radius:0 2px 2px 0;
-  background:linear-gradient(90deg,rgba(5,7,6,.12),transparent);
-  color:#d7d1bd;
+  border-left:2px solid transparent;
+  border-radius:0;
+  background:transparent;
+  color:#c8c2af;
   font:inherit;
   text-align:left;
   font-size:clamp(13px,1vw,16px);
-  letter-spacing:1.5px;
+  letter-spacing:1.8px;
   cursor:pointer;
-  transition:background .16s,color .16s,border-color .16s,transform .16s;
-  text-shadow:0 2px 10px rgba(0,0,0,.9);
+  transition:background .15s,color .15s,border-color .15s,transform .15s;
+  text-shadow:0 2px 10px rgba(0,0,0,.95);
 }
 .menuNavButton:hover{
-  background:linear-gradient(90deg,rgba(223,173,69,.10),transparent);
-  color:#fff7dc;
-  transform:translateX(4px);
+  background:linear-gradient(90deg,rgba(222,178,76,.11),transparent 78%);
+  color:#fff6dc;
+  transform:translateX(3px);
 }
 .menuNavButton.active,
 .menuNavButton:focus-visible{
-  background:linear-gradient(90deg,rgba(223,173,69,.21),rgba(223,173,69,.035) 70%,transparent);
+  background:linear-gradient(90deg,rgba(222,178,76,.18),rgba(222,178,76,.025) 72%,transparent);
   border-left-color:#dfad45;
-  color:#fff4cf;
+  color:#fff1ca;
   outline:none;
 }
 .menuNavButton:disabled{opacity:.42;cursor:not-allowed;transform:none!important}
 .menuNavArrow{
   font-size:20px;
-  color:#767264;
-  transition:transform .16s,color .16s;
+  line-height:1;
+  color:#686557;
+  transition:transform .15s,color .15s;
 }
-.menuNavButton:hover .menuNavArrow{transform:translateX(4px);color:#edc269}
-.menuNavButton.active .menuNavArrow{color:#e4b75c}
+.menuNavButton:hover .menuNavArrow{transform:translateX(4px);color:#e9bd67}
+.menuNavButton.active .menuNavArrow{color:#e1b252}
 
 .menuSlotBar{
   position:absolute;
   left:clamp(28px,4vw,58px);
-  bottom:clamp(74px,8vh,104px);
-  width:min(540px,46vw);
-  color:#989381;
+  bottom:clamp(74px,9vh,112px);
+  width:min(540px,45vw);
+  color:#98917d;
   text-shadow:0 2px 8px #000;
 }
 .menuSlotHeader{
@@ -813,9 +814,9 @@ function installMainMenuRedesign(){
   margin-bottom:8px;
   padding:0 1px;
   font-size:8px;
-  letter-spacing:2.4px;
+  letter-spacing:2.3px;
 }
-.menuSlotHeader strong{color:#d4cba9;font-weight:500}
+.menuSlotHeader strong{color:#d5cba8;font-weight:500}
 .menuHomeRedesign #saveSlots{
   width:100%;
   display:grid;
@@ -824,11 +825,11 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:106px;
-  padding:13px 12px;
-  border:1px solid rgba(231,220,171,.13);
+  min-height:96px;
+  padding:12px;
+  border:1px solid rgba(231,220,171,.11);
   border-radius:2px;
-  background:linear-gradient(180deg,rgba(7,9,8,.56),rgba(3,5,4,.30));
+  background:rgba(3,5,4,.28);
   color:#bbb5a1;
   display:flex;
   flex-direction:column;
@@ -836,67 +837,71 @@ function installMainMenuRedesign(){
   box-shadow:inset 0 1px rgba(255,255,255,.025);
 }
 .menuHomeRedesign .saveSlotCard:hover{
-  background:linear-gradient(180deg,rgba(223,173,69,.09),rgba(223,173,69,.025));
-  border-color:rgba(231,220,171,.24);
+  background:rgba(223,173,69,.065);
+  border-color:rgba(231,220,171,.20);
 }
 .menuHomeRedesign .saveSlotCard.selected{
-  border-color:rgba(223,173,69,.72);
-  background:linear-gradient(180deg,rgba(223,173,69,.15),rgba(223,173,69,.045));
-  box-shadow:0 0 22px rgba(223,173,69,.06),inset 0 1px rgba(255,237,180,.08);
+  border-color:rgba(223,173,69,.68);
+  background:rgba(223,173,69,.10);
+  box-shadow:0 0 20px rgba(223,173,69,.05);
 }
 .menuHomeRedesign .saveSlotTitle{
   font-size:8px;
-  letter-spacing:1.6px;
-  color:#e1d9bf;
+  letter-spacing:1.7px;
+  color:#ded6ba;
 }
 .menuHomeRedesign .saveSlotMode{
   font-size:7px;
-  color:#8e8979;
+  color:#858073;
 }
 .menuHomeRedesign .saveSlotDetail{
   display:block;
   margin-top:5px;
   font-size:8px;
-  color:#777466;
+  color:#6f6a5d;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
-.menuHomeRedesign .saveSlotActions{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:7px}
+.menuHomeRedesign .saveSlotActions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px;
+  margin-top:7px;
+}
 .menuHomeRedesign .saveSlotActions button{
   padding:6px 3px;
-  border:1px solid rgba(231,220,171,.10);
+  border:1px solid rgba(231,220,171,.09);
   border-radius:2px;
-  background:rgba(255,255,255,.025);
-  color:#a9a28d;
+  background:rgba(255,255,255,.022);
+  color:#99927e;
   font:inherit;
   font-size:7px;
   letter-spacing:1.2px;
   cursor:pointer;
 }
-.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.09);color:#e9dec0}
-.menuHomeRedesign .saveSlotActions button:disabled{opacity:.35;cursor:not-allowed}
+.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.085);color:#e5d8b8}
+.menuHomeRedesign .saveSlotActions button:disabled{opacity:.30;cursor:not-allowed}
 .menuSaveStatus{
   margin-top:7px;
   font-size:8px;
-  letter-spacing:1.4px;
-  color:#777466;
+  letter-spacing:1.3px;
+  color:#706b5d;
 }
+
 .menuRightPanel{
   position:absolute;
-  top:clamp(110px,15vh,150px);
-  right:clamp(24px,4vw,62px);
-  bottom:clamp(72px,8vh,104px);
-  width:min(365px,28vw);
-  min-height:0;
-  padding:26px 24px;
-  border-left:2px solid rgba(223,173,69,.34);
-  border-right:1px solid rgba(231,220,171,.07);
-  background:linear-gradient(90deg,rgba(4,6,5,.17),rgba(5,7,6,.48));
-  backdrop-filter:blur(6px);
-  color:#9a9581;
+  top:clamp(120px,17vh,170px);
+  right:clamp(30px,5vw,76px);
+  width:min(330px,25vw);
+  padding:22px 20px 24px;
+  border-top:1px solid rgba(226,211,164,.13);
+  border-bottom:1px solid rgba(226,211,164,.08);
+  border-left:2px solid rgba(223,173,69,.30);
+  background:linear-gradient(90deg,rgba(3,5,4,.05),rgba(3,5,4,.30));
+  backdrop-filter:blur(4px);
+  color:#98927e;
   text-shadow:0 2px 8px #000;
-  overflow:auto;
 }
 .menuRightHeader{
   display:flex;
@@ -904,70 +909,79 @@ function installMainMenuRedesign(){
   gap:14px;
   font-size:8px;
   letter-spacing:2px;
-  color:#b9b198;
-  margin-bottom:16px;
+  color:#a9a18b;
+  margin-bottom:20px;
 }
 .menuSignalState{
   display:flex;
   align-items:center;
-  gap:8px;
-  margin-bottom:14px;
-  font-size:18px;
-  letter-spacing:3px;
-  color:#e4d4aa;
+  gap:9px;
+  margin-bottom:12px;
+  font-size:16px;
+  letter-spacing:2.5px;
+  color:#ded1a7;
 }
 .menuSignalDot{
-  width:7px;
-  height:7px;
+  width:6px;
+  height:6px;
   border-radius:50%;
   background:#d3a43f;
-  box-shadow:0 0 12px rgba(223,173,69,.55);
+  box-shadow:0 0 11px rgba(223,173,69,.55);
   animation:menuSignalPulse 2.2s ease-in-out infinite;
 }
 @keyframes menuSignalPulse{
-  0%,100%{opacity:.35;box-shadow:0 0 6px rgba(223,173,69,.25)}
-  50%{opacity:1;box-shadow:0 0 15px rgba(223,173,69,.70)}
+  0%,100%{opacity:.35;box-shadow:0 0 6px rgba(223,173,69,.24)}
+  50%{opacity:1;box-shadow:0 0 14px rgba(223,173,69,.68)}
 }
 .menuRightLead{
   margin:0 0 16px;
-  max-width:290px;
+  max-width:280px;
   font-size:10px;
-  line-height:1.75;
-  color:#8d8a79;
+  line-height:1.8;
+  color:#7f7b6d;
 }
-.menuRightRule{height:1px;background:rgba(226,211,164,.10);margin:13px 0 16px}
+.menuRightRule{
+  height:1px;
+  background:rgba(226,211,164,.09);
+  margin:14px 0 16px;
+}
 .menuRightSectionLabel{
   font-size:8px;
   letter-spacing:2px;
-  color:#b5ae96;
-  margin-bottom:7px;
+  color:#aba38c;
+  margin-bottom:8px;
 }
 .menuHomeRedesign .usernameRow{width:100%;margin:0}
 .menuHomeRedesign .usernameInput{
   width:100%;
   box-sizing:border-box;
-  background:rgba(2,4,3,.54);
-  border-color:rgba(231,220,171,.12);
+  background:rgba(2,4,3,.50);
+  border-color:rgba(231,220,171,.11);
   border-radius:2px;
   color:#e2dcc0;
 }
 .menuHomeRedesign .usernameButton{
-  border-color:rgba(231,220,171,.12);
-  background:rgba(255,255,255,.035);
+  border-color:rgba(231,220,171,.11);
+  background:rgba(255,255,255,.028);
   border-radius:2px;
   color:#c4b894;
 }
-.menuHomeRedesign .houseLoader{width:100%;margin:12px 0 0;text-align:left}
-.menuHomeRedesign .houseLoaderTop{color:#96907d}
-.menuHomeRedesign .houseLoaderStatus{color:#777466;min-height:14px}
+.menuHomeRedesign .houseLoader{
+  width:100%;
+  margin:12px 0 0;
+  text-align:left;
+}
+.menuHomeRedesign .houseLoaderTop{color:#8e8876}
+.menuHomeRedesign .houseLoaderStatus{color:#6f6b5f;min-height:14px}
+
 .menuNameGate{
   position:absolute;
   inset:0;
   z-index:20;
   display:none;
   place-items:center;
-  background:rgba(0,0,0,.50);
-  backdrop-filter:blur(5px);
+  background:rgba(0,0,0,.52);
+  backdrop-filter:blur(6px);
 }
 .menuNameGate.open{display:grid}
 .menuNameGateCard{
@@ -975,7 +989,7 @@ function installMainMenuRedesign(){
   padding:24px;
   border:1px solid rgba(226,211,164,.18);
   border-radius:3px;
-  background:linear-gradient(145deg,rgba(8,11,9,.94),rgba(3,5,4,.96));
+  background:linear-gradient(145deg,rgba(8,11,9,.94),rgba(3,5,4,.97));
   box-shadow:0 28px 100px rgba(0,0,0,.62);
 }
 .menuNameGateTitle{
@@ -1031,20 +1045,21 @@ function installMainMenuRedesign(){
   font-size:7px;
   line-height:1.6;
   letter-spacing:1.4px;
-  color:#68655a;
+  color:#656157;
   text-shadow:0 2px 8px #000;
 }
 .menuFooter span:last-child{text-align:right}
+
 @media(max-width:1000px){
   .menuNav{width:min(330px,38vw)}
   .menuSlotBar{width:min(510px,52vw)}
-  .menuRightPanel{right:20px;width:min(330px,32vw)}
+  .menuRightPanel{right:20px;width:min(310px,31vw)}
 }
 @media(max-width:750px){
-  .menuLogoMain span{font-size:24px}
-  .menuLogoMain strong{font-size:32px}
-  .menuNav{top:172px;left:20px;width:min(320px,82vw)}
-  .menuSlotBar{left:20px;bottom:64px;width:calc(100vw - 40px)}
+  .menuLogoMain span{font-size:23px}
+  .menuLogoMain strong{font-size:31px}
+  .menuNav{top:174px;left:20px;width:min(320px,82vw)}
+  .menuSlotBar{left:20px;bottom:62px;width:calc(100vw - 40px)}
   .menuHomeRedesign #saveSlots{grid-template-columns:1fr}
   .menuRightPanel{display:none}
   .menuFooter{left:20px;right:20px;bottom:17px}
@@ -1095,8 +1110,9 @@ function installMainMenuRedesign(){
     }
   };
 
-  configureButton(continueButton,"CONTINUE",true);
-  configureButton(newGameButton,"NEW GAME");
+  const hasSelectedSave=Boolean(getSavedGame(selectedSaveSlot));
+  configureButton(continueButton,"CONTINUE",hasSelectedSave);
+  configureButton(newGameButton,"NEW GAME",!hasSelectedSave);
   configureButton(createLobbyButton,"HOST LOBBY");
   configureButton(joinLobbyButton,"JOIN LOBBY");
 
