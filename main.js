@@ -296,159 +296,149 @@ function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotation
   return mesh;
 }
 
-// New menu composition: a huge open Level-0 chamber with a collapsed center,
-// long sightlines, flooded carpet, and a broken ceiling that opens into darkness.
-addMenuBox("Floor",new THREE.Vector3(72,.20,92),new THREE.Vector3(0,-.10,-19),menuFloorMaterial);
-addMenuBox("Ceiling",new THREE.Vector3(72,.20,92),new THREE.Vector3(0,9.25,-19),menuCeilingMaterial);
-addMenuBox("LeftWall",new THREE.Vector3(.25,9.25,92),new THREE.Vector3(-36,4.62,-19),menuWallMaterial);
-addMenuBox("RightWall",new THREE.Vector3(.25,9.25,92),new THREE.Vector3(36,4.62,-19),menuWallMaterial);
-addMenuBox("FarWall",new THREE.Vector3(72,9.25,.25),new THREE.Vector3(0,4.62,-65),menuWallMaterial);
+// New menu composition: a broad, diagonal Level-0 chamber with a massive collapsed
+// ceiling bay, a flooded center, broken support walls, and much deeper sightlines.
+addMenuBox("Floor",new THREE.Vector3(90,.20,94),new THREE.Vector3(0,-.10,-10),menuFloorMaterial);
+addMenuBox("Ceiling",new THREE.Vector3(90,.20,94),new THREE.Vector3(0,9.25,-10),menuCeilingMaterial);
+addMenuBox("LeftWall",new THREE.Vector3(.25,9.25,94),new THREE.Vector3(-45,4.62,-10),menuWallMaterial);
+addMenuBox("RightWall",new THREE.Vector3(.25,9.25,94),new THREE.Vector3(45,4.62,-10),menuWallMaterial);
+addMenuBox("FarWall",new THREE.Vector3(90,9.25,.25),new THREE.Vector3(0,4.62,-57),menuWallMaterial);
 
-// Long low partitions preserve the classic repeated Backrooms geometry without
-// turning the menu into a corridor.
+// Large broken partitions cross the room at different depths. They are staggered
+// instead of forming a corridor, leaving a huge open playable-looking space.
 for(const [x,z,w,d,h,rot] of [
-  [-22,-3,18,.32,6.5,-.015],
-  [-2,-7,10,.32,7.1,.01],
-  [20,-5,15,.32,6.3,.018],
-  [-16,-17,.32,12,6.8,.03],
-  [8,-20,.32,17,6.6,-.025],
-  [-19,-34,17,.32,6.0,.02],
-  [12,-39,14,.32,5.5,-.02]
+  [-28,0,20,.34,6.4,-.02],
+  [-3,-8,15,.34,6.9,.035],
+  [23,-2,18,.34,6.1,-.025],
+  [-19,-18,.34,15,6.5,.035],
+  [15,-21,.34,20,6.2,-.03],
+  [-27,-33,15,.34,5.8,-.02],
+  [4,-36,22,.34,5.6,.025],
+  [27,-43,.34,15,5.2,-.03]
 ]){
-  addMenuBox("MenuPartition",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuWallMaterial,rot);
+  addMenuBox("BrokenPartition",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuWallMaterial,rot);
 }
 
-// A massive collapsed ceiling bay creates the main visual landmark.
-addMenuBox("CollapseHeader",new THREE.Vector3(25,.75,.60),new THREE.Vector3(1.5,7.1,-29),menuRuinMaterial,.08,.08,.02);
-addMenuBox("CollapseBeamA",new THREE.Vector3(11,.34,.44),new THREE.Vector3(-7,7.72,-23),menuRuinMaterial,-.22,.13,.05);
-addMenuBox("CollapseBeamB",new THREE.Vector3(9,.34,.44),new THREE.Vector3(10,7.35,-31),menuRuinMaterial,.16,-.10,-.04);
-addMenuBox("CollapseBeamC",new THREE.Vector3(12,.30,.40),new THREE.Vector3(-11,6.9,-37),menuRuinMaterial,.28,.08,.06);
+// A giant collapsed ceiling section hangs diagonally over the flooded center.
+addMenuBox("CollapseMain",new THREE.Vector3(24,.72,2.0),new THREE.Vector3(1,7.0,-14),menuRuinMaterial,-.20,.10,.04);
+addMenuBox("CollapseCross",new THREE.Vector3(16,.58,1.3),new THREE.Vector3(-11,7.45,-22),menuRuinMaterial,.34,.08,.03);
+addMenuBox("CollapseDeep",new THREE.Vector3(19,.52,1.1),new THREE.Vector3(16,7.10,-31),menuRuinMaterial,-.14,-.12,-.05);
 
-// Deep black voids behind the collapse and at the far end.
-addMenuBox("CentralVoidBack",new THREE.Vector3(19,5.5,.08),new THREE.Vector3(1.5,3.0,-46.5),menuDarkMaterial);
-addMenuBox("FarVoid",new THREE.Vector3(25,6.2,.08),new THREE.Vector3(0,3.0,-64.7),menuDarkMaterial);
-
-// Broken wall sections frame the central void.
-addMenuBox("VoidLeft",new THREE.Vector3(3.8,7.0,.45),new THREE.Vector3(-11.5,3.5,-46),menuRuinMaterial);
-addMenuBox("VoidRight",new THREE.Vector3(4.5,6.6,.45),new THREE.Vector3(14.5,3.3,-46),menuRuinMaterial);
-addMenuBox("VoidTopLeft",new THREE.Vector3(8.0,1.25,.45),new THREE.Vector3(-6.5,7.55,-46),menuRuinMaterial,-.02,.04,.01);
-addMenuBox("VoidTopRight",new THREE.Vector3(9.0,1.05,.45),new THREE.Vector3(8.0,7.75,-46),menuRuinMaterial,.03,-.03,-.01);
-
-// Open ceiling damage. Some gaps are irregular so the scene doesn't read like
-// a clean test room.
+// Exposed black space above the collapse.
 for(const [x,z,w,d,rx,rz] of [
-  [-17,-1,7.2,3.4,.05,.03],
-  [2,-12,6.0,3.2,-.07,.04],
-  [17,-24,7.0,3.6,.10,-.05],
-  [-8,-30,5.6,3.0,.14,.05],
-  [12,-43,7.2,3.3,-.06,-.07],
-  [-15,-56,6.0,3.5,.08,.04]
+  [-18,2,10,4.2,.06,.02],
+  [2,-14,12,5.2,-.12,.05],
+  [18,-29,9,4.0,.10,-.06],
+  [-10,-39,8,3.6,.13,.04],
+  [17,-49,11,4.0,-.08,-.05]
 ]){
-  addMenuBox("MenuCeilingVoid",new THREE.Vector3(w,.12,d),new THREE.Vector3(x,9.08,z),menuDarkMaterial,0,rx,rz);
+  addMenuBox("OpenCeiling",new THREE.Vector3(w,.12,d),new THREE.Vector3(x,9.08,z),menuDarkMaterial,0,rx,rz);
 }
 
-// Remaining fluorescent grid, with several missing sections.
-for(let x=-30;x<=30;x+=6){
-  addMenuBox("CeilingRailX",new THREE.Vector3(.10,.12,88),new THREE.Vector3(x,9.11,-19),menuTrimMaterial);
-}
-for(let z=-61;z<=23;z+=6){
-  addMenuBox("CeilingRailZ",new THREE.Vector3(70,.12,.10),new THREE.Vector3(0,9.11,z),menuTrimMaterial);
+// Broken support towers create a new silhouette without enclosing the camera.
+for(const [x,z,w,d,h,rot] of [
+  [-33,-11,2.3,2.3,7.7,.00],
+  [30,-15,2.0,2.0,6.9,.03],
+  [-25,-31,2.4,2.4,6.5,-.02],
+  [24,-34,2.2,2.2,6.1,.04],
+  [-4,-47,2.6,2.6,5.8,-.03]
+]){
+  addMenuBox("RuinedSupport",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuRuinMaterial,rot);
 }
 
-// Fallen structural pieces and ceiling tiles.
-for(const [x,z,len,rot,y,rx,rz] of [
-  [-17,-8,8.0,.16,7.95,.08,.02],
-  [3,-18,6.4,-.24,7.68,-.10,.04],
-  [16,-29,7.5,.20,7.55,.13,-.05],
-  [-8,-38,9.0,-.18,7.28,.06,.06],
-  [11,-51,6.8,.30,7.82,-.10,-.04]
+// A huge partially-opened wall frame at the far end acts as the focal landmark.
+addMenuBox("FarFrameLeft",new THREE.Vector3(5.0,8.1,.48),new THREE.Vector3(-16,4.05,-55.8),menuRuinMaterial);
+addMenuBox("FarFrameRight",new THREE.Vector3(5.0,6.3,.48),new THREE.Vector3(17,3.15,-55.8),menuRuinMaterial);
+addMenuBox("FarFrameTop",new THREE.Vector3(28,1.65,.48),new THREE.Vector3(.5,7.75,-55.8),menuRuinMaterial,.03,.03,.01);
+addMenuBox("FarFrameVoid",new THREE.Vector3(24,6.0,.08),new THREE.Vector3(.5,3.0,-55.5),menuDarkMaterial);
+
+// A broad flooded section breaks up the carpet plane and catches the surviving light.
+addMenuBox("FloodedSection",new THREE.Vector3(24,.025,15),new THREE.Vector3(10,.018,-12),menuWetMaterial,.06);
+addMenuBox("FloodedSectionEdge",new THREE.Vector3(27,.045,.20),new THREE.Vector3(10,.042,-19.4),menuRuinMaterial,.06);
+addMenuBox("FloodedSectionEdge2",new THREE.Vector3(.20,.045,15),new THREE.Vector3(-1.8,.042,-12),menuRuinMaterial,.06);
+
+// Dirty carpet islands and water stains.
+for(const [x,z,w,d,ry] of [
+  [-22,8,7.0,2.0,.22],
+  [21,9,6.0,1.7,-.18],
+  [-29,-10,5.5,1.6,.30],
+  [-14,-25,6.8,1.8,-.20],
+  [25,-28,5.0,1.5,.26],
+  [-20,-43,6.3,1.8,-.18],
+  [9,-46,7.0,1.7,.22]
 ]){
-  addMenuBox("FallenBeam",new THREE.Vector3(len,.30,.38),new THREE.Vector3(x,y,z),menuRuinMaterial,rot,rx,rz);
-}
-for(const [x,z,w,d,rx,rz] of [
-  [-21,-12,3.6,2.4,.09,.04],
-  [14,-19,4.1,2.2,-.12,-.05],
-  [-13,-31,4.6,2.8,.11,.08],
-  [7,-42,4.0,2.5,-.08,-.06],
-  [-9,-54,4.8,2.5,.13,.04]
-]){
-  addMenuBox("BrokenTile",new THREE.Vector3(w,.14,d),new THREE.Vector3(x,7.74,z),menuRuinMaterial,0,rx,rz);
+  addMenuBox("DampCarpet",new THREE.Vector3(w,.028,d),new THREE.Vector3(x,.016,z),menuStainMaterial,ry);
+  addMenuBox("Puddle",new THREE.Vector3(w*.60,.012,d*.50),new THREE.Vector3(x,.035,z),menuWetMaterial,ry);
 }
 
-// Tall water damage and peeling wallpaper make the walls visibly ruined.
+// Long water streaks and peeled wallpaper remain visible on the perimeter.
 for(const [x,z,w,h,rot] of [
-  [-35,-8,.20,5.4,.01],
-  [-35,-28,.16,3.8,-.02],
-  [-35,-53,.18,4.6,.04],
-  [35,-17,.18,4.7,-.02],
-  [35,-42,.15,3.6,.03]
+  [-44,-5,.22,5.3,.01],
+  [-44,-28,.16,4.0,-.02],
+  [-44,-49,.18,4.7,.04],
+  [44,-10,.18,4.8,-.02],
+  [44,-36,.15,3.8,.03],
+  [44,-52,.16,2.9,-.04]
 ]){
   addMenuBox("WaterDamage",new THREE.Vector3(w,h,.04),new THREE.Vector3(x,3.1,z),menuStainMaterial,rot);
 }
 for(const [x,z,w,h,rx,rz] of [
-  [-35,-18,1.2,3.2,.03,.06],
-  [35,-29,1.3,3.3,-.02,-.06],
-  [-35,-61,1.1,2.4,.06,.08],
-  [35,-56,1.0,2.5,-.04,-.08]
+  [-44,-17,1.3,3.1,.03,.06],
+  [-44,-58,1.0,2.4,.06,.08],
+  [44,-24,1.2,3.3,-.03,-.07],
+  [44,-57,1.0,2.2,-.04,-.08]
 ]){
-  addMenuBox("WallpaperTear",new THREE.Vector3(w,h,.05),new THREE.Vector3(x,4.0,z),menuRuinMaterial,0,rx,rz);
+  addMenuBox("WallpaperPeel",new THREE.Vector3(w,h,.05),new THREE.Vector3(x,4.0,z),menuRuinMaterial,0,rx,rz);
 }
 
-// Dirty wet carpet and larger puddles give the room depth.
-for(const [x,z,w,d,ry] of [
-  [-11,-4,5.8,1.8,.20],
-  [15,-10,5.0,1.6,-.18],
-  [-18,-21,4.6,1.4,.34],
-  [2,-27,6.2,1.8,-.20],
-  [17,-36,4.8,1.4,.28],
-  [-11,-45,6.0,1.6,-.14],
-  [7,-56,5.2,1.5,.24]
+// Fallen panels and ceiling chunks.
+for(const [x,z,len,rot,y,rx,rz] of [
+  [-19,-7,7.8,.18,7.88,.08,.02],
+  [5,-18,8.6,-.26,7.62,-.11,.04],
+  [25,-25,6.5,.22,7.50,.14,-.05],
+  [-6,-34,9.5,-.16,7.25,.05,.07],
+  [15,-45,7.4,.30,7.78,-.10,-.04]
 ]){
-  addMenuBox("DampCarpet",new THREE.Vector3(w,.028,d),new THREE.Vector3(x,.016,z),menuStainMaterial,ry);
-  addMenuBox("Puddle",new THREE.Vector3(w*.62,.012,d*.50),new THREE.Vector3(x,.035,z),menuWetMaterial,ry);
+  addMenuBox("FallenBeam",new THREE.Vector3(len,.30,.38),new THREE.Vector3(x,y,z),menuRuinMaterial,rot,rx,rz);
+}
+for(const [x,z,w,d,rx,rz] of [
+  [-31,-5,4.0,2.5,.09,.04],
+  [20,-13,4.2,2.5,-.11,-.05],
+  [-19,-32,4.8,2.8,.12,.08],
+  [1,-42,4.3,2.6,-.08,-.06],
+  [-12,-52,4.8,2.5,.13,.05]
+]){
+  addMenuBox("BrokenCeilingTile",new THREE.Vector3(w,.14,d),new THREE.Vector3(x,7.72,z),menuRuinMaterial,0,rx,rz);
 }
 
-// Debris is sparse but larger around the collapsed section.
-for(const [x,z,sx,sy,sz,ry,rx,rz] of [
-  [12,1,1.4,.18,.45,.35,.12,.02],
-  [23,-7,1.1,.17,.38,-.50,.08,.04],
-  [7,-16,1.3,.17,.34,.18,.07,.03],
-  [21,-27,1.6,.19,.40,-.28,.08,.05],
-  [-3,-34,1.0,.14,.32,.55,.12,.02],
-  [18,-45,1.2,.17,.36,-.42,.10,.04],
-  [-20,-53,1.2,.17,.34,.24,.08,.03]
-]){
-  addMenuBox("MenuDebris",new THREE.Vector3(sx,sy,sz),new THREE.Vector3(x,sy*.5+.02,z),menuRuinMaterial,ry,rx,rz);
-}
-
-// Exposed electrical cables.
+// Hanging cables frame the collapse and the far opening.
 function addHangingCable(x,z,length,sway){
   const curve=new THREE.CatmullRomCurve3([
     new THREE.Vector3(x,9.05,z),
-    new THREE.Vector3(x+sway*.25,8.05,z),
-    new THREE.Vector3(x+sway*.60,7.0,z+.28),
+    new THREE.Vector3(x+sway*.22,8.0,z),
+    new THREE.Vector3(x+sway*.62,7.0,z+.30),
     new THREE.Vector3(x+sway,9.05-length,z+.60)
   ]);
   const geometry=new THREE.TubeGeometry(curve,18,.035,6,false);
   const mesh=new THREE.Mesh(geometry,menuRuinMaterial);
   menuSet.add(mesh);
 }
-addHangingCable(-10,-4,3.5,-.95);
-addHangingCable(5,-14,3.1,.70);
-addHangingCable(18,-25,4.3,-.85);
-addHangingCable(-7,-35,2.9,-.65);
-addHangingCable(15,-48,3.9,.90);
+addHangingCable(-16,-2,3.7,-.95);
+addHangingCable(1,-12,3.4,.72);
+addHangingCable(19,-24,4.5,-.88);
+addHangingCable(-9,-35,3.1,-.68);
+addHangingCable(18,-49,4.0,.92);
 
-// Fluorescents: a few survivors remain bright while the deeper ones nearly die.
+// Fluorescent survivors are arranged diagonally to reinforce the new composition.
 const menuLightData=[
-  [-12,2,8,.2],
-  [7,-4,14,.9],
-  [-4,-13,6,1.7],
-  [18,-21,12,2.6],
-  [-15,-30,8,3.4],
-  [5,-40,6,4.2],
-  [-17,-49,4.2,4.9],
-  [12,-57,3.8,5.8]
+  [-18,7,10,.15],
+  [8,5,15,.9],
+  [-7,-8,7,1.8],
+  [20,-15,12,2.6],
+  [-20,-26,9,3.5],
+  [4,-35,6.5,4.2],
+  [-17,-45,4.2,5.0],
+  [13,-53,3.6,5.8]
 ];
 
 for(const [x,z,power,phase] of menuLightData){
@@ -463,20 +453,22 @@ for(const [x,z,power,phase] of menuLightData){
   menuSet.add(point);
 }
 
-const menuAmbient=new THREE.HemisphereLight(0xd0c28b,0x11120f,.60);
+const menuAmbient=new THREE.HemisphereLight(0xd0c28b,0x11120f,.56);
 menuSet.add(menuAmbient);
 
-const menuFill=new THREE.PointLight(0xd0b86d,3.1,42,2);
-menuFill.position.set(10,4,-8);
+const menuFill=new THREE.PointLight(0xd0b86d,3.5,44,2);
+menuFill.position.set(-4,4,-8);
 menuSet.add(menuFill);
 
-const menuFarLight=new THREE.PointLight(0xc5a85e,2.2,36,2);
-menuFarLight.position.set(0,3,-45);
+const menuFarLight=new THREE.PointLight(0xc5a85e,1.7,40,2);
+menuFarLight.position.set(6,3,-48);
 menuSet.add(menuFarLight);
 
-const menuCameraStart=new THREE.Vector3(13.8,2.28,12.2);
-const menuCameraTarget=new THREE.Vector3(1.5,2.70,-28.5);
-menuCamera.fov=68;
+// New diagonal camera composition. The room is viewed across its width rather than
+// straight down a corridor, making the open space and collapsed bay immediately visible.
+const menuCameraStart=new THREE.Vector3(-17.8,2.30,17.5);
+const menuCameraTarget=new THREE.Vector3(5.5,2.90,-17.5);
+menuCamera.fov=72;
 menuCamera.updateProjectionMatrix();
 
 let menuBackdropWasActive=false;
