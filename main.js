@@ -2159,6 +2159,51 @@ function isSpiderBlocked(x,z){
   return false;
 }
 
+function spiderHasLineOfSight(){
+  const dx=player.pos.x-spiderEntity.position.x;
+  const dz=player.pos.z-spiderEntity.position.z;
+  const distance=Math.hypot(dx,dz);
+
+  if(distance>.001 && distance>18) return false;
+
+  const steps=Math.max(2,Math.ceil(distance/.45));
+  const probeRadius=.12;
+
+  for(let step=1;step<steps;step++){
+    const t=step/steps;
+    const x=spiderEntity.position.x+dx*t;
+    const z=spiderEntity.position.z+dz*t;
+    const walls=world.getNearbyWallBounds(x,z,probeRadius);
+
+    for(const wall of walls){
+      const nx=Math.max(wall.minX,Math.min(x,wall.maxX));
+      const nz=Math.max(wall.minZ,Math.min(z,wall.maxZ));
+      const wx=x-nx;
+      const wz=z-nz;
+      if(wx*wx+wz*wz<probeRadius*probeRadius){
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function rotatePlayerTowardSpider(dt){
+  const dx=spiderEntity.position.x-player.pos.x;
+  const dz=spiderEntity.position.z-player.pos.z;
+  if(dx*dx+dz*dz<.0001) return;
+
+  const targetYaw=Math.atan2(dx,dz);
+  let delta=targetYaw-player.yaw;
+
+  while(delta>Math.PI) delta-=Math.PI*2;
+  while(delta<-Math.PI) delta+=Math.PI*2;
+
+  const turnSpeed=5.5;
+  player.yaw+=delta*Math.min(1,dt*turnSpeed);
+}
+
 function findSpiderSpawnPosition(){
   const forwardX=-Math.sin(player.yaw);
   const forwardZ=-Math.cos(player.yaw);
@@ -2987,7 +3032,34 @@ function animate(){
   }
 
   const flicker=flashlightFlicker(t);
-  flashlight.intensity=flashlightOn ? 68.0*flicker : 0;
+  let flashlightStrength=68.0*flicker;
+
+  if(flashlightOn && !houseMode && spiderActive){
+    const spiderDistance=Math.hypot(
+      player.pos.x-spiderEntity.position.x,
+      player.pos.z-spiderEntity.position.z
+    );
+
+    // Normal outside the danger zone, then rapidly dim as the spider closes in.
+    const proximity=THREE.MathUtils.clamp(
+      (12-spiderDistance)/10,
+      0,
+      1
+    );
+    const dimmedStrength=THREE.MathUtils.lerp(
+      flashlightStrength,
+      7.0*flicker,
+      proximity*proximity
+    );
+
+    flashlightStrength=dimmedStrength;
+
+    if(spiderJumpscareTimer>0){
+      flashlightStrength=4.0*flicker;
+    }
+  }
+
+  flashlight.intensity=flashlightOn ? flashlightStrength : 0;
   if(!houseMode){
     playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
   }
@@ -3036,6 +3108,14 @@ function animate(){
       player.pos.x-spiderEntity.position.x,
       player.pos.z-spiderEntity.position.z
     );
+
+    const spiderSeesPlayer=
+      targetDistance<=18 &&
+      spiderHasLineOfSight();
+
+    if(spiderSeesPlayer && spiderBehaviorState==="chase"){
+      rotatePlayerTowardSpider(dt);
+    }
 
     if(spiderBehaviorState==="stalk"){
       setSpiderAnimation("stalk");
