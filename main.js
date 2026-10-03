@@ -3238,11 +3238,6 @@ const spiderRevealLight=new THREE.PointLight(0xff7a38,0,18,1.6);
 spiderRevealLight.position.set(0,1.2,0);
 spiderEntity.add(spiderRevealLight);
 
-// A neutral fill light sits close to the spider so its actual body stays readable
-// during the chase. This is separate from the orange reveal glow.
-const spiderBodyLight=new THREE.PointLight(0xffe8d0,0,8,1.8);
-spiderBodyLight.position.set(0,1.15,.35);
-spiderEntity.add(spiderBodyLight);
 scene.add(spiderEntity);
 
 let spiderLoaded=false;
@@ -3293,8 +3288,8 @@ const SPIDER_ANIMATION_RANGES={
 const SPIDER_ANIMATION_ALIAS={
   idle:"idle1",
   stalk:"idle2",
-  chase:"walk",
-  attack:"attack1",
+  chase:"idle2",
+  attack:"attack2",
   hit:"hit1",
   death:"die1"
 };
@@ -3840,11 +3835,39 @@ function finishSpiderModel(model,animations,sourceName){
     obj.receiveShadow=true;
     obj.renderOrder=10;
 
-    const materials=Array.isArray(obj.material)?obj.material:[obj.material];
-    for(const material of materials){
-      if(!material) continue;
-      material.visible=true;
+    const originalMaterials=Array.isArray(obj.material)
+      ? obj.material
+      : [obj.material];
+
+    const makeUnlitMaterial=(source)=>{
+      if(!source){
+        return new THREE.MeshBasicMaterial({
+          color:0x6b5145,
+          side:THREE.DoubleSide
+        });
+      }
+
+      const material=new THREE.MeshBasicMaterial({
+        color:source.color?.clone?.() || new THREE.Color(0xffffff),
+        map:source.map || null,
+        alphaMap:source.alphaMap || null,
+        transparent:Boolean(source.transparent),
+        opacity:Number.isFinite(source.opacity) ? source.opacity : 1,
+        side:source.side ?? THREE.FrontSide,
+        vertexColors:Boolean(source.vertexColors)
+      });
+
+      material.name=source.name || "SpiderOriginalUnlit";
+      material.depthTest=true;
+      material.depthWrite=true;
       material.needsUpdate=true;
+      return material;
+    };
+
+    if(Array.isArray(obj.material)){
+      obj.material=originalMaterials.map(makeUnlitMaterial);
+    }else{
+      obj.material=makeUnlitMaterial(originalMaterials[0]);
     }
 
   });
@@ -4069,6 +4092,12 @@ function finishSpiderModel(model,animations,sourceName){
   if(spiderActions.size===0 && animations?.length===0){
     console.log("[DeepSeeker] Spider visual loaded without animation clips (static fallback).");
   }
+
+  console.log("[DeepSeeker] Spider render material",{
+    sourceMaterialTypes:[...new Set(
+      [].concat(...model.children.map(child=>[])
+    )).values()]
+  });
 
   console.log(
     "[DeepSeeker] Spider-Psionic asset loaded from ZIP",
@@ -4883,10 +4912,6 @@ function animate(){
 
   spiderRevealLight.intensity=(!houseMode && spiderActive)
     ? (spiderJumpscareTimer>0 ? 5.0 : 2.8)
-    : 0;
-
-  spiderBodyLight.intensity=(!houseMode && spiderActive)
-    ? (spiderJumpscareTimer>0 ? 11.0 : 7.5)
     : 0;
 
   if(spiderActive && !houseMode){
