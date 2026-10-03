@@ -3269,7 +3269,7 @@ const SPIDER_ATTACK_RANGE=1.65;
 const SPIDER_SPEED=2.35;
 const SPIDER_RADIUS=.55;
 const SPIDER_GROUND_OFFSET=.08;
-const SPIDER_TARGET_SPAN=2.4;
+const SPIDER_TARGET_SPAN=3.4;
 
 const SPIDER_ANIMATION_RANGES={
   idle1:[164,213],
@@ -3816,35 +3816,25 @@ function finishSpiderModel(model,animations,sourceName){
     obj.frustumCulled=false;
     obj.castShadow=true;
     obj.receiveShadow=true;
+    obj.renderOrder=10;
 
-    const materials=Array.isArray(obj.material)?obj.material:[obj.material];
-    for(const material of materials){
-      if(!material) continue;
-      material.visible=true;
-      material.transparent=false;
-      material.opacity=1;
-      material.depthTest=true;
-      material.depthWrite=true;
-      material.side=THREE.DoubleSide;
+    // The uploaded FBX can carry Unity-era materials that do not render reliably
+    // in this browser scene. Keep the real geometry/skinning, but give every mesh
+    // a guaranteed-visible fallback material so the model itself is always present.
+    const visibleMaterial=new THREE.MeshBasicMaterial({
+      color:0xb56e4c,
+      side:THREE.DoubleSide,
+      transparent:false,
+      opacity:1,
+      depthTest:true,
+      depthWrite:true
+    });
 
-      // Keep the spider readable during the chase even when the Backrooms are
-      // nearly black. This is a subtle material lift, not a visible glow.
-      if("emissive" in material){
-        material.emissive=new THREE.Color(0x4a2013);
-        material.emissiveIntensity=.95;
-      }
-
-      // Some FBX materials arrive with extremely dark baked colors. Give them
-      // a warm visible base while keeping any supplied texture map intact.
-      if(material.color){
-        material.color.set(0x8a5038);
-      }
-
-      if("flatShading" in material){
-        material.flatShading=false;
-      }
-
-      material.needsUpdate=true;
+    if(Array.isArray(obj.material)){
+      obj.material=obj.material.map(()=>visibleMaterial.clone());
+      visibleMaterial.dispose();
+    }else{
+      obj.material=visibleMaterial;
     }
   });
 
@@ -3862,11 +3852,54 @@ function finishSpiderModel(model,animations,sourceName){
   spiderActions.clear();
   spiderAnimationState="";
 
-  const sourceClip=animations?.[0] || null;
-  if(sourceClip){
-    const sourceFPS=329/Math.max(sourceClip.duration,.001);
-    spiderMixer=new THREE.AnimationMixer(model);
+  const normalizedAnimationName=(clip)=>String(clip?.name||"")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g," ");
 
+  // This asset is documented as 15 separate animations. FBXLoader commonly
+  // exposes those as 15 clips, so use the clips directly in documented order.
+  const documentedClipNames=[
+    "walk",
+    "attack1",
+    "attack2",
+    "eat",
+    "defend",
+    "hit1",
+    "hit2",
+    "crouch",
+    "stand",
+    "idle1",
+    "idle2",
+    "jump",
+    "sidestep",
+    "die1",
+    "die2"
+  ];
+
+  const directClips=new Map();
+
+  if(animations?.length>=documentedClipNames.length){
+    for(let i=0;i<documentedClipNames.length;i++){
+      directClips.set(documentedClipNames[i],animations[i]);
+    }
+  }else if(animations?.length>1){
+    for(const clip of animations){
+      const name=normalizedAnimationName(clip);
+      if(name.includes("walk")) directClips.set("walk",clip);
+      else if(name.includes("attack 1") || name.includes("attack1")) directClips.set("attack1",clip);
+      else if(name.includes("attack 2") || name.includes("attack2")) directClips.set("attack2",clip);
+      else if(name.includes("idle 1") || name.includes("idle1")) directClips.set("idle1",clip);
+      else if(name.includes("idle 2") || name.includes("idle2")) directClips.set("idle2",clip);
+      else if(name.includes("die 1") || name.includes("die1")) directClips.set("die1",clip);
+      else if(name.includes("die 2") || name.includes("die2")) directClips.set("die2",clip);
+    }
+  }
+
+  // If the exporter combines everything into one long clip, retain the original
+  // frame-range fallback used by the asset documentation.
+  if(animations?.length===1){
+    const sourceClip=animations[0];
+    const sourceFPS=329/Math.max(sourceClip.duration,.001);
     for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
       const clip=THREE.AnimationUtils.subclip(
         sourceClip,
@@ -3875,6 +3908,15 @@ function finishSpiderModel(model,animations,sourceName){
         endFrame+1,
         sourceFPS
       );
+      directClips.set(name,clip);
+    }
+  }
+
+  if(directClips.size){
+    spiderMixer=new THREE.AnimationMixer(model);
+
+    for(const [name,clip] of directClips){
+      if(!clip) continue;
       const action=spiderMixer.clipAction(clip);
       action.setLoop(
         name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
@@ -3895,6 +3937,7 @@ function finishSpiderModel(model,animations,sourceName){
       source:sourceName,
       format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
       animations:animations?.map(animation=>animation.name)||[],
+      animationCount:animations?.length||0,
       meshCount
     }
   );
@@ -3906,7 +3949,7 @@ function finishSpiderModel(model,animations,sourceName){
     spawnSpiderAtPlayer();
   }
 
-  eventText.textContent=sourceClip ? "SPIDER READY" : "SPIDER READY (STATIC)";
+  eventText.textContent=spiderActions.size ? "SPIDER READY" : "SPIDER READY (STATIC)";
   eventText.style.opacity="1";
   setTimeout(()=>{
     if(
