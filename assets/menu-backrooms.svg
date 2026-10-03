@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#2b2b22"/>
+    <stop offset=".42" stop-color="#787351"/>
+    <stop offset="1" stop-color="#171813"/>
+  </linearGradient>
+  <linearGradient id="leftWall" x1="0" y1="0" x2="1" y2="0">
+    <stop stop-color="#343426"/>
+    <stop offset=".55" stop-color="#8a855b"/>
+    <stop offset="1" stop-color="#6f6b49"/>
+  </linearGradient>
+  <linearGradient id="rightWall" x1="1" y1="0" x2="0" y2="0">
+    <stop stop-color="#333327"/>
+    <stop offset=".52" stop-color="#8a865f"/>
+    <stop offset="1" stop-color="#6b6748"/>
+  </linearGradient>
+  <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+    <stop stop-color="#6a6448"/>
+    <stop offset=".65" stop-color="#3b3a2b"/>
+    <stop offset="1" stop-color="#171814"/>
+  </linearGradient>
+  <linearGradient id="ceiling" x1="0" y1="0" x2="0" y2="1">
+    <stop stop-color="#5a5948"/>
+    <stop offset="1" stop-color="#77735a"/>
+  </linearGradient>
+  <radialGradient id="lampGlow">
+    <stop stop-color="#fff6cf" stop-opacity=".9"/>
+    <stop offset=".24" stop-color="#fff0b6" stop-opacity=".32"/>
+    <stop offset="1" stop-color="#fff0b6" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="centerGlow">
+    <stop stop-color="#a59b6b" stop-opacity=".18"/>
+    <stop offset="1" stop-color="#4c4a35" stop-opacity="0"/>
+  </radialGradient>
+  <pattern id="wallPattern" width="96" height="48" patternUnits="userSpaceOnUse">
+    <rect width="96" height="48" fill="#8c875c"/>
+    <path d="M0 47H96" stroke="#666144" stroke-width="2" opacity=".28"/>
+    <path d="M0 2H96" stroke="#b8b180" stroke-width="1" opacity=".13"/>
+    <path d="M12 0V48M61 0V48" stroke="#5e5a40" stroke-width="2" opacity=".08"/>
+    <circle cx="28" cy="23" r="1.5" fill="#5e5a40" opacity=".10"/>
+    <circle cx="79" cy="11" r="1" fill="#4d4a37" opacity=".08"/>
+  </pattern>
+  <pattern id="carpet" width="34" height="34" patternUnits="userSpaceOnUse">
+    <rect width="34" height="34" fill="#4b4834"/>
+    <circle cx="4" cy="8" r=".8" fill="#8b845d" opacity=".14"/>
+    <circle cx="18" cy="23" r=".7" fill="#8b845d" opacity=".12"/>
+    <circle cx="29" cy="12" r=".6" fill="#1c1d17" opacity=".22"/>
+    <circle cx="10" cy="30" r=".5" fill="#181914" opacity=".18"/>
+  </pattern>
+  <filter id="soft"><feGaussianBlur stdDeviation="18"/></filter>
+  <filter id="grain">
+    <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="8"/>
+    <feColorMatrix values="1 0 0 0 0
+                            0 1 0 0 0
+                            0 0 1 0 0
+                            0 0 0 .08 0"/>
+  </filter>
+  <filter id="shadow"><feGaussianBlur stdDeviation="5"/></filter>
+</defs>
+
+<rect width="1920" height="1080" fill="url(#bg)"/>
+
+<!-- ceiling -->
+<polygon points="0,0 1920,0 1550,510 430,510" fill="url(#ceiling)"/>
+<g opacity=".45" stroke="#474635" stroke-width="3">
+  <path d="M140 0L610 510"/><path d="M420 0L790 510"/><path d="M700 0L945 510"/>
+  <path d="M980 0L975 510"/><path d="M1260 0L1160 510"/><path d="M1540 0L1320 510"/>
+  <path d="M1820 0L1470 510"/>
+</g>
+<g opacity=".28" stroke="#aaa47a" stroke-width="2">
+  <path d="M0 155H1745"/><path d="M0 300H1640"/>
+</g>
+
+<!-- left wall -->
+<polygon points="0,150 430,510 610,1080 0,1080" fill="url(#wallPattern)"/>
+<polygon points="0,150 430,510 610,1080 0,1080" fill="url(#leftWall)" opacity=".26"/>
+<!-- right wall -->
+<polygon points="1920,135 1550,510 1315,1080 1920,1080" fill="url(#wallPattern)"/>
+<polygon points="1920,135 1550,510 1315,1080 1920,1080" fill="url(#rightWall)" opacity=".28"/>
+
+<!-- panel seams -->
+<g stroke="#4e4b36" stroke-width="7" opacity=".38">
+  <path d="M210 235L470 530L545 1080"/>
+  <path d="M-20 565L438 575L620 1080"/>
+  <path d="M1710 228L1518 530L1325 1080"/>
+  <path d="M1940 560L1540 575L1308 1080"/>
+</g>
+<g stroke="#b2aa79" stroke-width="2" opacity=".18">
+  <path d="M216 237L476 528L551 1080"/>
+  <path d="M1705 230L1515 530L1320 1080"/>
+</g>
+
+<!-- floor -->
+<polygon points="430,510 1550,510 1920,1080 0,1080" fill="url(#floor)"/>
+<polygon points="430,510 1550,510 1920,1080 0,1080" fill="url(#carpet)" opacity=".72"/>
+<g stroke="#817955" stroke-width="3" opacity=".18">
+  <path d="M470 560L105 1080"/><path d="M620 550L420 1080"/><path d="M790 540L700 1080"/>
+  <path d="M1130 540L1220 1080"/><path d="M1300 550L1480 1080"/><path d="M1450 560L1820 1080"/>
+</g>
+
+<!-- distant hallway -->
+<polygon points="760,395 1160,395 1360,760 560,760" fill="#0f100d"/>
+<polygon points="845,420 1075,420 1195,700 725,700" fill="#070806"/>
+<ellipse cx="960" cy="500" rx="260" ry="190" fill="url(#centerGlow)"/>
+
+<!-- distant door -->
+<rect x="885" y="454" width="150" height="214" fill="#23241b" stroke="#4b4934" stroke-width="5"/>
+<rect x="897" y="466" width="126" height="190" fill="#171812"/>
+<circle cx="1008" cy="567" r="5" fill="#b3a66e"/>
+<circle cx="1008" cy="567" r="13" fill="#b3a66e" opacity=".08"/>
+
+<!-- ceiling lights -->
+<g>
+  <ellipse cx="540" cy="333" rx="260" ry="130" fill="url(#lampGlow)" opacity=".52" filter="url(#soft)"/>
+  <ellipse cx="1380" cy="335" rx="260" ry="130" fill="url(#lampGlow)" opacity=".42" filter="url(#soft)"/>
+  <rect x="420" y="318" width="245" height="15" rx="3" fill="#ece5c2"/>
+  <rect x="1285" y="318" width="245" height="15" rx="3" fill="#e8e1c0"/>
+  <rect x="650" y="255" width="160" height="10" rx="2" fill="#e8e1bf" opacity=".7"/>
+  <rect x="1110" y="255" width="160" height="10" rx="2" fill="#e8e1bf" opacity=".68"/>
+</g>
+
+<!-- side fluorescent spill -->
+<g opacity=".24" filter="url(#soft)">
+  <rect x="90" y="360" width="260" height="35" fill="#f1e9c4"/>
+  <rect x="1570" y="360" width="260" height="35" fill="#f1e9c4"/>
+</g>
+
+<!-- foreground darkness -->
+<rect width="1920" height="1080" fill="url(#centerGlow)" opacity=".18"/>
+<rect width="1920" height="1080" filter="url(#grain)" opacity=".65"/>
+<rect width="1920" height="1080" fill="none" stroke="#000" stroke-width="180" opacity=".28"/>
+</svg>
