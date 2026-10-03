@@ -55,6 +55,7 @@ const houseLoadStatusHome=document.getElementById("houseLoadStatusHome");
 const houseLoadFillLobby=document.getElementById("houseLoadFillLobby");
 const houseLoadPercentLobby=document.getElementById("houseLoadPercentLobby");
 const houseLoadStatusLobby=document.getElementById("houseLoadStatusLobby");
+let menuControlsButton=null;
 
 
 const gltfLoader=new GLTFLoader();
@@ -512,6 +513,201 @@ function refreshSaveInfo(){
   renderSaveSlots();
   updateSaveSlotLabels();
   updateHouseLoadingUI();
+}
+
+function installMainMenuRedesign(){
+  if(!homeScreen || homeScreen.dataset.deepseekerMenu==="redesigned") return;
+  homeScreen.dataset.deepseekerMenu="redesigned";
+  homeScreen.classList.add("menuHomeRedesign");
+
+  const menuTitle=homeScreen.querySelector(".menuTitle");
+  const usernameRow=homeScreen.querySelector(".usernameRow");
+  const houseLoader=homeScreen.querySelector("#houseLoaderHome");
+  const saveSlots=document.getElementById("saveSlots");
+
+  const style=document.createElement("style");
+  style.id="deepseeker-menu-redesign";
+  style.textContent=`
+#menuBackdrop{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;background:
+  radial-gradient(circle at 71% 42%,rgba(205,190,117,.13),transparent 17%),
+  radial-gradient(circle at 28% 78%,rgba(46,71,55,.22),transparent 25%),
+  linear-gradient(180deg,#050806 0%,#020302 100%)}
+#menuBackdrop::before{content:"";position:absolute;inset:-12%;opacity:.32;background:
+  linear-gradient(90deg,transparent 0 12%,rgba(220,208,158,.055) 12.1%,transparent 12.2% 38%,rgba(220,208,158,.04) 38.1%,transparent 38.2% 71%,rgba(220,208,158,.05) 71.1%,transparent 71.2%),
+  linear-gradient(180deg,transparent 0 18%,rgba(220,208,158,.035) 18.1%,transparent 18.2% 74%,rgba(220,208,158,.045) 74.1%,transparent 74.2%);
+transform:perspective(900px) rotateX(62deg) translateY(11%);transform-origin:center bottom}
+#menuBackdrop::after{content:"";position:absolute;inset:0;background:
+  linear-gradient(90deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.18) 26%,transparent 55%),
+  radial-gradient(circle at 72% 48%,transparent 0 15%,rgba(0,0,0,.52) 52%,rgba(0,0,0,.86) 100%)}
+.menuBackdropGlow{position:absolute;width:46vw;height:46vw;min-width:420px;min-height:420px;right:-8vw;top:-15vw;border-radius:50%;background:radial-gradient(circle,rgba(215,201,138,.13),rgba(215,201,138,0) 68%);filter:blur(10px);animation:menuGlow 7s ease-in-out infinite alternate}
+.menuBackdropScan{position:absolute;inset:0;background:repeating-linear-gradient(180deg,transparent 0 3px,rgba(255,255,255,.012) 4px,transparent 5px);opacity:.45}
+@keyframes menuGlow{from{transform:translate3d(-2%,2%,0) scale(.94);opacity:.7}to{transform:translate3d(3%,-1%,0) scale(1.04);opacity:1}}
+#homeScreen.menuHomeRedesign{position:relative;z-index:2;display:block;width:min(1180px,calc(100vw - 52px));height:min(760px,calc(100vh - 52px));padding:0;box-sizing:border-box;border:1px solid rgba(235,225,184,.15);border-radius:20px;background:rgba(7,10,8,.80);box-shadow:0 38px 120px rgba(0,0,0,.66),inset 0 1px rgba(255,255,255,.045);backdrop-filter:blur(13px);overflow:hidden}
+#homeScreen.menuHomeRedesign.hidden{display:none}
+.menuShell{display:grid;grid-template-columns:270px minmax(0,1fr);height:100%;min-height:0}
+.menuSidebar{display:flex;flex-direction:column;padding:28px 18px 18px;background:linear-gradient(180deg,rgba(11,15,12,.94),rgba(4,6,5,.88));border-right:1px solid rgba(231,220,171,.09);min-width:0}
+.menuBrand{padding:2px 12px 26px;border-bottom:1px solid rgba(231,220,171,.09)}
+.menuBrandMark{width:34px;height:34px;display:grid;place-items:center;margin-bottom:13px;border:1px solid rgba(218,203,143,.34);border-radius:10px;color:#e8dfb8;font-size:12px;letter-spacing:2px;background:linear-gradient(145deg,rgba(216,201,138,.13),rgba(255,255,255,.025));box-shadow:0 0 28px rgba(216,201,138,.05)}
+.menuBrandName{font-size:23px;letter-spacing:5px;color:#f1e9c6;text-shadow:0 0 22px rgba(220,202,137,.12)}
+.menuBrandSub{margin-top:7px;font-size:8px;letter-spacing:2.3px;color:#817e6d}
+.menuNav{display:flex;flex-direction:column;gap:7px;margin-top:20px}
+.menuNavButton{position:relative;width:100%;min-height:52px;padding:0 13px;display:grid;grid-template-columns:28px 1fr 16px;align-items:center;gap:8px;border:1px solid transparent;border-radius:10px;background:transparent;color:#969482;font:inherit;text-align:left;font-size:10px;letter-spacing:1.9px;cursor:pointer;transition:background .18s,border-color .18s,color .18s,transform .18s}
+.menuNavButton:hover{background:rgba(216,201,138,.06);border-color:rgba(216,201,138,.12);color:#e0d8b5;transform:translateX(2px)}
+.menuNavButton.active,.menuNavButton:focus-visible{background:linear-gradient(90deg,rgba(216,201,138,.13),rgba(216,201,138,.03));border-color:rgba(216,201,138,.23);color:#f0e8c3;outline:none}
+.menuNavButton.active::before{content:"";position:absolute;left:-1px;top:9px;bottom:9px;width:2px;background:#d8c98a;box-shadow:0 0 15px rgba(216,201,138,.45)}
+.menuNavButton:disabled{opacity:.34;cursor:not-allowed;transform:none!important}
+.menuNavIndex{font-size:8px;letter-spacing:1px;color:#6f6d61}
+.menuNavArrow{font-size:14px;color:#59584e;transition:transform .18s,color .18s}
+.menuNavButton:hover .menuNavArrow{transform:translateX(3px);color:#d4c898}
+.menuSideStatus{margin-top:auto;padding:15px 12px;border-top:1px solid rgba(231,220,171,.08);font-size:8px;line-height:1.8;letter-spacing:1.5px;color:#66675d}
+.menuSideStatus strong{display:block;margin-bottom:3px;color:#98947d;font-weight:600}
+.menuMainPanel{position:relative;min-width:0;overflow:auto;padding:48px 52px 34px}
+.menuMainPanel::before{content:"";position:absolute;top:0;right:0;width:54%;height:1px;background:linear-gradient(90deg,transparent,rgba(216,201,138,.24));opacity:.7}
+.menuMainEyebrow{display:flex;justify-content:space-between;gap:20px;font-size:8px;letter-spacing:2.8px;color:#777568;text-transform:uppercase}
+.menuMainTitle{margin:26px 0 10px;max-width:760px;font-size:clamp(42px,6vw,74px);font-weight:500;line-height:.95;letter-spacing:8px;color:#eee7c7;text-shadow:0 7px 35px rgba(0,0,0,.8)}
+.menuMainLead{max-width:620px;margin:0;color:#8d8b79;font-size:12px;line-height:1.75;letter-spacing:1.3px}
+.menuRule{height:1px;margin:28px 0;border-top:1px solid rgba(231,220,171,.08)}
+.menuInfoGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:14px}
+.menuPanelCard{min-width:0;padding:17px 17px 16px;border:1px solid rgba(231,220,171,.10);border-radius:13px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));box-shadow:inset 0 1px rgba(255,255,255,.025)}
+.menuSectionHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px;font-size:8px;letter-spacing:2.1px;color:#827f70}
+.menuSectionHeader strong{color:#c8c1a4;font-weight:600}
+.menuHomeRedesign .usernameRow{width:100%;margin:0}
+.menuHomeRedesign .usernameInput{background:rgba(2,4,3,.72);border-color:rgba(231,220,171,.10);border-radius:9px;color:#e2dcc0}
+.menuHomeRedesign .usernameButton{border-color:rgba(231,220,171,.13);background:rgba(255,255,255,.03);border-radius:9px;color:#bdb38f}
+.menuHomeRedesign .houseLoader{width:100%;margin:0;text-align:left}
+.menuHomeRedesign .houseLoaderTop{color:#8a8775}
+.menuHomeRedesign .houseLoaderStatus{color:#777566;min-height:14px}
+.menuHomeRedesign #saveSlots{width:100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.menuHomeRedesign .saveSlotCard{padding:11px 9px;border-color:rgba(231,220,171,.09);background:rgba(255,255,255,.018)}
+.menuHomeRedesign .saveSlotCard.selected{border-color:rgba(216,201,138,.48);background:rgba(216,201,138,.065);box-shadow:0 0 25px rgba(216,201,138,.045)}
+.menuArchiveNote{margin-top:9px;font-size:8px;letter-spacing:1.35px;color:#66665a}
+.menuFooter{display:flex;justify-content:space-between;gap:20px;margin-top:16px;font-size:8px;line-height:1.7;letter-spacing:1.4px;color:#5f6056}
+.menuFooter span:last-child{text-align:right}
+@media(max-width:900px){#homeScreen.menuHomeRedesign{width:min(96vw,760px);height:min(94vh,820px)}.menuShell{grid-template-columns:210px minmax(0,1fr)}.menuMainPanel{padding:34px 28px 28px}.menuMainTitle{font-size:clamp(34px,7vw,58px);letter-spacing:5px}.menuInfoGrid{grid-template-columns:1fr}.menuHomeRedesign #saveSlots{grid-template-columns:1fr}}
+@media(max-width:650px){#homeScreen.menuHomeRedesign{width:96vw;height:94vh;border-radius:16px}.menuShell{display:flex;flex-direction:column}.menuSidebar{flex:none;padding:14px 13px 9px;border-right:0;border-bottom:1px solid rgba(231,220,171,.09)}.menuBrand{display:flex;align-items:center;gap:11px;padding:0 4px 11px}.menuBrandMark{margin:0;width:30px;height:30px}.menuBrandSub{display:none}.menuBrandName{font-size:18px}.menuNav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px}.menuNavButton{min-height:38px;padding:0 6px;display:flex;justify-content:center;text-align:center}.menuNavButton .menuNavIndex,.menuNavButton .menuNavArrow{display:none}.menuNavButton.active::before{left:8px;right:8px;top:auto;bottom:-1px;width:auto;height:2px}.menuSideStatus{display:none}.menuMainPanel{padding:24px 18px 24px}.menuMainEyebrow{font-size:7px}.menuMainTitle{margin-top:17px}.menuMainLead{font-size:10px}}
+`;
+  document.head.appendChild(style);
+
+  if(!document.getElementById("menuBackdrop")){
+    const backdrop=document.createElement("div");
+    backdrop.id="menuBackdrop";
+    backdrop.innerHTML=`
+      <div class="menuBackdropGlow"></div>
+      <div class="menuBackdropScan"></div>
+    `;
+    overlay.insertBefore(backdrop,homeScreen);
+  }
+
+  const shell=document.createElement("div");
+  shell.className="menuShell";
+
+  const sidebar=document.createElement("aside");
+  sidebar.className="menuSidebar";
+
+  const brand=document.createElement("div");
+  brand.className="menuBrand";
+  brand.innerHTML=`
+    <div class="menuBrandMark">DS</div>
+    <div>
+      <div class="menuBrandName">DEEPSEEKER</div>
+      <div class="menuBrandSub">LIMINAL EXPLORATION TERMINAL</div>
+    </div>
+  `;
+
+  const nav=document.createElement("nav");
+  nav.className="menuNav";
+  nav.setAttribute("aria-label","Main menu");
+
+  const configureButton=(button,index,label,active=false)=>{
+    button.className="menuNavButton"+(active?" active":"");
+    button.type="button";
+    if(button===continueButton){
+      button.innerHTML=`<span class="menuNavIndex">${index}</span><span id="continueSlotLabel">CONTINUE SLOT ${selectedSaveSlot}</span><span class="menuNavArrow">›</span>`;
+    }else{
+      button.innerHTML=`<span class="menuNavIndex">${index}</span><span>${label}</span><span class="menuNavArrow">›</span>`;
+    }
+  };
+
+  configureButton(newGameButton,"01","NEW GAME",true);
+  configureButton(continueButton,"02","CONTINUE");
+  configureButton(createLobbyButton,"03","HOST LOBBY");
+  configureButton(joinLobbyButton,"04","JOIN LOBBY");
+
+  menuControlsButton=document.createElement("button");
+  menuControlsButton.className="menuNavButton";
+  menuControlsButton.type="button";
+  menuControlsButton.innerHTML=`<span class="menuNavIndex">05</span><span>CONTROLS</span><span class="menuNavArrow">›</span>`;
+  menuControlsButton.addEventListener("click",()=>{
+    showControls();
+  });
+
+  nav.append(newGameButton,continueButton,createLobbyButton,joinLobbyButton,menuControlsButton);
+
+  const sideStatus=document.createElement("div");
+  sideStatus.className="menuSideStatus";
+  sideStatus.innerHTML=`<strong>DEEPSEEKER SYSTEM</strong>PROCEDURAL BUILD · ONLINE READY<br>OBJECTIVE: FIND A WAY DEEPER`;
+
+  sidebar.append(brand,nav,sideStatus);
+
+  const main=document.createElement("main");
+  main.className="menuMainPanel";
+
+  const eyebrow=document.createElement("div");
+  eyebrow.className="menuMainEyebrow";
+  eyebrow.innerHTML=`<span>FIELD TERMINAL // DS-01</span><span>BUILD ${new Date().getFullYear()}</span>`;
+
+  const title=document.createElement("h1");
+  title.className="menuMainTitle";
+  title.textContent="DON'T LOOK BACK.";
+
+  const lead=document.createElement("p");
+  lead.className="menuMainLead";
+  lead.textContent="The apartment is only the entrance. Something is waiting in the halls beyond it.";
+
+  const rule=document.createElement("div");
+  rule.className="menuRule";
+
+  const infoGrid=document.createElement("div");
+  infoGrid.className="menuInfoGrid";
+
+  const profile=document.createElement("section");
+  profile.className="menuPanelCard";
+  profile.innerHTML=`
+    <div class="menuSectionHeader"><strong>PLAYER PROFILE</strong><span>LOCAL</span></div>
+  `;
+  if(usernameRow) profile.appendChild(usernameRow);
+
+  const loaderCard=document.createElement("section");
+  loaderCard.className="menuPanelCard";
+  loaderCard.innerHTML=`
+    <div class="menuSectionHeader"><strong>APARTMENT ASSET</strong><span>LOAD STATUS</span></div>
+  `;
+  if(houseLoader) loaderCard.appendChild(houseLoader);
+
+  infoGrid.append(profile,loaderCard);
+
+  const archive=document.createElement("section");
+  archive.className="menuPanelCard";
+  archive.innerHTML=`
+    <div class="menuSectionHeader"><strong>LOCAL ARCHIVE</strong><span>SAVE SLOTS</span></div>
+  `;
+  if(saveSlots) archive.appendChild(saveSlots);
+
+  const archiveNote=document.createElement("div");
+  archiveNote.className="menuArchiveNote";
+  archiveNote.appendChild(saveInfo);
+  archive.appendChild(archiveNote);
+
+  const footer=document.createElement("div");
+  footer.className="menuFooter";
+  footer.innerHTML=`<span>TAB · CONTROLS &nbsp;&nbsp; ESC · RELEASE MOUSE</span><span>STAY IN THE LIGHT. KEEP MOVING.</span>`;
+
+  main.append(eyebrow,title,lead,rule,infoGrid,archive,footer);
+  shell.append(sidebar,main);
+
+  if(menuTitle) menuTitle.remove();
+  homeScreen.innerHTML="";
+  homeScreen.appendChild(shell);
 }
 
 function updateHouseLoadingUI(progress=null,status=null){
@@ -1979,6 +2175,8 @@ function setHouseMode(enabled,options={}){
   }
 }
 
+installMainMenuRedesign();
+
 const initialParams=new URLSearchParams(location.search);
 const querySaveSlot=initialParams.get("saveSlot");
 if(querySaveSlot!==null){
@@ -2193,18 +2391,30 @@ function playerHasLineOfSightToSpider(){
 }
 
 function rotatePlayerTowardSpider(dt){
-  const dx=spiderEntity.position.x-player.pos.x;
-  const dz=spiderEntity.position.z-player.pos.z;
-  if(dx*dx+dz*dz<.0001) return;
+  if(performance.now()-player.lastLookInputAt<220) return;
+
+  const targetX=spiderEntity.position.x;
+  const targetY=spiderEntity.position.y+.72;
+  const targetZ=spiderEntity.position.z;
+
+  const dx=targetX-player.pos.x;
+  const dy=targetY-(player.pos.y+player.jumpY);
+  const dz=targetZ-player.pos.z;
+  const horizontal=Math.hypot(dx,dz);
+  if(horizontal<.001) return;
 
   const targetYaw=Math.atan2(dx,dz);
-  let delta=targetYaw-player.yaw;
+  let yawDelta=targetYaw-player.yaw;
+  while(yawDelta>Math.PI) yawDelta-=Math.PI*2;
+  while(yawDelta<-Math.PI) yawDelta+=Math.PI*2;
 
-  while(delta>Math.PI) delta-=Math.PI*2;
-  while(delta<-Math.PI) delta+=Math.PI*2;
+  const targetPitch=-Math.atan2(dy,horizontal);
+  const pitchDelta=targetPitch-player.pitch;
+  const turnSpeed=7.5;
 
-  const turnSpeed=7.0;
-  player.yaw+=delta*Math.min(1,dt*turnSpeed);
+  player.yaw+=yawDelta*Math.min(1,dt*turnSpeed);
+  player.pitch+=pitchDelta*Math.min(1,dt*turnSpeed);
+  player.pitch=Math.max(-Math.PI/2+.02,Math.min(Math.PI/2-.02,player.pitch));
 }
 
 function findSpiderSpawnPosition(){
@@ -2280,28 +2490,30 @@ function moveSpiderTowardPlayer(dt){
 function startSpiderJumpscare(){
   spiderBehaviorState="jumpscare";
   spiderBehaviorTime=0;
-  spiderJumpscareTimer=.9;
+  spiderJumpscareTimer=1.05;
   spiderJumpscareStartY=camera.position.y;
   spiderJumpscareDirection.set(0,0,-1);
   camera.getWorldDirection(spiderJumpscareDirection);
 
   const scarePosition=camera.position.clone().add(
-    spiderJumpscareDirection.multiplyScalar(.82)
+    spiderJumpscareDirection.clone().multiplyScalar(1.22)
   );
+
   spiderEntity.position.copy(scarePosition);
-  spiderEntity.position.y=camera.position.y-.75;
+  spiderEntity.position.y=camera.position.y-.82;
   spiderEntity.rotation.y=Math.atan2(
     camera.position.x-spiderEntity.position.x,
     camera.position.z-spiderEntity.position.z
   );
-  spiderJumpscareScale=1.65;
+  spiderJumpscareScale=1.16;
   spiderEntity.scale.setScalar(spiderJumpscareScale);
   spiderEntity.visible=true;
 
-  setSpiderAnimation("attack");
+  setSpiderAnimation("attack2");
   player.keys.clear();
   player.vel.set(0,0,0);
-  pulse=1;
+  player.jumpVelocity=0;
+  pulse=1.25;
 
   eventText.textContent="CAUGHT";
   eventText.style.opacity="1";
@@ -3088,22 +3300,44 @@ function animate(){
       spiderJumpscareTimer=Math.max(0,spiderJumpscareTimer-dt);
       spiderBehaviorTime+=dt;
 
+      const jumpProgress=THREE.MathUtils.clamp(
+        1-spiderJumpscareTimer/1.05,
+        0,
+        1
+      );
+      const easeOut=1-Math.pow(1-jumpProgress,3);
+
       spiderEntity.position.copy(camera.position).addScaledVector(
         spiderJumpscareDirection,
-        .76 + spiderBehaviorTime*.08
+        THREE.MathUtils.lerp(1.22,.56,easeOut)
       );
-      spiderEntity.position.y=camera.position.y-.75;
-      spiderEntity.scale.setScalar(
-        spiderJumpscareScale + Math.sin(spiderBehaviorTime*42)*.06
-      );
+      spiderEntity.position.y=
+        camera.position.y-.82+Math.sin(jumpProgress*Math.PI)*.06;
+
+      const scale=THREE.MathUtils.lerp(
+        spiderJumpscareScale,
+        1.72,
+        easeOut
+      ) + Math.sin(spiderBehaviorTime*34)*.035;
+
+      spiderEntity.scale.setScalar(scale);
       spiderEntity.rotation.y=Math.atan2(
         camera.position.x-spiderEntity.position.x,
         camera.position.z-spiderEntity.position.z
       );
-      setSpiderAnimation("attack");
+
+      if(jumpProgress<.42){
+        setSpiderAnimation("attack2");
+      }else{
+        setSpiderAnimation("attack1");
+      }
 
       player.keys.clear();
       player.vel.set(0,0,0);
+
+      const shake=jumpProgress*jumpProgress;
+      camera.position.x+=Math.sin(spiderBehaviorTime*76)*.012*shake;
+      camera.position.y+=Math.cos(spiderBehaviorTime*68)*.009*shake;
 
       if(spiderJumpscareTimer<=0){
         finishSpiderJumpscare();
