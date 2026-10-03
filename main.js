@@ -550,7 +550,7 @@ transform:perspective(900px) rotateX(61deg) translateY(12%);transform-origin:cen
   linear-gradient(180deg,transparent 0 34%,rgba(210,198,151,.055) 34.15%,transparent 34.35% 68%,rgba(210,198,151,.045) 68.15%,transparent 68.35%);
 filter:blur(.2px)}
 #menuBackdrop .menuBackdropLight{position:absolute;right:11vw;top:12vh;width:min(38vw,520px);height:4px;background:linear-gradient(90deg,transparent,rgba(245,236,193,.18),rgba(245,236,193,.72),rgba(245,236,193,.12),transparent);box-shadow:0 0 34px rgba(233,219,161,.18),0 0 90px rgba(233,219,161,.08);transform:rotate(-2deg);opacity:.8;animation:menuLightPulse 5.5s ease-in-out infinite}
-#menuBackdrop .menuBackdropLight:nth-child(2){top:22vh;right:24vw;width:min(26vw,360px);opacity:.34;animation-delay:-2s}
+#menuBackdrop .menuBackdropLight.secondary{top:22vh;right:24vw;width:min(26vw,360px);opacity:.34;animation-delay:-2s}
 #menuBackdrop .menuBackdropHaze{position:absolute;inset:0;background:
   radial-gradient(ellipse at 72% 40%,rgba(214,201,138,.055),transparent 21%),
   linear-gradient(90deg,transparent 48%,rgba(204,196,165,.035) 70%,transparent 100%);filter:blur(22px);animation:menuHaze 13s ease-in-out infinite alternate}
@@ -598,8 +598,8 @@ filter:blur(.2px)}
 .menuArchiveNote{margin-top:9px;font-size:8px;letter-spacing:1.35px;color:#66665a}
 .menuFooter{display:flex;justify-content:space-between;gap:20px;margin-top:16px;font-size:8px;line-height:1.7;letter-spacing:1.4px;color:#5f6056}
 .menuFooter span:last-child{text-align:right}
-@media(max-width:900px){#homeScreen.menuHomeRedesign{width:min(96vw,760px);height:min(94vh,820px)}.menuShell{grid-template-columns:210px minmax(0,1fr)}.menuMainPanel{padding:34px 28px 28px}.menuMainTitle{font-size:clamp(34px,7vw,58px);letter-spacing:5px}.menuInfoGrid{grid-template-columns:1fr}.menuHomeRedesign #saveSlots{grid-template-columns:1fr}}
-@media(max-width:650px){#homeScreen.menuHomeRedesign{width:96vw;height:94vh;border-radius:16px}.menuShell{display:flex;flex-direction:column}.menuSidebar{flex:none;padding:14px 13px 9px;border-right:0;border-bottom:1px solid rgba(231,220,171,.09)}.menuBrand{display:flex;align-items:center;gap:11px;padding:0 4px 11px}.menuBrandMark{margin:0;width:30px;height:30px}.menuBrandSub{display:none}.menuBrandName{font-size:18px}.menuNav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px}.menuNavButton{min-height:38px;padding:0 6px;display:flex;justify-content:center;text-align:center}.menuNavButton .menuNavIndex,.menuNavButton .menuNavArrow{display:none}.menuNavButton.active::before{left:8px;right:8px;top:auto;bottom:-1px;width:auto;height:2px}.menuSideStatus{display:none}.menuMainPanel{padding:24px 18px 24px}.menuMainEyebrow{font-size:7px}.menuMainTitle{margin-top:17px}.menuMainLead{font-size:10px}}
+@media(max-width:900px){#homeScreen.menuHomeRedesign{inset:0;width:100vw;height:100vh;border-radius:0}.menuShell{grid-template-columns:210px minmax(0,1fr)}.menuMainPanel{padding:34px 28px 28px}.menuMainTitle{font-size:clamp(34px,7vw,58px);letter-spacing:5px}.menuInfoGrid{grid-template-columns:1fr}.menuHomeRedesign #saveSlots{grid-template-columns:1fr}}
+@media(max-width:650px){#homeScreen.menuHomeRedesign{inset:0;width:100vw;height:100vh;border-radius:0}.menuShell{display:flex;flex-direction:column}.menuSidebar{flex:none;padding:14px 13px 9px;border-right:0;border-bottom:1px solid rgba(231,220,171,.09)}.menuBrand{display:flex;align-items:center;gap:11px;padding:0 4px 11px}.menuBrandMark{margin:0;width:30px;height:30px}.menuBrandSub{display:none}.menuBrandName{font-size:18px}.menuNav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px}.menuNavButton{min-height:38px;padding:0 6px;display:flex;justify-content:center;text-align:center}.menuNavButton .menuNavIndex,.menuNavButton .menuNavArrow{display:none}.menuNavButton.active::before{left:8px;right:8px;top:auto;bottom:-1px;width:auto;height:2px}.menuSideStatus{display:none}.menuMainPanel{padding:24px 18px 24px}.menuMainEyebrow{font-size:7px}.menuMainTitle{margin-top:17px}.menuMainLead{font-size:10px}}
 `;
   document.head.appendChild(style);
 
@@ -611,7 +611,7 @@ filter:blur(.2px)}
       <div class="menuBackdropScan"></div>
       <div class="menuBackdropArchitecture"></div>
       <div class="menuBackdropLight"></div>
-      <div class="menuBackdropLight"></div>
+      <div class="menuBackdropLight secondary"></div>
       <div class="menuBackdropHaze"></div>
     `;
     overlay.insertBefore(backdrop,homeScreen);
