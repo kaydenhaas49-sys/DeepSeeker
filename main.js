@@ -219,34 +219,18 @@ addMenuBox("LeftWall",new THREE.Vector3(.34,9.4,118),new THREE.Vector3(-56,4.7,-
 addMenuBox("RightWall",new THREE.Vector3(.34,9.4,118),new THREE.Vector3(56,4.7,-7),menuWallMaterial);
 addMenuBox("BackWall",new THREE.Vector3(112,9.4,.34),new THREE.Vector3(0,4.7,-66),menuWallMaterial);
 
-const ceilingXs=[-49,-42,-35,-28,-21,-14,-7,0,7,14,21,28,35,42,49];
-const ceilingZs=[-63,-56,-49,-42,-35,-28,-21,-14,-7,0,7,14,21,28,35,42,49];
-for(const z of ceilingZs){
-  for(const x of ceilingXs){
-    const broken=
-      (x===-7&&z===-35) ||
-      (x===14&&z===-49) ||
-      (x===28&&z===-21) ||
-      (x===-28&&z===7) ||
-      (x===7&&z===28);
-    if(broken) continue;
+// Match the playable Backrooms ceiling: one continuous flat drop-ceiling surface
+// using the same 1m tile texture scale as World.buildChunkMeshes().
+menuCeilingTexture.repeat.set(28,29.5);
+const menuCeilingGeometry=new THREE.PlaneGeometry(112,118);
+menuCeilingGeometry.rotateX(Math.PI/2); // face down, like the gameplay ceiling
+const menuCeilingMesh=new THREE.Mesh(menuCeilingGeometry,menuCeilingMaterial);
+menuCeilingMesh.name="MenuCeiling";
+menuCeilingMesh.position.set(0,9,-7);
+menuSet.add(menuCeilingMesh);
 
-    const droop=((x+z)%4===0 ? .018 : 0);
-    const twist=((x-z)%5===0 ? -.012 : 0);
-
-    addMenuBox(
-      "CeilingTile",
-      new THREE.Vector3(6.5,.12,6.4),
-      new THREE.Vector3(x,9.12,z),
-      menuCeilingMaterial,
-      0,
-      droop,
-      twist
-    );
-  }
-}
-
-// Missing ceiling panels expose dark service voids and hanging structure.
+// A few panels are missing. Dark void cards sit over the continuous ceiling so
+// those spots read as open service cavities without introducing a second grid.
 for(const [x,z,w,d] of [
   [-7,-35,6.5,6.4],
   [14,-49,6.5,6.4],
@@ -254,11 +238,8 @@ for(const [x,z,w,d] of [
   [-28,7,6.5,6.4],
   [7,28,6.5,6.4]
 ]){
-  addMenuBox("CeilingVoid",new THREE.Vector3(w,.18,d),new THREE.Vector3(x,9.04,z),menuDarkMaterial);
+  addMenuBox("CeilingVoid",new THREE.Vector3(w,.10,d),new THREE.Vector3(x,9.055,z),menuDarkMaterial);
 }
-
-// The real ceiling texture already contains its dark 1m grid, so there are
-// no extra geometric rails sitting on top of the panels.
 
 // Irregular columns and partial walls make the room read as a real ruined
 // level rather than a flat hallway.
