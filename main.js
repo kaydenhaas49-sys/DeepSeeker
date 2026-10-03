@@ -541,10 +541,19 @@ function installMainMenuRedesign(){
   position:absolute;
   inset:0;
   pointer-events:none;
-  background:
-    linear-gradient(90deg,rgba(2,4,3,.96) 0%,rgba(2,4,3,.83) 18%,rgba(2,4,3,.24) 42%,transparent 66%),
-    linear-gradient(180deg,rgba(0,0,0,.70) 0%,transparent 22%,transparent 70%,rgba(0,0,0,.72) 100%);
   z-index:1;
+  background:
+    linear-gradient(90deg,
+      rgba(1,3,2,.97) 0%,
+      rgba(1,3,2,.91) 17%,
+      rgba(1,3,2,.60) 33%,
+      rgba(1,3,2,.16) 50%,
+      transparent 69%),
+    linear-gradient(180deg,
+      rgba(0,0,0,.68) 0%,
+      transparent 20%,
+      transparent 69%,
+      rgba(0,0,0,.78) 100%);
 }
 #menuBackdrop{
   position:absolute;
@@ -553,144 +562,213 @@ function installMainMenuRedesign(){
   pointer-events:none;
   z-index:0;
   background:
-    radial-gradient(circle at 73% 34%,rgba(216,194,118,.20),transparent 19%),
-    radial-gradient(circle at 63% 62%,rgba(72,89,67,.19),transparent 26%),
-    linear-gradient(180deg,#151a17 0%,#0b100d 50%,#040604 100%);
+    radial-gradient(ellipse at 77% 42%,rgba(204,188,122,.15),transparent 19%),
+    radial-gradient(ellipse at 73% 68%,rgba(74,88,60,.12),transparent 26%),
+    linear-gradient(180deg,#121714 0%,#0a0e0c 48%,#030504 100%);
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
-  inset:-10%;
+  inset:0;
   background:
-    linear-gradient(90deg,transparent 0 11%,rgba(230,222,183,.08) 11.15%,transparent 11.4% 28%,rgba(230,222,183,.035) 28.15%,transparent 28.4% 46%,rgba(230,222,183,.055) 46.15%,transparent 46.4% 70%,rgba(230,222,183,.045) 70.15%,transparent 70.4%),
-    linear-gradient(180deg,transparent 0 19%,rgba(230,222,183,.055) 19.15%,transparent 19.45% 48%,rgba(230,222,183,.035) 48.15%,transparent 48.45% 78%,rgba(230,222,183,.045) 78.15%,transparent 78.45%);
-  transform:perspective(900px) rotateX(62deg) translateY(10%);
-  transform-origin:center bottom;
-  opacity:.58;
+    radial-gradient(ellipse at 77% 51%,transparent 0 18%,rgba(0,0,0,.18) 41%,rgba(0,0,0,.72) 100%),
+    linear-gradient(90deg,transparent 0 49%,rgba(206,196,154,.035) 49.1%,transparent 49.3% 72%,rgba(206,196,154,.025) 72.1%,transparent 72.3%);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 74% 44%,transparent 0 12%,rgba(0,0,0,.08) 30%,rgba(0,0,0,.70) 100%),
-    repeating-linear-gradient(180deg,transparent 0 5px,rgba(255,255,255,.012) 6px,transparent 7px);
-  mix-blend-mode:screen;
+    repeating-linear-gradient(180deg,
+      transparent 0 5px,
+      rgba(255,255,255,.010) 6px,
+      transparent 7px),
+    radial-gradient(ellipse at 74% 44%,transparent 0 13%,rgba(0,0,0,.05) 28%,rgba(0,0,0,.66) 100%);
   opacity:.56;
 }
 .menuBackdropGlow{
   position:absolute;
-  width:48vw;
-  height:48vw;
-  min-width:480px;
-  min-height:480px;
-  right:-8vw;
-  top:-14vw;
+  right:8vw;
+  top:15vh;
+  width:min(42vw,680px);
+  height:min(42vw,680px);
   border-radius:50%;
-  background:radial-gradient(circle,rgba(232,211,145,.18),rgba(232,211,145,.04) 30%,transparent 69%);
-  filter:blur(12px);
+  background:radial-gradient(circle,
+    rgba(236,218,157,.19) 0,
+    rgba(236,218,157,.075) 18%,
+    rgba(236,218,157,.025) 38%,
+    transparent 70%);
+  filter:blur(13px);
   animation:menuGlow 8s ease-in-out infinite alternate;
 }
 .menuBackdropScan{
   position:absolute;
-  inset:0;
-  background:linear-gradient(90deg,transparent,rgba(213,201,153,.06),transparent);
-  width:34vw;
-  transform:translateX(-40vw) skewX(-10deg);
-  animation:menuSweep 11s ease-in-out infinite;
-  opacity:.28;
+  top:0;
+  bottom:0;
+  left:-28vw;
+  width:20vw;
+  transform:skewX(-11deg);
+  background:linear-gradient(90deg,transparent,rgba(224,210,160,.045),transparent);
+  animation:menuSweep 13s ease-in-out infinite;
+  opacity:.55;
 }
 .menuBackdropArchitecture{
   position:absolute;
   inset:0;
+  opacity:.75;
   background:
-    linear-gradient(90deg,transparent 53%,rgba(211,200,157,.08) 53.15%,transparent 53.4% 61%,rgba(211,200,157,.05) 61.15%,transparent 61.4%),
-    linear-gradient(180deg,transparent 28%,rgba(211,200,157,.06) 28.15%,transparent 28.45% 59%,rgba(211,200,157,.05) 59.15%,transparent 59.4%);
-  opacity:.62;
+    linear-gradient(90deg,
+      transparent 0 54%,
+      rgba(229,216,173,.045) 54.15%,
+      transparent 54.45% 72%,
+      rgba(229,216,173,.028) 72.15%,
+      transparent 72.45%),
+    linear-gradient(180deg,
+      transparent 0 22%,
+      rgba(229,216,173,.035) 22.15%,
+      transparent 22.4% 61%,
+      rgba(229,216,173,.025) 61.15%,
+      transparent 61.4%);
 }
 .menuBackdropTower{
   position:absolute;
-  right:15vw;
-  bottom:7vh;
-  width:14vw;
-  height:50vh;
-  min-width:140px;
+  right:6vw;
+  top:19vh;
+  width:min(43vw,700px);
+  height:63vh;
+  min-width:380px;
+  min-height:390px;
+  opacity:.60;
+  transform:perspective(1200px) rotateY(-11deg);
+  transform-origin:right center;
   background:
-    linear-gradient(90deg,rgba(0,0,0,.2),rgba(220,209,162,.08),rgba(0,0,0,.28)),
-    repeating-linear-gradient(180deg,transparent 0 34px,rgba(231,220,177,.055) 35px 36px,transparent 37px);
-  border:1px solid rgba(226,215,171,.10);
-  transform:skewY(-4deg);
-  box-shadow:0 0 80px rgba(216,201,138,.06);
-  opacity:.44;
+    linear-gradient(90deg,
+      rgba(7,10,8,.52) 0,
+      rgba(31,36,28,.20) 17%,
+      rgba(15,20,16,.08) 49%,
+      rgba(2,4,3,.54) 100%),
+    linear-gradient(180deg,
+      rgba(221,211,170,.035) 0 2%,
+      transparent 2% 18%,
+      rgba(221,211,170,.028) 18% 18.3%,
+      transparent 18.3% 100%);
+  border-left:1px solid rgba(228,216,173,.10);
+  border-right:1px solid rgba(228,216,173,.045);
+  box-shadow:
+    inset 0 0 90px rgba(0,0,0,.48),
+    0 0 100px rgba(222,205,150,.035);
 }
-.menuBackdropTower::before,
-.menuBackdropTower::after{
+.menuBackdropTower::before{
   content:"";
-  position:absolute;
-  top:-8vh;
-  width:3px;
-  height:66vh;
-  background:linear-gradient(180deg,transparent,rgba(230,218,171,.16),transparent);
-}
-.menuBackdropTower::before{left:22%}
-.menuBackdropTower::after{right:18%}
-.menuBackdropPipe{
-  position:absolute;
-  right:3vw;
-  bottom:18vh;
-  width:34vw;
-  max-width:520px;
-  height:4px;
-  background:linear-gradient(90deg,transparent,rgba(215,203,160,.08) 10%,rgba(234,222,178,.55) 45%,rgba(234,222,178,.15) 80%,transparent);
-  box-shadow:0 0 24px rgba(229,214,159,.11);
-  transform:rotate(-5deg);
-  opacity:.65;
-}
-.menuBackdropLight{
-  position:absolute;
-  right:12vw;
-  top:14vh;
-  width:min(31vw,480px);
-  height:5px;
-  background:linear-gradient(90deg,transparent,rgba(244,237,203,.20),rgba(244,237,203,.86),rgba(244,237,203,.15),transparent);
-  box-shadow:0 0 26px rgba(239,222,166,.22),0 0 88px rgba(239,222,166,.09);
-  transform:rotate(-2deg);
-  animation:menuLightPulse 5.8s ease-in-out infinite;
-  opacity:.85;
-}
-.menuBackdropLight.secondary{
-  top:25vh;
-  right:25vw;
-  width:min(23vw,350px);
-  opacity:.28;
-  animation-delay:-2.5s;
-}
-.menuBackdropHaze{
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 74% 42%,rgba(217,201,138,.06),transparent 22%),
-    linear-gradient(90deg,transparent 35%,rgba(206,197,164,.03) 73%,transparent);
+    linear-gradient(90deg,
+      transparent 0 16%,
+      rgba(224,211,167,.04) 16.2%,
+      transparent 16.5% 50%,
+      rgba(224,211,167,.025) 50.2%,
+      transparent 50.5% 82%,
+      rgba(224,211,167,.035) 82.2%,
+      transparent 82.5%),
+    linear-gradient(180deg,
+      transparent 0 14%,
+      rgba(224,211,167,.035) 14.2%,
+      transparent 14.5% 74%,
+      rgba(224,211,167,.03) 74.2%,
+      transparent 74.5%);
+}
+.menuBackdropTower::after{
+  content:"";
+  position:absolute;
+  left:18%;
+  right:21%;
+  top:16%;
+  bottom:7%;
+  border:1px solid rgba(229,217,172,.055);
+  background:
+    linear-gradient(90deg,
+      rgba(0,0,0,.40),
+      rgba(231,218,169,.025) 50%,
+      rgba(0,0,0,.46)),
+    linear-gradient(180deg,
+      rgba(233,222,180,.025),
+      transparent 35% 64%,
+      rgba(0,0,0,.22));
+  box-shadow:inset 0 0 45px rgba(0,0,0,.34);
+}
+.menuBackdropPipe{
+  position:absolute;
+  right:4vw;
+  bottom:21vh;
+  width:min(34vw,560px);
+  height:2px;
+  background:linear-gradient(90deg,
+    transparent,
+    rgba(230,216,172,.10) 12%,
+    rgba(230,216,172,.48) 48%,
+    rgba(230,216,172,.12) 86%,
+    transparent);
+  box-shadow:0 0 22px rgba(228,210,155,.07);
+  transform:rotate(-4deg);
+  opacity:.72;
+}
+.menuBackdropLight{
+  position:absolute;
+  right:20vw;
+  top:18vh;
+  width:min(31vw,500px);
+  height:4px;
+  background:linear-gradient(90deg,
+    transparent,
+    rgba(245,237,204,.18),
+    rgba(245,237,204,.88) 52%,
+    rgba(245,237,204,.16),
+    transparent);
+  box-shadow:
+    0 0 24px rgba(239,222,166,.18),
+    0 0 80px rgba(239,222,166,.07);
+  transform:rotate(-2deg);
+  animation:menuLightPulse 6.4s ease-in-out infinite;
+  opacity:.82;
+}
+.menuBackdropLight.secondary{
+  top:31vh;
+  right:30vw;
+  width:min(20vw,320px);
+  opacity:.25;
+  animation-delay:-2.7s;
+}
+.menuBackdropHaze{
+  position:absolute;
+  inset:-6%;
+  background:
+    radial-gradient(ellipse at 79% 42%,rgba(216,199,138,.065),transparent 20%),
+    linear-gradient(90deg,
+      transparent 27%,
+      rgba(214,205,173,.018) 58%,
+      transparent 80%);
   filter:blur(24px);
-  animation:menuHaze 13s ease-in-out infinite alternate;
+  animation:menuHaze 14s ease-in-out infinite alternate;
 }
 @keyframes menuGlow{
-  from{transform:translate3d(-2%,2%,0) scale(.94);opacity:.60}
-  to{transform:translate3d(3%,-1%,0) scale(1.06);opacity:1}
+  from{transform:translate3d(-2%,2%,0) scale(.95);opacity:.58}
+  to{transform:translate3d(2%,-2%,0) scale(1.06);opacity:1}
 }
 @keyframes menuLightPulse{
-  0%,100%{opacity:.48;filter:brightness(.84)}
-  46%{opacity:.92;filter:brightness(1.18)}
-  50%{opacity:.62;filter:brightness(.70)}
-  54%{opacity:.90;filter:brightness(1.08)}
+  0%,100%{opacity:.42;filter:brightness(.80)}
+  44%{opacity:.88;filter:brightness(1.10)}
+  50%{opacity:.58;filter:brightness(.68)}
+  56%{opacity:.84;filter:brightness(1.04)}
 }
 @keyframes menuSweep{
-  0%{transform:translateX(-40vw) skewX(-10deg)}
-  46%,100%{transform:translateX(130vw) skewX(-10deg)}
+  0%{transform:translateX(-30vw) skewX(-11deg);opacity:0}
+  15%{opacity:.38}
+  48%,100%{transform:translateX(145vw) skewX(-11deg);opacity:0}
 }
 @keyframes menuHaze{
-  from{transform:translate3d(-2%,0,0) scale(1)}
-  to{transform:translate3d(2%,-1%,0) scale(1.04)}
+  from{transform:translate3d(-1%,0,0) scale(1)}
+  to{transform:translate3d(2%,-1%,0) scale(1.035)}
 }
 
 #homeScreen.menuHomeRedesign{
@@ -747,39 +825,38 @@ function installMainMenuRedesign(){
   letter-spacing:3.6px;
   color:#8f8976;
 }
-
 .menuNav{
   position:absolute;
   left:clamp(28px,4vw,58px);
-  top:clamp(225px,30vh,305px);
-  width:min(355px,31vw);
+  top:clamp(220px,29vh,295px);
+  width:min(340px,29vw);
   display:flex;
   flex-direction:column;
 }
 .menuNavGroup{
   position:relative;
 }
-.menuNavGroup + .menuNavGroup{margin-top:17px}
+.menuNavGroup + .menuNavGroup{margin-top:16px}
 .menuNavGroupLabel{
   display:flex;
   align-items:center;
   gap:10px;
-  margin:0 0 5px 22px;
+  margin:0 0 4px 22px;
   font-size:7px;
-  letter-spacing:2.4px;
-  color:#777161;
+  letter-spacing:2.5px;
+  color:#6f6a5c;
   text-shadow:0 2px 8px #000;
 }
 .menuNavGroupLabel::after{
   content:"";
   flex:1;
   height:1px;
-  background:linear-gradient(90deg,rgba(226,211,164,.10),transparent);
+  background:linear-gradient(90deg,rgba(226,211,164,.085),transparent);
 }
 .menuNavButton{
   position:relative;
   width:100%;
-  min-height:46px;
+  min-height:44px;
   padding:0 18px 0 22px;
   display:flex;
   align-items:center;
@@ -791,29 +868,25 @@ function installMainMenuRedesign(){
   color:#c7c1ae;
   font:inherit;
   text-align:left;
-  font-size:clamp(12px,.95vw,15px);
-  letter-spacing:1.7px;
+  font-size:clamp(12px,.93vw,15px);
+  letter-spacing:1.6px;
   cursor:pointer;
   transition:background .15s,color .15s,border-color .15s,transform .15s;
   text-shadow:0 2px 10px rgba(0,0,0,.95);
 }
 .menuNavButton:hover{
-  background:linear-gradient(90deg,rgba(224,177,70,.10),transparent 80%);
+  background:linear-gradient(90deg,rgba(224,177,70,.085),transparent 82%);
   color:#fff6dc;
   transform:translateX(3px);
 }
 .menuNavButton.active,
 .menuNavButton:focus-visible{
-  background:linear-gradient(90deg,rgba(224,177,70,.18),rgba(224,177,70,.022) 73%,transparent);
+  background:linear-gradient(90deg,rgba(224,177,70,.16),rgba(224,177,70,.015) 74%,transparent);
   border-left-color:#dfad45;
   color:#fff2cc;
   outline:none;
 }
-.menuNavButton:disabled{
-  opacity:.38;
-  cursor:not-allowed;
-  transform:none!important;
-}
+.menuNavButton:disabled{opacity:.38;cursor:not-allowed;transform:none!important}
 .menuNavArrow{
   font-size:19px;
   line-height:1;
@@ -826,8 +899,8 @@ function installMainMenuRedesign(){
 .menuSlotBar{
   position:absolute;
   left:clamp(28px,4vw,58px);
-  bottom:clamp(70px,8vh,104px);
-  width:min(565px,47vw);
+  bottom:clamp(66px,7.5vh,98px);
+  width:min(520px,44vw);
   color:#8f8977;
   text-shadow:0 2px 8px #000;
 }
@@ -835,7 +908,7 @@ function installMainMenuRedesign(){
   display:flex;
   align-items:center;
   justify-content:space-between;
-  margin-bottom:8px;
+  margin-bottom:7px;
   padding:0 1px;
   font-size:7px;
   letter-spacing:2.3px;
@@ -845,40 +918,36 @@ function installMainMenuRedesign(){
   width:100%;
   display:grid;
   grid-template-columns:repeat(3,1fr);
-  gap:7px;
+  gap:6px;
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:92px;
-  padding:11px 12px;
-  border:1px solid rgba(231,220,171,.10);
+  min-height:82px;
+  padding:10px;
+  border:1px solid rgba(231,220,171,.095);
   border-radius:2px;
-  background:rgba(3,5,4,.25);
+  background:rgba(3,5,4,.18);
   color:#b5af9b;
   display:flex;
   flex-direction:column;
   justify-content:center;
-  box-shadow:inset 0 1px rgba(255,255,255,.025);
+  box-shadow:inset 0 1px rgba(255,255,255,.022);
 }
 .menuHomeRedesign .saveSlotCard:hover{
-  background:rgba(223,173,69,.06);
-  border-color:rgba(231,220,171,.18);
+  background:rgba(223,173,69,.055);
+  border-color:rgba(231,220,171,.17);
 }
 .menuHomeRedesign .saveSlotCard.selected{
-  border-color:rgba(223,173,69,.70);
-  background:rgba(223,173,69,.095);
-  box-shadow:0 0 20px rgba(223,173,69,.045);
+  border-color:rgba(223,173,69,.66);
+  background:rgba(223,173,69,.085);
+  box-shadow:0 0 20px rgba(223,173,69,.04);
 }
-.menuHomeRedesign .saveSlotTitle{
-  font-size:8px;
-  letter-spacing:1.7px;
-  color:#dfd6ba;
-}
+.menuHomeRedesign .saveSlotTitle{font-size:8px;letter-spacing:1.7px;color:#dfd6ba}
 .menuHomeRedesign .saveSlotMode{font-size:7px;color:#817c6e}
 .menuHomeRedesign .saveSlotDetail{
   display:block;
-  margin-top:5px;
-  font-size:8px;
+  margin-top:4px;
+  font-size:7px;
   color:#6c685c;
   white-space:nowrap;
   overflow:hidden;
@@ -887,62 +956,60 @@ function installMainMenuRedesign(){
 .menuHomeRedesign .saveSlotActions{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:4px;
-  margin-top:7px;
+  gap:3px;
+  margin-top:6px;
 }
 .menuHomeRedesign .saveSlotActions button{
-  padding:6px 3px;
-  border:1px solid rgba(231,220,171,.085);
+  padding:5px 3px;
+  border:1px solid rgba(231,220,171,.075);
   border-radius:2px;
-  background:rgba(255,255,255,.018);
+  background:rgba(255,255,255,.015);
   color:#96907c;
   font:inherit;
   font-size:7px;
-  letter-spacing:1.15px;
+  letter-spacing:1.1px;
   cursor:pointer;
 }
-.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.085);color:#e8dcbe}
+.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.075);color:#e8dcbe}
 .menuHomeRedesign .saveSlotActions button:disabled{opacity:.28;cursor:not-allowed}
 .menuSaveStatus{
-  margin-top:6px;
+  margin-top:5px;
   padding-left:1px;
   font-size:7px;
-  letter-spacing:1.3px;
+  letter-spacing:1.2px;
   color:#666255;
 }
 
 .menuRightPanel{
   position:absolute;
-  top:clamp(118px,17vh,170px);
-  right:clamp(30px,5vw,76px);
-  width:min(325px,25vw);
-  padding:20px 20px 22px;
-  border-top:1px solid rgba(226,211,164,.12);
-  border-right:1px solid rgba(226,211,164,.07);
-  border-bottom:1px solid rgba(226,211,164,.07);
-  border-left:2px solid rgba(223,173,69,.30);
-  background:linear-gradient(90deg,rgba(3,5,4,.025),rgba(3,5,4,.27));
-  backdrop-filter:blur(4px);
+  top:clamp(118px,16vh,165px);
+  right:clamp(30px,4.5vw,70px);
+  width:min(275px,22vw);
+  padding:2px 0 4px 16px;
+  border:0;
+  border-left:1px solid rgba(223,173,69,.28);
+  background:transparent;
   color:#96907d;
   text-shadow:0 2px 8px #000;
+  opacity:.92;
 }
 .menuRightHeader{
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:14px;
-  margin-bottom:18px;
+  margin-bottom:15px;
   font-size:7px;
-  letter-spacing:2.2px;
-  color:#a49d87;
+  letter-spacing:2.1px;
+  color:#8e8877;
 }
 .menuSignalState{
   display:flex;
   align-items:center;
-  gap:9px;
-  margin-bottom:11px;
-  font-size:16px;
-  letter-spacing:2.5px;
+  gap:8px;
+  margin-bottom:9px;
+  font-size:15px;
+  letter-spacing:2.4px;
   color:#ddd1a7;
 }
 .menuSignalDot{
@@ -950,42 +1017,38 @@ function installMainMenuRedesign(){
   height:6px;
   border-radius:50%;
   background:#d3a43f;
-  box-shadow:0 0 11px rgba(223,173,69,.55);
+  box-shadow:0 0 10px rgba(223,173,69,.5);
   animation:menuSignalPulse 2.2s ease-in-out infinite;
 }
-@keyframes menuSignalPulse{
-  0%,100%{opacity:.35;box-shadow:0 0 6px rgba(223,173,69,.22)}
-  50%{opacity:1;box-shadow:0 0 14px rgba(223,173,69,.68)}
-}
 .menuRightLead{
-  margin:0 0 15px;
-  max-width:278px;
-  font-size:10px;
+  margin:0 0 13px;
+  max-width:248px;
+  font-size:9px;
   line-height:1.8;
-  color:#7d786c;
+  color:#777267;
 }
 .menuRightRule{
   height:1px;
-  background:rgba(226,211,164,.09);
-  margin:14px 0 15px;
+  background:rgba(226,211,164,.075);
+  margin:12px 0 14px;
 }
 .menuRightSectionLabel{
-  margin-bottom:7px;
+  margin-bottom:6px;
   font-size:7px;
   letter-spacing:2.3px;
-  color:#aaa38c;
+  color:#a29a83;
 }
 .menuHomeRedesign .houseLoader{
   width:100%;
-  margin:11px 0 0;
+  margin:9px 0 0;
   text-align:left;
 }
-.menuHomeRedesign .houseLoaderTop{color:#8e8875}
-.menuHomeRedesign .houseLoaderStatus{color:#6d685c;min-height:14px}
+.menuHomeRedesign .houseLoaderTop{color:#858071}
+.menuHomeRedesign .houseLoaderStatus{color:#666156;min-height:14px}
 .menuRightMeta{
   display:grid;
-  gap:7px;
-  margin-top:13px;
+  gap:6px;
+  margin-top:11px;
 }
 .menuRightMetaRow{
   display:flex;
@@ -994,8 +1057,8 @@ function installMainMenuRedesign(){
   font-size:7px;
   letter-spacing:1.5px;
 }
-.menuRightMetaRow span:first-child{color:#615d52}
-.menuRightMetaRow span:last-child{color:#918a77}
+.menuRightMetaRow span:first-child{color:#57534a}
+.menuRightMetaRow span:last-child{color:#8b8472}
 
 .menuNameGate{
   position:absolute;
@@ -1068,15 +1131,15 @@ function installMainMenuRedesign(){
   font-size:7px;
   line-height:1.6;
   letter-spacing:1.4px;
-  color:#625e54;
+  color:#5f5b52;
   text-shadow:0 2px 8px #000;
 }
 .menuFooter span:last-child{text-align:right}
 
 @media(max-width:1000px){
-  .menuNav{width:min(330px,39vw)}
-  .menuSlotBar{width:min(510px,52vw)}
-  .menuRightPanel{right:20px;width:min(300px,31vw)}
+  .menuNav{width:min(320px,38vw)}
+  .menuSlotBar{width:min(500px,50vw)}
+  .menuRightPanel{right:20px;width:min(270px,30vw)}
 }
 @media(max-width:750px){
   .menuLogoMain span{font-size:23px}
