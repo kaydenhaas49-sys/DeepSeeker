@@ -1041,8 +1041,8 @@ function installMainMenuRedesign(){
     }
   };
 
-  configureButton(newGameButton,"NEW GAME",true);
-  configureButton(continueButton,"CONTINUE");
+  configureButton(continueButton,"CONTINUE",true);
+  configureButton(newGameButton,"NEW GAME");
   configureButton(createLobbyButton,"HOST LOBBY");
   configureButton(joinLobbyButton,"JOIN LOBBY");
 
@@ -1050,7 +1050,7 @@ function installMainMenuRedesign(){
   configureButton(menuControlsButton,"CONTROLS");
   menuControlsButton.addEventListener("click",()=>showControls());
 
-  nav.append(newGameButton,continueButton,createLobbyButton,joinLobbyButton,menuControlsButton);
+  nav.append(continueButton,newGameButton,createLobbyButton,joinLobbyButton,menuControlsButton);
 
   const slotBar=document.createElement("div");
   slotBar.className="menuSlotBar";
