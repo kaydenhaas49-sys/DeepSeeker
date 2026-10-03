@@ -1,4 +1,4 @@
-# DeepSeeker — Rebuild
+# Backrooms: Lost Signal — Rebuild
 
 A clean restart of the game project.
 
