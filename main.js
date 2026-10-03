@@ -4537,6 +4537,9 @@ function setAdminStatus(message){
 }
 function openAdminAccess(){
   if(!phoneOpen) return;
+  player.keys.clear();
+  player.vel.set(0,0,0);
+  if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
   adminOverlay.classList.add("open");
   adminOverlay.setAttribute("aria-hidden","false");
   adminAuthCard.style.display=adminUnlocked ? "none" : "block";
@@ -4833,6 +4836,8 @@ document.addEventListener("pointerlockchange",()=>{
 });
 
 document.addEventListener("keydown",e=>{
+  if(adminOverlay?.classList.contains("open")) return;
+
   if(e.code==="Enter" && !e.repeat && gameStarted && !phoneOpen && !controlsOpen && !chatOpen){
     e.preventDefault();
     openChat();

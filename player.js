@@ -49,11 +49,15 @@ export class Player {
     this.setupHands();
 
     this.onKeyDown = (e) => {
+      const adminOverlay=document.getElementById("adminOverlay");
+      if(adminOverlay?.classList.contains("open")) return;
+
       const target=e.target;
       const typingTarget=
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
-        target?.isContentEditable;
+        target?.isContentEditable ||
+        target?.closest?.('input, textarea, [contenteditable="true"]');
 
       if(typingTarget) return;
 
@@ -74,7 +78,19 @@ export class Player {
       }
       this.keys.add(e.code);
     };
-    this.onKeyUp = (e) => this.keys.delete(e.code);
+    this.onKeyUp = (e) => {
+      if(document.getElementById("adminOverlay")?.classList.contains("open")){
+        this.keys.clear();
+        return;
+      }
+      if(
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target?.isContentEditable ||
+        e.target?.closest?.('input, textarea, [contenteditable="true"]')
+      ) return;
+      this.keys.delete(e.code);
+    };
     this.onMouseMove = (e) => {
       if (!this.locked) return;
       this.lastLookInputAt = performance.now();
