@@ -1503,6 +1503,7 @@ function installMainMenuRedesign(){
       '<button id="menuEditorReset" type="button">RESET</button>'+
       '<button id="menuEditorLocal" type="button">SAVE LOCAL</button>'+
       '<button id="menuEditorGithub" type="button">GITHUB EXPORT</button>'+
+      '<button id="menuEditorOpenGithub" type="button">OPEN GITHUB</button>'+
     '</div>'+
     '<div id="menuEditorStatus" class="menuEditorStatus"></div>';
 
@@ -1510,6 +1511,7 @@ function installMainMenuRedesign(){
   const resetButton=editor.querySelector("#menuEditorReset");
   const localButton=editor.querySelector("#menuEditorLocal");
   const githubButton=editor.querySelector("#menuEditorGithub");
+  const openGithubButton=editor.querySelector("#menuEditorOpenGithub");
   const urlInput=editor.querySelector("#menuEditorUrl");
   const xInput=editor.querySelector("#menuEditorX");
   const yInput=editor.querySelector("#menuEditorY");
@@ -1603,6 +1605,15 @@ function installMainMenuRedesign(){
     applyMenuEditor(menuConfig);
     localStorage.setItem("deepseeker-menu-config",JSON.stringify(menuConfig));
     status.textContent="SAVED ON THIS BROWSER";
+  });
+
+  openGithubButton.addEventListener("click",()=>{
+    window.open(
+      "https://github.com/kaydenhaas49-sys/DeepSeeker/edit/main/main.js",
+      "_blank",
+      "noopener,noreferrer"
+    );
+    status.textContent="GITHUB EDITOR OPENED";
   });
 
   githubButton.addEventListener("click",async()=>{
