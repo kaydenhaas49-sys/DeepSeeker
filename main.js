@@ -95,7 +95,7 @@ scene.add(ambient);
 const playerLight=new THREE.PointLight(0xb59b68,0,24,1.9);
 scene.add(playerLight);
 
-const flashlight=new THREE.SpotLight(0xf0dfad,95,110,Math.PI/4.2,.78,1.1);
+const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
@@ -2987,7 +2987,7 @@ function animate(){
   }
 
   const flicker=flashlightFlicker(t);
-  flashlight.intensity=flashlightOn ? 88.0*flicker : 0;
+  flashlight.intensity=flashlightOn ? 68.0*flicker : 0;
   if(!houseMode){
     playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
   }

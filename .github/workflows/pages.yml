@@ -40,6 +40,14 @@ jobs:
           sudo apt-get install -y assimp-utils
 
           test -f assets/Spider-Psionic/spider.fbx
+          test -f assets/Spider-Psionic/spider2_color.jpg
+
+          # The original FBX stores the diffuse texture as
+          # ../../../../spider2_color.jpg. Assimp preserves that URI when
+          # exporting GLB, so place the exact uploaded texture at the
+          # corresponding site-root path.
+          cp assets/Spider-Psionic/spider2_color.jpg ./spider2_color.jpg
+
           assimp info assets/Spider-Psionic/spider.fbx
 
           (
