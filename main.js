@@ -8,6 +8,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { flashlightFlicker } from "./character.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
@@ -3697,10 +3698,17 @@ async function extractSpiderPack(zipUrl){
   }
 
   const modelCandidates=entries
-    .filter(entry=>entry.lower.endsWith(".fbx") || entry.lower.endsWith(".glb"))
+    .filter(entry=>
+      entry.lower.endsWith(".obj") ||
+      entry.lower.endsWith(".fbx") ||
+      entry.lower.endsWith(".glb")
+    )
     .sort((a,b)=>{
       const score=(entry)=>{
-        const modelScore=entry.lower.endsWith(".fbx") ? 100 : 50;
+        const modelScore=
+          entry.lower.endsWith(".obj") ? 120 :
+          entry.lower.endsWith(".fbx") ? 100 :
+          50;
         const spiderScore=entry.lower.includes("spider") ? 25 : 0;
         return modelScore+spiderScore;
       };
@@ -3782,7 +3790,9 @@ async function extractSpiderPack(zipUrl){
     return normalized.slice(normalized.lastIndexOf("/")+1);
   };
 
-  const selectedEntries=[modelEntry,...imageEntries];
+  // Keep every model format from the pack so the runtime can fall back
+  // between OBJ, FBX, and GLB without re-fetching the ZIP.
+  const selectedEntries=[...modelCandidates,...imageEntries];
   const resourceBlobs=new Map();
 
   for(const entry of selectedEntries){
@@ -3804,7 +3814,10 @@ async function extractSpiderPack(zipUrl){
     : "";
 
   return {
-    modelType:modelEntry.lower.endsWith(".fbx") ? "fbx" : "glb",
+    modelType:
+      modelEntry.lower.endsWith(".obj") ? "obj" :
+      modelEntry.lower.endsWith(".fbx") ? "fbx" :
+      "glb",
     modelName:normalizedModelName,
     modelDirectory,
     modelBytes:await readEntry(modelEntry),
@@ -4061,9 +4074,37 @@ async function loadSpiderFromPack(){
       }
     };
 
-    if(extracted.modelType==="fbx"){
-      // Parse the actual FBX bytes directly. This avoids depending on a blob URL
-      // being fetched back through FileLoader before FBXLoader can build the model.
+    if(extracted.modelType==="obj"){
+      // The pack includes an OBJ export. Use it as the primary browser path:
+      // OBJ is static but gives us the exact spider geometry without relying on
+      // the FBX parser's handling of the original Unity export.
+      try{
+        const object=new OBJLoader(packManager)
+          .parse(new TextDecoder().decode(extracted.modelBytes));
+        handleLoaded(object,[]);
+      }catch(objError){
+        console.warn("[DeepSeeker] Spider OBJ parse failed; trying FBX:",objError);
+        const fbxEntry=Array.from(extracted.resourceBlobs.keys())
+          .find(name=>name.endsWith(".fbx"));
+
+        if(!fbxEntry){
+          failSpiderLoad(objError,"SPIDER MODEL PARSE FAILED");
+        }else{
+          extracted.modelType="fbx";
+          extracted.modelName=fbxEntry.split("/").pop();
+          const loader=new FBXLoader(packManager);
+          const fbxBytes=await extracted.resourceBlobs.get(fbxEntry).arrayBuffer();
+
+          try{
+            const object=loader.parse(fbxBytes,extracted.modelDirectory);
+            handleLoaded(object,object.animations||[]);
+          }catch(fbxError){
+            console.error("[DeepSeeker] Spider FBX fallback failed:",fbxError);
+            failSpiderLoad(fbxError,"SPIDER MODEL PARSE FAILED");
+          }
+        }
+      }
+    }else if(extracted.modelType==="fbx"){
       const loader=new FBXLoader(packManager);
       try{
         const object=loader.parse(
