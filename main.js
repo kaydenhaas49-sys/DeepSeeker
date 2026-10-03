@@ -849,20 +849,30 @@ function installMainMenuRedesign(){
   z-index:0;
   overflow:hidden;
   pointer-events:none;
-  background:#171611;
+  background:#14130d;
 }
-.menuBGPhoto{
+.menuBGRuined{
   position:absolute;
-  inset:-2%;
-  background-image:
-    linear-gradient(90deg,rgba(10,9,6,.84) 0%,rgba(10,9,6,.58) 26%,rgba(10,9,6,.14) 57%,rgba(5,6,5,.42) 100%),
-    linear-gradient(180deg,rgba(56,48,29,.16),rgba(5,6,5,.54)),
-    url("https://i1.pickpik.com/photos/438/198/326/corridor-hallway-old-run-down-preview.jpg");
-  background-size:cover;
-  background-position:center;
-  background-repeat:no-repeat;
-  filter:saturate(.72) contrast(1.08) brightness(.72);
-  transform:scale(1.025);
+  inset:-1%;
+  width:102%;
+  height:102%;
+  display:block;
+  filter:saturate(.88) contrast(1.05) brightness(.82);
+  transform:scale(1.015);
+}
+.menuBGRuined .fixture{animation:menuRuinedFlicker 6.2s steps(1,end) infinite}
+.menuBGRuined .fixture.delay{animation-delay:2.1s}
+@keyframes menuRuinedFlicker{
+  0%,100%{opacity:.92}
+  38%{opacity:.92}
+  39%{opacity:.30}
+  40%{opacity:.76}
+  46%{opacity:.70}
+  47%{opacity:.08}
+  49%{opacity:.62}
+  51%{opacity:.20}
+  54%{opacity:.84}
+  72%{opacity:.78}
 }
 #menuBackdrop::before{
   content:"";
@@ -870,19 +880,20 @@ function installMainMenuRedesign(){
   inset:0;
   z-index:2;
   background:
-    radial-gradient(ellipse at 73% 48%,transparent 0 18%,rgba(0,0,0,.18) 46%,rgba(0,0,0,.78) 100%),
-    linear-gradient(180deg,rgba(0,0,0,.08),transparent 28%,rgba(0,0,0,.52) 100%);
+    linear-gradient(90deg,rgba(3,3,2,.84) 0%,rgba(3,3,2,.55) 27%,rgba(3,3,2,.06) 63%,rgba(2,2,2,.24) 100%),
+    radial-gradient(ellipse at 73% 47%,transparent 0 15%,rgba(0,0,0,.10) 36%,rgba(0,0,0,.82) 100%),
+    linear-gradient(180deg,rgba(0,0,0,.05),transparent 30%,rgba(0,0,0,.44) 100%);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
   z-index:3;
-  background:
-    linear-gradient(90deg,rgba(2,3,2,.18),transparent 50%,rgba(0,0,0,.14)),
-    repeating-linear-gradient(180deg,transparent 0 8px,rgba(255,255,255,.007) 9px,transparent 10px);
+  background:repeating-linear-gradient(180deg,transparent 0 7px,rgba(255,255,255,.008) 8px,transparent 9px);
+  opacity:.72;
 }
-.menuBGScene,
+.menuBGPhoto,
+#menuBackdrop .menuBGScene,
 #menuBackdrop .menuBGHall,
 #menuBackdrop .menuBGCeiling,
 #menuBackdrop .menuBGFloor,
@@ -890,9 +901,7 @@ function installMainMenuRedesign(){
 #menuBackdrop .menuBGWallR,
 #menuBackdrop .menuBGLight,
 #menuBackdrop .menuBGGlow,
-#menuBackdrop .menuBGScan{
-  display:none;
-}
+#menuBackdrop .menuBGScan{display:none}
 #homeScreen.menuHomeRedesign{
   position:absolute;
   inset:0;
@@ -1219,8 +1228,142 @@ function installMainMenuRedesign(){
   const backdrop=document.createElement("div");
   backdrop.id="menuBackdrop";
   backdrop.innerHTML=`
-    <div class="menuBGPhoto"></div>
-  `;  overlay.insertBefore(backdrop,homeScreen);
+    <svg class="menuBGRuined" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <pattern id="rb-wallpaper" width="72" height="48" patternUnits="userSpaceOnUse">
+          <rect width="72" height="48" fill="#9e995f"/>
+          <path d="M0 24 L18 8 L36 24 L54 8 L72 24" fill="none" stroke="#696a42" stroke-width="4" opacity=".42"/>
+          <path d="M0 24 L18 40 L36 24 L54 40 L72 24" fill="none" stroke="#c1b979" stroke-width="2.5" opacity=".28"/>
+        </pattern>
+        <linearGradient id="rb-floor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#5e5942"/><stop offset=".52" stop-color="#4a4737"/><stop offset="1" stop-color="#1b1c17"/>
+        </linearGradient>
+        <linearGradient id="rb-ceil" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#8b8878"/><stop offset=".7" stop-color="#5b594e"/><stop offset="1" stop-color="#2e3027"/>
+        </linearGradient>
+        <radialGradient id="rb-lamp">
+          <stop offset="0" stop-color="#fff5cc" stop-opacity=".46"/><stop offset=".5" stop-color="#fff0af" stop-opacity=".13"/><stop offset="1" stop-color="#fff0af" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="rb-vignette">
+          <stop offset=".42" stop-color="#000" stop-opacity="0"/>
+          <stop offset=".84" stop-color="#000" stop-opacity=".22"/>
+          <stop offset="1" stop-color="#000" stop-opacity=".78"/>
+        </radialGradient>
+        <filter id="rb-noise">
+          <feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="3" seed="9"/>
+          <feColorMatrix type="saturate" values="0"/>
+          <feComponentTransfer><feFuncA type="table" tableValues="0 .08"/></feComponentTransfer>
+        </filter>
+        <filter id="rb-blur"><feGaussianBlur stdDeviation="15"/></filter>
+      </defs>
+    
+      <!-- Large open Level-0-like room, not a tunnel. -->
+      <polygon points="0,0 1600,0 1190,348 410,348" fill="url(#rb-ceil)"/>
+      <polygon points="0,0 410,348 410,900 0,900" fill="url(#rb-wallpaper)"/>
+      <polygon points="1600,0 1190,348 1190,900 1600,900" fill="url(#rb-wallpaper)"/>
+      <polygon points="0,900 410,348 1190,348 1600,900" fill="url(#rb-floor)"/>
+    
+      <!-- stained, sagging ceiling -->
+      <g opacity=".7" stroke="#44443a" stroke-width="5">
+        <line x1="170" y1="0" x2="560" y2="348"/>
+        <line x1="440" y1="0" x2="700" y2="348"/>
+        <line x1="740" y1="0" x2="800" y2="348"/>
+        <line x1="1040" y1="0" x2="900" y2="348"/>
+        <line x1="1310" y1="0" x2="1020" y2="348"/>
+      </g>
+      <g fill="#3a3a31" opacity=".58">
+        <ellipse cx="365" cy="92" rx="85" ry="27"/>
+        <ellipse cx="1090" cy="78" rx="95" ry="31"/>
+        <ellipse cx="835" cy="238" rx="68" ry="23"/>
+      </g>
+    
+      <!-- broken ceiling sections + exposed wires -->
+      <polygon points="285,20 452,20 510,100 345,96" fill="#20221c"/>
+      <polygon points="1110,14 1270,14 1210,102 1054,96" fill="#25261f"/>
+      <path d="M356 34 C415 92 420 130 386 188" fill="none" stroke="#2d2f28" stroke-width="9"/>
+      <path d="M357 34 C416 92 421 130 387 188" fill="none" stroke="#8b8060" stroke-width="2.5"/>
+      <path d="M1185 24 C1140 92 1155 140 1195 205" fill="none" stroke="#2c2f27" stroke-width="10"/>
+    
+      <!-- peeling sections of wallpaper -->
+      <g opacity=".82">
+        <path d="M70 210 l108 20 24 98-126 32z" fill="#d0c57d"/>
+        <path d="M101 244 l88 18-28 53-72-13z" fill="#d9d1a0"/>
+        <path d="M290 470 l106-25 16 101-98 24z" fill="#d0c37e"/>
+        <path d="M1530 230 l-116 22-22 104 128 24z" fill="#d0c57d"/>
+        <path d="M1406 474 l-106-27-15 100 99 26z" fill="#cec07a"/>
+      </g>
+      <g fill="#4d4a36" opacity=".7">
+        <path d="M148 320 l72 28-41 82-75-24z"/>
+        <path d="M1378 318 l-72 28 41 82 75-24z"/>
+        <path d="M252 618 l130-37 40 63-148 51z"/>
+        <path d="M1348 618 l-130-37-40 63 148 51z"/>
+      </g>
+    
+      <!-- low wall trim -->
+      <polygon points="0,724 410,540 1190,540 1600,724 1600,758 1190,575 410,575 0,758" fill="#35352a"/>
+    
+      <!-- open room breaks / pillars, keeping the space maze-like -->
+      <polygon points="305,365 385,373 360,635 265,662" fill="#696846" opacity=".9"/>
+      <polygon points="1295,365 1215,373 1240,635 1335,662" fill="#696846" opacity=".9"/>
+      <polygon points="530,350 575,350 560,520 510,520" fill="#4c4b39" opacity=".88"/>
+      <polygon points="1070,350 1025,350 1040,520 1090,520" fill="#4c4b39" opacity=".88"/>
+    
+      <!-- ruined floor: wet patches, torn carpet, debris -->
+      <g fill="#22231c" opacity=".42">
+        <ellipse cx="390" cy="700" rx="150" ry="38"/>
+        <ellipse cx="1210" cy="700" rx="140" ry="34"/>
+        <ellipse cx="760" cy="805" rx="180" ry="42"/>
+        <ellipse cx="1020" cy="640" rx="82" ry="22"/>
+      </g>
+      <g fill="#8a815f" opacity=".33">
+        <path d="M80 820 l145-66 70 28-165 74z"/>
+        <path d="M1330 816 l-148-56-68 31 167 67z"/>
+      </g>
+      <g fill="#25271f" opacity=".9">
+        <path d="M245 785 l82-22 43 19-91 31z"/>
+        <rect x="1255" y="748" width="108" height="19" rx="3" transform="rotate(9 1255 748)"/>
+        <path d="M1080 820 l60-28 50 22-75 31z"/>
+        <rect x="455" y="832" width="66" height="13" rx="2" transform="rotate(-8 455 832)"/>
+      </g>
+    
+      <!-- receding fluorescent lights across the ceiling -->
+      <g class="fixture">
+        <ellipse cx="800" cy="335" rx="190" ry="95" fill="url(#rb-lamp)" filter="url(#rb-blur)"/>
+        <rect x="690" y="313" width="220" height="14" rx="3" fill="#ded8bc"/>
+        <rect x="730" y="317" width="140" height="5" fill="#fff4c8"/>
+      </g>
+      <g class="fixture delay">
+        <ellipse cx="800" cy="238" rx="135" ry="64" fill="url(#rb-lamp)" filter="url(#rb-blur)"/>
+        <rect x="733" y="219" width="134" height="10" rx="3" fill="#bebba5"/>
+        <rect x="758" y="222" width="84" height="4" fill="#eee6c6"/>
+      </g>
+      <g class="fixture">
+        <ellipse cx="800" cy="145" rx="91" ry="42" fill="url(#rb-lamp)" filter="url(#rb-blur)"/>
+        <rect x="755" y="133" width="90" height="7" rx="2" fill="#a5a59a"/>
+      </g>
+    
+      <!-- distant opening, not a traditional door -->
+      <polygon points="695,348 905,348 985,542 615,542" fill="#5a5842"/>
+      <rect x="735" y="388" width="130" height="154" fill="#131510"/>
+      <rect x="752" y="404" width="96" height="138" fill="#25271f"/>
+      <ellipse cx="800" cy="462" rx="78" ry="64" fill="#4c4a37" opacity=".18"/>
+    
+      <!-- hanging light/wire on the right -->
+      <path d="M1205 30 C1248 100 1257 160 1224 220 C1195 275 1194 332 1225 390" fill="none" stroke="#20221c" stroke-width="11"/>
+      <path d="M1204 30 C1247 100 1256 160 1223 220 C1194 275 1193 332 1224 390" fill="none" stroke="#8c8464" stroke-width="2.5"/>
+    
+      <!-- water damage on carpet -->
+      <g fill="#10120e" opacity=".28">
+        <ellipse cx="585" cy="590" rx="67" ry="14"/>
+        <ellipse cx="990" cy="575" rx="58" ry="13"/>
+        <ellipse cx="690" cy="690" rx="82" ry="18"/>
+      </g>
+    
+      <rect width="1600" height="900" filter="url(#rb-noise)" opacity=".48"/>
+      <rect width="1600" height="900" fill="url(#rb-vignette)"/>
+    </svg>
+  `;
+  overlay.insertBefore(backdrop,homeScreen);
 
   homeScreen.innerHTML="";
   const layout=document.createElement("div");
