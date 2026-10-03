@@ -262,12 +262,8 @@ for(const [x,z,w,d,h,rot] of [
   addMenuBox("Partition",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuWallMaterial,rot);
 }
 
-// Mid-room architectural frame: a doorless opening that gives the camera a
-// strong near-to-far read and keeps the menu unmistakably inside the level.
-addMenuBox("MidRoomHeader",new THREE.Vector3(17.0,.72,.42),new THREE.Vector3(4.5,7.15,-17.5),menuWallMaterial);
-addMenuBox("MidRoomLeft",new THREE.Vector3(.48,6.9,7.0),new THREE.Vector3(-4.0,3.45,-18.0),menuWallMaterial);
-addMenuBox("MidRoomRight",new THREE.Vector3(.48,6.9,7.0),new THREE.Vector3(13.0,3.45,-18.0),menuWallMaterial);
-addMenuBox("MidRoomDark",new THREE.Vector3(16.0,6.45,.16),new THREE.Vector3(4.5,3.2,-18.9),menuDarkMaterial);
+// No artificial center frame: keep the menu view built from the same wall geometry
+// language as the playable Backrooms instead of introducing a separate gray/black structure.
 
 // The main visual anchor: a deep open bay that disappears into fog.
 addMenuBox("DeepBayFrameTop",new THREE.Vector3(24,1.05,.5),new THREE.Vector3(1.5,7.95,-64.5),menuRuinMaterial);
