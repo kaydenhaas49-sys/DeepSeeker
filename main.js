@@ -446,9 +446,10 @@ function updateMenuScene(t,dt){
       menuBackdropWasActive=false;
       menuSet.visible=false;
       world.root.visible=true;
-      menuScene.fog.color.set(0x030302);
-      menuScene.fog.near=14;
-      menuScene.fog.far=62;
+      scene.background.set(0x000100);
+      scene.fog.color.set(0x030302);
+      scene.fog.near=14;
+      scene.fog.far=62;
     }
     return false;
   }
@@ -457,10 +458,10 @@ function updateMenuScene(t,dt){
     menuBackdropWasActive=true;
     if(menuBackdropElement) menuBackdropElement.style.display="none";
     menuSet.visible=true;
-    menuScene.background.set(0x6f694c);
-    menuScene.fog.color.set(0x746d50);
-    menuScene.fog.near=12;
-    menuScene.fog.far=68;
+    scene.background.set(0x6f694c);
+    scene.fog.color.set(0x746d50);
+    scene.fog.near=12;
+    scene.fog.far=68;
     menuCamera.position.copy(menuCameraStart);
     menuCamera.lookAt(menuCameraTarget);
   }
@@ -4308,7 +4309,7 @@ function animate(){
   const usingMenuCamera=menuIsVisible && updateMenuScene(t,dt);
 
   renderer.render(
-    usingMenuCamera ? menuScene : scene,
+    scene,
     usingMenuCamera ? menuCamera : camera
   );
 }
