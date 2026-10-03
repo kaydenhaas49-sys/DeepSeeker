@@ -331,13 +331,15 @@ for(const args of [
 // Fluorescent fixtures: each light is real geometry + a real point light.
 
 function addFixtureCracks(fixture,x,z,index,rotationY=0){
-  const crackedIndices=new Set([0,3,5,8,11,15]);
+  const crackedIndices=new Set([
+    0,1,2,4,5,7,8,9,10,12,13,14,15,16,17,18,20,21,22,24,25,26,27,29,30
+  ]);
   if(!crackedIndices.has(index)) return;
 
   const crackMaterial=new THREE.LineBasicMaterial({
     color:0x1a1a15,
     transparent:true,
-    opacity:.82
+    opacity:.88
   });
 
   const makeCrack=(points,offsetX=0,offsetZ=0)=>{
@@ -352,42 +354,63 @@ function addFixtureCracks(fixture,x,z,index,rotationY=0){
   };
 
   const variants=[
-    [[-1.35,-.22],[-.75,-.05],[-.36,-.20],[.05,-.02],[.48,-.18],[.98,-.03],[1.40,-.16]],
-    [[-.86,.24],[-.48,.05],[-.18,.20],[.25,.03],[.64,.14],[1.18,-.02]],
-    [[-.34,.08],[-.05,.28],[.24,.10],[.44,.31]]
+    [[-1.35,-.22],[-.96,-.02],[-.68,-.24],[-.30,-.06],[.08,-.22],[.46,-.02],[.82,-.20],[1.38,-.06]],
+    [[-1.18,.20],[-.82,.02],[-.48,.23],[-.16,.05],[.22,.21],[.58,.04],[.96,.22],[1.35,.08]],
+    [[-.52,-.02],[-.25,-.30],[.04,-.10],[.28,-.34],[.58,-.12],[.86,-.28],[1.22,-.08]]
   ];
 
   const chosen=variants[index%variants.length];
   makeCrack(chosen);
-  if(index%2===0){
+
+  // Cracked fixtures often have a second branching fracture.
+  if(index%3!==1){
     makeCrack(
-      [[-.05,-.02],[.13,-.30],[.31,-.15],[.50,-.34]],
-      -.15,
-      .06
+      [[-.18,.02],[.00,-.24],[.24,-.10],[.42,-.30],[.70,-.17]],
+      index%2===0 ? -.18 : .12,
+      index%2===0 ? .08 : -.04
+    );
+  }
+
+  // One short side branch makes the fracture look like broken diffuser plastic
+  // instead of a single painted line.
+  if(index%4===0){
+    makeCrack(
+      [[-.42,.02],[-.66,.24],[-.86,.10]],
+      .08,
+      -.02
     );
   }
 }
+
 const menuLightFixtures3D=[
-  [-12,16,7.2,-.6],[-2,9,8.8,-.1],[9,16,6.8,.35],
-  [-42,11,5.5,.2],[-24,4,10,.8],[-8,15,13,1.6],[10,5,8.5,2.5],[31,11,12,3.3],
-  [-35,-10,8.5,4.1],[-14,-16,5.0,4.8],[8,-15,12.5,5.5],[34,-18,6.2,6.2],
-  [-24,-31,9.5,7.0],[0,-34,14,7.8],[24,-35,5.8,8.4],[-8,-47,8.5,9.0],[18,-52,4.0,9.6]
+  [-46,25,4.8,.2],[-31,26,6.0,.7],[-15,25,7.5,1.2],[1,25,5.6,1.7],[17,25,8.0,2.2],[34,25,5.0,2.7],
+  [-40,10,7.0,3.1],[-23,11,5.2,3.6],[-7,10,8.5,4.1],[10,10,6.4,4.6],[27,10,7.8,5.1],
+  [-45,-5,5.6,5.6],[-28,-7,8.5,6.2],[-11,-5,6.2,6.8],[6,-7,9.2,7.4],[23,-6,5.7,8.0],[40,-8,7.4,8.6],
+  [-42,-23,6.8,9.1],[-25,-24,5.4,9.7],[-8,-22,8.8,10.3],[10,-24,6.0,10.9],[27,-23,8.0,11.5],
+  [-38,-41,5.2,12.0],[-20,-43,7.8,12.6],[-2,-42,5.8,13.2],[16,-43,8.6,13.8],[34,-41,5.0,14.4],
+  [-22,-57,7.2,15.0],[0,-56,5.4,15.6],[22,-57,7.8,16.2],[42,-55,5.5,16.8]
 ];
+
 for(let fixtureIndex=0;fixtureIndex<menuLightFixtures3D.length;fixtureIndex++){
   const [x,z,power,phase]=menuLightFixtures3D[fixtureIndex];
+  const cracked=[0,1,2,4,5,7,8,9,10,12,13,14,15,16,17,18,20,21,22,24,25,26,27,29,30].includes(fixtureIndex);
+  const lightPower=cracked ? power*.24 : power;
+
   const fixture=addMenuBox(
     "Fluorescent",
     new THREE.Vector3(3.5,.10,.95),
     new THREE.Vector3(x,8.97,z),
     menuLightMaterial
   );
-  fixture.userData.basePower=power;
+  fixture.userData.basePower=lightPower;
   fixture.userData.phase=phase;
+  fixture.userData.cracked=cracked;
 
-  const point=new THREE.PointLight(0xffe6a8,power,18,2);
+  const point=new THREE.PointLight(0xffe6a8,lightPower,18,2);
   point.position.set(x,8.08,z);
-  point.userData.basePower=power;
+  point.userData.basePower=lightPower;
   point.userData.phase=phase;
+  point.userData.cracked=cracked;
   menuSet.add(point);
   addFixtureCracks(fixture,x,z,fixtureIndex,0);
 }
@@ -493,15 +516,20 @@ function updateMenuScene(t,dt){
     const base=node.userData.basePower;
     const wave=Math.sin(t*1.55+phase)*.055;
 
+    // Cracked fixtures run much dimmer even before their ballast flickers.
+    const cracked=node.userData.cracked===true;
+    const crackedDim=cracked ? .52 : 1;
+
     // Occasional hard ballast dropout, staggered per fixture.
     const dropout=Math.sin(t*3.65+phase*3.3)>.996 ? -.82 : 0;
 
     if(node.isLight){
-      node.intensity=Math.max(.06,base*(1+wave+dropout));
+      node.intensity=Math.max(.025,base*crackedDim*(1+wave+dropout));
     }else if(node.material?.emissiveIntensity!==undefined){
       node.material.emissiveIntensity=Math.max(
-        .10,
-        3.15*(1+Math.sin(t*1.55+phase)*.045+dropout*.55)
+        .06,
+        (cracked ? 1.28 : 3.15)*
+          (1+Math.sin(t*1.55+phase)*.045+dropout*.55)
       );
     }
   });
