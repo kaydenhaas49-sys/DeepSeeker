@@ -932,12 +932,11 @@ function installMainMenuRedesign(){
     linear-gradient(180deg,rgba(0,0,0,.16) 0%,transparent 35%,rgba(0,0,0,.54) 100%);
 }
 #menuBackdrop{
+  display:none!important;
   position:absolute;
   inset:0;
   z-index:0;
-  overflow:hidden;
   pointer-events:none;
-  background:#14130d;
 }
 .menuBGRuined{
   position:absolute;
