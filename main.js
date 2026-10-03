@@ -1590,6 +1590,26 @@ function installMainMenuRedesign(){
     '<div class="menuEditorSub">Edit the background and icons here. Open EDIT to drag menu panels and resize them from the bottom-right corner.</div>'+
     '<div class="menuLayoutHint">LAYOUT EDIT MODE: DRAG A PANEL TO MOVE IT · DRAG ITS CORNER TO RESIZE IT.</div>'+
     '<div id="menuEditorLayoutSelection" class="menuLayoutSelection">Selected: NONE</div>'+
+    '<div class="menuElementEditor">'+
+      '<div class="menuEditorSectionTitle">ELEMENT EDITOR</div>'+
+      '<div class="menuEditorSub">Select any visible menu element. Drag it directly, resize it with the corner handle, or edit every value below.</div>'+
+      '<div class="menuEditorRow"><label>ELEMENT</label><select id="menuElementSelect"></select></div>'+
+      '<div class="menuElementControlGrid">'+
+        '<label>X <input id="elX" type="number" step="1"></label><label>Y <input id="elY" type="number" step="1"></label>'+
+        '<label>WIDTH <input id="elW" type="number" min="1" step="1"></label><label>HEIGHT <input id="elH" type="number" min="1" step="1"></label>'+
+        '<label>FONT SIZE <input id="elFontSize" type="number" min="1" step="1"></label><label>LETTER SPACING <input id="elLetterSpacing" type="number" step=".1"></label>'+
+        '<label>LINE HEIGHT <input id="elLineHeight" type="text"></label><label>OPACITY <input id="elOpacity" type="number" min="0" max="100" step="1"></label>'+
+        '<label>PADDING <input id="elPadding" type="text"></label><label>MARGIN <input id="elMargin" type="text"></label>'+
+        '<label>GAP <input id="elGap" type="text"></label><label>BORDER RADIUS <input id="elRadius" type="number" min="0" step="1"></label>'+
+        '<label>FONT WEIGHT <input id="elWeight" type="text"></label><label>TEXT ALIGN <input id="elAlign" type="text"></label>'+
+        '<label>TEXT COLOR <input id="elColor" type="text" spellcheck="false"></label><label>BACKGROUND <input id="elBackground" type="text" spellcheck="false"></label>'+
+      '</div>'+
+      '<div class="menuEditorRow"><label>CUSTOM CSS</label><textarea id="elCustomCss" spellcheck="false" placeholder="color:#fff; transform:rotate(-2deg);"></textarea></div>'+
+      '<div class="menuElementActions">'+
+        '<button id="elApply" type="button">APPLY ELEMENT</button><button id="elReset" type="button">RESET ELEMENT</button><button id="elResetAll" type="button">RESET ALL ELEMENTS</button>'+
+      '</div>'+ 
+      '<div id="menuElementStatus" class="menuEditorStatus"></div>'+ 
+    '</div>'+
     '<div class="menuEditorGrid">'+
       '<div class="menuEditorRow"><label>BACKGROUND IMAGE URL</label><input id="menuEditorUrl" type="text" spellcheck="false"></div>'+
       '<div class="menuEditorRow"><label>HORIZONTAL POSITION</label><div class="menuEditorRange"><input id="menuEditorX" type="range" min="0" max="100" value="50"><output id="menuEditorXOut">50%</output></div></div>'+
@@ -1627,6 +1647,21 @@ function installMainMenuRedesign(){
   const sepiaInput=editor.querySelector("#menuEditorSepia");
   const status=editor.querySelector("#menuEditorStatus");
   const layoutSelection=editor.querySelector("#menuEditorLayoutSelection");
+  const elementSelect=editor.querySelector("#menuElementSelect");
+  const elementInputs={
+    x:editor.querySelector("#elX"),y:editor.querySelector("#elY"),w:editor.querySelector("#elW"),h:editor.querySelector("#elH"),
+    fontSize:editor.querySelector("#elFontSize"),letterSpacing:editor.querySelector("#elLetterSpacing"),lineHeight:editor.querySelector("#elLineHeight"),
+    opacity:editor.querySelector("#elOpacity"),padding:editor.querySelector("#elPadding"),margin:editor.querySelector("#elMargin"),gap:editor.querySelector("#elGap"),
+    radius:editor.querySelector("#elRadius"),weight:editor.querySelector("#elWeight"),align:editor.querySelector("#elAlign"),color:editor.querySelector("#elColor"),
+    background:editor.querySelector("#elBackground"),customCss:editor.querySelector("#elCustomCss")
+  };
+  const elementApplyButton=editor.querySelector("#elApply");
+  const elementResetButton=editor.querySelector("#elReset");
+  const elementResetAllButton=editor.querySelector("#elResetAll");
+  const elementStatus=editor.querySelector("#menuElementStatus");
+  const elementStyles={};
+  let selectedElement=null;
+  let selectedElementId="";
   let menuLayoutState=null;
   let resetMenuLayoutEditor=()=>{};
   const iconInputs={
@@ -1658,12 +1693,13 @@ function installMainMenuRedesign(){
     saturation:118,
     sepia:38,
     icons:{...defaultMenuIcons},
-    layout:defaultMenuLayout
+    layout:defaultMenuLayout,
+    elements:{}
   };
   let menuConfig={...defaultMenuConfig};
   try{
     const saved=JSON.parse(localStorage.getItem("deepseeker-menu-config")||"null");
-    if(saved && typeof saved==="object") menuConfig={...menuConfig,...saved,icons:{...defaultMenuIcons,...(saved.icons||{})},layout:{...defaultMenuLayout,...(saved.layout||{})}};
+    if(saved && typeof saved==="object") menuConfig={...menuConfig,...saved,icons:{...defaultMenuIcons,...(saved.icons||{})},layout:{...defaultMenuLayout,...(saved.layout||{})},elements:{...(saved.elements||{})}};
   }catch{}
 
   function syncMenuEditor(){
@@ -1692,6 +1728,7 @@ function installMainMenuRedesign(){
       saturation:Number(saturationInput.value),
       sepia:Number(sepiaInput.value),
       layout:menuLayoutState ? Object.fromEntries(Object.entries(menuLayoutState).map(([key,rect])=>[key,{...rect}])) : menuConfig.layout,
+      elements:{...elementStyles},
       icons:Object.fromEntries(
         Object.entries(iconInputs).map(([key,input])=>[
           key,
@@ -1699,6 +1736,137 @@ function installMainMenuRedesign(){
         ])
       )
     };
+  }
+
+  const menuEditableRootIds=new Set(["menuEditor","menuEditButton"]);
+
+  function getElementLabel(element,index){
+    const explicit=element.dataset.menuEditLabel;
+    if(explicit) return explicit;
+    const cls=String(element.className||"").split(/\s+/).filter(Boolean)[0];
+    const text=String(element.textContent||"").replace(/\s+/g," ").trim().slice(0,36);
+    return (element.tagName?.toLowerCase()||"element")+" "+(cls?("· "+cls+" "):"")+" "+(text?('· "'+text+'"'):"")+" ["+(index+1)+"]";
+  }
+
+  function collectMenuEditableElements(){
+    const all=[...layout.querySelectorAll("*")].filter(element=>{
+      if(element===editor || element.closest(".menuEditor") || element===editButton || element.classList.contains("menuResizeHandle")) return false;
+      return element!==layout;
+    });
+
+    all.forEach((element,index)=>{
+      if(!element.dataset.menuEditId) element.dataset.menuEditId="el-"+index;
+      if(!element.dataset.menuEditLabel) element.dataset.menuEditLabel=getElementLabel(element,index);
+    });
+
+    return all;
+  }
+
+  function getElementById(id){
+    return layout.querySelector('[data-menu-edit-id="'+CSS.escape(id)+'"]');
+  }
+
+  function readComputedElementState(element){
+    const style=getComputedStyle(element);
+    const rect=element.getBoundingClientRect();
+    const rootRect=layout.getBoundingClientRect();
+    return {
+      x:Math.round(rect.left-rootRect.left),
+      y:Math.round(rect.top-rootRect.top),
+      w:Math.round(rect.width),
+      h:Math.round(rect.height),
+      fontSize:parseFloat(style.fontSize)||0,
+      letterSpacing:style.letterSpacing==="normal"?0:(parseFloat(style.letterSpacing)||0),
+      lineHeight:style.lineHeight,
+      opacity:Math.round((parseFloat(style.opacity)||1)*100),
+      padding:style.padding,
+      margin:style.margin,
+      gap:style.gap==="normal"?"":style.gap,
+      radius:parseFloat(style.borderRadius)||0,
+      weight:style.fontWeight,
+      align:style.textAlign,
+      color:style.color,
+      background:style.backgroundColor,
+      customCss:""
+    };
+  }
+
+  function applyElementStyle(element,id,state){
+    if(!element||!state) return;
+    element.classList.add("menuElementBeingEdited");
+    element.style.position="relative";
+    element.style.left=Number.isFinite(Number(state.x))?Number(state.x)+"px":"0px";
+    element.style.top=Number.isFinite(Number(state.y))?Number(state.y)+"px":"0px";
+    if(Number.isFinite(Number(state.w))){element.style.width=Math.max(1,Number(state.w))+"px";}
+    if(Number.isFinite(Number(state.h))){element.style.height=Math.max(1,Number(state.h))+"px";}
+    if(Number.isFinite(Number(state.fontSize)) && Number(state.fontSize)>0) element.style.fontSize=Number(state.fontSize)+"px";
+    if(state.letterSpacing!==undefined && state.letterSpacing!=="") element.style.letterSpacing=Number(state.letterSpacing)+"px";
+    if(state.lineHeight!==undefined && state.lineHeight!=="") element.style.lineHeight=String(state.lineHeight);
+    if(state.opacity!==undefined && state.opacity!=="") element.style.opacity=Math.max(0,Math.min(100,Number(state.opacity)))/100;
+    if(state.padding!==undefined) element.style.padding=String(state.padding);
+    if(state.margin!==undefined) element.style.margin=String(state.margin);
+    if(state.gap!==undefined && state.gap!=="") element.style.gap=String(state.gap);
+    if(state.radius!==undefined && state.radius!=="") element.style.borderRadius=Math.max(0,Number(state.radius))+"px";
+    if(state.weight!==undefined && state.weight!=="") element.style.fontWeight=String(state.weight);
+    if(state.align!==undefined && state.align!=="") element.style.textAlign=String(state.align);
+    if(state.color!==undefined && state.color!=="") element.style.color=String(state.color);
+    if(state.background!==undefined && state.background!=="") element.style.background=String(state.background);
+    if(state.customCss!==undefined) element.style.cssText += String(state.customCss).trim() ? ";"+String(state.customCss) : "";
+    if(element.tagName==="SPAN" && (state.w!==undefined || state.h!==undefined)) element.style.display="inline-block";
+    element.dataset.menuEdited="1";
+    elementStyles[id]={...state};
+  }
+
+  function syncElementInputs(element){
+    if(!element) return;
+    const id=element.dataset.menuEditId;
+    const state={...readComputedElementState(element),...(elementStyles[id]||{})};
+    for(const [key,input] of Object.entries(elementInputs)) if(input) input.value=state[key]===undefined?"":String(state[key]);
+    selectedElementId=id||"";
+    selectedElement=element;
+    if(elementStatus) elementStatus.textContent=element.dataset.menuEditLabel||id||"";
+  }
+
+  function populateElementSelect(){
+    if(!elementSelect) return;
+    const elements=collectMenuEditableElements();
+    elementSelect.innerHTML="";
+    elements.forEach((element,index)=>{
+      const option=document.createElement("option");
+      option.value=element.dataset.menuEditId;
+      option.textContent=element.dataset.menuEditLabel||getElementLabel(element,index);
+      elementSelect.appendChild(option);
+    });
+    if(selectedElementId && getElementById(selectedElementId)) elementSelect.value=selectedElementId;
+    else if(elements[0]) elementSelect.value=elements[0].dataset.menuEditId;
+    const current=getElementById(elementSelect.value);
+    if(current) syncElementInputs(current);
+  }
+
+  function applySelectedElement(){
+    const element=getElementById(elementSelect?.value||selectedElementId);
+    if(!element) return;
+    const state={};
+    for(const [key,input] of Object.entries(elementInputs)) state[key]=String(input?.value??"");
+    applyElementStyle(element,element.dataset.menuEditId,state);
+    if(elementStatus) elementStatus.textContent="APPLIED · "+(element.dataset.menuEditLabel||element.dataset.menuEditId);
+  }
+
+  function resetSelectedElement(){
+    const element=getElementById(elementSelect?.value||selectedElementId);
+    if(!element) return;
+    const id=element.dataset.menuEditId;
+    element.removeAttribute("style");
+    delete elementStyles[id];
+    syncElementInputs(element);
+    if(elementStatus) elementStatus.textContent="RESET · "+(element.dataset.menuEditLabel||id);
+  }
+
+  function resetAllElements(){
+    collectMenuEditableElements().forEach(element=>element.removeAttribute("style"));
+    for(const key of Object.keys(elementStyles)) delete elementStyles[key];
+    if(elementStatus) elementStatus.textContent="ALL ELEMENTS RESET";
+    populateElementSelect();
   }
 
   function applyMenuEditor(config){
@@ -1730,6 +1898,14 @@ function installMainMenuRedesign(){
     });
   }
 
+  elementSelect.addEventListener("change",()=>{
+    const element=getElementById(elementSelect.value);
+    if(element) syncElementInputs(element);
+  });
+  elementApplyButton.addEventListener("click",applySelectedElement);
+  elementResetButton.addEventListener("click",resetSelectedElement);
+  elementResetAllButton.addEventListener("click",resetAllElements);
+
   applyButton.addEventListener("click",()=>{
     applyMenuEditor(readMenuEditor());
     status.textContent="APPLIED";
@@ -1740,6 +1916,11 @@ function installMainMenuRedesign(){
     resetMenuLayoutEditor();
     menuConfig={...defaultMenuConfig,icons:{...menuIcons},layout:menuLayoutState||defaultMenuLayout};
     applyMenuEditor(menuConfig);
+    for(const [id,state] of Object.entries(elementStyles)){
+      const element=getElementById(id);
+      if(element) applyElementStyle(element,id,state);
+    }
+    populateElementSelect();
     status.textContent="RESET";
   });
 
@@ -1894,7 +2075,11 @@ function installMainMenuRedesign(){
     console.warn("[DeepSeeker] Menu layout editor disabled:",error);
   }
 
-  window.__deepseekerMenu={};
+  populateElementSelect();
+  window.__deepseekerMenu={
+    refreshElementEditor:populateElementSelect,
+    getElementStyles:()=>JSON.parse(JSON.stringify(elementStyles))
+  };
 }
 
 function updateHouseLoadingUI(progress=null,status=null){
