@@ -2025,7 +2025,7 @@ let spiderJumpscareScale=1;
 let spiderAutoLookTimer=0;
 let spiderAutoLookStarted=false;
 
-const SPIDER_STALK_TIME=2.0;
+const SPIDER_STALK_TIME=4.5;
 const SPIDER_AUTO_LOOK_DURATION=1.0;
 const SPIDER_ATTACK_RANGE=1.65;
 const SPIDER_SPEED=2.35;
@@ -2214,8 +2214,8 @@ function findSpiderSpawnPosition(){
   const rightZ=-Math.sin(player.yaw);
 
   const candidates=[
-    [6,0],[8,0],[7,3],[7,-3],
-    [10,4],[10,-4],[12,2],[12,-2]
+    [14,0],[16,0],[15,4],[15,-4],
+    [18,5],[18,-5],[20,3],[20,-3]
   ];
 
   for(const [distance,side] of candidates){
@@ -2371,8 +2371,8 @@ function spawnSpiderAtPlayer(){
 
   spiderBehaviorState="stalk";
   spiderBehaviorTime=0;
-  spiderAutoLookTimer=0;
-  spiderAutoLookStarted=false;
+  spiderAutoLookTimer=SPIDER_AUTO_LOOK_DURATION;
+  spiderAutoLookStarted=true;
   spiderAttackPlayed=false;
   spiderActive=true;
   spiderEntity.visible=true;
@@ -3115,19 +3115,6 @@ function animate(){
       player.pos.x-spiderEntity.position.x,
       player.pos.z-spiderEntity.position.z
     );
-
-    const playerSeesSpider=
-      (spiderBehaviorState==="stalk" || spiderBehaviorState==="chase") &&
-      targetDistance<=18 &&
-      playerHasLineOfSightToSpider();
-
-    if(
-      !spiderAutoLookStarted &&
-      playerSeesSpider
-    ){
-      spiderAutoLookStarted=true;
-      spiderAutoLookTimer=SPIDER_AUTO_LOOK_DURATION;
-    }
 
     if(spiderAutoLookTimer>0){
       spiderAutoLookTimer=Math.max(
