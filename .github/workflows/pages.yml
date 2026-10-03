@@ -56,7 +56,71 @@ jobs:
           )
 
           test -s assets/Spider-Psionic-runtime/spider.glb
-          ls -lh assets/Spider-Psionic/spider.fbx assets/Spider-Psionic-runtime/spider.glb
+
+          # Assimp preserves the FBX's old Windows texture URI. The original
+          # URI resolves above the GitHub Pages site root, so rewrite it to
+          # the actual deployed Pages-relative texture location.
+          python3 - <<'PY'
+          import json
+          import struct
+          from pathlib import Path
+
+          path = Path("assets/Spider-Psionic-runtime/spider.glb")
+          data = path.read_bytes()
+
+          magic, version, total_length = struct.unpack_from("<4sII", data, 0)
+          if magic != b"glTF" or version != 2:
+              raise SystemExit("runtime spider GLB is not glTF 2")
+
+          pos = 12
+          json_bytes = None
+          chunks = []
+
+          while pos < len(data):
+              chunk_length, chunk_type = struct.unpack_from("<II", data, pos)
+              pos += 8
+              chunk = data[pos:pos + chunk_length]
+              pos += chunk_length
+              chunks.append((chunk_type, chunk))
+              if chunk_type == 0x4E4F534A:
+                  json_bytes = chunk
+
+          if json_bytes is None:
+              raise SystemExit("runtime spider GLB has no JSON chunk")
+
+          doc = json.loads(json_bytes.decode("utf-8").rstrip(" \\t\\r\\n\\x00"))
+          images = doc.get("images", [])
+          rewrites = 0
+
+          for image in images:
+              uri = image.get("uri")
+              if not uri:
+                  continue
+              if uri.lower().replace("\\\\", "/").endswith("/spider2_color.jpg") or uri.lower().endswith("spider2_color.jpg"):
+                  image["uri"] = "../../spider2_color.jpg"
+                  rewrites += 1
+
+          if rewrites == 0:
+              raise SystemExit("could not find spider2_color.jpg URI in generated GLB")
+
+          new_json = json.dumps(doc, separators=(",", ":")).encode("utf-8")
+          new_json += b" " * ((-len(new_json)) % 4)
+
+          rebuilt = bytearray()
+          rebuilt.extend(struct.pack("<4sII", b"glTF", 2, 0))
+
+          for chunk_type, chunk in chunks:
+              if chunk_type == 0x4E4F534A:
+                  chunk = new_json
+              rebuilt.extend(struct.pack("<II", len(chunk), chunk_type))
+              rebuilt.extend(chunk)
+
+          struct.pack_into("<I", rebuilt, 8, len(rebuilt))
+          path.write_bytes(rebuilt)
+          print(f"rewrote {rewrites} spider texture URI(s) to ../../spider2_color.jpg")
+          PY
+
+          ls -lh assets/Spider-Psionic/spider.fbx assets/Spider-Psionic-runtime/spider.glb assets/Spider-Psionic-runtime/spider.glb
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
