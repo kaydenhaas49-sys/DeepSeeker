@@ -356,7 +356,10 @@ function addFixtureCracks(fixture,x,z,index,rotationY=0){
   const variants=[
     [[-1.35,-.22],[-.96,-.02],[-.68,-.24],[-.30,-.06],[.08,-.22],[.46,-.02],[.82,-.20],[1.38,-.06]],
     [[-1.18,.20],[-.82,.02],[-.48,.23],[-.16,.05],[.22,.21],[.58,.04],[.96,.22],[1.35,.08]],
-    [[-.52,-.02],[-.25,-.30],[.04,-.10],[.28,-.34],[.58,-.12],[.86,-.28],[1.22,-.08]]
+    [[-.52,-.02],[-.25,-.30],[.04,-.10],[.28,-.34],[.58,-.12],[.86,-.28],[1.22,-.08]],
+    [[-1.40,.10],[-1.05,-.16],[-.72,.04],[-.38,-.18],[-.02,.08],[.38,-.14],[.74,.02],[1.30,-.20]],
+    [[-1.26,-.08],[-.92,.18],[-.54,-.04],[-.14,.20],[.20,-.02],[.62,.16],[1.00,-.06],[1.34,.14]],
+    [[-1.38,.22],[-1.00,.02],[-.62,.24],[-.28,-.08],[.12,.06],[.44,-.20],[.84,.12],[1.40,-.04]]
   ];
 
   const chosen=variants[index%variants.length];
@@ -391,40 +394,83 @@ const menuLightFixtures3D=[
   [-22,-57,7.2,15.0],[0,-56,5.4,15.6],[22,-57,7.8,16.2],[42,-55,5.5,16.8]
 ];
 
+const menuBrokenLightMaterial=new THREE.MeshStandardMaterial({
+  color:0x10100e,
+  roughness:.96
+});
+
 function addCrackedFixtureModel(x,z,index){
   const group=new THREE.Group();
   group.name="FluorescentCracked";
   group.position.set(x,8.97,z);
 
-  // Leave the gaps open. The ceiling grid above provides the dark contrast,
-  // while the damaged diffuser pieces remain the visible fixture geometry.
-  const pieces=[
-    {w:1.03,x:-1.16,y:.008,z:.012,rx:-.025,rz:-.018},
-    {w:.92,x:-.12,y:-.018,z:-.018,rx:.012,rz:.030},
-    {w:1.18,x:1.00,y:.014,z:.018,rx:-.018,rz:-.024}
+  // Different broken fixtures use different diffuser splits, offsets and missing
+  // sections so the damage does not repeat like a copied prop.
+  const variants=[
+    [
+      {w:1.02,x:-1.16,y:.012,z:.01,rx:-.030,rz:-.018},
+      {w:.78,x:-.08,y:-.020,z:-.02,rx:.015,rz:.035,black:true},
+      {w:1.12,x:1.00,y:.016,z:.02,rx:-.022,rz:-.028}
+    ],
+    [
+      {w:.72,x:-1.28,y:-.012,z:-.03,rx:.020,rz:.045},
+      {w:1.22,x:-.18,y:.010,z:.015,rx:-.010,rz:-.020},
+      {w:.86,x:1.13,y:-.026,z:-.018,rx:.030,rz:.065,black:true}
+    ],
+    [
+      {w:.92,x:-1.12,y:.018,z:.025,rx:-.035,rz:.020,black:true},
+      {w:1.04,x:-.02,y:-.010,z:-.012,rx:.020,rz:-.040},
+      {w:.62,x:1.05,y:.022,z:.030,rx:-.050,rz:.080}
+    ],
+    [
+      {w:1.30,x:-1.02,y:-.018,z:-.015,rx:.012,rz:-.050},
+      {w:.58,x:.16,y:.028,z:.035,rx:-.040,rz:.070,black:true},
+      {w:.98,x:1.10,y:-.008,z:-.020,rx:.030,rz:-.015}
+    ],
+    [
+      {w:.80,x:-1.24,y:.020,z:.005,rx:-.025,rz:-.075,black:true},
+      {w:.90,x:-.16,y:-.030,z:-.028,rx:.040,rz:.050},
+      {w:1.25,x:1.05,y:.014,z:.018,rx:-.018,rz:-.030}
+    ],
+    [
+      {w:1.10,x:-1.10,y:-.008,z:-.025,rx:.018,rz:.025},
+      {w:.68,x:-.08,y:.024,z:.030,rx:-.045,rz:-.080},
+      {w:.96,x:1.02,y:-.022,z:-.012,rx:.050,rz:.060,black:true}
+    ]
   ];
 
+  const pieces=variants[index%variants.length];
   for(const piece of pieces){
     const mesh=new THREE.Mesh(
       new THREE.BoxGeometry(piece.w,.065,.84),
-      menuLightMaterial
+      piece.black ? menuBrokenLightMaterial : menuLightMaterial
     );
     mesh.position.set(piece.x,piece.y,piece.z);
     mesh.rotation.set(piece.rx,0,piece.rz);
-    mesh.name="CrackedDiffuserPiece";
+    mesh.name=piece.black ? "CrackedBlackSection" : "CrackedDiffuserPiece";
     group.add(mesh);
   }
 
-  // A small broken shard makes some damaged fixtures visibly incomplete.
-  if(index%3!==1){
-    const shard=new THREE.Mesh(
-      new THREE.BoxGeometry(.34,.052,.34),
+  // Some fixtures lose a different little fragment, with the fragment position
+  // following the variant instead of repeating one placement.
+  const shardVariants=[
+    null,
+    {x:-1.56,y:.040,z:.12,rz:-.22},
+    {x:1.54,y:.052,z:-.10,rz:.18},
+    null,
+    {x:-1.48,y:.030,z:-.14,rz:.28},
+    {x:1.50,y:.048,z:.14,rz:-.16}
+  ];
+  const shard=shardVariants[index%shardVariants.length];
+  if(shard){
+    const mesh=new THREE.Mesh(
+      new THREE.BoxGeometry(.28,.048,.30),
       menuLightMaterial
     );
-    shard.position.set(index%2===0 ? 1.52 : -1.52,.055,index%2===0 ? -.10 : .11);
-    shard.rotation.set(.08,0,index%2===0 ? .16 : -.12);
-    shard.name="CrackedDiffuserShard";
-    group.add(shard);
+    mesh.position.set(shard.x,shard.y,shard.z);
+    mesh.rotation.set(.06,0,shard.rz);
+    mesh.name="CrackedDiffuserShard";
+    group.add(mesh);
   }
 
   menuSet.add(group);
