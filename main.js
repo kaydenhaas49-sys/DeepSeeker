@@ -2022,10 +2022,11 @@ let spiderJumpscareTimer=0;
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
 let spiderJumpscareScale=1;
+let spiderLookConfirmTime=0;
 
 const SPIDER_STALK_TIME=2.0;
 const SPIDER_ATTACK_RANGE=1.65;
-const SPIDER_SPEED=1.45;
+const SPIDER_SPEED=2.35;
 const SPIDER_RADIUS=.55;
 const SPIDER_GROUND_OFFSET=.08;
 const SPIDER_TARGET_SPAN=2.4;
@@ -2159,37 +2160,44 @@ function isSpiderBlocked(x,z){
   return false;
 }
 
+const spiderSightRaycaster=new THREE.Raycaster();
+const spiderSightOrigin=new THREE.Vector3();
+const spiderSightTarget=new THREE.Vector3();
+
 function spiderHasLineOfSight(){
   const dx=player.pos.x-spiderEntity.position.x;
   const dz=player.pos.z-spiderEntity.position.z;
   const distance=Math.hypot(dx,dz);
 
-  if(distance>.001 && distance>18) return false;
+  if(distance<.25 || distance>18) return false;
 
-  const steps=Math.max(2,Math.ceil(distance/.45));
-  const probeRadius=.12;
+  spiderSightOrigin.set(
+    spiderEntity.position.x,
+    Math.max(.65,player.pos.y-.35),
+    spiderEntity.position.z
+  );
 
-  for(let step=1;step<steps;step++){
-    const t=step/steps;
-    const x=spiderEntity.position.x+dx*t;
-    const z=spiderEntity.position.z+dz*t;
-    const walls=world.getNearbyWallBounds(x,z,probeRadius);
+  spiderSightTarget.set(
+    player.pos.x,
+    EYE,
+    player.pos.z
+  );
 
-    for(const wall of walls){
-      const nx=Math.max(wall.minX,Math.min(x,wall.maxX));
-      const nz=Math.max(wall.minZ,Math.min(z,wall.maxZ));
-      const wx=x-nx;
-      const wz=z-nz;
-      if(wx*wx+wz*wz<probeRadius*probeRadius){
-        return false;
-      }
-    }
-  }
+  const direction=spiderSightTarget.clone().sub(spiderSightOrigin);
+  const length=direction.length();
+  if(length<.001) return true;
 
-  return true;
+  direction.normalize();
+  spiderSightRaycaster.set(spiderSightOrigin,direction);
+  spiderSightRaycaster.far=Math.max(0,length-.15);
+
+  const hits=spiderSightRaycaster.intersectObjects(world.root.children,true);
+  return hits.length===0;
 }
 
 function rotatePlayerTowardSpider(dt){
+  if(performance.now()-player.lastLookInputAt<280) return;
+
   const dx=spiderEntity.position.x-player.pos.x;
   const dz=spiderEntity.position.z-player.pos.z;
   if(dx*dx+dz*dz<.0001) return;
@@ -2200,7 +2208,7 @@ function rotatePlayerTowardSpider(dt){
   while(delta>Math.PI) delta-=Math.PI*2;
   while(delta<-Math.PI) delta+=Math.PI*2;
 
-  const turnSpeed=5.5;
+  const turnSpeed=2.35;
   player.yaw+=delta*Math.min(1,dt*turnSpeed);
 }
 
@@ -2341,6 +2349,7 @@ function resetPlayerAfterSpiderCatch(){
   spiderJumpscareScale=1;
   spiderBehaviorState="chase";
   spiderBehaviorTime=0;
+  spiderLookConfirmTime=0;
   spiderEntity.scale.setScalar(1);
   spiderEntity.position.y=SPIDER_GROUND_OFFSET;
   setSpiderAnimation("chase");
@@ -2366,6 +2375,7 @@ function spawnSpiderAtPlayer(){
 
   spiderBehaviorState="stalk";
   spiderBehaviorTime=0;
+  spiderLookConfirmTime=0;
   spiderAttackPlayed=false;
   spiderActive=true;
   spiderEntity.visible=true;
@@ -3113,7 +3123,27 @@ function animate(){
       targetDistance<=18 &&
       spiderHasLineOfSight();
 
-    if(spiderSeesPlayer && spiderBehaviorState==="chase"){
+    if(
+      spiderBehaviorState==="chase" &&
+      spiderSeesPlayer &&
+      spiderBehaviorTime>=0.75
+    ){
+      spiderLookConfirmTime=Math.min(
+        1.2,
+        spiderLookConfirmTime+dt
+      );
+    }else{
+      spiderLookConfirmTime=Math.max(
+        0,
+        spiderLookConfirmTime-dt*2.5
+      );
+    }
+
+    if(
+      spiderLookConfirmTime>=0.3 &&
+      targetDistance<=12 &&
+      spiderBehaviorState==="chase"
+    ){
       rotatePlayerTowardSpider(dt);
     }
 
@@ -3160,6 +3190,7 @@ function animate(){
     spiderEntity.visible=false;
     spiderBehaviorState="idle";
     spiderBehaviorTime=0;
+    spiderLookConfirmTime=0;
   }
   if(eventCooldown>0) eventCooldown-=dt;
   if(!houseMode && eventCooldown<=0 && t>nextEvent){

@@ -31,6 +31,7 @@ export class Player {
     this.fov = 70;
     this.crouched = false;
     this.stamina = 100;
+    this.lastLookInputAt = 0;
     this.stepDistance = 0;
     this.onStep = null;
     this.jumpY = 0;
@@ -76,6 +77,7 @@ export class Player {
     this.onKeyUp = (e) => this.keys.delete(e.code);
     this.onMouseMove = (e) => {
       if (!this.locked) return;
+      this.lastLookInputAt = performance.now();
       this.yaw -= e.movementX * MOUSE_SENS;
       this.pitch -= e.movementY * MOUSE_SENS;
       this.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.pitch));
