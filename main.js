@@ -1230,63 +1230,162 @@ function installMainMenuRedesign(){
   backdrop.innerHTML=`
     <svg class="menuBGScene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <defs>
-          <linearGradient id="ms-ceil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#505047"/><stop offset=".55" stop-color="#31322c"/><stop offset="1" stop-color="#171914"/></linearGradient>
-          <linearGradient id="ms-left" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0b0d0b"/><stop offset=".64" stop-color="#24261f"/><stop offset="1" stop-color="#4e4d40"/></linearGradient>
-          <linearGradient id="ms-right" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#080a08"/><stop offset=".60" stop-color="#25271f"/><stop offset="1" stop-color="#4a493d"/></linearGradient>
-          <linearGradient id="ms-floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4d4b3e"/><stop offset=".28" stop-color="#323228"/><stop offset="1" stop-color="#0a0c09"/></linearGradient>
-          <radialGradient id="ms-light" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#efe7c8" stop-opacity=".34"/><stop offset=".45" stop-color="#d8d0b0" stop-opacity=".11"/><stop offset="1" stop-color="#d8d0b0" stop-opacity="0"/></radialGradient>
-          <radialGradient id="ms-haze" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#d0c6a4" stop-opacity=".11"/><stop offset="1" stop-color="#d0c6a4" stop-opacity="0"/></radialGradient>
-          <filter id="ms-soft"><feGaussianBlur stdDeviation="10"/></filter>
-          <filter id="ms-soft2"><feGaussianBlur stdDeviation="26"/></filter>
+          <linearGradient id="abg-wall" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#aaa477"/><stop offset=".55" stop-color="#969065"/><stop offset="1" stop-color="#777354"/>
+          </linearGradient>
+          <linearGradient id="abg-floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#7a765b"/><stop offset=".45" stop-color="#5a5745"/><stop offset="1" stop-color="#24251e"/>
+          </linearGradient>
+          <linearGradient id="abg-ceil" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#66675c"/><stop offset="1" stop-color="#929181"/>
+          </linearGradient>
+          <radialGradient id="abg-light" cx=".5" cy=".5" r=".5">
+            <stop offset="0" stop-color="#fff2bc" stop-opacity=".32"/>
+            <stop offset=".4" stop-color="#fff0b1" stop-opacity=".12"/>
+            <stop offset="1" stop-color="#fff0b1" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="abg-dark" cx=".5" cy=".5" r=".7">
+            <stop offset="0" stop-color="#000" stop-opacity="0"/>
+            <stop offset=".72" stop-color="#000" stop-opacity=".18"/>
+            <stop offset="1" stop-color="#000" stop-opacity=".78"/>
+          </radialGradient>
+          <filter id="abg-blur"><feGaussianBlur stdDeviation="12"/></filter>
+          <filter id="abg-grain">
+            <feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="3" seed="18"/>
+            <feColorMatrix type="saturate" values="0"/>
+            <feComponentTransfer><feFuncA type="table" tableValues="0 .11"/></feComponentTransfer>
+          </filter>
         </defs>
     
-        <polygon points="0,0 1600,0 1215,330 470,330" fill="url(#ms-ceil)"/>
-        <g opacity=".27" stroke="#151712" stroke-width="10">
-          <line x1="200" y1="0" x2="565" y2="330"/><line x1="520" y1="0" x2="750" y2="330"/>
-          <line x1="850" y1="0" x2="880" y2="330"/><line x1="1180" y1="0" x2="1000" y2="330"/>
-          <line x1="1480" y1="0" x2="1100" y2="330"/>
+        <!-- one-point-perspective room -->
+        <polygon points="0,0 1600,0 1115,355 485,355" fill="url(#abg-ceil)"/>
+        <polygon points="0,0 485,355 485,900 0,900" fill="url(#abg-wall)"/>
+        <polygon points="1600,0 1115,355 1115,900 1600,900" fill="url(#abg-wall)"/>
+        <polygon points="0,900 485,355 1115,355 1600,900" fill="url(#abg-floor)"/>
+    
+        <!-- yellowed wall seams -->
+        <g opacity=".18" stroke="#5b5945" stroke-width="3">
+          <line x1="0" y1="610" x2="485" y2="500"/>
+          <line x1="0" y1="735" x2="485" y2="570"/>
+          <line x1="1600" y1="610" x2="1115" y2="500"/>
+          <line x1="1600" y1="735" x2="1115" y2="570"/>
         </g>
-        <g opacity=".23" fill="#11130f">
-          <ellipse cx="690" cy="82" rx="92" ry="28"/><ellipse cx="1125" cy="118" rx="76" ry="22"/><ellipse cx="390" cy="40" rx="58" ry="18"/>
+    
+        <!-- dark baseboards -->
+        <polygon points="0,760 485,555 1115,555 1600,760 1600,790 1115,586 485,586 0,790" fill="#27271f" opacity=".95"/>
+    
+        <!-- ceiling tile grid -->
+        <g stroke="#3d3e36" stroke-width="5" opacity=".55">
+          <line x1="150" y1="0" x2="570" y2="355"/>
+          <line x1="420" y1="0" x2="695" y2="355"/>
+          <line x1="710" y1="0" x2="810" y2="355"/>
+          <line x1="1000" y1="0" x2="925" y2="355"/>
+          <line x1="1290" y1="0" x2="1045" y2="355"/>
+          <line x1="1570" y1="0" x2="1110" y2="355"/>
+          <line x1="0" y1="125" x2="1600" y2="125"/>
+          <line x1="0" y1="250" x2="1600" y2="250"/>
         </g>
     
-        <polygon points="0,0 470,330 470,900 0,900" fill="url(#ms-left)"/>
-        <g opacity=".18" stroke="#b9ad82" stroke-width="3"><line x1="160" y1="72" x2="420" y2="350"/><line x1="40" y1="255" x2="380" y2="415"/><line x1="245" y1="525" x2="415" y2="550"/></g>
-        <g opacity=".20" fill="#0a0c09"><path d="M95 310l140 18-48 118-128-32z"/><path d="M40 640l200-45 95 95-235 44z"/></g>
-        <rect x="286" y="320" width="92" height="154" rx="5" fill="#171914" opacity=".9"/>
-        <rect x="298" y="333" width="68" height="128" rx="3" fill="#2e3028"/>
-        <rect x="313" y="360" width="38" height="6" fill="#777158" opacity=".45"/><circle cx="338" cy="398" r="5" fill="#847544" opacity=".55"/>
-        <rect x="321" y="420" width="30" height="4" fill="#151711"/>
+        <!-- missing ceiling tiles / water stains -->
+        <g fill="#252721" opacity=".82">
+          <polygon points="280,18 420,22 458,104 306,92"/>
+          <polygon points="1215,16 1370,18 1298,96 1160,92"/>
+          <polygon points="765,214 873,220 859,286 744,282"/>
+        </g>
+        <g fill="#49483d" opacity=".7">
+          <ellipse cx="515" cy="135" rx="55" ry="19"/>
+          <ellipse cx="1060" cy="100" rx="62" ry="23"/>
+          <ellipse cx="920" cy="265" rx="42" ry="15"/>
+        </g>
     
-        <polygon points="1600,0 1130,330 1130,900 1600,900" fill="url(#ms-right)"/>
-        <g opacity=".16" stroke="#c1b58b" stroke-width="3"><line x1="1420" y1="90" x2="1180" y2="360"/><line x1="1560" y1="270" x2="1210" y2="425"/><line x1="1350" y1="520" x2="1170" y2="550"/></g>
-        <path d="M1380 230C1330 320 1310 410 1290 520" fill="none" stroke="#6f6b58" stroke-width="11" opacity=".50"/>
-        <path d="M1450 210C1395 315 1374 408 1354 526" fill="none" stroke="#252720" stroke-width="7" opacity=".90"/>
-        <path d="M1492 198C1455 284 1439 364 1427 446" fill="none" stroke="#6d6854" stroke-width="4" opacity=".35"/>
+        <!-- left-side repeating doors -->
+        <g>
+          <polygon points="128,205 275,224 345,393 209,388" fill="#6e6b52" opacity=".92"/>
+          <polygon points="151,227 263,240 319,375 216,371" fill="#3d3d31"/>
+          <rect x="257" y="299" width="10" height="20" rx="4" fill="#aaa073" opacity=".8"/>
     
-        <polygon points="0,900 470,330 1130,330 1600,900" fill="url(#ms-floor)"/>
-        <g stroke="#79715b" stroke-width="3" opacity=".17"><line x1="0" y1="900" x2="470" y2="330"/><line x1="260" y1="900" x2="560" y2="330"/><line x1="600" y1="900" x2="720" y2="330"/><line x1="1000" y1="900" x2="910" y2="330"/><line x1="1330" y1="900" x2="1035" y2="330"/><line x1="1600" y1="900" x2="1130" y2="330"/></g>
-        <g fill="#0b0c0a" opacity=".34"><ellipse cx="530" cy="660" rx="118" ry="38"/><ellipse cx="1150" cy="620" rx="88" ry="29"/><ellipse cx="890" cy="795" rx="160" ry="48"/></g>
-        <g fill="#171914" opacity=".85"><rect x="1180" y="765" width="88" height="24" rx="4" transform="rotate(-8 1180 765)"/><rect x="1260" y="795" width="47" height="18" rx="3" transform="rotate(16 1260 795)"/><path d="M420 790l54-22 42 20-58 27z"/></g>
+          <polygon points="55,395 292,375 371,503 92,548" fill="#747157" opacity=".95"/>
+          <polygon points="102,412 278,399 324,483 125,516" fill="#3a3a31"/>
+          <rect x="279" y="436" width="9" height="17" rx="4" fill="#aa9b68"/>
     
-        <polygon points="700,330 900,330 1015,640 585,640" fill="#34362d"/>
-        <rect x="705" y="384" width="190" height="246" fill="#171914"/><rect x="720" y="398" width="160" height="232" fill="#292b24"/>
-        <rect x="740" y="416" width="120" height="192" fill="#11130f"/><rect x="753" y="430" width="95" height="172" fill="#1c1e18"/>
-        <circle cx="827" cy="515" r="7" fill="#8c7a4b"/><rect x="744" y="448" width="114" height="3" fill="#7d755b" opacity=".18"/><rect x="744" y="590" width="114" height="3" fill="#0a0b09"/>
+          <polygon points="-18,630 245,559 376,620 0,745" fill="#77745b"/>
+        </g>
     
-        <ellipse cx="800" cy="341" rx="170" ry="120" fill="url(#ms-light)" filter="url(#ms-soft2)" class="menuFixture"/>
-        <rect x="718" y="306" width="164" height="14" rx="4" fill="#b9b6a0" opacity=".65" class="menuFixture"/>
-        <rect x="744" y="311" width="112" height="5" fill="#eee4c5" opacity=".72" class="menuFixture"/>
-        <ellipse cx="1010" cy="205" rx="180" ry="100" fill="url(#ms-light)" filter="url(#ms-soft2)" class="menuFixture delay"/>
-        <rect x="915" y="152" width="192" height="13" rx="4" fill="#a6a593" opacity=".56" transform="rotate(-8 915 152)" class="menuFixture delay"/>
-        <rect x="953" y="157" width="112" height="4" fill="#e2dcc3" opacity=".55" transform="rotate(-8 953 157)" class="menuFixture delay"/>
+        <!-- right-side repeating doors -->
+        <g>
+          <polygon points="1472,205 1325,224 1255,393 1391,388" fill="#6e6b52" opacity=".92"/>
+          <polygon points="1449,227 1337,240 1281,375 1384,371" fill="#3d3d31"/>
+          <rect x="1333" y="299" width="10" height="20" rx="4" fill="#aaa073" opacity=".8"/>
     
-        <path d="M1180 80C1240 150 1255 225 1218 300C1188 360 1174 438 1200 510" fill="none" stroke="#55564c" stroke-width="18" opacity=".7"/>
-        <path d="M1178 80C1238 150 1251 225 1215 300C1185 360 1172 438 1198 510" fill="none" stroke="#85816d" stroke-width="4" opacity=".4"/>
-        <path d="M1250 80C1274 176 1266 246 1238 322" fill="none" stroke="#20221d" stroke-width="10" opacity=".9"/>
+          <polygon points="1545,395 1308,375 1229,503 1508,548" fill="#747157" opacity=".95"/>
+          <polygon points="1498,412 1322,399 1276,483 1475,516" fill="#3a3a31"/>
+          <rect x="1311" y="436" width="9" height="17" rx="4" fill="#aa9b68"/>
     
-        <g fill="#0a0c09" opacity=".20"><circle cx="940" cy="500" r="16"/><circle cx="977" cy="540" r="7"/><circle cx="1010" cy="590" r="11"/><circle cx="1095" cy="470" r="8"/><circle cx="1220" cy="555" r="14"/><circle cx="470" cy="455" r="9"/></g>
-        <ellipse cx="1010" cy="470" rx="380" ry="170" fill="url(#ms-haze)" filter="url(#ms-soft)" class="menuDust"/>
+          <polygon points="1618,630 1355,559 1224,620 1600,745" fill="#77745b"/>
+        </g>
+    
+        <!-- peeling wall patches -->
+        <g opacity=".58">
+          <path d="M325 430 q55-35 105 5 l-18 79 q-62 20-94-7z" fill="#c4bc8b"/>
+          <path d="M1198 430 q-55-35-105 5 l18 79 q62 20 94-7z" fill="#c4bc8b"/>
+          <path d="M195 650 l104-36 72 26-125 54z" fill="#665f45"/>
+          <path d="M1405 650 l-104-36-72 26 125 54z" fill="#665f45"/>
+        </g>
+    
+        <!-- long carpet texture -->
+        <g stroke="#a39a72" stroke-width="2" opacity=".18">
+          <line x1="0" y1="850" x2="515" y2="570"/>
+          <line x1="160" y1="900" x2="590" y2="565"/>
+          <line x1="340" y1="900" x2="660" y2="560"/>
+          <line x1="1260" y1="900" x2="1040" y2="560"/>
+          <line x1="1440" y1="900" x2="1090" y2="570"/>
+          <line x1="1600" y1="850" x2="1085" y2="570"/>
+        </g>
+        <g fill="#29291f" opacity=".42">
+          <ellipse cx="410" cy="665" rx="118" ry="32"/>
+          <ellipse cx="1260" cy="690" rx="106" ry="30"/>
+          <ellipse cx="735" cy="785" rx="156" ry="36"/>
+          <ellipse cx="1010" cy="625" rx="58" ry="18"/>
+        </g>
+    
+        <!-- far end, darker than the room -->
+        <polygon points="675,355 925,355 1010,560 590,560" fill="#5d5c48"/>
+        <rect x="720" y="390" width="160" height="170" fill="#23241d"/>
+        <rect x="742" y="410" width="116" height="150" fill="#11130f"/>
+        <rect x="754" y="426" width="92" height="3" fill="#b3a875" opacity=".24"/>
+        <circle cx="824" cy="495" r="7" fill="#a38e57" opacity=".82"/>
+    
+        <!-- receding fluorescent fixtures -->
+        <g class="menuFixture">
+          <ellipse cx="800" cy="337" rx="160" ry="78" fill="url(#abg-light)" filter="url(#abg-blur)"/>
+          <rect x="713" y="314" width="174" height="12" rx="3" fill="#e4dfc5"/>
+          <rect x="742" y="318" width="112" height="4" fill="#fff4c9"/>
+        </g>
+        <g class="menuFixture delay">
+          <ellipse cx="800" cy="250" rx="120" ry="58" fill="url(#abg-light)" filter="url(#abg-blur)"/>
+          <rect x="736" y="232" width="128" height="9" rx="3" fill="#c8c4ad"/>
+          <rect x="757" y="235" width="88" height="3" fill="#f1e9c8"/>
+        </g>
+        <g class="menuFixture">
+          <ellipse cx="800" cy="168" rx="88" ry="42" fill="url(#abg-light)" filter="url(#abg-blur)"/>
+          <rect x="757" y="155" width="86" height="7" rx="2" fill="#aaa99a"/>
+        </g>
+    
+        <!-- hanging wires -->
+        <path d="M1165 55 C1195 132 1212 206 1180 280 C1160 326 1156 368 1180 410" fill="none" stroke="#2d2e28" stroke-width="12"/>
+        <path d="M1163 55 C1193 132 1210 206 1178 280 C1158 326 1154 368 1178 410" fill="none" stroke="#77735e" stroke-width="3"/>
+    
+        <!-- loose trash near foreground -->
+        <g fill="#26271f" opacity=".85">
+          <path d="M270 770 l70-18 42 17-75 27z"/>
+          <rect x="1260" y="750" width="96" height="18" rx="4" transform="rotate(8 1260 750)"/>
+          <path d="M1110 825 l52-24 44 18-61 28z"/>
+          <rect x="460" y="820" width="58" height="14" rx="2" transform="rotate(-11 460 820)"/>
+        </g>
+    
+        <!-- subtle photo-like grain + vignette -->
+        <rect width="1600" height="900" filter="url(#abg-grain)" opacity=".45"/>
+        <rect width="1600" height="900" fill="url(#abg-dark)"/>
       </svg>
   `;
   overlay.insertBefore(backdrop,homeScreen);
