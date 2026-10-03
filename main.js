@@ -850,143 +850,192 @@ function installMainMenuRedesign(){
   overflow:hidden;
   pointer-events:none;
   background:
-    radial-gradient(ellipse at 74% 33%,rgba(186,170,113,.13),transparent 18%),
-    radial-gradient(ellipse at 92% 58%,rgba(92,83,55,.14),transparent 16%),
-    radial-gradient(ellipse at 18% 74%,rgba(18,20,17,.72),transparent 34%),
-    linear-gradient(180deg,#171712 0%,#333126 38%,#171813 72%,#070806 100%);
+    radial-gradient(ellipse at 76% 43%,rgba(184,171,116,.15),transparent 13%),
+    radial-gradient(ellipse at 79% 62%,rgba(84,79,58,.14),transparent 20%),
+    linear-gradient(180deg,#11130f 0%,#2b2b24 42%,#161814 71%,#070807 100%);
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
   inset:0;
   background:
-    linear-gradient(90deg,rgba(0,0,0,.62),rgba(0,0,0,.10) 42%,rgba(0,0,0,.28)),
-    radial-gradient(ellipse at 76% 46%,transparent 0 11%,rgba(0,0,0,.16) 32%,rgba(0,0,0,.84) 100%),
-    linear-gradient(180deg,rgba(0,0,0,.08),transparent 42%,rgba(0,0,0,.38));
+    radial-gradient(ellipse at 78% 44%,transparent 0 10%,rgba(0,0,0,.08) 24%,rgba(0,0,0,.78) 57%,rgba(0,0,0,.95) 100%),
+    linear-gradient(90deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,.22) 42%,rgba(0,0,0,.08) 68%,rgba(0,0,0,.34) 100%),
+    linear-gradient(180deg,rgba(0,0,0,.10),transparent 28%,rgba(0,0,0,.58) 100%);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
   background:
-    repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.009) 7px,transparent 8px),
-    repeating-linear-gradient(92deg,transparent 0 17%,rgba(18,19,15,.10) 17.3% 17.7%,transparent 18% 36%),
-    linear-gradient(180deg,rgba(0,0,0,.10),transparent 30%,rgba(0,0,0,.64) 100%);
-  opacity:.9;
+    repeating-linear-gradient(90deg,transparent 0 11%,rgba(255,255,255,.012) 11.1% 11.3%,transparent 11.4% 22.5%),
+    repeating-linear-gradient(0deg,transparent 0 19%,rgba(0,0,0,.055) 19.2% 19.8%,transparent 20% 40%),
+    radial-gradient(ellipse at 71% 36%,rgba(218,210,169,.045),transparent 22%);
+  opacity:.82;
 }
+
+/* Main corridor: a long, abandoned passage with a clear vanishing point. */
 .menuBGHall{
   position:absolute;
-  right:8%;
-  top:18%;
-  width:48%;
-  height:70%;
+  left:52%;
+  top:20%;
+  width:49%;
+  height:73%;
   background:
-    linear-gradient(90deg,rgba(182,171,126,.09),rgba(74,69,50,.07) 24%,transparent 48%),
-    repeating-linear-gradient(172deg,transparent 0 18%,rgba(35,33,25,.12) 18.4% 18.9%,transparent 19.2% 31%),
-    linear-gradient(180deg,rgba(66,63,49,.28),rgba(8,8,6,.96));
-  clip-path:polygon(29% 0,71% 0,100% 100%,0 100%);
-  box-shadow:0 0 100px rgba(0,0,0,.72);
+    linear-gradient(90deg,rgba(64,63,51,.40),rgba(31,32,27,.16) 24%,rgba(6,7,6,.82) 100%),
+    repeating-linear-gradient(0deg,transparent 0 14%,rgba(185,178,141,.032) 14.2% 14.7%,transparent 15% 29%),
+    linear-gradient(180deg,rgba(67,66,54,.62),rgba(9,10,8,.98));
+  clip-path:polygon(27% 0,73% 0,100% 100%,0 100%);
+  box-shadow:inset 0 0 90px rgba(0,0,0,.65),0 0 90px rgba(0,0,0,.6);
 }
+
+/* Ceiling panels, some dark and uneven like a neglected office. */
 .menuBGCeiling{
   position:absolute;
-  left:34%;
-  right:-5%;
-  top:-4%;
-  height:50%;
+  left:41%;
+  right:-4%;
+  top:-5%;
+  height:49%;
   background:
-    repeating-linear-gradient(90deg,transparent 0 14%,rgba(142,137,113,.035) 14.2% 14.7%,transparent 15% 28%),
-    repeating-linear-gradient(8deg,transparent 0 21%,rgba(31,30,23,.08) 21.2% 21.8%,transparent 22% 43%),
-    linear-gradient(170deg,rgba(123,117,92,.13),rgba(38,37,29,.08) 60%,transparent 100%);
-  transform:skewX(-15deg);
+    repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 1px,transparent 1px 13%),
+    repeating-linear-gradient(180deg,rgba(255,255,255,.018) 0 1px,transparent 1px 20%),
+    radial-gradient(ellipse at 66% 58%,rgba(0,0,0,.42),transparent 18%),
+    radial-gradient(ellipse at 87% 34%,rgba(0,0,0,.25),transparent 13%),
+    linear-gradient(165deg,#555449 0%,#34352c 52%,#171914 100%);
+  clip-path:polygon(10% 0,100% 0,100% 76%,55% 100%,34% 65%);
+  transform:skewX(-11deg);
+  box-shadow:inset 0 -22px 34px rgba(0,0,0,.45);
 }
+
+/* Dirty carpet/concrete floor with perspective seams and dark stains. */
 .menuBGFloor{
   position:absolute;
-  left:28%;
-  right:-4%;
-  bottom:-13%;
-  height:64%;
+  left:29%;
+  right:-3%;
+  bottom:-15%;
+  height:66%;
   background:
-    repeating-linear-gradient(90deg,transparent 0 12%,rgba(155,143,103,.032) 12.1% 12.3%),
-    repeating-linear-gradient(0deg,transparent 0 12%,rgba(91,84,61,.028) 12.1% 12.4%),
-    radial-gradient(ellipse at 56% 28%,rgba(62,57,40,.20),transparent 22%),
-    linear-gradient(180deg,rgba(103,96,66,.11),rgba(5,5,4,.96) 76%);
-  transform:perspective(900px) rotateX(62deg);
+    repeating-linear-gradient(90deg,transparent 0 9%,rgba(173,163,116,.036) 9.1% 9.3%,transparent 9.5% 18%),
+    repeating-linear-gradient(0deg,transparent 0 12%,rgba(49,48,38,.16) 12.2% 12.8%,transparent 13% 26%),
+    radial-gradient(ellipse at 59% 39%,rgba(104,95,64,.19),transparent 13%),
+    radial-gradient(ellipse at 70% 69%,rgba(7,8,7,.60),transparent 16%),
+    radial-gradient(ellipse at 43% 78%,rgba(9,9,8,.42),transparent 20%),
+    linear-gradient(180deg,#4a493d 0%,#2a2b23 31%,#10120f 77%,#060706 100%);
+  transform:perspective(900px) rotateX(63deg);
   transform-origin:bottom center;
+  box-shadow:inset 0 24px 36px rgba(0,0,0,.32);
 }
+
+/* Left and right walls frame the corridor instead of looking like gradients. */
 .menuBGWallL{
   position:absolute;
-  left:-8%;
+  left:-6%;
   top:22%;
-  width:62%;
-  height:84%;
+  width:61%;
+  height:82%;
   background:
-    repeating-linear-gradient(0deg,transparent 0 18%,rgba(128,119,91,.045) 18.2% 18.6%),
-    radial-gradient(ellipse at 34% 30%,rgba(143,126,79,.09),transparent 24%),
-    linear-gradient(90deg,rgba(10,10,8,.99),rgba(73,69,52,.12) 76%,transparent);
-  clip-path:polygon(0 0,100% 8%,69% 100%,0 100%);
+    repeating-linear-gradient(0deg,transparent 0 12%,rgba(203,194,151,.034) 12.2% 12.7%,transparent 13% 25%),
+    radial-gradient(ellipse at 72% 26%,rgba(145,128,83,.12),transparent 19%),
+    linear-gradient(90deg,#090a08 0%,#25261f 47%,#555244 100%);
+  clip-path:polygon(0 0,100% 9%,71% 100%,0 100%);
+  box-shadow:inset -28px 0 42px rgba(0,0,0,.35);
+}
+.menuBGWallL::after{
+  content:"";
+  position:absolute;
+  right:8%;
+  top:15%;
+  width:38%;
+  height:52%;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 10%,rgba(0,0,0,.10) 10.2% 11%,transparent 11.3% 22%),
+    linear-gradient(110deg,rgba(189,176,126,.08),rgba(29,30,25,.02));
+  transform:skewY(-10deg);
+  opacity:.7;
 }
 .menuBGWallR{
   position:absolute;
-  right:-8%;
+  right:-7%;
   top:22%;
-  width:58%;
-  height:84%;
+  width:56%;
+  height:82%;
   background:
-    repeating-linear-gradient(0deg,transparent 0 16%,rgba(126,117,87,.04) 16.2% 16.5%),
-    radial-gradient(ellipse at 65% 38%,rgba(126,108,63,.08),transparent 22%),
-    linear-gradient(270deg,rgba(7,7,6,.99),rgba(66,61,45,.10) 72%,transparent);
-  clip-path:polygon(12% 8%,100% 0,100% 100%,34% 100%);
+    repeating-linear-gradient(0deg,transparent 0 13%,rgba(203,194,151,.032) 13.2% 13.8%,transparent 14% 27%),
+    radial-gradient(ellipse at 38% 36%,rgba(139,121,73,.12),transparent 18%),
+    linear-gradient(270deg,#090a08 0%,#292a22 53%,#514f40 100%);
+  clip-path:polygon(14% 9%,100% 0,100% 100%,30% 100%);
+  box-shadow:inset 28px 0 42px rgba(0,0,0,.30);
 }
+.menuBGWallR::after{
+  content:"";
+  position:absolute;
+  left:8%;
+  top:19%;
+  width:33%;
+  height:39%;
+  background:
+    repeating-linear-gradient(90deg,transparent 0 16%,rgba(0,0,0,.10) 16.5% 18%,transparent 18.5% 34%),
+    linear-gradient(160deg,rgba(212,194,141,.08),rgba(23,24,20,.01));
+  transform:skewY(10deg);
+  opacity:.62;
+}
+
+/* Sickly fluorescent fixtures: one working badly, one mostly dead. */
 .menuBGLight{
   position:absolute;
-  width:min(220px,18vw);
-  height:8px;
-  border-radius:999px;
-  background:linear-gradient(90deg,#b8b9a7,#e2dfc5 45%,#6d7064 100%);
-  box-shadow:0 0 12px rgba(216,214,184,.46),0 0 44px rgba(196,184,139,.18);
-  transform:rotate(-8deg);
-  animation:menuFluoro 4.8s ease-in-out infinite;
+  width:min(245px,20vw);
+  height:9px;
+  border-radius:3px;
+  background:linear-gradient(90deg,#77796f,#f0e5bf 38%,#bbbcae 72%,#4f514a 100%);
+  box-shadow:0 0 10px rgba(223,218,183,.42),0 0 46px rgba(201,189,139,.15);
+  transform:rotate(-7deg);
+  animation:menuFluoro 5.4s steps(1,end) infinite;
 }
-.menuBGLight.one{right:24%;top:15%;opacity:.68}
-.menuBGLight.two{right:7%;top:31%;width:min(130px,11vw);opacity:.28;animation-delay:1.8s}
+.menuBGLight.one{right:21%;top:13%;opacity:.72}
+.menuBGLight.two{right:4%;top:29%;width:min(150px,12vw);opacity:.22;animation-delay:2.1s}
 @keyframes menuFluoro{
   0%,100%{opacity:.68}
-  46%{opacity:.74}
-  47%{opacity:.25}
-  49%{opacity:.62}
-  51%{opacity:.14}
-  54%{opacity:.58}
-  72%{opacity:.42}
+  41%{opacity:.72}
+  42%{opacity:.18}
+  44%{opacity:.62}
+  46%{opacity:.08}
+  49%{opacity:.50}
+  51%{opacity:.22}
+  55%{opacity:.58}
+  74%{opacity:.47}
 }
+
+/* Faint dirty light in the distance. */
 .menuBGGlow{
   position:absolute;
-  right:21%;
-  top:23%;
-  width:min(430px,35vw);
-  height:min(430px,35vw);
+  right:19%;
+  top:25%;
+  width:min(460px,38vw);
+  height:min(460px,38vw);
   border-radius:50%;
-  background:radial-gradient(circle,rgba(180,158,103,.09),rgba(137,119,74,.018) 40%,transparent 72%);
-  filter:blur(18px);
+  background:radial-gradient(circle,rgba(190,174,116,.11),rgba(142,127,84,.02) 38%,transparent 72%);
+  filter:blur(20px);
   mix-blend-mode:screen;
-  animation:menuGlow 8s ease-in-out infinite alternate;
+  animation:menuGlow 9s ease-in-out infinite alternate;
 }
 .menuBGScan{
   position:absolute;
   top:-10%;
   bottom:-10%;
-  left:-26%;
-  width:23vw;
-  background:linear-gradient(90deg,transparent,rgba(191,176,128,.035),transparent);
+  left:-25%;
+  width:18vw;
+  background:linear-gradient(90deg,transparent,rgba(193,180,133,.028),transparent);
   transform:skewX(-12deg);
-  animation:menuSweep 18s ease-in-out infinite;
+  animation:menuSweep 22s ease-in-out infinite;
+  opacity:.55;
 }
 @keyframes menuGlow{
-  from{transform:translate3d(-1%,1%,0) scale(.96);opacity:.38}
-  to{transform:translate3d(2%,-2%,0) scale(1.06);opacity:.84}
+  from{transform:translate3d(-1%,-1%,0) scale(.96);opacity:.34}
+  to{transform:translate3d(2%,1%,0) scale(1.04);opacity:.74}
 }
 @keyframes menuSweep{
   0%{transform:translateX(-10vw) skewX(-12deg);opacity:0}
-  18%{opacity:.3}
+  18%{opacity:.20}
   48%,100%{transform:translateX(150vw) skewX(-12deg);opacity:0}
 }
 
