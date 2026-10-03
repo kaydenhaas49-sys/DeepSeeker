@@ -3382,9 +3382,7 @@ newGameButton.addEventListener("click",event=>{
 });
 
 continueButton.addEventListener("click",()=>{
-  if(window.__deepseekerMenu?.openNameGate){
-    window.__deepseekerMenu.openNameGate(()=>continueGame(selectedSaveSlot));
-  }
+  continueGame(selectedSaveSlot);
 });
 
 createLobbyButton.addEventListener("click",()=>{
