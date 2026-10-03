@@ -3840,24 +3840,13 @@ function finishSpiderModel(model,animations,sourceName){
     obj.receiveShadow=true;
     obj.renderOrder=10;
 
-    // The uploaded FBX can carry Unity-era materials that do not render reliably
-    // in this browser scene. Keep the real geometry/skinning, but give every mesh
-    // a guaranteed-visible fallback material so the model itself is always present.
-    const visibleMaterial=new THREE.MeshBasicMaterial({
-      color:0xb56e4c,
-      side:THREE.DoubleSide,
-      transparent:false,
-      opacity:1,
-      depthTest:true,
-      depthWrite:true
-    });
-
-    if(Array.isArray(obj.material)){
-      obj.material=obj.material.map(()=>visibleMaterial.clone());
-      visibleMaterial.dispose();
-    }else{
-      obj.material=visibleMaterial;
+    const materials=Array.isArray(obj.material)?obj.material:[obj.material];
+    for(const material of materials){
+      if(!material) continue;
+      material.visible=true;
+      material.needsUpdate=true;
     }
+
   });
 
   if(meshCount===0){
@@ -3942,31 +3931,56 @@ function finishSpiderModel(model,animations,sourceName){
   };
 
   const rootBoneNames=new Set();
+  const animatedNodeNames=new Set();
   model.traverse(obj=>{
+    animatedNodeNames.add(String(obj.name||"").toLowerCase());
+
     if(!obj.isSkinnedMesh || !obj.skeleton) return;
     for(const bone of obj.skeleton.bones){
+      const boneName=String(bone.name||"").toLowerCase();
+      animatedNodeNames.add(boneName);
       if(!bone.parent?.isBone){
-        rootBoneNames.add(String(bone.name||"").toLowerCase());
+        rootBoneNames.add(boneName);
       }
     }
   });
 
-  const isRootPositionTrack=(track)=>{
-    if(!track?.name || !track.name.endsWith(".position")) return false;
-    const target=String(track.name).slice(0,-".position".length);
-    const nodeName=target
+  const trackTargetName=(track)=>{
+    if(!track?.name) return "";
+    return String(track.name)
+      .slice(0,Math.max(0,String(track.name).lastIndexOf(".")))
       .split("|")
       .pop()
       .split(":")
       .pop()
       .toLowerCase();
-    return rootBoneNames.has(nodeName);
   };
 
   const makeStableSpiderClip=(clip)=>{
     if(!clip) return null;
     const stable=clip.clone();
-    stable.tracks=stable.tracks.filter(track=>!isRootPositionTrack(track));
+
+    // The pack contains animation data authored for a different FBX scene
+    // hierarchy. Keep the bone rotations that actually animate the spider,
+    // but discard scene/root translation, scaling, and unknown-node tracks.
+    stable.tracks=stable.tracks.filter(track=>{
+      const target=trackTargetName(track);
+      if(!animatedNodeNames.has(target)) return false;
+
+      if(track.name.endsWith(".position")){
+        return !rootBoneNames.has(target);
+      }
+
+      if(track.name.endsWith(".scale")){
+        return false;
+      }
+
+      return track.name.endsWith(".quaternion") ||
+        track.name.endsWith(".position") ||
+        track.name.endsWith(".color") ||
+        track.name.endsWith(".morphTargetInfluences");
+    });
+
     stable.resetDuration();
     return stable;
   };
@@ -4040,7 +4054,11 @@ function finishSpiderModel(model,animations,sourceName){
 
     console.log("[DeepSeeker] Spider animation map",{
       selected:[...directClips.keys()],
-      rootBones:[...rootBoneNames]
+      rootBones:[...rootBoneNames],
+      trackCounts:[...directClips.entries()].map(([name,clip])=>[
+        name,
+        clip?.tracks?.length||0
+      ])
     });
 
     setSpiderAnimation(spiderWantedState);
