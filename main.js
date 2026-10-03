@@ -1207,7 +1207,7 @@ function installMainMenuRedesign(){
 .menuSlotBar{
   position:absolute;
   left:clamp(24px,4vw,60px);
-  top:clamp(640px,68vh,680px);
+  top:clamp(700px,68vh,740px);
   width:min(390px,calc(100vw - 48px));
   color:#8c8675;
   text-shadow:0 2px 8px #000;
@@ -1297,7 +1297,7 @@ function installMainMenuRedesign(){
   }
   .menuRightPanel{top:182px;min-height:205px}
   .menuNav{top:405px}
-  .menuSlotBar{top:610px}
+  .menuSlotBar{top:670px}
   .menuRightMeta{grid-template-columns:1fr 1fr 1fr}
 }
 `;
