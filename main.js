@@ -244,21 +244,21 @@ scene.add(menuSet);
 
 const menuWallMaterial=new THREE.MeshStandardMaterial({
   map:menuWallTexture,
-  color:0xb0a86f,
+  color:0xb9af72,
   roughness:0.94,
   metalness:0
 });
 
 const menuFloorMaterial=new THREE.MeshStandardMaterial({
   map:menuFloorTexture,
-  color:0x5b5640,
+  color:0x625b43,
   roughness:1,
   metalness:0
 });
 
 const menuCeilingMaterial=new THREE.MeshStandardMaterial({
   map:menuCeilingTexture,
-  color:0x85836d,
+  color:0x9b9886,
   roughness:0.96,
   metalness:0
 });
@@ -448,6 +448,60 @@ for(const [x,z,sx,sz] of [
   );
 }
 
+
+// Strong visual ruin elements positioned in the camera's immediate view.
+// These deliberately read as structural damage, not abstract stains.
+addMenuBox(
+  "MenuBrokenCeiling",
+  new THREE.Vector3(8.5,.20,5.0),
+  new THREE.Vector3(4.2,7.72,-6.5),
+  menuRuinMaterial,
+  -.08
+);
+
+for(const [x,z,len,rot] of [
+  [1.3,-4.2,4.8,-.12],
+  [7.2,-7.0,5.6,.10],
+  [10.4,-13.0,4.2,-.16]
+]){
+  addMenuBox(
+    "MenuFallenBeam",
+    new THREE.Vector3(len,.18,.26),
+    new THREE.Vector3(x,6.65,z),
+    menuRuinMaterial,
+    rot
+  );
+}
+
+for(const [x,z,sx,sz,rot] of [
+  [-4.5,-7.8,3.4,1.5,.18],
+  [6.7,-2.0,2.8,1.1,-.10],
+  [13.0,-11.5,3.1,1.3,.24]
+]){
+  addMenuBox(
+    "MenuRuinWallChunk",
+    new THREE.Vector3(sx,2.8,sz),
+    new THREE.Vector3(x,3.4,z),
+    menuRuinMaterial,
+    rot
+  );
+}
+
+for(const [x,z] of [
+  [2.0,-1.5],
+  [5.8,-9.4],
+  [10.8,-5.4]
+]){
+  const puddle=addMenuBox(
+    "MenuPuddle",
+    new THREE.Vector3(2.8,.035,1.4),
+    new THREE.Vector3(x,.015,z),
+    menuStainMaterial,
+    .2
+  );
+  puddle.scale.y=.55;
+}
+
 const menuLights=[
   {x:-10,z:1,power:11},
   {x:3,z:-7,power:13},
@@ -475,13 +529,13 @@ for(let i=0;i<menuLights.length;i++){
   menuSet.add(point);
 }
 
-const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x28281d,.62);
-const menuFill=new THREE.PointLight(0xd4c694,4.2,30,2);
+const menuAmbient=new THREE.HemisphereLight(0xd0bf87,0x222219,.92);
+const menuFill=new THREE.PointLight(0xd7bf78,6.2,34,2);
 menuFill.position.set(-4,4,-4);
 menuSet.add(menuAmbient,menuFill);
 
-const menuCameraStart=new THREE.Vector3(-1.8,2.15,9.6);
-const menuCameraTarget=new THREE.Vector3(1.6,2.55,-18.5);
+const menuCameraStart=new THREE.Vector3(4.6,2.15,7.8);
+const menuCameraTarget=new THREE.Vector3(-2.8,2.5,-12.2);
 
 let menuSceneReady=false;
 let menuBackdropWasActive=false;
