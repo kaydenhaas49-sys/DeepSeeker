@@ -856,25 +856,32 @@ function installMainMenuRedesign(){
   inset:0;
   pointer-events:none;
   z-index:2;
+  overflow:hidden;
   background:
-    linear-gradient(90deg,rgba(0,0,0,.68) 0%,rgba(0,0,0,.36) 24%,rgba(0,0,0,.05) 55%,rgba(0,0,0,.20) 100%),
-    linear-gradient(180deg,rgba(0,0,0,.18),transparent 34%,rgba(0,0,0,.42) 100%),
-    url("https://images.unsplash.com/photo-1784231209207-40f1e53d2f3f?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400")
+    linear-gradient(90deg,rgba(5,6,4,.86) 0%,rgba(8,9,6,.54) 24%,rgba(12,11,7,.12) 55%,rgba(5,5,4,.28) 100%),
+    linear-gradient(180deg,rgba(58,46,17,.28),rgba(93,73,25,.12) 42%,rgba(5,5,4,.58) 100%),
+    url("https://images.unsplash.com/photo-1761251947081-c7477f5337ca?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wdW5kZXJmaW5lZA%3D%3D&ixlib=rb-4.1.0&q=88&w=2400")
     center center / cover no-repeat;
-  background-color:#17170f;
-  filter:saturate(.92) contrast(1.04);
+  background-color:#302e21;
+  background-blend-mode:multiply,color,normal;
+  filter:sepia(.38) saturate(1.18) contrast(1.08) brightness(.72);
+}
+#menuBackdrop::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(ellipse at 66% 44%,transparent 0 21%,rgba(0,0,0,.10) 44%,rgba(0,0,0,.56) 100%),
+    linear-gradient(90deg,transparent 52%,rgba(215,192,116,.035) 70%,transparent 90%);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 66% 46%,transparent 0 26%,rgba(0,0,0,.34) 100%),
-    repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.005) 7px,transparent 8px);
-  opacity:.72;
-}
-#menuBackdrop .menuSignalNoise{
-  display:none;
+    repeating-linear-gradient(180deg,transparent 0 5px,rgba(255,255,255,.007) 6px,transparent 7px),
+    linear-gradient(180deg,rgba(0,0,0,.04),transparent 38%,rgba(0,0,0,.34) 100%);
+  opacity:.8;
 }
 
 #homeScreen.menuHomeRedesign{
@@ -894,127 +901,183 @@ function installMainMenuRedesign(){
   overflow:hidden;
 }
 #homeScreen.menuHomeRedesign.hidden{display:none}
+
 .menuHomeLayout{
   position:relative;
-  z-index:4;
+  z-index:5;
   width:100%;
   height:100%;
 }
+
 .menuHomeLayout::before{
   content:"";
   position:absolute;
-  left:clamp(22px,3vw,48px);
-  top:clamp(205px,27vh,280px);
-  bottom:clamp(74px,8vh,104px);
-  width:1px;
-  background:linear-gradient(180deg,transparent,rgba(223,173,69,.25) 10%,rgba(223,173,69,.10) 78%,transparent);
+  left:0;
+  top:0;
+  bottom:0;
+  width:min(520px,42vw);
+  background:
+    linear-gradient(90deg,rgba(4,5,4,.90),rgba(4,5,4,.64) 63%,transparent 100%);
   pointer-events:none;
 }
+
 .menuLogo{
   position:absolute;
-  left:clamp(38px,4vw,66px);
-  top:clamp(30px,5vh,56px);
-  color:#f4efdc;
-  text-shadow:0 4px 26px rgba(0,0,0,.96);
+  left:clamp(34px,4.2vw,72px);
+  top:clamp(34px,5.5vh,62px);
+  max-width:390px;
+  color:#f2ead1;
+  text-shadow:0 3px 22px #000,0 0 40px rgba(0,0,0,.65);
 }
 .menuLogoMain{
   display:flex;
   flex-direction:column;
-  line-height:.84;
-  letter-spacing:clamp(4px,.60vw,9px);
+  line-height:.86;
   font-weight:600;
+  letter-spacing:clamp(3px,.45vw,7px);
 }
 .menuLogoMain span{
-  font-size:clamp(21px,2.35vw,38px);
-  color:#ebe5d3;
+  font-size:clamp(17px,1.8vw,29px);
+  color:#d9d2bf;
 }
 .menuLogoMain strong{
-  font-size:clamp(36px,4.35vw,66px);
+  margin-top:6px;
+  font-size:clamp(31px,3.55vw,58px);
   font-weight:600;
-  color:#d8b65d;
-  letter-spacing:clamp(5px,.72vw,11px);
+  color:#d8b865;
+  letter-spacing:clamp(4px,.58vw,9px);
 }
 .menuLogoSub{
-  margin-top:14px;
+  margin-top:13px;
   padding-left:2px;
   font-size:8px;
-  letter-spacing:3.7px;
-  color:#8e8875;
+  letter-spacing:3.1px;
+  color:#8d8979;
 }
+
 .menuNav{
   position:absolute;
-  left:clamp(30px,4vw,60px);
-  top:clamp(222px,30vh,300px);
-  width:min(340px,28vw);
+  left:clamp(28px,4.2vw,72px);
+  top:clamp(232px,28vh,292px);
+  width:min(360px,32vw);
   display:flex;
   flex-direction:column;
+  gap:19px;
 }
-.menuNavGroup{position:relative}
-.menuNavGroup + .menuNavGroup{margin-top:15px}
+
+.menuNavGroup{
+  position:relative;
+}
+.menuNavGroup + .menuNavGroup{
+  margin-top:0;
+}
+
 .menuNavGroupLabel{
   display:flex;
   align-items:center;
-  gap:10px;
-  margin:0 0 3px 20px;
+  gap:11px;
+  margin:0 0 6px 4px;
   font-size:7px;
-  letter-spacing:2.5px;
-  color:#696456;
+  letter-spacing:2.8px;
+  color:#777363;
   text-shadow:0 2px 8px #000;
+}
+.menuNavGroupLabel::before{
+  content:"";
+  width:16px;
+  height:1px;
+  background:#c6a65c;
+  opacity:.6;
 }
 .menuNavGroupLabel::after{
   content:"";
   flex:1;
   height:1px;
-  background:linear-gradient(90deg,rgba(226,211,164,.08),transparent);
+  background:linear-gradient(90deg,rgba(226,211,164,.14),transparent);
 }
+
 .menuNavButton{
   position:relative;
   width:100%;
-  min-height:43px;
-  padding:0 18px 0 20px;
+  min-height:48px;
+  padding:0 15px 0 18px;
   display:flex;
   align-items:center;
   justify-content:space-between;
-  border:0;
+  border:1px solid rgba(235,224,179,.09);
   border-left:2px solid transparent;
-  border-radius:0;
-  background:transparent;
-  color:#c9c3b0;
+  border-radius:4px;
+  background:linear-gradient(90deg,rgba(13,14,12,.48),rgba(13,14,12,.18));
+  color:#cbc5b2;
   font:inherit;
   text-align:left;
-  font-size:clamp(12px,.91vw,15px);
-  letter-spacing:1.65px;
+  font-size:clamp(11px,.82vw,14px);
+  letter-spacing:1.8px;
   cursor:pointer;
-  transition:background .15s,color .15s,border-color .15s,transform .15s;
-  text-shadow:0 2px 10px rgba(0,0,0,.96);
+  transition:
+    background .16s,
+    color .16s,
+    border-color .16s,
+    transform .16s,
+    box-shadow .16s;
+  text-shadow:0 2px 8px #000;
+  backdrop-filter:blur(3px);
+}
+.menuNavButton::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:8px;
+  bottom:8px;
+  width:2px;
+  background:#d7b35d;
+  opacity:0;
+  transition:opacity .16s;
 }
 .menuNavButton:hover{
-  background:linear-gradient(90deg,rgba(224,177,70,.09),transparent 86%);
-  color:#fff7df;
-  transform:translateX(3px);
+  background:linear-gradient(90deg,rgba(31,31,25,.72),rgba(31,31,25,.25));
+  color:#fff5d9;
+  border-color:rgba(223,190,107,.22);
+  transform:translateX(4px);
+  box-shadow:0 7px 24px rgba(0,0,0,.25);
+}
+.menuNavButton:hover::before,
+.menuNavButton.active::before{
+  opacity:1;
 }
 .menuNavButton.active,
 .menuNavButton:focus-visible{
-  background:linear-gradient(90deg,rgba(224,177,70,.17),rgba(224,177,70,.012) 74%,transparent);
-  border-left-color:#dfad45;
-  color:#fff3cf;
+  background:linear-gradient(90deg,rgba(114,88,34,.38),rgba(47,39,23,.13));
+  border-color:rgba(223,190,107,.30);
+  border-left-color:#d7b35d;
+  color:#fff3cb;
   outline:none;
+  box-shadow:0 8px 28px rgba(0,0,0,.30),inset 0 1px rgba(255,255,255,.05);
 }
-.menuNavButton:disabled{opacity:.38;cursor:not-allowed;transform:none!important}
+.menuNavButton:disabled{
+  opacity:.34;
+  cursor:not-allowed;
+  transform:none!important;
+}
 .menuNavArrow{
-  font-size:19px;
+  font-size:21px;
   line-height:1;
-  color:#5d5a4e;
-  transition:transform .15s,color .15s;
+  color:#666254;
+  transition:transform .16s,color .16s;
 }
-.menuNavButton:hover .menuNavArrow{transform:translateX(4px);color:#ebbf68}
-.menuNavButton.active .menuNavArrow{color:#e2b253}
+.menuNavButton:hover .menuNavArrow{
+  transform:translateX(4px);
+  color:#e7be68;
+}
+.menuNavButton.active .menuNavArrow{
+  color:#e2b253;
+}
 
 .menuSlotBar{
   position:absolute;
-  left:clamp(30px,4vw,60px);
-  bottom:clamp(68px,7.5vh,100px);
-  width:min(500px,43vw);
+  left:clamp(28px,4.2vw,72px);
+  bottom:clamp(31px,4.5vh,52px);
+  width:min(440px,38vw);
   color:#8c8675;
   text-shadow:0 2px 8px #000;
 }
@@ -1027,7 +1090,10 @@ function installMainMenuRedesign(){
   font-size:7px;
   letter-spacing:2.2px;
 }
-.menuSlotHeader strong{color:#d2c8a5;font-weight:500}
+.menuSlotHeader strong{
+  color:#d2c8a5;
+  font-weight:500;
+}
 .menuHomeRedesign #saveSlots{
   width:100%;
   display:grid;
@@ -1036,79 +1102,167 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:79px;
-  padding:9px 10px;
+  min-height:68px;
+  padding:8px 9px;
   border:1px solid rgba(231,220,171,.09);
-  border-radius:2px;
-  background:rgba(2,4,3,.14);
+  border-radius:4px;
+  background:rgba(5,6,5,.32);
   color:#b2ac99;
   display:flex;
   flex-direction:column;
   justify-content:center;
   box-shadow:inset 0 1px rgba(255,255,255,.018);
+  backdrop-filter:blur(3px);
 }
-.menuHomeRedesign .saveSlotCard:hover{background:rgba(223,173,69,.055);border-color:rgba(231,220,171,.16)}
-.menuHomeRedesign .saveSlotCard.selected{border-color:rgba(223,173,69,.66);background:rgba(223,173,69,.085);box-shadow:0 0 18px rgba(223,173,69,.035)}
-.menuHomeRedesign .saveSlotTitle{font-size:8px;letter-spacing:1.7px;color:#ddd4b9}
-.menuHomeRedesign .saveSlotMode{font-size:7px;color:#7e796d}
-.menuHomeRedesign .saveSlotDetail{display:block;margin-top:4px;font-size:7px;color:#676258;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.menuHomeRedesign .saveSlotActions{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:6px}
-.menuHomeRedesign .saveSlotActions button{padding:5px 3px;border:1px solid rgba(231,220,171,.07);border-radius:2px;background:rgba(255,255,255,.014);color:#8e8877;font:inherit;font-size:7px;letter-spacing:1px;cursor:pointer}
-.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.075);color:#e7dabd}
-.menuHomeRedesign .saveSlotActions button:disabled{opacity:.27;cursor:not-allowed}
-.menuSaveStatus{margin-top:5px;padding-left:1px;font-size:7px;letter-spacing:1.2px;color:#625e54}
+.menuHomeRedesign .saveSlotCard:hover{
+  background:rgba(223,173,69,.08);
+  border-color:rgba(231,220,171,.18);
+}
+.menuHomeRedesign .saveSlotCard.selected{
+  border-color:rgba(223,173,69,.66);
+  background:rgba(223,173,69,.11);
+  box-shadow:0 0 18px rgba(223,173,69,.05);
+}
+.menuHomeRedesign .saveSlotTitle{
+  font-size:8px;
+  letter-spacing:1.7px;
+  color:#ddd4b9;
+}
+.menuHomeRedesign .saveSlotMode{
+  font-size:7px;
+  color:#7e796d;
+}
+.menuHomeRedesign .saveSlotDetail{
+  display:block;
+  margin-top:4px;
+  font-size:7px;
+  color:#676258;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.menuHomeRedesign .saveSlotActions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:3px;
+  margin-top:6px;
+}
+.menuHomeRedesign .saveSlotActions button{
+  padding:5px 3px;
+  border:1px solid rgba(231,220,171,.07);
+  border-radius:3px;
+  background:rgba(255,255,255,.018);
+  color:#8e8877;
+  font:inherit;
+  font-size:7px;
+  letter-spacing:1px;
+  cursor:pointer;
+}
+.menuHomeRedesign .saveSlotActions button:hover{
+  background:rgba(223,173,69,.075);
+  color:#e7dabd;
+}
+.menuHomeRedesign .saveSlotActions button:disabled{
+  opacity:.27;
+  cursor:not-allowed;
+}
+.menuSaveStatus{
+  margin-top:5px;
+  padding-left:1px;
+  font-size:7px;
+  letter-spacing:1.2px;
+  color:#625e54;
+}
 
 .menuRightPanel{
   position:absolute;
-  top:clamp(126px,18vh,178px);
-  right:clamp(34px,5vw,78px);
-  width:min(260px,20vw);
-  padding:0 0 0 15px;
+  right:clamp(30px,4.2vw,72px);
+  bottom:clamp(31px,5vh,56px);
+  top:auto;
+  width:min(280px,23vw);
+  padding:16px 0 0 16px;
   border:0;
-  border-left:1px solid rgba(223,173,69,.25);
-  background:transparent;
+  border-left:1px solid rgba(223,173,69,.30);
   color:#918b79;
   text-shadow:0 2px 8px #000;
-  opacity:.90;
+  opacity:.92;
 }
-.menuRightHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px;font-size:7px;letter-spacing:2px;color:#858070}
-.menuSignalState{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:15px;letter-spacing:2.4px;color:#ddd1a7}
-.menuSignalDot{width:6px;height:6px;border-radius:50%;background:#d3a43f;box-shadow:0 0 9px rgba(223,173,69,.45);animation:menuSignalPulse 2.2s ease-in-out infinite}
-.menuRightLead{margin:0 0 13px;max-width:240px;font-size:9px;line-height:1.8;color:#746f64}
-.menuRightRule{height:1px;background:rgba(226,211,164,.07);margin:12px 0 14px}
-.menuRightSectionLabel{margin-bottom:6px;font-size:7px;letter-spacing:2.2px;color:#9c9580}
-.menuHomeRedesign .houseLoader{width:100%;margin:9px 0 0;text-align:left}
-.menuHomeRedesign .houseLoaderTop{color:#817b6c}
-.menuHomeRedesign .houseLoaderStatus{color:#646055;min-height:14px}
-.menuRightMeta{display:grid;gap:6px;margin-top:11px}
-.menuRightMetaRow{display:flex;justify-content:space-between;gap:12px;font-size:7px;letter-spacing:1.4px}
+.menuRightHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+  font-size:7px;
+  letter-spacing:2px;
+  color:#8b8573;
+}
+.menuSignalState{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:9px;
+  font-size:14px;
+  letter-spacing:2.2px;
+  color:#ddd1a7;
+}
+.menuSignalDot{
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#d2a13c;
+  box-shadow:0 0 10px rgba(223,173,69,.55);
+}
+.menuRightLead{
+  margin:0 0 12px;
+  max-width:250px;
+  font-size:9px;
+  line-height:1.8;
+  color:#777165;
+}
+.menuRightRule{
+  height:1px;
+  background:rgba(226,211,164,.08);
+  margin:11px 0 13px;
+}
+.menuRightSectionLabel{
+  margin-bottom:5px;
+  font-size:7px;
+  letter-spacing:2.2px;
+  color:#9c9580;
+}
+.menuHomeRedesign .houseLoader{
+  width:100%;
+  margin:8px 0 0;
+  text-align:left;
+}
+.menuHomeRedesign .houseLoaderTop{
+  color:#817b6c;
+}
+.menuHomeRedesign .houseLoaderStatus{
+  color:#646055;
+  min-height:14px;
+}
+.menuRightMeta{
+  display:grid;
+  gap:6px;
+  margin-top:10px;
+}
+.menuRightMetaRow{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  font-size:7px;
+  letter-spacing:1.3px;
+}
 .menuRightMetaRow span:first-child{color:#514e46}
 .menuRightMetaRow span:last-child{color:#878071}
 
-.menuNameGate{
-  position:absolute;inset:0;z-index:20;display:none;place-items:center;
-  background:rgba(0,0,0,.54);backdrop-filter:blur(7px);
-}
-.menuNameGate.open{display:grid}
-.menuNameGateCard{
-  width:min(430px,calc(100vw - 40px));padding:24px;
-  border:1px solid rgba(226,211,164,.18);border-radius:3px;
-  background:linear-gradient(145deg,rgba(8,11,9,.94),rgba(3,5,4,.97));
-  box-shadow:0 28px 100px rgba(0,0,0,.62);
-}
-.menuNameGateTitle{font-size:16px;letter-spacing:3px;color:#f0e7c8;margin-bottom:8px}
-.menuNameGateText{margin:0 0 17px;font-size:9px;line-height:1.7;letter-spacing:1.4px;color:#8f8b79}
-.menuNameGateActions{display:flex;gap:7px;margin-top:9px}
-.menuNameGateActions button{flex:1;min-height:38px;border:1px solid rgba(231,220,171,.14);border-radius:2px;background:rgba(255,255,255,.04);color:#cfc6a9;font:inherit;font-size:9px;letter-spacing:1.5px;cursor:pointer}
-.menuNameGateActions button.primary{border-color:rgba(223,173,69,.42);background:rgba(223,173,69,.10);color:#f0dfaf}
-.menuNameGateActions button:hover{background:rgba(223,173,69,.10)}
-.menuNameGate .usernameRow{width:100%;margin:0}
-.menuNameGate .usernameInput{background:rgba(1,3,2,.82);border-color:rgba(231,220,171,.14);border-radius:2px}
 .menuFooter{
   position:absolute;
-  left:clamp(24px,3vw,50px);
-  right:clamp(24px,3vw,50px);
-  bottom:clamp(18px,3vh,28px);
+  left:clamp(28px,4.2vw,72px);
+  right:clamp(28px,4.2vw,72px);
+  bottom:14px;
   display:flex;
   justify-content:space-between;
   gap:22px;
