@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { World, EYE, mulberry32 } from "./world.js";
+import { createTextures } from "./textures.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
 import { Multiplayer } from "./multiplayer.js";
@@ -101,146 +102,19 @@ scene.add(playerLight);
 // textures, fog and depth instead of a flat CSS illustration.
 const menuCamera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.05,160);
 
-function makeMenuTexture(kind){
-  const canvas=document.createElement("canvas");
-  canvas.width=768;
-  canvas.height=768;
-  const ctx=canvas.getContext("2d");
+// Use the exact procedural textures from the playable Backrooms so the title screen
+// has the same wallpaper and drop-ceiling language as the actual game.
+const menuTextures=createTextures(Math.min(renderer.capabilities.getMaxAnisotropy(),4));
+const menuWallTexture=menuTextures.wall;
+const menuFloorTexture=menuTextures.floor;
+const menuCeilingTexture=menuTextures.ceiling;
 
-  if(kind==="wall"){
-    ctx.fillStyle="#aaa16b";
-    ctx.fillRect(0,0,768,768);
-
-    for(let y=0;y<768;y+=96){
-      for(let x=0;x<768;x+=96){
-        ctx.strokeStyle="rgba(67,66,39,.34)";
-        ctx.lineWidth=4;
-        ctx.beginPath();
-        ctx.moveTo(x+8,y+48);
-        ctx.lineTo(x+30,y+19);
-        ctx.lineTo(x+52,y+48);
-        ctx.lineTo(x+74,y+19);
-        ctx.stroke();
-
-        ctx.strokeStyle="rgba(225,214,158,.16)";
-        ctx.lineWidth=2;
-        ctx.beginPath();
-        ctx.moveTo(x+8,y+52);
-        ctx.lineTo(x+30,y+81);
-        ctx.lineTo(x+52,y+52);
-        ctx.lineTo(x+74,y+81);
-        ctx.stroke();
-      }
-    }
-
-    for(let i=0;i<4200;i++){
-      const x=Math.random()*768;
-      const y=Math.random()*768;
-      const dark=Math.random()<.62;
-      ctx.fillStyle=dark
-        ? `rgba(51,50,35,${(.035+Math.random()*.08).toFixed(3)})`
-        : `rgba(243,235,189,${(.02+Math.random()*.05).toFixed(3)})`;
-      ctx.fillRect(x,y,1+Math.random()*2.5,1+Math.random()*2.5);
-    }
-
-    for(let i=0;i<24;i++){
-      const x=Math.random()*768;
-      const y=Math.random()*768;
-      const rx=20+Math.random()*80;
-      const ry=30+Math.random()*120;
-      const g=ctx.createRadialGradient(x,y,2,x,y,Math.max(rx,ry));
-      g.addColorStop(0,"rgba(57,52,34,.18)");
-      g.addColorStop(.55,"rgba(80,73,42,.08)");
-      g.addColorStop(1,"rgba(80,73,42,0)");
-      ctx.fillStyle=g;
-      ctx.beginPath();
-      ctx.ellipse(x,y,rx,ry,Math.random(),0,Math.PI*2);
-      ctx.fill();
-    }
-  }else if(kind==="carpet"){
-    ctx.fillStyle="#53503e";
-    ctx.fillRect(0,0,768,768);
-
-    for(let i=60000;i--;){
-      const x=Math.random()*768;
-      const y=Math.random()*768;
-      ctx.fillStyle=Math.random()<.64
-        ? `rgba(20,21,17,${(.06+Math.random()*.14).toFixed(3)})`
-        : `rgba(139,131,90,${(.025+Math.random()*.07).toFixed(3)})`;
-      ctx.fillRect(x,y,1,1);
-    }
-
-    for(let y=0;y<768;y+=12){
-      ctx.fillStyle="rgba(219,207,157,.018)";
-      ctx.fillRect(0,y,768,1);
-    }
-
-    for(let i=0;i<30;i++){
-      const x=Math.random()*768;
-      const y=Math.random()*768;
-      const rx=12+Math.random()*75;
-      const ry=6+Math.random()*30;
-      const g=ctx.createRadialGradient(x,y,1,x,y,Math.max(rx,ry));
-      g.addColorStop(0,"rgba(9,10,8,.36)");
-      g.addColorStop(.55,"rgba(9,10,8,.12)");
-      g.addColorStop(1,"rgba(9,10,8,0)");
-      ctx.fillStyle=g;
-      ctx.beginPath();
-      ctx.ellipse(x,y,rx,ry,Math.random()*Math.PI,0,Math.PI*2);
-      ctx.fill();
-    }
-  }else{
-    ctx.fillStyle="#858477";
-    ctx.fillRect(0,0,768,768);
-    for(let y=0;y<768;y+=96){
-      for(let x=0;x<768;x+=96){
-        ctx.strokeStyle="rgba(48,48,42,.28)";
-        ctx.lineWidth=3;
-        ctx.strokeRect(x+2,y+2,92,92);
-      }
-    }
-    for(let i=0;i<40;i++){
-      const x=20+Math.random()*728;
-      const y=20+Math.random()*728;
-      const r=8+Math.random()*35;
-      const g=ctx.createRadialGradient(x,y,1,x,y,r);
-      g.addColorStop(0,"rgba(48,47,41,.26)");
-      g.addColorStop(1,"rgba(48,47,41,0)");
-      ctx.fillStyle=g;
-      ctx.beginPath();
-      ctx.arc(x,y,r,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
-
-  const texture=new THREE.CanvasTexture(canvas);
-  texture.wrapS=THREE.RepeatWrapping;
-  texture.wrapT=THREE.RepeatWrapping;
-  texture.colorSpace=THREE.SRGBColorSpace;
-  texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),4);
-  return texture;
-}
-
-const menuScene=new THREE.Scene();
-menuScene.background=new THREE.Color(0x4d4a34);
-menuScene.fog=new THREE.Fog(0x55513a,15,76);
-
-const menuSet=new THREE.Group();
-menuSet.name="RuinedBackroomsMenuSet";
-menuSet.visible=false;
-menuScene.add(menuSet);
-
-const menuWallTexture=makeMenuTexture("wall");
-menuWallTexture.repeat.set(4.2,2.8);
-const menuFloorTexture=makeMenuTexture("carpet");
-menuFloorTexture.repeat.set(10,10);
-const menuCeilingTexture=makeMenuTexture("ceiling");
-menuCeilingTexture.repeat.set(8,8);
+menuFloorTexture.repeat.set(28,29.5);
 
 const menuWallMaterial=new THREE.MeshStandardMaterial({
   map:menuWallTexture,
-  color:0xb1a86c,
-  roughness:.97
+  color:0xffffff,
+  roughness:.92
 });
 const menuFloorMaterial=new THREE.MeshStandardMaterial({
   map:menuFloorTexture,
@@ -249,8 +123,8 @@ const menuFloorMaterial=new THREE.MeshStandardMaterial({
 });
 const menuCeilingMaterial=new THREE.MeshStandardMaterial({
   map:menuCeilingTexture,
-  color:0xa6a495,
-  roughness:.97
+  color:0xffffff,
+  roughness:.95
 });
 const menuDarkMaterial=new THREE.MeshStandardMaterial({
   color:0x0b0d0a,
@@ -285,9 +159,36 @@ const menuLightMaterial=new THREE.MeshStandardMaterial({
 });
 
 function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotationZ=0){
+  let meshMaterial=material;
+
+  // The gameplay walls are textured at real 4m scale. Give each menu wall its
+  // own map transform so long perimeter walls and short partitions keep the
+  // same wallpaper density instead of stretching one shared texture.
+  if(material===menuWallMaterial && material.map){
+    meshMaterial=material.clone();
+    meshMaterial.map=material.map.clone();
+    const wallSpan=Math.max(size.x,size.z);
+    meshMaterial.map.repeat.set(
+      Math.max(1,wallSpan/4),
+      Math.max(1,size.y/4)
+    );
+    meshMaterial.map.needsUpdate=true;
+  }
+
+  // Gameplay ceiling tiles use a 1m grid. Match that scale on every menu tile.
+  if(material===menuCeilingMaterial && material.map){
+    meshMaterial=material.clone();
+    meshMaterial.map=material.map.clone();
+    meshMaterial.map.repeat.set(
+      Math.max(1,size.x/4),
+      Math.max(1,size.z/4)
+    );
+    meshMaterial.map.needsUpdate=true;
+  }
+
   const mesh=new THREE.Mesh(
     new THREE.BoxGeometry(size.x,size.y,size.z),
-    material
+    meshMaterial
   );
   mesh.name=name;
   mesh.position.copy(position);
@@ -347,13 +248,8 @@ for(const [x,z,w,d] of [
   addMenuBox("CeilingVoid",new THREE.Vector3(w,.18,d),new THREE.Vector3(x,9.04,z),menuDarkMaterial);
 }
 
-// Long grid rails sell the scale of the room and help frame the camera.
-for(const z of [-59.5,-52.5,-45.5,-38.5,-31.5,-24.5,-17.5,-10.5,-3.5,3.5,10.5,17.5,24.5,31.5,38.5,45.5]){
-  addMenuBox("CeilingRailX",new THREE.Vector3(106,.065,.065),new THREE.Vector3(0,8.995,z),menuTrimMaterial);
-}
-for(const x of [-52.5,-45.5,-38.5,-31.5,-24.5,-17.5,-10.5,-3.5,3.5,10.5,17.5,24.5,31.5,38.5,45.5,52.5]){
-  addMenuBox("CeilingRailZ",new THREE.Vector3(.065,.065,112),new THREE.Vector3(x,8.995,-7),menuTrimMaterial);
-}
+// The real ceiling texture already contains its dark 1m grid, so there are
+// no extra geometric rails sitting on top of the panels.
 
 // Irregular columns and partial walls make the room read as a real ruined
 // level rather than a flat hallway.
