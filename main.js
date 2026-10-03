@@ -1023,7 +1023,7 @@ function installMainMenuRedesign(){
   const logo=document.createElement("div");
   logo.className="menuLogo";
   logo.innerHTML=`
-    <div class="menuLogoMain">DEEPSEEKER</div>
+    <div class="menuLogoMain">BACKROOMS: LOST SIGNAL</div>
     <div class="menuLogoSub">LIMINAL EXPLORATION // DS-01</div>
   `;
 
