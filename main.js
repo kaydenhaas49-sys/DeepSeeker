@@ -818,7 +818,6 @@ function installMainMenuRedesign(){
   homeScreen.classList.add("menuHomeRedesign");
   overlay.classList.add("deepseekerMenuOverlay");
 
-  const usernameRow=homeScreen.querySelector(".usernameRow");
   const houseLoader=homeScreen.querySelector("#houseLoaderHome");
   const saveSlots=document.getElementById("saveSlots");
 
@@ -860,7 +859,7 @@ function installMainMenuRedesign(){
   background:
     linear-gradient(90deg,rgba(5,6,4,.86) 0%,rgba(8,9,6,.54) 24%,rgba(12,11,7,.12) 55%,rgba(5,5,4,.28) 100%),
     linear-gradient(180deg,rgba(58,46,17,.28),rgba(93,73,25,.12) 42%,rgba(5,5,4,.58) 100%),
-    url("https://images.unsplash.com/photo-1761251947081-c7477f5337ca?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400")
+    url("https://images.unsplash.com/photo-1761251946420-8b65ad19f2e7?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400")
     center center / cover no-repeat;
   background-color:#302e21;
   background-blend-mode:multiply,color,normal;
@@ -1275,6 +1274,85 @@ function installMainMenuRedesign(){
 }
 .menuFooter span:last-child{text-align:right}
 
+.menuEditButton{
+  position:absolute;
+  top:18px;
+  right:20px;
+  z-index:12;
+  min-width:78px;
+  height:34px;
+  padding:0 13px;
+  border:1px solid rgba(235,224,179,.20);
+  border-radius:4px;
+  background:rgba(5,6,5,.55);
+  color:#d8cfb5;
+  font:inherit;
+  font-size:8px;
+  letter-spacing:2px;
+  cursor:pointer;
+  backdrop-filter:blur(8px);
+  box-shadow:0 7px 24px rgba(0,0,0,.28);
+}
+.menuEditButton:hover{
+  color:#fff3cf;
+  border-color:rgba(223,190,107,.48);
+  background:rgba(31,31,25,.72);
+}
+.menuEditor{
+  position:absolute;
+  top:60px;
+  right:20px;
+  z-index:20;
+  display:none;
+  width:min(390px,calc(100vw - 40px));
+  max-height:calc(100vh - 82px);
+  overflow:auto;
+  padding:18px;
+  box-sizing:border-box;
+  border:1px solid rgba(231,220,171,.17);
+  border-radius:7px;
+  background:rgba(7,8,6,.95);
+  box-shadow:0 24px 80px rgba(0,0,0,.58);
+  backdrop-filter:blur(14px);
+  color:#c8c0a7;
+}
+.menuEditor.open{display:block}
+.menuEditorTitle{font-size:11px;letter-spacing:2.3px;color:#eee5ca}
+.menuEditorSub{margin-top:5px;font-size:8px;line-height:1.6;color:#777261}
+.menuEditorGrid{display:grid;gap:11px;margin-top:15px}
+.menuEditorRow{display:grid;gap:5px}
+.menuEditorRow label{font-size:7px;letter-spacing:1.7px;color:#938b76}
+.menuEditorRow input[type="text"]{
+  width:100%;
+  box-sizing:border-box;
+  padding:9px 10px;
+  border:1px solid rgba(231,220,171,.11);
+  border-radius:4px;
+  background:#020302;
+  color:#e5ddc4;
+  font:inherit;
+  font-size:9px;
+  outline:none;
+}
+.menuEditorRow input[type="text"]:focus{border-color:rgba(223,190,107,.42)}
+.menuEditorRange{display:grid;grid-template-columns:1fr 48px;gap:8px;align-items:center}
+.menuEditorRange input[type="range"]{width:100%;accent-color:#d3ad58}
+.menuEditorRange output{text-align:right;font-size:8px;color:#b9af93}
+.menuEditorActions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:15px}
+.menuEditorActions button{
+  min-height:35px;
+  border:1px solid rgba(231,220,171,.12);
+  border-radius:4px;
+  background:rgba(255,255,255,.035);
+  color:#cfc5a8;
+  font:inherit;
+  font-size:8px;
+  letter-spacing:1.3px;
+  cursor:pointer;
+}
+.menuEditorActions button:hover{background:rgba(223,173,69,.10);border-color:rgba(223,173,69,.28)}
+.menuEditorStatus{min-height:13px;margin-top:9px;font-size:7px;letter-spacing:1px;color:#77705e}
+
 @media(max-width:1000px){
   .menuNav{width:min(320px,38vw)}
   .menuSlotBar{width:min(480px,50vw)}
@@ -1402,6 +1480,148 @@ function installMainMenuRedesign(){
   footer.className="menuFooter";
   footer.innerHTML=`<span>TAB · CONTROLS &nbsp;&nbsp; ESC · RELEASE MOUSE</span><span>STAY IN THE LIGHT. KEEP MOVING.</span>`;
 
+  const editButton=document.createElement("button");
+  editButton.type="button";
+  editButton.className="menuEditButton";
+  editButton.textContent="EDIT";
+
+  const editor=document.createElement("section");
+  editor.className="menuEditor";
+  editor.innerHTML=
+    '<div class="menuEditorTitle">MENU EDITOR</div>'+
+    '<div class="menuEditorSub">Preview changes live. SAVE LOCAL remembers them on this browser. GITHUB EXPORT copies the values for committing to the repository.</div>'+
+    '<div class="menuEditorGrid">'+
+      '<div class="menuEditorRow"><label>BACKGROUND IMAGE URL</label><input id="menuEditorUrl" type="text" spellcheck="false"></div>'+
+      '<div class="menuEditorRow"><label>HORIZONTAL POSITION</label><div class="menuEditorRange"><input id="menuEditorX" type="range" min="0" max="100" value="50"><output id="menuEditorXOut">50%</output></div></div>'+
+      '<div class="menuEditorRow"><label>VERTICAL POSITION</label><div class="menuEditorRange"><input id="menuEditorY" type="range" min="0" max="100" value="50"><output id="menuEditorYOut">50%</output></div></div>'+
+      '<div class="menuEditorRow"><label>BRIGHTNESS</label><div class="menuEditorRange"><input id="menuEditorBrightness" type="range" min="40" max="120" value="72"><output id="menuEditorBrightnessOut">72%</output></div></div>'+
+      '<div class="menuEditorRow"><label>SATURATION</label><div class="menuEditorRange"><input id="menuEditorSaturation" type="range" min="50" max="160" value="118"><output id="menuEditorSaturationOut">118%</output></div></div>'+
+      '<div class="menuEditorRow"><label>SEPIA</label><div class="menuEditorRange"><input id="menuEditorSepia" type="range" min="0" max="100" value="38"><output id="menuEditorSepiaOut">38%</output></div></div>'+
+    '</div>'+
+    '<div class="menuEditorActions">'+
+      '<button id="menuEditorApply" type="button">APPLY</button>'+
+      '<button id="menuEditorReset" type="button">RESET</button>'+
+      '<button id="menuEditorLocal" type="button">SAVE LOCAL</button>'+
+      '<button id="menuEditorGithub" type="button">GITHUB EXPORT</button>'+
+    '</div>'+
+    '<div id="menuEditorStatus" class="menuEditorStatus"></div>';
+
+  const applyButton=editor.querySelector("#menuEditorApply");
+  const resetButton=editor.querySelector("#menuEditorReset");
+  const localButton=editor.querySelector("#menuEditorLocal");
+  const githubButton=editor.querySelector("#menuEditorGithub");
+  const urlInput=editor.querySelector("#menuEditorUrl");
+  const xInput=editor.querySelector("#menuEditorX");
+  const yInput=editor.querySelector("#menuEditorY");
+  const brightnessInput=editor.querySelector("#menuEditorBrightness");
+  const saturationInput=editor.querySelector("#menuEditorSaturation");
+  const sepiaInput=editor.querySelector("#menuEditorSepia");
+  const status=editor.querySelector("#menuEditorStatus");
+  const outputX=editor.querySelector("#menuEditorXOut");
+  const outputY=editor.querySelector("#menuEditorYOut");
+  const outputB=editor.querySelector("#menuEditorBrightnessOut");
+  const outputS=editor.querySelector("#menuEditorSaturationOut");
+  const outputP=editor.querySelector("#menuEditorSepiaOut");
+
+  const defaultMenuConfig={
+    url:"https://images.unsplash.com/photo-1761251946420-8b65ad19f2e7?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400",
+    x:50,
+    y:50,
+    brightness:72,
+    saturation:118,
+    sepia:38
+  };
+  let menuConfig={...defaultMenuConfig};
+  try{
+    const saved=JSON.parse(localStorage.getItem("deepseeker-menu-config")||"null");
+    if(saved && typeof saved==="object") menuConfig={...menuConfig,...saved};
+  }catch{}
+
+  function syncMenuEditor(){
+    urlInput.value=String(menuConfig.url||defaultMenuConfig.url);
+    xInput.value=String(menuConfig.x);
+    yInput.value=String(menuConfig.y);
+    brightnessInput.value=String(menuConfig.brightness);
+    saturationInput.value=String(menuConfig.saturation);
+    sepiaInput.value=String(menuConfig.sepia);
+    outputX.textContent=xInput.value+"%";
+    outputY.textContent=yInput.value+"%";
+    outputB.textContent=brightnessInput.value+"%";
+    outputS.textContent=saturationInput.value+"%";
+    outputP.textContent=sepiaInput.value+"%";
+  }
+
+  function readMenuEditor(){
+    return {
+      url:String(urlInput.value||"").trim(),
+      x:Number(xInput.value),
+      y:Number(yInput.value),
+      brightness:Number(brightnessInput.value),
+      saturation:Number(saturationInput.value),
+      sepia:Number(sepiaInput.value)
+    };
+  }
+
+  function applyMenuEditor(config){
+    menuConfig={...defaultMenuConfig,...config};
+    const safeUrl=String(menuConfig.url||defaultMenuConfig.url).replace(/"/g,"");
+    backdrop.style.backgroundImage=
+      "linear-gradient(90deg,rgba(5,6,4,.86) 0%,rgba(8,9,6,.54) 24%,rgba(12,11,7,.12) 55%,rgba(5,5,4,.28) 100%),"+
+      "linear-gradient(180deg,rgba(58,46,17,.28),rgba(93,73,25,.12) 42%,rgba(5,5,4,.58) 100%),"+
+      "url(\"" + safeUrl + "\")";
+    backdrop.style.backgroundPosition=String(menuConfig.x)+"% "+String(menuConfig.y)+"%";
+    backdrop.style.backgroundSize="cover";
+    backdrop.style.filter=
+      "sepia("+String(menuConfig.sepia)+"%) saturate("+String(menuConfig.saturation)+"%) contrast(1.08) brightness("+String(menuConfig.brightness)+"%)";
+    syncMenuEditor();
+  }
+
+  for(const input of [xInput,yInput,brightnessInput,saturationInput,sepiaInput]){
+    input.addEventListener("input",()=>{
+      outputX.textContent=xInput.value+"%";
+      outputY.textContent=yInput.value+"%";
+      outputB.textContent=brightnessInput.value+"%";
+      outputS.textContent=saturationInput.value+"%";
+      outputP.textContent=sepiaInput.value+"%";
+      applyMenuEditor(readMenuEditor());
+    });
+  }
+
+  applyButton.addEventListener("click",()=>{
+    applyMenuEditor(readMenuEditor());
+    status.textContent="APPLIED";
+  });
+
+  resetButton.addEventListener("click",()=>{
+    menuConfig={...defaultMenuConfig};
+    applyMenuEditor(menuConfig);
+    status.textContent="RESET";
+  });
+
+  localButton.addEventListener("click",()=>{
+    menuConfig=readMenuEditor();
+    applyMenuEditor(menuConfig);
+    localStorage.setItem("deepseeker-menu-config",JSON.stringify(menuConfig));
+    status.textContent="SAVED ON THIS BROWSER";
+  });
+
+  githubButton.addEventListener("click",async()=>{
+    menuConfig=readMenuEditor();
+    const snippet="const MENU_BACKGROUND_CONFIG="+JSON.stringify(menuConfig,null,2)+";";
+    try{
+      await navigator.clipboard.writeText(snippet);
+      status.textContent="GITHUB CONFIG COPIED";
+    }catch{
+      window.prompt("Copy this config into the repo:",snippet);
+    }
+  });
+
+  editButton.addEventListener("click",()=>{
+    editor.classList.toggle("open");
+    editButton.textContent=editor.classList.contains("open")?"CLOSE":"EDIT";
+  });
+
+  layout.append(editButton,editor);
   layout.append(logo,nav,slotBar,right,footer);
 
 
