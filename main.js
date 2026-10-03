@@ -868,7 +868,8 @@ function installMainMenuRedesign(){
   left:clamp(20px,3vw,52px);
   bottom:clamp(16px,2.5vh,32px);
   width:min(470px,38vw);
-  padding:20px 21px;
+  min-height:230px;
+  padding:26px 21px;
   border-left:3px solid rgba(223,173,69,.34);
   border-right:0;
   background:linear-gradient(90deg,rgba(5,7,6,.44),rgba(5,7,6,.10));
