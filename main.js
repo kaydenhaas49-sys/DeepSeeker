@@ -3699,15 +3699,15 @@ async function extractSpiderPack(zipUrl){
 
   const modelCandidates=entries
     .filter(entry=>
-      entry.lower.endsWith(".obj") ||
       entry.lower.endsWith(".fbx") ||
+      entry.lower.endsWith(".obj") ||
       entry.lower.endsWith(".glb")
     )
     .sort((a,b)=>{
       const score=(entry)=>{
         const modelScore=
+          entry.lower.endsWith(".fbx") ? 130 :
           entry.lower.endsWith(".obj") ? 120 :
-          entry.lower.endsWith(".fbx") ? 100 :
           50;
         const spiderScore=entry.lower.includes("spider") ? 25 : 0;
         return modelScore+spiderScore;
@@ -3974,6 +3974,10 @@ function finishSpiderModel(model,animations,sourceName){
     spiderWantedState="idle";
   }
 
+  if(spiderActions.size===0 && animations?.length===0){
+    console.log("[DeepSeeker] Spider visual loaded without animation clips (static fallback).");
+  }
+
   console.log(
     "[DeepSeeker] Spider-Psionic asset loaded from ZIP",
     {
@@ -4074,47 +4078,45 @@ async function loadSpiderFromPack(){
       }
     };
 
-    if(extracted.modelType==="obj"){
-      // The pack includes an OBJ export. Use it as the primary browser path:
-      // OBJ is static but gives us the exact spider geometry without relying on
-      // the FBX parser's handling of the original Unity export.
-      try{
-        const object=new OBJLoader(packManager)
-          .parse(new TextDecoder().decode(extracted.modelBytes));
-        handleLoaded(object,[]);
-      }catch(objError){
-        console.warn("[DeepSeeker] Spider OBJ parse failed; trying FBX:",objError);
-        const fbxEntry=Array.from(extracted.resourceBlobs.keys())
-          .find(name=>name.endsWith(".fbx"));
-
-        if(!fbxEntry){
-          failSpiderLoad(objError,"SPIDER MODEL PARSE FAILED");
-        }else{
-          extracted.modelType="fbx";
-          extracted.modelName=fbxEntry.split("/").pop();
-          const loader=new FBXLoader(packManager);
-          const fbxBytes=await extracted.resourceBlobs.get(fbxEntry).arrayBuffer();
-
-          try{
-            const object=loader.parse(fbxBytes,extracted.modelDirectory);
-            handleLoaded(object,object.animations||[]);
-          }catch(fbxError){
-            console.error("[DeepSeeker] Spider FBX fallback failed:",fbxError);
-            failSpiderLoad(fbxError,"SPIDER MODEL PARSE FAILED");
-          }
-        }
-      }
-    }else if(extracted.modelType==="fbx"){
+    if(extracted.modelType==="fbx"){
+      // Use the rigged FBX as the actual visual model so its skeleton and
+      // animation clips remain attached to the rendered meshes.
       const loader=new FBXLoader(packManager);
+
       try{
         const object=loader.parse(
           extracted.modelBytes.buffer,
           extracted.modelDirectory
         );
         handleLoaded(object,object.animations||[]);
-      }catch(error){
-        failSpiderLoad(error,"SPIDER FBX PARSE FAILED");
+
+        console.log("[DeepSeeker] using rigged FBX spider visual");
+      }catch(fbxError){
+        console.warn("[DeepSeeker] FBX visual failed; falling back to static OBJ:",fbxError);
+
+        const objEntry=Array.from(extracted.resourceBlobs.keys())
+          .find(name=>name.endsWith(".obj"));
+
+        const objBlob=objEntry
+          ? extracted.resourceBlobs.get(objEntry)
+          : null;
+
+        if(!objBlob){
+          failSpiderLoad(fbxError,"SPIDER MODEL PARSE FAILED");
+        }else{
+          try{
+            const objLoader=new OBJLoader(packManager);
+            const object=objLoader.parse(
+              new TextDecoder().decode(await objBlob.arrayBuffer())
+            );
+            handleLoaded(object,[]);
+            console.log("[DeepSeeker] using static OBJ spider fallback");
+          }catch(objError){
+            failSpiderLoad(objError,"SPIDER MODEL PARSE FAILED");
+          }
+        }
       }
+
     }else{
       const loader=new GLTFLoader(packManager);
       loader.setDRACOLoader(dracoLoader);
