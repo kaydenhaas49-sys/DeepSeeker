@@ -192,7 +192,7 @@ function makeMenuTexture(kind){
       ctx.restore();
       ctx.fill();
     }
-  else{
+  }else{
     ctx.fillStyle="#878675";
     ctx.fillRect(0,0,512,512);
 
