@@ -100,13 +100,40 @@ scene.add(playerLight);
 // remains visible behind the menu, so the title screen uses real geometry,
 // textures, fog and depth instead of a flat CSS illustration.
 const menuCamera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.08,180);
-const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x1d2117,0.46);
-const menuKeyLight=new THREE.PointLight(0xffe7a5,32,34,1.75);
-const menuFillLight=new THREE.PointLight(0xcbd6b4,8,28,1.9);
-scene.add(menuAmbient,menuKeyLight,menuFillLight);
+const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x1d2117,0.54);
+const menuKeyLight=new THREE.PointLight(0xffe7a5,38,38,1.75);
+const menuFillLight=new THREE.PointLight(0xcbd6b4,10,30,1.9);
 
 const MENU_WORLD_X=32;
 const MENU_WORLD_Z=30;
+
+// Lightweight floating dust used only on the title screen. It gives the
+// distant fluorescent light a little depth without adding another asset.
+const menuDustCount=420;
+const menuDustPositions=new Float32Array(menuDustCount*3);
+for(let i=0;i<menuDustCount;i++){
+  menuDustPositions[i*3+0]=MENU_WORLD_X+(Math.random()-.5)*34;
+  menuDustPositions[i*3+1]=1.2+Math.random()*7.2;
+  menuDustPositions[i*3+2]=MENU_WORLD_Z-18+Math.random()*38;
+}
+const menuDustGeometry=new THREE.BufferGeometry();
+menuDustGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(menuDustPositions,3)
+);
+const menuDustMaterial=new THREE.PointsMaterial({
+  color:0xd8d1b1,
+  size:.035,
+  transparent:true,
+  opacity:.24,
+  depthWrite:false,
+  sizeAttenuation:true
+});
+const menuDust=new THREE.Points(menuDustGeometry,menuDustMaterial);
+menuDust.frustumCulled=false;
+menuDust.visible=false;
+
+scene.add(menuAmbient,menuKeyLight,menuFillLight,menuDust);
 const MENU_CAMERA_HEIGHT=2.28;
 const MENU_LOOK_HEIGHT=2.65;
 let menuSceneReady=false;
@@ -144,50 +171,76 @@ function updateMenuScene(t,dt){
       menuAmbient.intensity=0;
       menuKeyLight.intensity=0;
       menuFillLight.intensity=0;
+      menuDust.visible=false;
       spiderRevealLight.intensity=0;
-      spiderEntity.visible=false;
       scene.background.set(0x000100);
+      scene.fog.color.set(0x030302);
+      scene.fog.near=14;
+      scene.fog.far=62;
     }
     return false;
   }
 
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
-    menuAmbient.intensity=0.46;
-    menuKeyLight.intensity=32;
-    menuFillLight.intensity=8;
-    scene.background.set(0x080905);
+    menuAmbient.intensity=0.54;
+    menuKeyLight.intensity=38;
+    menuFillLight.intensity=10;
+    menuDust.visible=true;
+    scene.background.set(0x0b0a06);
+    scene.fog.color.set(0x0e0d08);
+    scene.fog.near=9;
+    scene.fog.far=78;
   }
 
   // Keep the nearby Backrooms chunks streamed while the title screen is open.
   world.update(MENU_WORLD_X,MENU_WORLD_Z);
   updateMenuSpider(t,dt);
 
-  const sway=Math.sin(t*0.12)*0.65;
-  const drift=Math.sin(t*0.08+1.1)*0.32;
-  const lookDrift=Math.sin(t*0.10+0.7)*0.7;
+  // Slow, almost imperceptible camera movement makes the title screen feel
+  // like a real place instead of a static wallpaper.
+  const sway=Math.sin(t*0.115)*0.85+Math.sin(t*0.043)*0.24;
+  const forwardDrift=Math.sin(t*0.075+1.3)*0.55;
+  const heightDrift=Math.sin(t*0.17)*0.045;
+  const lookDrift=Math.sin(t*0.095+0.7)*0.9;
 
   menuCamera.position.set(
     MENU_WORLD_X+sway,
-    MENU_CAMERA_HEIGHT+drift,
-    MENU_WORLD_Z+9.5
+    MENU_CAMERA_HEIGHT+heightDrift,
+    MENU_WORLD_Z+10.5+forwardDrift
   );
   menuCamera.lookAt(
     MENU_WORLD_X+lookDrift,
-    MENU_LOOK_HEIGHT,
-    MENU_WORLD_Z-10
+    MENU_LOOK_HEIGHT-0.18,
+    MENU_WORLD_Z-15
   );
 
+  // Gentle fluorescent flicker. It stays subtle enough that it won't read
+  // like a jumpscare while the player is sitting at the menu.
+  const fluorescentWave=
+    0.94+
+    Math.sin(t*3.7)*0.025+
+    Math.sin(t*13.1)*0.018+
+    Math.sin(t*29.7)*0.008;
+
   menuKeyLight.position.set(
-    MENU_WORLD_X+sway*0.5,
-    7.85,
+    MENU_WORLD_X+sway*0.45,
+    7.85+Math.sin(t*.31)*.08,
     MENU_WORLD_Z+4.5
   );
+  menuKeyLight.intensity=38*fluorescentWave;
+
   menuFillLight.position.set(
     MENU_WORLD_X-6.0,
     4.2,
     MENU_WORLD_Z-2.0
   );
+  menuFillLight.intensity=10*(0.92+Math.sin(t*.17)*.08);
+
+  menuDustMaterial.opacity=
+    0.18+
+    Math.sin(t*.35)*0.025+
+    Math.sin(t*1.8)*0.012;
 
   menuSceneReady=true;
   return true;
@@ -641,16 +694,16 @@ function installMainMenuRedesign(){
   z-index:1;
   background:
     linear-gradient(90deg,
-      rgba(1,2,1,.96) 0%,
-      rgba(1,2,1,.86) 17%,
-      rgba(1,2,1,.52) 31%,
-      rgba(1,2,1,.16) 48%,
-      transparent 70%),
+      rgba(1,2,1,.90) 0%,
+      rgba(1,2,1,.70) 15%,
+      rgba(1,2,1,.34) 30%,
+      rgba(1,2,1,.08) 46%,
+      transparent 68%),
     linear-gradient(180deg,
-      rgba(0,0,0,.60) 0%,
+      rgba(0,0,0,.44) 0%,
       transparent 25%,
       transparent 66%,
-      rgba(0,0,0,.84) 100%);
+      rgba(0,0,0,.62) 100%);
 }
 #menuBackdrop{
   position:absolute;
@@ -665,8 +718,8 @@ function installMainMenuRedesign(){
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 71% 42%,transparent 0 14%,rgba(0,0,0,.05) 33%,rgba(0,0,0,.62) 100%),
-    linear-gradient(90deg,rgba(0,0,0,.10),transparent 43%,rgba(0,0,0,.10));
+    radial-gradient(ellipse at 71% 42%,transparent 0 17%,rgba(0,0,0,.06) 38%,rgba(0,0,0,.48) 100%),
+    linear-gradient(90deg,rgba(0,0,0,.06),transparent 43%,rgba(0,0,0,.06));
 }
 #menuBackdrop::after{
   content:"";
@@ -678,6 +731,12 @@ function installMainMenuRedesign(){
       rgba(255,255,255,.008) 6px,
       transparent 7px);
   opacity:.42;
+}
+#menuBackdrop{
+  filter:saturate(.9) contrast(1.05);
+}
+#menuBackdrop .menuBackdropGlow{
+  mix-blend-mode:screen;
 }
 .menuBackdropGlow{
   position:absolute;
