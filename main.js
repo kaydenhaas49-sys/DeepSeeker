@@ -183,67 +183,18 @@ function updateMenuScene(t,dt){
 
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
-    menuAmbient.intensity=0.54;
-    menuKeyLight.intensity=38;
-    menuFillLight.intensity=10;
-    menuDust.visible=true;
-    scene.background.set(0x0b0a06);
-    scene.fog.color.set(0x0e0d08);
-    scene.fog.near=9;
-    scene.fog.far=78;
+    menuAmbient.intensity=0;
+    menuKeyLight.intensity=0;
+    menuFillLight.intensity=0;
+    menuDust.visible=false;
+    spiderRevealLight.intensity=0;
   }
 
-  // Keep the nearby Backrooms chunks streamed while the title screen is open.
-  world.update(MENU_WORLD_X,MENU_WORLD_Z);
-  updateMenuSpider(t,dt);
-
-  // Slow, almost imperceptible camera movement makes the title screen feel
-  // like a real place instead of a static wallpaper.
-  const sway=Math.sin(t*0.115)*0.85+Math.sin(t*0.043)*0.24;
-  const forwardDrift=Math.sin(t*0.075+1.3)*0.55;
-  const heightDrift=Math.sin(t*0.17)*0.045;
-  const lookDrift=Math.sin(t*0.095+0.7)*0.9;
-
-  menuCamera.position.set(
-    MENU_WORLD_X+sway,
-    MENU_CAMERA_HEIGHT+heightDrift,
-    MENU_WORLD_Z+10.5+forwardDrift
-  );
-  menuCamera.lookAt(
-    MENU_WORLD_X+lookDrift,
-    MENU_LOOK_HEIGHT-0.18,
-    MENU_WORLD_Z-15
-  );
-
-  // Gentle fluorescent flicker. It stays subtle enough that it won't read
-  // like a jumpscare while the player is sitting at the menu.
-  const fluorescentWave=
-    0.94+
-    Math.sin(t*3.7)*0.025+
-    Math.sin(t*13.1)*0.018+
-    Math.sin(t*29.7)*0.008;
-
-  menuKeyLight.position.set(
-    MENU_WORLD_X+sway*0.45,
-    7.85+Math.sin(t*.31)*.08,
-    MENU_WORLD_Z+4.5
-  );
-  menuKeyLight.intensity=38*fluorescentWave;
-
-  menuFillLight.position.set(
-    MENU_WORLD_X-6.0,
-    4.2,
-    MENU_WORLD_Z-2.0
-  );
-  menuFillLight.intensity=10*(0.92+Math.sin(t*.17)*.08);
-
-  menuDustMaterial.opacity=
-    0.18+
-    Math.sin(t*.35)*0.025+
-    Math.sin(t*1.8)*0.012;
-
+  // The title screen now has its own CSS/HTML liminal environment. Do not
+  // stream procedural chunks or animate the gameplay spider just for the menu.
+  // This keeps startup lighter and makes the menu independent of game assets.
   menuSceneReady=true;
-  return true;
+  return false;
 }
 
 const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
@@ -1536,6 +1487,7 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   }
 
   gameStarted=true;
+  ensureSpiderLoading();
   overlay.classList.add("hidden");
   audio.start();
 
@@ -2750,6 +2702,7 @@ spiderEntity.add(spiderRevealLight);
 scene.add(spiderEntity);
 
 let spiderLoaded=false;
+let spiderLoadStarted=false;
 let spiderModel=null;
 let spiderMixer=null;
 const spiderActions=new Map();
@@ -3235,13 +3188,22 @@ async function loadSpiderFromPack(){
       spiderActions.clear();
       spiderAnimationState="";
       console.error("[DeepSeeker] converted Spider-Psionic GLB failed:",error);
-      eventText.textContent="SPIDER GLB FAILED TO LOAD";
-      eventText.style.opacity="1";
+      // A missing entity is a gameplay asset problem, not a menu problem.
+      // Only surface the message after a run has actually started.
+      if(gameStarted){
+        eventText.textContent="SPIDER GLB FAILED TO LOAD";
+        eventText.style.opacity="1";
+      }
     }
   );
 }
 
-loadSpiderFromPack();
+function ensureSpiderLoading(){
+  if(spiderLoadStarted || spiderLoaded) return;
+  spiderLoadStarted=true;
+  loadSpiderFromPack();
+}
+
 player.onStep=({intensity})=>audio.step(intensity);
 
 const BACKROOMS_FALL_DURATION=1.8;
