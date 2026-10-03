@@ -849,195 +849,58 @@ function installMainMenuRedesign(){
   z-index:0;
   overflow:hidden;
   pointer-events:none;
-  background:
-    radial-gradient(ellipse at 76% 43%,rgba(184,171,116,.15),transparent 13%),
-    radial-gradient(ellipse at 79% 62%,rgba(84,79,58,.14),transparent 20%),
-    linear-gradient(180deg,#11130f 0%,#2b2b24 42%,#161814 71%,#070807 100%);
+  background:#080906;
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
   inset:0;
+  z-index:2;
   background:
-    radial-gradient(ellipse at 78% 44%,transparent 0 10%,rgba(0,0,0,.08) 24%,rgba(0,0,0,.78) 57%,rgba(0,0,0,.95) 100%),
-    linear-gradient(90deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,.22) 42%,rgba(0,0,0,.08) 68%,rgba(0,0,0,.34) 100%),
-    linear-gradient(180deg,rgba(0,0,0,.10),transparent 28%,rgba(0,0,0,.58) 100%);
+    linear-gradient(90deg,rgba(3,4,3,.78) 0%,rgba(3,4,3,.32) 34%,rgba(3,4,3,.08) 66%,rgba(3,4,3,.28) 100%),
+    radial-gradient(ellipse at 73% 53%,transparent 0 13%,rgba(0,0,0,.08) 32%,rgba(0,0,0,.88) 100%);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
+  z-index:3;
   background:
-    repeating-linear-gradient(90deg,transparent 0 11%,rgba(255,255,255,.012) 11.1% 11.3%,transparent 11.4% 22.5%),
-    repeating-linear-gradient(0deg,transparent 0 19%,rgba(0,0,0,.055) 19.2% 19.8%,transparent 20% 40%),
-    radial-gradient(ellipse at 71% 36%,rgba(218,210,169,.045),transparent 22%);
-  opacity:.82;
+    linear-gradient(180deg,rgba(0,0,0,.12),transparent 28%,rgba(0,0,0,.48) 100%),
+    repeating-linear-gradient(180deg,transparent 0 7px,rgba(255,255,255,.008) 8px,transparent 9px);
 }
-
-/* Main corridor: a long, abandoned passage with a clear vanishing point. */
-.menuBGHall{
+.menuBGScene{
   position:absolute;
-  left:52%;
-  top:20%;
-  width:49%;
-  height:73%;
-  background:
-    linear-gradient(90deg,rgba(64,63,51,.40),rgba(31,32,27,.16) 24%,rgba(6,7,6,.82) 100%),
-    repeating-linear-gradient(0deg,transparent 0 14%,rgba(185,178,141,.032) 14.2% 14.7%,transparent 15% 29%),
-    linear-gradient(180deg,rgba(67,66,54,.62),rgba(9,10,8,.98));
-  clip-path:polygon(27% 0,73% 0,100% 100%,0 100%);
-  box-shadow:inset 0 0 90px rgba(0,0,0,.65),0 0 90px rgba(0,0,0,.6);
+  inset:0;
+  width:100%;
+  height:100%;
+  display:block;
 }
-
-/* Ceiling panels, some dark and uneven like a neglected office. */
-.menuBGCeiling{
-  position:absolute;
-  left:41%;
-  right:-4%;
-  top:-5%;
-  height:49%;
-  background:
-    repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 1px,transparent 1px 13%),
-    repeating-linear-gradient(180deg,rgba(255,255,255,.018) 0 1px,transparent 1px 20%),
-    radial-gradient(ellipse at 66% 58%,rgba(0,0,0,.42),transparent 18%),
-    radial-gradient(ellipse at 87% 34%,rgba(0,0,0,.25),transparent 13%),
-    linear-gradient(165deg,#555449 0%,#34352c 52%,#171914 100%);
-  clip-path:polygon(10% 0,100% 0,100% 76%,55% 100%,34% 65%);
-  transform:skewX(-11deg);
-  box-shadow:inset 0 -22px 34px rgba(0,0,0,.45);
+.menuBGScene .menuFixture{animation:menuFixtureFlicker 5.8s steps(1,end) infinite}
+.menuBGScene .menuFixture.delay{animation-delay:2.4s;opacity:.45}
+.menuBGScene .menuDust{animation:menuDustDrift 14s linear infinite}
+@keyframes menuFixtureFlicker{
+  0%,100%{opacity:.84}
+  38%{opacity:.82}
+  39%{opacity:.16}
+  40%{opacity:.72}
+  43%{opacity:.46}
+  44%{opacity:.05}
+  46%{opacity:.62}
+  72%{opacity:.55}
 }
-
-/* Dirty carpet/concrete floor with perspective seams and dark stains. */
-.menuBGFloor{
-  position:absolute;
-  left:29%;
-  right:-3%;
-  bottom:-15%;
-  height:66%;
-  background:
-    repeating-linear-gradient(90deg,transparent 0 9%,rgba(173,163,116,.036) 9.1% 9.3%,transparent 9.5% 18%),
-    repeating-linear-gradient(0deg,transparent 0 12%,rgba(49,48,38,.16) 12.2% 12.8%,transparent 13% 26%),
-    radial-gradient(ellipse at 59% 39%,rgba(104,95,64,.19),transparent 13%),
-    radial-gradient(ellipse at 70% 69%,rgba(7,8,7,.60),transparent 16%),
-    radial-gradient(ellipse at 43% 78%,rgba(9,9,8,.42),transparent 20%),
-    linear-gradient(180deg,#4a493d 0%,#2a2b23 31%,#10120f 77%,#060706 100%);
-  transform:perspective(900px) rotateX(63deg);
-  transform-origin:bottom center;
-  box-shadow:inset 0 24px 36px rgba(0,0,0,.32);
+@keyframes menuDustDrift{
+  from{transform:translateX(-1%)}
+  to{transform:translateX(1%)}
 }
-
-/* Left and right walls frame the corridor instead of looking like gradients. */
-.menuBGWallL{
-  position:absolute;
-  left:-6%;
-  top:22%;
-  width:61%;
-  height:82%;
-  background:
-    repeating-linear-gradient(0deg,transparent 0 12%,rgba(203,194,151,.034) 12.2% 12.7%,transparent 13% 25%),
-    radial-gradient(ellipse at 72% 26%,rgba(145,128,83,.12),transparent 19%),
-    linear-gradient(90deg,#090a08 0%,#25261f 47%,#555244 100%);
-  clip-path:polygon(0 0,100% 9%,71% 100%,0 100%);
-  box-shadow:inset -28px 0 42px rgba(0,0,0,.35);
-}
-.menuBGWallL::after{
-  content:"";
-  position:absolute;
-  right:8%;
-  top:15%;
-  width:38%;
-  height:52%;
-  background:
-    repeating-linear-gradient(0deg,transparent 0 10%,rgba(0,0,0,.10) 10.2% 11%,transparent 11.3% 22%),
-    linear-gradient(110deg,rgba(189,176,126,.08),rgba(29,30,25,.02));
-  transform:skewY(-10deg);
-  opacity:.7;
-}
-.menuBGWallR{
-  position:absolute;
-  right:-7%;
-  top:22%;
-  width:56%;
-  height:82%;
-  background:
-    repeating-linear-gradient(0deg,transparent 0 13%,rgba(203,194,151,.032) 13.2% 13.8%,transparent 14% 27%),
-    radial-gradient(ellipse at 38% 36%,rgba(139,121,73,.12),transparent 18%),
-    linear-gradient(270deg,#090a08 0%,#292a22 53%,#514f40 100%);
-  clip-path:polygon(14% 9%,100% 0,100% 100%,30% 100%);
-  box-shadow:inset 28px 0 42px rgba(0,0,0,.30);
-}
-.menuBGWallR::after{
-  content:"";
-  position:absolute;
-  left:8%;
-  top:19%;
-  width:33%;
-  height:39%;
-  background:
-    repeating-linear-gradient(90deg,transparent 0 16%,rgba(0,0,0,.10) 16.5% 18%,transparent 18.5% 34%),
-    linear-gradient(160deg,rgba(212,194,141,.08),rgba(23,24,20,.01));
-  transform:skewY(10deg);
-  opacity:.62;
-}
-
-/* Sickly fluorescent fixtures: one working badly, one mostly dead. */
-.menuBGLight{
-  position:absolute;
-  width:min(245px,20vw);
-  height:9px;
-  border-radius:3px;
-  background:linear-gradient(90deg,#77796f,#f0e5bf 38%,#bbbcae 72%,#4f514a 100%);
-  box-shadow:0 0 10px rgba(223,218,183,.42),0 0 46px rgba(201,189,139,.15);
-  transform:rotate(-7deg);
-  animation:menuFluoro 5.4s steps(1,end) infinite;
-}
-.menuBGLight.one{right:21%;top:13%;opacity:.72}
-.menuBGLight.two{right:4%;top:29%;width:min(150px,12vw);opacity:.22;animation-delay:2.1s}
-@keyframes menuFluoro{
-  0%,100%{opacity:.68}
-  41%{opacity:.72}
-  42%{opacity:.18}
-  44%{opacity:.62}
-  46%{opacity:.08}
-  49%{opacity:.50}
-  51%{opacity:.22}
-  55%{opacity:.58}
-  74%{opacity:.47}
-}
-
-/* Faint dirty light in the distance. */
-.menuBGGlow{
-  position:absolute;
-  right:19%;
-  top:25%;
-  width:min(460px,38vw);
-  height:min(460px,38vw);
-  border-radius:50%;
-  background:radial-gradient(circle,rgba(190,174,116,.11),rgba(142,127,84,.02) 38%,transparent 72%);
-  filter:blur(20px);
-  mix-blend-mode:screen;
-  animation:menuGlow 9s ease-in-out infinite alternate;
-}
-.menuBGScan{
-  position:absolute;
-  top:-10%;
-  bottom:-10%;
-  left:-25%;
-  width:18vw;
-  background:linear-gradient(90deg,transparent,rgba(193,180,133,.028),transparent);
-  transform:skewX(-12deg);
-  animation:menuSweep 22s ease-in-out infinite;
-  opacity:.55;
-}
-@keyframes menuGlow{
-  from{transform:translate3d(-1%,-1%,0) scale(.96);opacity:.34}
-  to{transform:translate3d(2%,1%,0) scale(1.04);opacity:.74}
-}
-@keyframes menuSweep{
-  0%{transform:translateX(-10vw) skewX(-12deg);opacity:0}
-  18%{opacity:.20}
-  48%,100%{transform:translateX(150vw) skewX(-12deg);opacity:0}
-}
+#menuBackdrop .menuBGHall,
+#menuBackdrop .menuBGCeiling,
+#menuBackdrop .menuBGFloor,
+#menuBackdrop .menuBGWallL,
+#menuBackdrop .menuBGWallR,
+#menuBackdrop .menuBGLight,
+#menuBackdrop .menuBGGlow,
+#menuBackdrop .menuBGScan{display:none}
 
 #homeScreen.menuHomeRedesign{
   position:absolute;
@@ -1365,15 +1228,66 @@ function installMainMenuRedesign(){
   const backdrop=document.createElement("div");
   backdrop.id="menuBackdrop";
   backdrop.innerHTML=`
-    <div class="menuBGHall"></div>
-    <div class="menuBGCeiling"></div>
-    <div class="menuBGFloor"></div>
-    <div class="menuBGWallL"></div>
-    <div class="menuBGWallR"></div>
-    <div class="menuBGLight one"></div>
-    <div class="menuBGLight two"></div>
-    <div class="menuBGGlow"></div>
-    <div class="menuBGScan"></div>
+    <svg class="menuBGScene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="ms-ceil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#505047"/><stop offset=".55" stop-color="#31322c"/><stop offset="1" stop-color="#171914"/></linearGradient>
+          <linearGradient id="ms-left" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0b0d0b"/><stop offset=".64" stop-color="#24261f"/><stop offset="1" stop-color="#4e4d40"/></linearGradient>
+          <linearGradient id="ms-right" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#080a08"/><stop offset=".60" stop-color="#25271f"/><stop offset="1" stop-color="#4a493d"/></linearGradient>
+          <linearGradient id="ms-floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4d4b3e"/><stop offset=".28" stop-color="#323228"/><stop offset="1" stop-color="#0a0c09"/></linearGradient>
+          <radialGradient id="ms-light" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#efe7c8" stop-opacity=".34"/><stop offset=".45" stop-color="#d8d0b0" stop-opacity=".11"/><stop offset="1" stop-color="#d8d0b0" stop-opacity="0"/></radialGradient>
+          <radialGradient id="ms-haze" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#d0c6a4" stop-opacity=".11"/><stop offset="1" stop-color="#d0c6a4" stop-opacity="0"/></radialGradient>
+          <filter id="ms-soft"><feGaussianBlur stdDeviation="10"/></filter>
+          <filter id="ms-soft2"><feGaussianBlur stdDeviation="26"/></filter>
+        </defs>
+    
+        <polygon points="0,0 1600,0 1215,330 470,330" fill="url(#ms-ceil)"/>
+        <g opacity=".27" stroke="#151712" stroke-width="10">
+          <line x1="200" y1="0" x2="565" y2="330"/><line x1="520" y1="0" x2="750" y2="330"/>
+          <line x1="850" y1="0" x2="880" y2="330"/><line x1="1180" y1="0" x2="1000" y2="330"/>
+          <line x1="1480" y1="0" x2="1100" y2="330"/>
+        </g>
+        <g opacity=".23" fill="#11130f">
+          <ellipse cx="690" cy="82" rx="92" ry="28"/><ellipse cx="1125" cy="118" rx="76" ry="22"/><ellipse cx="390" cy="40" rx="58" ry="18"/>
+        </g>
+    
+        <polygon points="0,0 470,330 470,900 0,900" fill="url(#ms-left)"/>
+        <g opacity=".18" stroke="#b9ad82" stroke-width="3"><line x1="160" y1="72" x2="420" y2="350"/><line x1="40" y1="255" x2="380" y2="415"/><line x1="245" y1="525" x2="415" y2="550"/></g>
+        <g opacity=".20" fill="#0a0c09"><path d="M95 310l140 18-48 118-128-32z"/><path d="M40 640l200-45 95 95-235 44z"/></g>
+        <rect x="286" y="320" width="92" height="154" rx="5" fill="#171914" opacity=".9"/>
+        <rect x="298" y="333" width="68" height="128" rx="3" fill="#2e3028"/>
+        <rect x="313" y="360" width="38" height="6" fill="#777158" opacity=".45"/><circle cx="338" cy="398" r="5" fill="#847544" opacity=".55"/>
+        <rect x="321" y="420" width="30" height="4" fill="#151711"/>
+    
+        <polygon points="1600,0 1130,330 1130,900 1600,900" fill="url(#ms-right)"/>
+        <g opacity=".16" stroke="#c1b58b" stroke-width="3"><line x1="1420" y1="90" x2="1180" y2="360"/><line x1="1560" y1="270" x2="1210" y2="425"/><line x1="1350" y1="520" x2="1170" y2="550"/></g>
+        <path d="M1380 230C1330 320 1310 410 1290 520" fill="none" stroke="#6f6b58" stroke-width="11" opacity=".50"/>
+        <path d="M1450 210C1395 315 1374 408 1354 526" fill="none" stroke="#252720" stroke-width="7" opacity=".90"/>
+        <path d="M1492 198C1455 284 1439 364 1427 446" fill="none" stroke="#6d6854" stroke-width="4" opacity=".35"/>
+    
+        <polygon points="0,900 470,330 1130,330 1600,900" fill="url(#ms-floor)"/>
+        <g stroke="#79715b" stroke-width="3" opacity=".17"><line x1="0" y1="900" x2="470" y2="330"/><line x1="260" y1="900" x2="560" y2="330"/><line x1="600" y1="900" x2="720" y2="330"/><line x1="1000" y1="900" x2="910" y2="330"/><line x1="1330" y1="900" x2="1035" y2="330"/><line x1="1600" y1="900" x2="1130" y2="330"/></g>
+        <g fill="#0b0c0a" opacity=".34"><ellipse cx="530" cy="660" rx="118" ry="38"/><ellipse cx="1150" cy="620" rx="88" ry="29"/><ellipse cx="890" cy="795" rx="160" ry="48"/></g>
+        <g fill="#171914" opacity=".85"><rect x="1180" y="765" width="88" height="24" rx="4" transform="rotate(-8 1180 765)"/><rect x="1260" y="795" width="47" height="18" rx="3" transform="rotate(16 1260 795)"/><path d="M420 790l54-22 42 20-58 27z"/></g>
+    
+        <polygon points="700,330 900,330 1015,640 585,640" fill="#34362d"/>
+        <rect x="705" y="384" width="190" height="246" fill="#171914"/><rect x="720" y="398" width="160" height="232" fill="#292b24"/>
+        <rect x="740" y="416" width="120" height="192" fill="#11130f"/><rect x="753" y="430" width="95" height="172" fill="#1c1e18"/>
+        <circle cx="827" cy="515" r="7" fill="#8c7a4b"/><rect x="744" y="448" width="114" height="3" fill="#7d755b" opacity=".18"/><rect x="744" y="590" width="114" height="3" fill="#0a0b09"/>
+    
+        <ellipse cx="800" cy="341" rx="170" ry="120" fill="url(#ms-light)" filter="url(#ms-soft2)" class="menuFixture"/>
+        <rect x="718" y="306" width="164" height="14" rx="4" fill="#b9b6a0" opacity=".65" class="menuFixture"/>
+        <rect x="744" y="311" width="112" height="5" fill="#eee4c5" opacity=".72" class="menuFixture"/>
+        <ellipse cx="1010" cy="205" rx="180" ry="100" fill="url(#ms-light)" filter="url(#ms-soft2)" class="menuFixture delay"/>
+        <rect x="915" y="152" width="192" height="13" rx="4" fill="#a6a593" opacity=".56" transform="rotate(-8 915 152)" class="menuFixture delay"/>
+        <rect x="953" y="157" width="112" height="4" fill="#e2dcc3" opacity=".55" transform="rotate(-8 953 157)" class="menuFixture delay"/>
+    
+        <path d="M1180 80C1240 150 1255 225 1218 300C1188 360 1174 438 1200 510" fill="none" stroke="#55564c" stroke-width="18" opacity=".7"/>
+        <path d="M1178 80C1238 150 1251 225 1215 300C1185 360 1172 438 1198 510" fill="none" stroke="#85816d" stroke-width="4" opacity=".4"/>
+        <path d="M1250 80C1274 176 1266 246 1238 322" fill="none" stroke="#20221d" stroke-width="10" opacity=".9"/>
+    
+        <g fill="#0a0c09" opacity=".20"><circle cx="940" cy="500" r="16"/><circle cx="977" cy="540" r="7"/><circle cx="1010" cy="590" r="11"/><circle cx="1095" cy="470" r="8"/><circle cx="1220" cy="555" r="14"/><circle cx="470" cy="455" r="9"/></g>
+        <ellipse cx="1010" cy="470" rx="380" ry="170" fill="url(#ms-haze)" filter="url(#ms-soft)" class="menuDust"/>
+      </svg>
   `;
   overlay.insertBefore(backdrop,homeScreen);
 
