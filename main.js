@@ -1935,6 +1935,7 @@ function installMainMenuRedesign(){
     const id=element.dataset.menuEditId;
     if(!isPanelElement(element)){
       element.setAttribute("style",element.dataset.menuOriginalStyle||"");
+      delete element.dataset.menuCustomCss;
       element.classList.remove("menuElementBeingEdited");
     }
     delete elementStyles[id];
@@ -1947,6 +1948,7 @@ function installMainMenuRedesign(){
     collectMenuEditableElements().forEach(element=>{
       if(!isPanelElement(element)){
         element.setAttribute("style",element.dataset.menuOriginalStyle||"");
+        delete element.dataset.menuCustomCss;
         element.classList.remove("menuElementBeingEdited");
       }
       element.classList.remove("menuElementSelected");
