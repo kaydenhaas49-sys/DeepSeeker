@@ -810,17 +810,20 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  padding:8px;
-  border:1px solid rgba(231,220,171,.12);
+  min-height:92px;
+  padding:13px 12px;
+  border:1px solid rgba(231,220,171,.14);
   border-radius:2px;
-  background:rgba(4,6,5,.34);
+  background:rgba(4,6,5,.38);
   color:#bbb5a1;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
 }
-.menuHomeRedesign .saveSlotCard:hover{background:rgba(235,218,164,.07)}
+.menuHomeRedesign .saveSlotCard:hover{background:rgba(235,218,164,.07);border-color:rgba(231,220,171,.22)}
 .menuHomeRedesign .saveSlotCard.selected{
-  border-color:rgba(223,173,69,.60);
-  background:rgba(223,173,69,.10);
-  box-shadow:none;
+  border-color:rgba(223,173,69,.68);
+  background:rgba(223,173,69,.11);
 }
 .menuHomeRedesign .saveSlotTitle{
   font-size:8px;
@@ -906,6 +909,66 @@ function installMainMenuRedesign(){
 .menuHomeRedesign .houseLoader{width:100%;margin:10px 0 0;text-align:left}
 .menuHomeRedesign .houseLoaderTop{color:#96907d}
 .menuHomeRedesign .houseLoaderStatus{color:#777466;min-height:14px}
+.menuNameGate{
+  position:absolute;
+  inset:0;
+  z-index:20;
+  display:none;
+  place-items:center;
+  background:rgba(0,0,0,.50);
+  backdrop-filter:blur(5px);
+}
+.menuNameGate.open{display:grid}
+.menuNameGateCard{
+  width:min(430px,calc(100vw - 40px));
+  padding:24px;
+  border:1px solid rgba(226,211,164,.18);
+  border-radius:3px;
+  background:linear-gradient(145deg,rgba(8,11,9,.94),rgba(3,5,4,.96));
+  box-shadow:0 28px 100px rgba(0,0,0,.62);
+}
+.menuNameGateTitle{
+  font-size:16px;
+  letter-spacing:3px;
+  color:#f0e7c8;
+  margin-bottom:8px;
+}
+.menuNameGateText{
+  margin:0 0 17px;
+  font-size:9px;
+  line-height:1.7;
+  letter-spacing:1.4px;
+  color:#8f8b79;
+}
+.menuNameGateActions{
+  display:flex;
+  gap:7px;
+  margin-top:9px;
+}
+.menuNameGateActions button{
+  flex:1;
+  min-height:38px;
+  border:1px solid rgba(231,220,171,.14);
+  border-radius:2px;
+  background:rgba(255,255,255,.04);
+  color:#cfc6a9;
+  font:inherit;
+  font-size:9px;
+  letter-spacing:1.5px;
+  cursor:pointer;
+}
+.menuNameGateActions button.primary{
+  border-color:rgba(223,173,69,.42);
+  background:rgba(223,173,69,.10);
+  color:#f0dfaf;
+}
+.menuNameGateActions button:hover{background:rgba(223,173,69,.10)}
+.menuNameGate .usernameRow{width:100%;margin:0}
+.menuNameGate .usernameInput{
+  background:rgba(1,3,2,.82);
+  border-color:rgba(231,220,171,.14);
+  border-radius:2px;
+}
 .menuFooter{
   position:absolute;
   left:clamp(22px,3vw,52px);
@@ -1006,7 +1069,6 @@ function installMainMenuRedesign(){
     <div class="menuRightRule"></div>
     <div style="font-size:8px;letter-spacing:2px;color:#b5ae96;margin-bottom:8px">PLAYER</div>
   `;
-  if(usernameRow) right.appendChild(usernameRow);
   if(houseLoader){
     const loaderLabel=document.createElement("div");
     loaderLabel.style.cssText="margin-top:13px;font-size:8px;letter-spacing:2px;color:#b5ae96;";
@@ -1016,12 +1078,86 @@ function installMainMenuRedesign(){
   }
   right.appendChild(saveStatus);
 
+  const nameGate=document.createElement("div");
+  nameGate.className="menuNameGate";
+  nameGate.innerHTML=`
+    <div class="menuNameGateCard">
+      <div class="menuNameGateTitle">IDENTIFY YOURSELF</div>
+      <p class="menuNameGateText">Choose the name that other players will see. Your name is saved locally for future sessions.</p>
+    </div>
+  `;
+  const nameCard=nameGate.firstElementChild;
+  if(usernameRow) nameCard.appendChild(usernameRow);
+
+  const nameActions=document.createElement("div");
+  nameActions.className="menuNameGateActions";
+  const nameCancel=document.createElement("button");
+  nameCancel.type="button";
+  nameCancel.textContent="CANCEL";
+  const nameContinue=document.createElement("button");
+  nameContinue.type="button";
+  nameContinue.className="primary";
+  nameContinue.textContent="CONTINUE";
+  nameActions.append(nameCancel,nameContinue);
+  nameCard.appendChild(nameActions);
+  layout.appendChild(nameGate);
+
   const footer=document.createElement("div");
   footer.className="menuFooter";
   footer.innerHTML=`<span>TAB · CONTROLS &nbsp;&nbsp; ESC · RELEASE MOUSE</span><span>STAY IN THE LIGHT. KEEP MOVING.</span>`;
 
   layout.append(logo,nav,slotBar,right,footer);
+
+  let pendingMenuAction=null;
+  const openNameGate=(action)=>{
+    pendingMenuAction=action;
+    const key="deepseeker-player-name";
+    let current="";
+    try{ current=localStorage.getItem(key)||""; }catch{}
+    const input=usernameRow?.querySelector(".usernameInput");
+    if(input) input.value=current;
+    nameGate.classList.add("open");
+    setTimeout(()=>input?.focus(),0);
+  };
+  const closeNameGate=()=>{
+    pendingMenuAction=null;
+    nameGate.classList.remove("open");
+  };
+  const submitNameGate=()=>{
+    const input=usernameRow?.querySelector(".usernameInput");
+    const name=String(input?.value||"").replace(/[<>]/g,"").replace(/\\s+/g," ").trim().slice(0,20);
+    if(!name){
+      input?.focus();
+      return;
+    }
+    try{ localStorage.setItem("deepseeker-player-name",name); }catch{}
+    const action=pendingMenuAction;
+    pendingMenuAction=null;
+    nameGate.classList.remove("open");
+    if(action) action();
+  };
+  nameCancel.addEventListener("click",closeNameGate);
+  nameContinue.addEventListener("click",submitNameGate);
+  usernameRow?.querySelector(".usernameInput")?.addEventListener("keydown",event=>{
+    if(event.key==="Enter"){
+      event.preventDefault();
+      submitNameGate();
+    }else if(event.key==="Escape"){
+      event.preventDefault();
+      closeNameGate();
+    }
+  });
+  usernameRow?.querySelector(".usernameButton")?.addEventListener("click",event=>{
+    event.preventDefault();
+    submitNameGate();
+  });
+
   homeScreen.appendChild(layout);
+
+  window.__deepseekerMenu={
+    openNameGate,
+    closeNameGate
+  };
 }
 
 function updateHouseLoadingUI(progress=null,status=null){
@@ -3240,21 +3376,29 @@ document.querySelectorAll(".phoneSaveSlot").forEach(button=>{
 
 newGameButton.addEventListener("click",event=>{
   event.preventDefault();
-  resetForNewGame(selectedSaveSlot);
+  if(window.__deepseekerMenu?.openNameGate){
+    window.__deepseekerMenu.openNameGate(()=>resetForNewGame(selectedSaveSlot));
+  }
 });
 
 continueButton.addEventListener("click",()=>{
-  continueGame(selectedSaveSlot);
+  if(window.__deepseekerMenu?.openNameGate){
+    window.__deepseekerMenu.openNameGate(()=>continueGame(selectedSaveSlot));
+  }
 });
 
 createLobbyButton.addEventListener("click",()=>{
   const code=Math.random().toString(36).slice(2,8).toUpperCase();
-  enterLobby(code,true);
+  if(window.__deepseekerMenu?.openNameGate){
+    window.__deepseekerMenu.openNameGate(()=>enterLobby(code,true));
+  }
 });
 
 joinLobbyButton.addEventListener("click",()=>{
   const code=window.prompt("Enter the lobby code:");
-  if(code) enterLobby(code,false);
+  if(code && window.__deepseekerMenu?.openNameGate){
+    window.__deepseekerMenu.openNameGate(()=>enterLobby(code,false));
+  }
 });
 
 startLobbyButton.addEventListener("click",()=>{
