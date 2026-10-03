@@ -244,7 +244,7 @@ menuScene.fog=new THREE.Fog(0x746d50,12,68);
 const menuSet=new THREE.Group();
 menuSet.name="RuinedBackroomsMenuSet";
 menuSet.visible=false;
-scene.add(menuSet);
+menuScene.add(menuSet);
 
 const menuWallMaterial=new THREE.MeshStandardMaterial({
   map:menuWallTexture,
@@ -458,10 +458,11 @@ function updateMenuScene(t,dt){
     menuBackdropWasActive=true;
     if(menuBackdropElement) menuBackdropElement.style.display="none";
     menuSet.visible=true;
-    scene.background.set(0x6f694c);
-    scene.fog.color.set(0x746d50);
-    scene.fog.near=12;
-    scene.fog.far=68;
+    world.root.visible=false;
+    menuScene.background.set(0x6f694c);
+    menuScene.fog.color.set(0x746d50);
+    menuScene.fog.near=12;
+    menuScene.fog.far=68;
     menuCamera.position.copy(menuCameraStart);
     menuCamera.lookAt(menuCameraTarget);
   }
@@ -4309,7 +4310,7 @@ function animate(){
   const usingMenuCamera=menuIsVisible && updateMenuScene(t,dt);
 
   renderer.render(
-    scene,
+    usingMenuCamera ? menuScene : scene,
     usingMenuCamera ? menuCamera : camera
   );
 }
