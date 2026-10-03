@@ -4905,6 +4905,29 @@ function animate(){
     flashlightStrength=dimmedStrength;
 
     if(spiderJumpscareTimer>0){
+      flashlightStrength=10.0*flicker;
+    }
+  }
+
+  flashlight.intensity=flashlightOn ? flashlightStrength : 0;
+  if(!houseMode){
+    playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
+  }
+
+  if(!houseMode && spiderMixer && spiderActive){
+    spiderMixer.update(dt);
+  }
+
+  if(spiderJumpscareTimer<=0){
+    groundSpiderEntity();
+  }
+
+  spiderRevealLight.intensity=(!houseMode && spiderActive)
+    ? (spiderJumpscareTimer>0 ? 5.0 : 2.8)
+    : 0;
+
+  if(spiderActive && !houseMode){
+    if(spiderJumpscareTimer>0){
       spiderJumpscareTimer=Math.max(0,spiderJumpscareTimer-dt);
       spiderBehaviorTime+=dt;
 
@@ -4920,24 +4943,16 @@ function animate(){
         THREE.MathUtils.lerp(1.15,.72,easeOut)
       );
       spiderEntity.position.y=camera.position.y-.05;
-
       spiderEntity.scale.setScalar(
-        THREE.MathUtils.lerp(
-          spiderJumpscareScale,
-          1.58,
-          easeOut
-        )
+        THREE.MathUtils.lerp(spiderJumpscareScale,1.58,easeOut)
       );
 
-      // Stay aimed at the player for the entire scare. Do not rotate from
-      // changing animation bounds or camera shake.
       spiderEntity.rotation.y=Math.atan2(
         player.pos.x-spiderEntity.position.x,
         player.pos.z-spiderEntity.position.z
       );
 
       setSpiderAnimation("attack2");
-
       player.keys.clear();
       player.vel.set(0,0,0);
 
@@ -4949,84 +4964,46 @@ function animate(){
         finishSpiderJumpscare();
       }
     }else{
-          spiderEntity.position.y=camera.position.y;
+      spiderBehaviorTime+=dt;
+
+      if(spiderAutoLookTimer>0){
+        spiderAutoLookTimer=Math.max(0,spiderAutoLookTimer-dt);
+        rotatePlayerTowardSpider(dt);
+      }
+
+      if(spiderBehaviorState==="stalk"){
+        setSpiderAnimation("stalk");
+        if(spiderBehaviorTime>=SPIDER_STALK_TIME){
+          spiderBehaviorState="chase";
+          spiderBehaviorTime=0;
+          setSpiderAnimation("chase");
         }
-      }else{
-        spiderEntity.position.y=camera.position.y;
+      }else if(spiderBehaviorState==="chase"){
+        setSpiderAnimation("chase");
+        const distance=moveSpiderTowardPlayer(dt);
+        if(distance<=SPIDER_ATTACK_RANGE){
+          spiderAttackPlayed=false;
+          audio.scare();
+          startSpiderJumpscare();
+        }
+      }else if(spiderBehaviorState==="attack"){
+        setSpiderAnimation("attack");
+        if(!spiderAttackPlayed){
+          spiderAttackPlayed=true;
+          pulse=1;
+        }
+        if(spiderBehaviorTime>=1.0){
+          spiderBehaviorState="chase";
+          spiderBehaviorTime=0;
+          setSpiderAnimation("chase");
+        }
       }
 
       spiderEntity.rotation.y=Math.atan2(
-        -(camera.position.x-spiderEntity.position.x),
-        -(camera.position.z-spiderEntity.position.z)
+        player.pos.x-spiderEntity.position.x,
+        player.pos.z-spiderEntity.position.z
       );
-
-      // Keep the face-forward Attack 2 clip for the full jumpscare.
-      setSpiderAnimation("attack2");
-
-      player.keys.clear();
-      player.vel.set(0,0,0);
-
-      const shake=jumpProgress*jumpProgress;
-      camera.position.x+=Math.sin(spiderBehaviorTime*76)*.012*shake;
-      camera.position.y+=Math.cos(spiderBehaviorTime*68)*.009*shake;
-
-      if(spiderJumpscareTimer<=0){
-        finishSpiderJumpscare();
-      }
-    }else{
-    spiderBehaviorTime+=dt;
-
-    const targetDistance=Math.hypot(
-      player.pos.x-spiderEntity.position.x,
-      player.pos.z-spiderEntity.position.z
-    );
-
-    if(spiderAutoLookTimer>0){
-      spiderAutoLookTimer=Math.max(
-        0,
-        spiderAutoLookTimer-dt
-      );
-      rotatePlayerTowardSpider(dt);
-    }
-
-    if(spiderBehaviorState==="stalk"){
-      setSpiderAnimation("stalk");
-
-      if(spiderBehaviorTime>=SPIDER_STALK_TIME){
-        spiderBehaviorState="chase";
-        spiderBehaviorTime=0;
-        setSpiderAnimation("chase");
-      }
-    }else if(spiderBehaviorState==="chase"){
-      setSpiderAnimation("chase");
-
-      const distance=moveSpiderTowardPlayer(dt);
-
-      if(distance<=SPIDER_ATTACK_RANGE){
-        spiderAttackPlayed=false;
-        audio.scare();
-        startSpiderJumpscare();
-      }
-    }else if(spiderBehaviorState==="attack"){
-      setSpiderAnimation("attack");
-
-      if(!spiderAttackPlayed){
-        spiderAttackPlayed=true;
-        pulse=1;
-      }
-
-      if(spiderBehaviorTime>=1.0){
-        spiderBehaviorState="chase";
-        spiderBehaviorTime=0;
-        setSpiderAnimation("chase");
-      }
-    }
-
-    spiderEntity.rotation.y=Math.atan2(
-      player.pos.x-spiderEntity.position.x,
-      player.pos.z-spiderEntity.position.z
-    );
-    spiderEntity.visible=true;
+      spiderEntity.visible=true;
     }
   }else{
     spiderEntity.visible=false;
