@@ -3236,6 +3236,12 @@ spiderEntity.visible=false;
 const spiderRevealLight=new THREE.PointLight(0xff7a38,0,18,1.6);
 spiderRevealLight.position.set(0,1.2,0);
 spiderEntity.add(spiderRevealLight);
+
+// A neutral fill light sits close to the spider so its actual body stays readable
+// during the chase. This is separate from the orange reveal glow.
+const spiderBodyLight=new THREE.PointLight(0xffe8d0,0,8,1.8);
+spiderBodyLight.position.set(0,1.15,.35);
+spiderEntity.add(spiderBodyLight);
 scene.add(spiderEntity);
 
 let spiderLoaded=false;
@@ -3824,8 +3830,14 @@ function finishSpiderModel(model,animations,sourceName){
       // Keep the spider readable during the chase even when the Backrooms are
       // nearly black. This is a subtle material lift, not a visible glow.
       if("emissive" in material){
-        material.emissive=new THREE.Color(0x2b170f);
-        material.emissiveIntensity=.42;
+        material.emissive=new THREE.Color(0x4a2013);
+        material.emissiveIntensity=.95;
+      }
+
+      // Some FBX materials arrive with extremely dark baked colors. Give them
+      // a warm visible base while keeping any supplied texture map intact.
+      if(material.color){
+        material.color.set(0x8a5038);
       }
 
       if("flatShading" in material){
@@ -4657,7 +4669,11 @@ function animate(){
   }
 
   spiderRevealLight.intensity=(!houseMode && spiderActive)
-    ? (spiderJumpscareTimer>0 ? 5.8 : 3.6)
+    ? (spiderJumpscareTimer>0 ? 5.0 : 2.8)
+    : 0;
+
+  spiderBodyLight.intensity=(!houseMode && spiderActive)
+    ? (spiderJumpscareTimer>0 ? 11.0 : 7.5)
     : 0;
 
   if(spiderActive && !houseMode){
