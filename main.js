@@ -391,17 +391,70 @@ const menuLightFixtures3D=[
   [-22,-57,7.2,15.0],[0,-56,5.4,15.6],[22,-57,7.8,16.2],[42,-55,5.5,16.8]
 ];
 
+function addCrackedFixtureModel(x,z,index){
+  const group=new THREE.Group();
+  group.name="FluorescentCracked";
+  group.position.set(x,8.97,z);
+
+  // Dark housing beneath the broken diffuser makes the gaps read as real breaks
+  // instead of painted lines floating over an intact rectangle.
+  const housing=new THREE.Mesh(
+    new THREE.BoxGeometry(3.5,.08,.95),
+    new THREE.MeshStandardMaterial({
+      color:0x171714,
+      roughness:.9
+    })
+  );
+  housing.position.y=-.055;
+  group.add(housing);
+
+  const pieces=[
+    {w:1.03,x:-1.16,y:.008,z:.012,rx:-.025,rz:-.018},
+    {w:.92,x:-.12,y:-.018,z:-.018,rx:.012,rz:.030},
+    {w:1.18,x:1.00,y:.014,z:.018,rx:-.018,rz:-.024}
+  ];
+
+  for(const piece of pieces){
+    const mesh=new THREE.Mesh(
+      new THREE.BoxGeometry(piece.w,.065,.84),
+      menuLightMaterial
+    );
+    mesh.position.set(piece.x,piece.y,piece.z);
+    mesh.rotation.set(piece.rx,0,piece.rz);
+    mesh.name="CrackedDiffuserPiece";
+    group.add(mesh);
+  }
+
+  // A small broken shard makes some damaged fixtures visibly incomplete.
+  if(index%3!==1){
+    const shard=new THREE.Mesh(
+      new THREE.BoxGeometry(.34,.052,.34),
+      menuLightMaterial
+    );
+    shard.position.set(index%2===0 ? 1.52 : -1.52,.055,index%2===0 ? -.10 : .11);
+    shard.rotation.set(.08,0,index%2===0 ? .16 : -.12);
+    shard.name="CrackedDiffuserShard";
+    group.add(shard);
+  }
+
+  menuSet.add(group);
+  return group;
+}
+
 for(let fixtureIndex=0;fixtureIndex<menuLightFixtures3D.length;fixtureIndex++){
   const [x,z,power,phase]=menuLightFixtures3D[fixtureIndex];
   const cracked=[0,1,2,4,5,7,8,9,10,12,13,14,15,16,17,18,20,21,22,24,25,26,27,29,30].includes(fixtureIndex);
   const lightPower=cracked ? power*.24 : power;
 
-  const fixture=addMenuBox(
-    "Fluorescent",
-    new THREE.Vector3(3.5,.10,.95),
-    new THREE.Vector3(x,8.97,z),
-    menuLightMaterial
-  );
+  const fixture=cracked
+    ? addCrackedFixtureModel(x,z,fixtureIndex)
+    : addMenuBox(
+      "Fluorescent",
+      new THREE.Vector3(3.5,.10,.95),
+      new THREE.Vector3(x,8.97,z),
+      menuLightMaterial
+    );
+
   fixture.userData.basePower=lightPower;
   fixture.userData.phase=phase;
   fixture.userData.cracked=cracked;
