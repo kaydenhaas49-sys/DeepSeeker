@@ -264,9 +264,9 @@ for(const [x,z,w,d,h,rot] of [
 
 // Mid-room architectural frame: a doorless opening that gives the camera a
 // strong near-to-far read and keeps the menu unmistakably inside the level.
-addMenuBox("MidRoomHeader",new THREE.Vector3(17.0,.72,.42),new THREE.Vector3(4.5,7.15,-17.5),menuRuinMaterial);
-addMenuBox("MidRoomLeft",new THREE.Vector3(.48,6.9,7.0),new THREE.Vector3(-4.0,3.45,-18.0),menuRuinMaterial);
-addMenuBox("MidRoomRight",new THREE.Vector3(.48,6.9,7.0),new THREE.Vector3(13.0,3.45,-18.0),menuRuinMaterial);
+addMenuBox("MidRoomHeader",new THREE.Vector3(17.0,.72,.42),new THREE.Vector3(4.5,7.15,-17.5),menuWallMaterial);
+addMenuBox("MidRoomLeft",new THREE.Vector3(.48,6.9,7.0),new THREE.Vector3(-4.0,3.45,-18.0),menuWallMaterial);
+addMenuBox("MidRoomRight",new THREE.Vector3(.48,6.9,7.0),new THREE.Vector3(13.0,3.45,-18.0),menuWallMaterial);
 addMenuBox("MidRoomDark",new THREE.Vector3(16.0,6.45,.16),new THREE.Vector3(4.5,3.2,-18.9),menuDarkMaterial);
 
 // The main visual anchor: a deep open bay that disappears into fog.
