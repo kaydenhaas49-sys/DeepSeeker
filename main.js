@@ -3288,7 +3288,9 @@ const SPIDER_ANIMATION_RANGES={
 const SPIDER_ANIMATION_ALIAS={
   idle:"idle1",
   stalk:"idle2",
-  chase:"walk",
+  // Walk is currently isolated because that clip is the one suspected of
+  // breaking the FBX rig. The spider still physically chases the player.
+  chase:"idle2",
   attack:"attack1",
   hit:"hit1",
   death:"die1"
