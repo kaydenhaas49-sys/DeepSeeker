@@ -1052,10 +1052,11 @@ function installMainMenuRedesign(){
 .menuRightPanel{
   position:absolute;
   left:clamp(24px,4vw,60px);
-  top:clamp(165px,19vh,190px);
+  top:clamp(158px,18vh,184px);
   width:min(390px,calc(100vw - 48px));
+  min-height:205px;
   box-sizing:border-box;
-  padding:11px 0 0 14px;
+  padding:14px 0 16px 14px;
   border-left:1px solid rgba(223,173,69,.32);
   color:#918b79;
   text-shadow:0 2px 8px #000;
@@ -1089,13 +1090,13 @@ function installMainMenuRedesign(){
   margin:0 0 9px;
   max-width:360px;
   font-size:9px;
-  line-height:1.65;
+  line-height:1.8;
   color:#777165;
 }
 .menuRightRule{
   height:1px;
   background:rgba(226,211,164,.08);
-  margin:9px 0 10px;
+  margin:12px 0 13px;
 }
 .menuRightSectionLabel{
   margin-bottom:5px;
@@ -1114,7 +1115,7 @@ function installMainMenuRedesign(){
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:10px;
-  margin-top:9px;
+  margin-top:13px;
 }
 .menuRightMetaRow{
   display:flex;
@@ -1130,7 +1131,7 @@ function installMainMenuRedesign(){
 .menuNav{
   position:absolute;
   left:clamp(24px,4vw,60px);
-  top:clamp(338px,39vh,382px);
+  top:clamp(382px,44vh,430px);
   width:min(390px,calc(100vw - 48px));
   display:flex;
   flex-direction:column;
@@ -1205,7 +1206,7 @@ function installMainMenuRedesign(){
 .menuSlotBar{
   position:absolute;
   left:clamp(24px,4vw,60px);
-  top:clamp(660px,74vh,700px);
+  top:clamp(720px,82vh,790px);
   width:min(390px,calc(100vw - 48px));
   color:#8c8675;
   text-shadow:0 2px 8px #000;
@@ -1229,8 +1230,8 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:70px;
-  padding:9px 11px;
+  min-height:88px;
+  padding:13px 11px;
   border:1px solid rgba(231,220,171,.09);
   border-radius:4px;
   background:rgba(5,6,5,.34);
@@ -1262,8 +1263,8 @@ function installMainMenuRedesign(){
 .menuHomeRedesign .saveSlotActions{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:5px;
-  margin-top:6px;
+  gap:6px;
+  margin-top:8px;
 }
 .menuHomeRedesign .saveSlotActions button{
   padding:5px 4px;
@@ -1293,9 +1294,9 @@ function installMainMenuRedesign(){
     left:20px;
     width:calc(100vw - 40px);
   }
-  .menuRightPanel{top:145px}
-  .menuNav{top:330px}
-  .menuSlotBar{top:650px}
+  .menuRightPanel{top:140px;min-height:205px}
+  .menuNav{top:350px}
+  .menuSlotBar{top:690px}
   .menuRightMeta{grid-template-columns:1fr 1fr 1fr}
 }
 `;
