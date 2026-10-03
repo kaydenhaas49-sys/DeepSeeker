@@ -914,6 +914,21 @@ function installMainMenuRedesign(){
 .menuHomeLayout.menuLayoutEditing .menuResizeHandle{display:block}
 .menuLayoutHint{margin-top:12px;padding:9px 10px;border:1px solid rgba(231,220,171,.08);border-radius:4px;background:rgba(255,255,255,.025);color:#77705f;font-size:7px;line-height:1.7;letter-spacing:1px}
 .menuLayoutSelection{margin-top:8px;color:#bfb18d;min-height:12px}
+.menuElementEditor{margin-top:14px;padding-top:13px;border-top:1px solid rgba(231,220,171,.08)}
+.menuEditorSectionTitle{font-size:8px;letter-spacing:2px;color:#c7b991}
+.menuElementControlGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+.menuElementControlGrid label{display:grid;gap:4px;font-size:6px;letter-spacing:1.2px;color:#77705f}
+.menuElementControlGrid input,.menuElementControlGrid select,.menuElementEditor textarea{width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid rgba(231,220,171,.11);border-radius:4px;background:#020302;color:#e4dbc0;font:inherit;font-size:8px;outline:none}
+.menuElementEditor textarea{min-height:62px;resize:vertical;line-height:1.5}
+.menuElementControlGrid input:focus,.menuElementEditor textarea:focus{border-color:rgba(223,190,107,.42)}
+.menuElementActions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px}
+.menuElementActions button{min-height:32px;border:1px solid rgba(231,220,171,.11);border-radius:4px;background:rgba(255,255,255,.035);color:#cfc5a8;font:inherit;font-size:7px;letter-spacing:1px;cursor:pointer}
+.menuElementActions button:hover{background:rgba(223,173,69,.10);border-color:rgba(223,173,69,.28)}
+.menuElementSelected{outline:1px solid rgba(245,205,116,.95)!important;outline-offset:3px;z-index:35}
+.menuElementResizeHandle{display:none;position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;border:1px solid rgba(245,214,143,.9);border-radius:2px;background:#090a07;box-shadow:0 3px 12px rgba(0,0,0,.5);cursor:nwse-resize;z-index:90}
+.menuElementResizeHandle::before{content:"";position:absolute;right:2px;bottom:3px;width:8px;height:1px;background:#d8b865;transform:rotate(-45deg);transform-origin:right center;box-shadow:0 -3px 0 rgba(216,184,101,.7)}
+.menuHomeLayout.menuLayoutEditing .menuElementSelected .menuElementResizeHandle{display:block}
+.menuElementBeingEdited{box-sizing:border-box}
 
 .menuHomeLayout::before{
   content:"";
@@ -1685,6 +1700,8 @@ function installMainMenuRedesign(){
     footer:{x:3,y:93,w:94,h:6}
   };
 
+  const isPanelElement=(element)=>Boolean(element && (element.classList.contains("menuLogo") || element.classList.contains("menuNav") || element.classList.contains("menuSlotBar") || element.classList.contains("menuRightPanel") || element.classList.contains("menuFooter")));
+ 
   const defaultMenuConfig={
     url:"https://images.unsplash.com/photo-1761251946420-8b65ad19f2e7?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400",
     x:50,
@@ -1701,6 +1718,7 @@ function installMainMenuRedesign(){
     const saved=JSON.parse(localStorage.getItem("deepseeker-menu-config")||"null");
     if(saved && typeof saved==="object") menuConfig={...menuConfig,...saved,icons:{...defaultMenuIcons,...(saved.icons||{})},layout:{...defaultMenuLayout,...(saved.layout||{})},elements:{...(saved.elements||{})}};
   }catch{}
+  Object.assign(elementStyles,menuConfig.elements||{});
 
   function syncMenuEditor(){
     urlInput.value=String(menuConfig.url||defaultMenuConfig.url);
@@ -1787,18 +1805,20 @@ function installMainMenuRedesign(){
       align:style.textAlign,
       color:style.color,
       background:style.backgroundColor,
-      customCss:""
+      customCss:element.dataset.menuCustomCss||""
     };
   }
 
   function applyElementStyle(element,id,state){
     if(!element||!state) return;
     element.classList.add("menuElementBeingEdited");
-    element.style.position="relative";
-    element.style.left=Number.isFinite(Number(state.x))?Number(state.x)+"px":"0px";
-    element.style.top=Number.isFinite(Number(state.y))?Number(state.y)+"px":"0px";
-    if(Number.isFinite(Number(state.w))){element.style.width=Math.max(1,Number(state.w))+"px";}
-    if(Number.isFinite(Number(state.h))){element.style.height=Math.max(1,Number(state.h))+"px";}
+    if(!isPanelElement(element)){
+      element.style.position="relative";
+      element.style.left=Number.isFinite(Number(state.x))?Number(state.x)+"px":"0px";
+      element.style.top=Number.isFinite(Number(state.y))?Number(state.y)+"px":"0px";
+      if(Number.isFinite(Number(state.w))){element.style.width=Math.max(1,Number(state.w))+"px";}
+      if(Number.isFinite(Number(state.h))){element.style.height=Math.max(1,Number(state.h))+"px";}
+    }
     if(Number.isFinite(Number(state.fontSize)) && Number(state.fontSize)>0) element.style.fontSize=Number(state.fontSize)+"px";
     if(state.letterSpacing!==undefined && state.letterSpacing!=="") element.style.letterSpacing=Number(state.letterSpacing)+"px";
     if(state.lineHeight!==undefined && state.lineHeight!=="") element.style.lineHeight=String(state.lineHeight);
@@ -1811,7 +1831,16 @@ function installMainMenuRedesign(){
     if(state.align!==undefined && state.align!=="") element.style.textAlign=String(state.align);
     if(state.color!==undefined && state.color!=="") element.style.color=String(state.color);
     if(state.background!==undefined && state.background!=="") element.style.background=String(state.background);
-    if(state.customCss!==undefined) element.style.cssText += String(state.customCss).trim() ? ";"+String(state.customCss) : "";
+    if(state.customCss!==undefined){
+      element.dataset.menuCustomCss=String(state.customCss);
+      for(const declaration of String(state.customCss).split(";")){
+        const colon=declaration.indexOf(":");
+        if(colon<=0) continue;
+        const prop=declaration.slice(0,colon).trim();
+        const value=declaration.slice(colon+1).trim();
+        if(prop) element.style.setProperty(prop,value);
+      }
+    }
     if(element.tagName==="SPAN" && (state.w!==undefined || state.h!==undefined)) element.style.display="inline-block";
     element.dataset.menuEdited="1";
     elementStyles[id]={...state};
@@ -1824,12 +1853,19 @@ function installMainMenuRedesign(){
     for(const [key,input] of Object.entries(elementInputs)) if(input) input.value=state[key]===undefined?"":String(state[key]);
     selectedElementId=id||"";
     selectedElement=element;
-    if(elementStatus) elementStatus.textContent=element.dataset.menuEditLabel||id||"";
+    if(elementSelect) elementSelect.value=id||"";
+    if(elementStatus) elementStatus.textContent=(element.dataset.menuEditLabel||id||"")+(isPanelElement(element)?" · PANEL GEOMETRY USES DRAG/RESIZE":"");
+    for(const key of ["x","y","w","h"]) if(elementInputs[key]) elementInputs[key].disabled=isPanelElement(element);
   }
 
   function populateElementSelect(){
     if(!elementSelect) return;
     const elements=collectMenuEditableElements();
+    attachDirectElementEditors(elements);
+    for(const [id,state] of Object.entries(elementStyles)){
+      const savedElement=getElementById(id);
+      if(savedElement) applyElementStyle(savedElement,id,state);
+    }
     elementSelect.innerHTML="";
     elements.forEach((element,index)=>{
       const option=document.createElement("option");
@@ -1852,18 +1888,62 @@ function installMainMenuRedesign(){
     if(elementStatus) elementStatus.textContent="APPLIED · "+(element.dataset.menuEditLabel||element.dataset.menuEditId);
   }
 
+  function attachDirectElementEditors(elements){
+    for(const element of elements){
+      if(element.dataset.menuDirectEditor==="1" || isPanelElement(element)) continue;
+      element.dataset.menuDirectEditor="1";
+      let handle=element.querySelector(":scope > .menuElementResizeHandle");
+      if(!handle){
+        handle=document.createElement("span");
+        handle.className="menuElementResizeHandle";
+        handle.title="Resize element";
+        element.appendChild(handle);
+        handle.addEventListener("pointerdown",event=>{
+          if(!menuLayoutEditing) return;
+          event.preventDefault();event.stopPropagation();
+          syncElementInputs(element);
+          const id=element.dataset.menuEditId;
+          const base={...readComputedElementState(element),...(elementStyles[id]||{})};
+          const sx=event.clientX,sy=event.clientY;
+          const sw=Number(base.w)||element.getBoundingClientRect().width;
+          const sh=Number(base.h)||element.getBoundingClientRect().height;
+          const move=ev=>applyElementStyle(element,id,{...base,w:Math.max(12,sw+(ev.clientX-sx)),h:Math.max(8,sh+(ev.clientY-sy))});
+          const stop=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",stop);syncElementInputs(element);};
+          document.addEventListener("pointermove",move);document.addEventListener("pointerup",stop,{once:true});
+        });
+      }
+      element.addEventListener("pointerdown",event=>{
+        if(!menuLayoutEditing || event.target.closest(".menuElementResizeHandle")) return;
+        event.preventDefault();event.stopPropagation();
+        syncElementInputs(element);
+        element.classList.add("menuElementSelected");
+        const id=element.dataset.menuEditId;
+        const base={...readComputedElementState(element),...(elementStyles[id]||{})};
+        const sx=event.clientX,sy=event.clientY;
+        const sl=Number(base.x)||0,st=Number(base.y)||0;
+        const move=ev=>applyElementStyle(element,id,{...base,x:sl+(ev.clientX-sx),y:st+(ev.clientY-sy)});
+        const stop=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",stop);syncElementInputs(element);};
+        document.addEventListener("pointermove",move);document.addEventListener("pointerup",stop,{once:true});
+      });
+    }
+  }
+
   function resetSelectedElement(){
     const element=getElementById(elementSelect?.value||selectedElementId);
     if(!element) return;
     const id=element.dataset.menuEditId;
-    element.removeAttribute("style");
+    if(!isPanelElement(element)) element.removeAttribute("style");
     delete elementStyles[id];
+    element.classList.remove("menuElementSelected");
     syncElementInputs(element);
     if(elementStatus) elementStatus.textContent="RESET · "+(element.dataset.menuEditLabel||id);
   }
 
   function resetAllElements(){
-    collectMenuEditableElements().forEach(element=>element.removeAttribute("style"));
+    collectMenuEditableElements().forEach(element=>{
+      if(!isPanelElement(element)) element.removeAttribute("style");
+      element.classList.remove("menuElementSelected");
+    });
     for(const key of Object.keys(elementStyles)) delete elementStyles[key];
     if(elementStatus) elementStatus.textContent="ALL ELEMENTS RESET";
     populateElementSelect();
@@ -1883,8 +1963,10 @@ function installMainMenuRedesign(){
     if(menuConfig.icons && typeof menuConfig.icons==="object"){
       menuIcons={...defaultMenuIcons,...menuConfig.icons};
     }
+    Object.assign(elementStyles,menuConfig.elements||{});
     refreshMenuIcons();
     syncMenuEditor();
+    populateElementSelect();
   }
 
   for(const input of [xInput,yInput,brightnessInput,saturationInput,sepiaInput]){
@@ -1930,6 +2012,7 @@ function installMainMenuRedesign(){
     applyMenuEditor(menuConfig);
     localStorage.setItem("deepseeker-menu-config",JSON.stringify(menuConfig));
     localStorage.setItem("deepseeker-menu-icons",JSON.stringify(menuIcons));
+    localStorage.setItem("deepseeker-menu-elements",JSON.stringify(elementStyles));
     status.textContent="SAVED ON THIS BROWSER";
   });
 
@@ -1947,7 +2030,8 @@ function installMainMenuRedesign(){
     const snippet=
       "const MENU_BACKGROUND_CONFIG="+JSON.stringify(menuConfig,null,2)+";\n"+
       "const MENU_ICONS="+JSON.stringify(menuConfig.icons,null,2)+";\n"+
-      "const MENU_LAYOUT="+JSON.stringify(menuConfig.layout,null,2)+";";
+      "const MENU_LAYOUT="+JSON.stringify(menuConfig.layout,null,2)+";\n"+
+      "const MENU_ELEMENTS="+JSON.stringify(menuConfig.elements,null,2)+";";
     try{
       await navigator.clipboard.writeText(snippet);
       status.textContent="GITHUB CONFIG COPIED";
