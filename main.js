@@ -3547,13 +3547,12 @@ function startSpiderJumpscare(){
   spiderJumpscareScale=1.16;
   spiderEntity.scale.setScalar(spiderJumpscareScale);
 
-  // The spider is directly between the player and the camera during the
-  // jumpscare, so its normal chase-facing rotation would show its back.
-  // Rotate it 180 degrees so the face points straight into the camera.
+  // The Spider-Psionic model faces +Z, so the normal player-facing
+  // yaw points its face directly toward the camera at this position.
   spiderEntity.rotation.y=Math.atan2(
     player.pos.x-spiderEntity.position.x,
     player.pos.z-spiderEntity.position.z
-  )+Math.PI;
+  );
 
   spiderEntity.visible=true;
 
@@ -4948,11 +4947,12 @@ function animate(){
         THREE.MathUtils.lerp(spiderJumpscareScale,1.58,easeOut)
       );
 
-      // Keep the face aimed at the camera for the whole attack.
+      // Keep the Spider-Psionic model facing the camera for the
+      // whole attack. Do not add 180 degrees; that turns its back forward.
       spiderEntity.rotation.y=Math.atan2(
         player.pos.x-spiderEntity.position.x,
         player.pos.z-spiderEntity.position.z
-      )+Math.PI;
+      );
 
       setSpiderAnimation("attack2");
       player.keys.clear();
