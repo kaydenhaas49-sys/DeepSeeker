@@ -789,7 +789,7 @@ function installMainMenuRedesign(){
   position:absolute;
   left:clamp(20px,3vw,52px);
   top:calc(clamp(155px,25vh,250px) + 255px);
-  width:min(500px,41vw);
+  width:min(400px,34vw);
   color:#989381;
   text-shadow:0 2px 8px #000;
 }
@@ -867,7 +867,7 @@ function installMainMenuRedesign(){
   position:absolute;
   left:clamp(20px,3vw,52px);
   bottom:clamp(16px,2.5vh,32px);
-  width:min(470px,38vw);
+  width:min(400px,34vw);
   min-height:320px;
   padding:30px 24px;
   border-left:3px solid rgba(223,173,69,.34);
@@ -986,8 +986,8 @@ function installMainMenuRedesign(){
 .menuFooter span:last-child{text-align:left}
 @media(max-width:900px){
   .menuNav{width:min(320px,45vw)}
-  .menuSlotBar{width:min(440px,58vw)}
-  .menuRightPanel{width:min(420px,48vw);left:20px}
+  .menuSlotBar{width:min(380px,58vw)}
+  .menuRightPanel{width:min(380px,58vw);left:20px}
 }
 @media(max-width:650px){
   .menuNav{top:145px;width:min(320px,82vw)}
