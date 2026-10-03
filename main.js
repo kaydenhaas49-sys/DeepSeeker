@@ -1207,7 +1207,7 @@ function installMainMenuRedesign(){
 .menuSlotBar{
   position:absolute;
   left:clamp(24px,4vw,60px);
-  top:clamp(805px,91vh,860px);
+  top:clamp(640px,68vh,680px);
   width:min(390px,calc(100vw - 48px));
   color:#8c8675;
   text-shadow:0 2px 8px #000;
@@ -1226,13 +1226,13 @@ function installMainMenuRedesign(){
   display:grid;
   grid-template-columns:1fr;
   gap:6px;
-  max-height:270px;
-  overflow:auto;
+  max-height:none;
+  overflow:visible;
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:88px;
-  padding:13px 11px;
+  min-height:68px;
+  padding:9px 11px;
   border:1px solid rgba(231,220,171,.09);
   border-radius:4px;
   background:rgba(5,6,5,.34);
@@ -1297,7 +1297,7 @@ function installMainMenuRedesign(){
   }
   .menuRightPanel{top:182px;min-height:205px}
   .menuNav{top:405px}
-  .menuSlotBar{top:760px}
+  .menuSlotBar{top:610px}
   .menuRightMeta{grid-template-columns:1fr 1fr 1fr}
 }
 `;
