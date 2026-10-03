@@ -1768,7 +1768,7 @@ function installMainMenuRedesign(){
 
   function collectMenuEditableElements(){
     const all=[...layout.querySelectorAll("*")].filter(element=>{
-      if(element===editor || element.closest(".menuEditor") || element===editButton || element.classList.contains("menuResizeHandle")) return false;
+      if(element===editor || element.closest(".menuEditor") || element===editButton || element.classList.contains("menuResizeHandle") || element.classList.contains("menuElementResizeHandle")) return false;
       return element!==layout;
     });
 
@@ -1811,6 +1811,7 @@ function installMainMenuRedesign(){
 
   function applyElementStyle(element,id,state){
     if(!element||!state) return;
+    if(!element.dataset.menuOriginalStyle) element.dataset.menuOriginalStyle=element.getAttribute("style")||"";
     element.classList.add("menuElementBeingEdited");
     if(!isPanelElement(element)){
       element.style.position="relative";
@@ -1932,7 +1933,10 @@ function installMainMenuRedesign(){
     const element=getElementById(elementSelect?.value||selectedElementId);
     if(!element) return;
     const id=element.dataset.menuEditId;
-    if(!isPanelElement(element)) element.removeAttribute("style");
+    if(!isPanelElement(element)){
+      element.setAttribute("style",element.dataset.menuOriginalStyle||"");
+      element.classList.remove("menuElementBeingEdited");
+    }
     delete elementStyles[id];
     element.classList.remove("menuElementSelected");
     syncElementInputs(element);
@@ -1941,7 +1945,10 @@ function installMainMenuRedesign(){
 
   function resetAllElements(){
     collectMenuEditableElements().forEach(element=>{
-      if(!isPanelElement(element)) element.removeAttribute("style");
+      if(!isPanelElement(element)){
+        element.setAttribute("style",element.dataset.menuOriginalStyle||"");
+        element.classList.remove("menuElementBeingEdited");
+      }
       element.classList.remove("menuElementSelected");
     });
     for(const key of Object.keys(elementStyles)) delete elementStyles[key];
