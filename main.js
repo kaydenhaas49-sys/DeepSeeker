@@ -3288,8 +3288,8 @@ const SPIDER_ANIMATION_RANGES={
 const SPIDER_ANIMATION_ALIAS={
   idle:"idle1",
   stalk:"idle2",
-  chase:"idle2",
-  attack:"attack2",
+  chase:"walk",
+  attack:"attack1",
   hit:"hit1",
   death:"die1"
 };
@@ -4077,6 +4077,7 @@ function finishSpiderModel(model,animations,sourceName){
 
     console.log("[DeepSeeker] Spider animation map",{
       selected:[...directClips.keys()],
+      aliases:SPIDER_ANIMATION_ALIAS,
       rootBones:[...rootBoneNames],
       trackCounts:[...directClips.entries()].map(([name,clip])=>[
         name,
