@@ -111,7 +111,7 @@ const MENU_CAMERA_HEIGHT=2.28;
 const MENU_LOOK_HEIGHT=2.65;
 let menuSceneReady=false;
 let menuBackdropWasActive=false;
-const menuSpiderBase=new THREE.Vector3(40,SPIDER_GROUND_OFFSET,18);
+const menuSpiderBase=new THREE.Vector3(40,0.08,18);
 let menuSpiderPhase=0;
 
 function updateMenuSpider(t,dt){
