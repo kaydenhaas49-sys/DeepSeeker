@@ -849,7 +849,20 @@ function installMainMenuRedesign(){
   z-index:0;
   overflow:hidden;
   pointer-events:none;
-  background:#080906;
+  background:#171611;
+}
+.menuBGPhoto{
+  position:absolute;
+  inset:-2%;
+  background-image:
+    linear-gradient(90deg,rgba(10,9,6,.84) 0%,rgba(10,9,6,.58) 26%,rgba(10,9,6,.14) 57%,rgba(5,6,5,.42) 100%),
+    linear-gradient(180deg,rgba(56,48,29,.16),rgba(5,6,5,.54)),
+    url("https://i1.pickpik.com/photos/438/198/326/corridor-hallway-old-run-down-preview.jpg");
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  filter:saturate(.72) contrast(1.08) brightness(.72);
+  transform:scale(1.025);
 }
 #menuBackdrop::before{
   content:"";
@@ -857,8 +870,8 @@ function installMainMenuRedesign(){
   inset:0;
   z-index:2;
   background:
-    linear-gradient(90deg,rgba(3,4,3,.78) 0%,rgba(3,4,3,.32) 34%,rgba(3,4,3,.08) 66%,rgba(3,4,3,.28) 100%),
-    radial-gradient(ellipse at 73% 53%,transparent 0 13%,rgba(0,0,0,.08) 32%,rgba(0,0,0,.88) 100%);
+    radial-gradient(ellipse at 73% 48%,transparent 0 18%,rgba(0,0,0,.18) 46%,rgba(0,0,0,.78) 100%),
+    linear-gradient(180deg,rgba(0,0,0,.08),transparent 28%,rgba(0,0,0,.52) 100%);
 }
 #menuBackdrop::after{
   content:"";
@@ -866,33 +879,10 @@ function installMainMenuRedesign(){
   inset:0;
   z-index:3;
   background:
-    linear-gradient(180deg,rgba(0,0,0,.12),transparent 28%,rgba(0,0,0,.48) 100%),
-    repeating-linear-gradient(180deg,transparent 0 7px,rgba(255,255,255,.008) 8px,transparent 9px);
+    linear-gradient(90deg,rgba(2,3,2,.18),transparent 50%,rgba(0,0,0,.14)),
+    repeating-linear-gradient(180deg,transparent 0 8px,rgba(255,255,255,.007) 9px,transparent 10px);
 }
-.menuBGScene{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  display:block;
-}
-.menuBGScene .menuFixture{animation:menuFixtureFlicker 5.8s steps(1,end) infinite}
-.menuBGScene .menuFixture.delay{animation-delay:2.4s;opacity:.45}
-.menuBGScene .menuDust{animation:menuDustDrift 14s linear infinite}
-@keyframes menuFixtureFlicker{
-  0%,100%{opacity:.84}
-  38%{opacity:.82}
-  39%{opacity:.16}
-  40%{opacity:.72}
-  43%{opacity:.46}
-  44%{opacity:.05}
-  46%{opacity:.62}
-  72%{opacity:.55}
-}
-@keyframes menuDustDrift{
-  from{transform:translateX(-1%)}
-  to{transform:translateX(1%)}
-}
+.menuBGScene,
 #menuBackdrop .menuBGHall,
 #menuBackdrop .menuBGCeiling,
 #menuBackdrop .menuBGFloor,
@@ -900,8 +890,9 @@ function installMainMenuRedesign(){
 #menuBackdrop .menuBGWallR,
 #menuBackdrop .menuBGLight,
 #menuBackdrop .menuBGGlow,
-#menuBackdrop .menuBGScan{display:none}
-
+#menuBackdrop .menuBGScan{
+  display:none;
+}
 #homeScreen.menuHomeRedesign{
   position:absolute;
   inset:0;
@@ -1228,167 +1219,8 @@ function installMainMenuRedesign(){
   const backdrop=document.createElement("div");
   backdrop.id="menuBackdrop";
   backdrop.innerHTML=`
-    <svg class="menuBGScene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <defs>
-          <linearGradient id="abg-wall" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#aaa477"/><stop offset=".55" stop-color="#969065"/><stop offset="1" stop-color="#777354"/>
-          </linearGradient>
-          <linearGradient id="abg-floor" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#7a765b"/><stop offset=".45" stop-color="#5a5745"/><stop offset="1" stop-color="#24251e"/>
-          </linearGradient>
-          <linearGradient id="abg-ceil" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#66675c"/><stop offset="1" stop-color="#929181"/>
-          </linearGradient>
-          <radialGradient id="abg-light" cx=".5" cy=".5" r=".5">
-            <stop offset="0" stop-color="#fff2bc" stop-opacity=".32"/>
-            <stop offset=".4" stop-color="#fff0b1" stop-opacity=".12"/>
-            <stop offset="1" stop-color="#fff0b1" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="abg-dark" cx=".5" cy=".5" r=".7">
-            <stop offset="0" stop-color="#000" stop-opacity="0"/>
-            <stop offset=".72" stop-color="#000" stop-opacity=".18"/>
-            <stop offset="1" stop-color="#000" stop-opacity=".78"/>
-          </radialGradient>
-          <filter id="abg-blur"><feGaussianBlur stdDeviation="12"/></filter>
-          <filter id="abg-grain">
-            <feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="3" seed="18"/>
-            <feColorMatrix type="saturate" values="0"/>
-            <feComponentTransfer><feFuncA type="table" tableValues="0 .11"/></feComponentTransfer>
-          </filter>
-        </defs>
-    
-        <!-- one-point-perspective room -->
-        <polygon points="0,0 1600,0 1115,355 485,355" fill="url(#abg-ceil)"/>
-        <polygon points="0,0 485,355 485,900 0,900" fill="url(#abg-wall)"/>
-        <polygon points="1600,0 1115,355 1115,900 1600,900" fill="url(#abg-wall)"/>
-        <polygon points="0,900 485,355 1115,355 1600,900" fill="url(#abg-floor)"/>
-    
-        <!-- yellowed wall seams -->
-        <g opacity=".18" stroke="#5b5945" stroke-width="3">
-          <line x1="0" y1="610" x2="485" y2="500"/>
-          <line x1="0" y1="735" x2="485" y2="570"/>
-          <line x1="1600" y1="610" x2="1115" y2="500"/>
-          <line x1="1600" y1="735" x2="1115" y2="570"/>
-        </g>
-    
-        <!-- dark baseboards -->
-        <polygon points="0,760 485,555 1115,555 1600,760 1600,790 1115,586 485,586 0,790" fill="#27271f" opacity=".95"/>
-    
-        <!-- ceiling tile grid -->
-        <g stroke="#3d3e36" stroke-width="5" opacity=".55">
-          <line x1="150" y1="0" x2="570" y2="355"/>
-          <line x1="420" y1="0" x2="695" y2="355"/>
-          <line x1="710" y1="0" x2="810" y2="355"/>
-          <line x1="1000" y1="0" x2="925" y2="355"/>
-          <line x1="1290" y1="0" x2="1045" y2="355"/>
-          <line x1="1570" y1="0" x2="1110" y2="355"/>
-          <line x1="0" y1="125" x2="1600" y2="125"/>
-          <line x1="0" y1="250" x2="1600" y2="250"/>
-        </g>
-    
-        <!-- missing ceiling tiles / water stains -->
-        <g fill="#252721" opacity=".82">
-          <polygon points="280,18 420,22 458,104 306,92"/>
-          <polygon points="1215,16 1370,18 1298,96 1160,92"/>
-          <polygon points="765,214 873,220 859,286 744,282"/>
-        </g>
-        <g fill="#49483d" opacity=".7">
-          <ellipse cx="515" cy="135" rx="55" ry="19"/>
-          <ellipse cx="1060" cy="100" rx="62" ry="23"/>
-          <ellipse cx="920" cy="265" rx="42" ry="15"/>
-        </g>
-    
-        <!-- left-side repeating doors -->
-        <g>
-          <polygon points="128,205 275,224 345,393 209,388" fill="#6e6b52" opacity=".92"/>
-          <polygon points="151,227 263,240 319,375 216,371" fill="#3d3d31"/>
-          <rect x="257" y="299" width="10" height="20" rx="4" fill="#aaa073" opacity=".8"/>
-    
-          <polygon points="55,395 292,375 371,503 92,548" fill="#747157" opacity=".95"/>
-          <polygon points="102,412 278,399 324,483 125,516" fill="#3a3a31"/>
-          <rect x="279" y="436" width="9" height="17" rx="4" fill="#aa9b68"/>
-    
-          <polygon points="-18,630 245,559 376,620 0,745" fill="#77745b"/>
-        </g>
-    
-        <!-- right-side repeating doors -->
-        <g>
-          <polygon points="1472,205 1325,224 1255,393 1391,388" fill="#6e6b52" opacity=".92"/>
-          <polygon points="1449,227 1337,240 1281,375 1384,371" fill="#3d3d31"/>
-          <rect x="1333" y="299" width="10" height="20" rx="4" fill="#aaa073" opacity=".8"/>
-    
-          <polygon points="1545,395 1308,375 1229,503 1508,548" fill="#747157" opacity=".95"/>
-          <polygon points="1498,412 1322,399 1276,483 1475,516" fill="#3a3a31"/>
-          <rect x="1311" y="436" width="9" height="17" rx="4" fill="#aa9b68"/>
-    
-          <polygon points="1618,630 1355,559 1224,620 1600,745" fill="#77745b"/>
-        </g>
-    
-        <!-- peeling wall patches -->
-        <g opacity=".58">
-          <path d="M325 430 q55-35 105 5 l-18 79 q-62 20-94-7z" fill="#c4bc8b"/>
-          <path d="M1198 430 q-55-35-105 5 l18 79 q62 20 94-7z" fill="#c4bc8b"/>
-          <path d="M195 650 l104-36 72 26-125 54z" fill="#665f45"/>
-          <path d="M1405 650 l-104-36-72 26 125 54z" fill="#665f45"/>
-        </g>
-    
-        <!-- long carpet texture -->
-        <g stroke="#a39a72" stroke-width="2" opacity=".18">
-          <line x1="0" y1="850" x2="515" y2="570"/>
-          <line x1="160" y1="900" x2="590" y2="565"/>
-          <line x1="340" y1="900" x2="660" y2="560"/>
-          <line x1="1260" y1="900" x2="1040" y2="560"/>
-          <line x1="1440" y1="900" x2="1090" y2="570"/>
-          <line x1="1600" y1="850" x2="1085" y2="570"/>
-        </g>
-        <g fill="#29291f" opacity=".42">
-          <ellipse cx="410" cy="665" rx="118" ry="32"/>
-          <ellipse cx="1260" cy="690" rx="106" ry="30"/>
-          <ellipse cx="735" cy="785" rx="156" ry="36"/>
-          <ellipse cx="1010" cy="625" rx="58" ry="18"/>
-        </g>
-    
-        <!-- far end, darker than the room -->
-        <polygon points="675,355 925,355 1010,560 590,560" fill="#5d5c48"/>
-        <rect x="720" y="390" width="160" height="170" fill="#23241d"/>
-        <rect x="742" y="410" width="116" height="150" fill="#11130f"/>
-        <rect x="754" y="426" width="92" height="3" fill="#b3a875" opacity=".24"/>
-        <circle cx="824" cy="495" r="7" fill="#a38e57" opacity=".82"/>
-    
-        <!-- receding fluorescent fixtures -->
-        <g class="menuFixture">
-          <ellipse cx="800" cy="337" rx="160" ry="78" fill="url(#abg-light)" filter="url(#abg-blur)"/>
-          <rect x="713" y="314" width="174" height="12" rx="3" fill="#e4dfc5"/>
-          <rect x="742" y="318" width="112" height="4" fill="#fff4c9"/>
-        </g>
-        <g class="menuFixture delay">
-          <ellipse cx="800" cy="250" rx="120" ry="58" fill="url(#abg-light)" filter="url(#abg-blur)"/>
-          <rect x="736" y="232" width="128" height="9" rx="3" fill="#c8c4ad"/>
-          <rect x="757" y="235" width="88" height="3" fill="#f1e9c8"/>
-        </g>
-        <g class="menuFixture">
-          <ellipse cx="800" cy="168" rx="88" ry="42" fill="url(#abg-light)" filter="url(#abg-blur)"/>
-          <rect x="757" y="155" width="86" height="7" rx="2" fill="#aaa99a"/>
-        </g>
-    
-        <!-- hanging wires -->
-        <path d="M1165 55 C1195 132 1212 206 1180 280 C1160 326 1156 368 1180 410" fill="none" stroke="#2d2e28" stroke-width="12"/>
-        <path d="M1163 55 C1193 132 1210 206 1178 280 C1158 326 1154 368 1178 410" fill="none" stroke="#77735e" stroke-width="3"/>
-    
-        <!-- loose trash near foreground -->
-        <g fill="#26271f" opacity=".85">
-          <path d="M270 770 l70-18 42 17-75 27z"/>
-          <rect x="1260" y="750" width="96" height="18" rx="4" transform="rotate(8 1260 750)"/>
-          <path d="M1110 825 l52-24 44 18-61 28z"/>
-          <rect x="460" y="820" width="58" height="14" rx="2" transform="rotate(-11 460 820)"/>
-        </g>
-    
-        <!-- subtle photo-like grain + vignette -->
-        <rect width="1600" height="900" filter="url(#abg-grain)" opacity=".45"/>
-        <rect width="1600" height="900" fill="url(#abg-dark)"/>
-      </svg>
-  `;
-  overlay.insertBefore(backdrop,homeScreen);
+    <div class="menuBGPhoto"></div>
+  `;  overlay.insertBefore(backdrop,homeScreen);
 
   homeScreen.innerHTML="";
   const layout=document.createElement("div");
