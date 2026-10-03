@@ -814,6 +814,7 @@ function refreshSaveInfo(){
 
 function installMainMenuRedesign(){
   if(!homeScreen || homeScreen.dataset.deepseekerMenu==="redesigned") return;
+
   homeScreen.dataset.deepseekerMenu="redesigned";
   homeScreen.classList.add("menuHomeRedesign");
   overlay.classList.add("deepseekerMenuOverlay");
@@ -839,54 +840,149 @@ function installMainMenuRedesign(){
   pointer-events:none;
   z-index:1;
   background:
-    linear-gradient(90deg,
-      rgba(1,2,1,.64) 0%,
-      rgba(1,2,1,.34) 18%,
-      rgba(1,2,1,.10) 38%,
-      transparent 58%),
-    linear-gradient(180deg,
-      rgba(0,0,0,.18) 0%,
-      transparent 28%,
-      transparent 68%,
-      rgba(0,0,0,.38) 100%);
+    linear-gradient(90deg,rgba(1,2,1,.88) 0%,rgba(1,2,1,.58) 24%,rgba(1,2,1,.18) 45%,transparent 67%),
+    linear-gradient(180deg,rgba(0,0,0,.16) 0%,transparent 35%,rgba(0,0,0,.54) 100%);
 }
 #menuBackdrop{
   position:absolute;
   inset:0;
-  pointer-events:none;
-  z-index:2;
+  z-index:0;
   overflow:hidden;
+  pointer-events:none;
   background:
-    linear-gradient(90deg,rgba(5,6,4,.86) 0%,rgba(8,9,6,.54) 24%,rgba(12,11,7,.12) 55%,rgba(5,5,4,.28) 100%),
-    linear-gradient(180deg,rgba(58,46,17,.28),rgba(93,73,25,.12) 42%,rgba(5,5,4,.58) 100%),
-    url("https://images.unsplash.com/photo-1761251946420-8b65ad19f2e7?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400")
-    center center / cover no-repeat;
-  background-color:#302e21;
-  background-blend-mode:multiply,color,normal;
-  filter:sepia(.38) saturate(1.18) contrast(1.08) brightness(.72);
+    radial-gradient(ellipse at 78% 25%,rgba(229,207,133,.13),transparent 19%),
+    linear-gradient(180deg,#0b0c08 0%,#171911 44%,#060705 100%);
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 66% 44%,transparent 0 21%,rgba(0,0,0,.10) 44%,rgba(0,0,0,.56) 100%),
-    linear-gradient(90deg,transparent 52%,rgba(215,192,116,.035) 70%,transparent 90%);
+    linear-gradient(90deg,rgba(0,0,0,.34),transparent 46%,rgba(0,0,0,.12)),
+    radial-gradient(ellipse at 78% 47%,transparent 0 15%,rgba(0,0,0,.05) 35%,rgba(0,0,0,.62) 100%);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
   background:
-    repeating-linear-gradient(180deg,transparent 0 5px,rgba(255,255,255,.007) 6px,transparent 7px),
-    linear-gradient(180deg,rgba(0,0,0,.04),transparent 38%,rgba(0,0,0,.34) 100%);
-  opacity:.8;
+    repeating-linear-gradient(180deg,transparent 0 5px,rgba(255,255,255,.008) 6px,transparent 7px),
+    linear-gradient(180deg,transparent 0 58%,rgba(0,0,0,.30) 100%);
+  opacity:.72;
+}
+.menuBGHall{
+  position:absolute;
+  right:8%;
+  top:18%;
+  width:48%;
+  height:70%;
+  background:
+    linear-gradient(90deg,rgba(196,187,140,.08),transparent 13%),
+    linear-gradient(180deg,rgba(32,34,26,.25),rgba(2,3,2,.94));
+  clip-path:polygon(29% 0,71% 0,100% 100%,0 100%);
+  box-shadow:0 0 100px rgba(0,0,0,.72);
+}
+.menuBGCeiling{
+  position:absolute;
+  left:34%;
+  right:-5%;
+  top:-4%;
+  height:50%;
+  background:
+    repeating-linear-gradient(90deg,transparent 0 12%,rgba(227,218,178,.04) 12.2% 12.7%,transparent 13% 25%),
+    linear-gradient(170deg,rgba(210,201,163,.12),transparent 66%);
+  transform:skewX(-15deg);
+}
+.menuBGFloor{
+  position:absolute;
+  left:28%;
+  right:-4%;
+  bottom:-13%;
+  height:64%;
+  background:
+    repeating-linear-gradient(90deg,transparent 0 12%,rgba(205,195,151,.032) 12.1% 12.3%),
+    repeating-linear-gradient(0deg,transparent 0 12%,rgba(205,195,151,.022) 12.1% 12.4%),
+    linear-gradient(180deg,rgba(112,105,72,.08),rgba(4,5,4,.94) 76%);
+  transform:perspective(900px) rotateX(62deg);
+  transform-origin:bottom center;
+}
+.menuBGWallL{
+  position:absolute;
+  left:-8%;
+  top:22%;
+  width:62%;
+  height:84%;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 18%,rgba(204,195,153,.038) 18.2% 18.5%),
+    linear-gradient(90deg,rgba(15,17,13,.94),rgba(108,105,77,.11) 76%,transparent);
+  clip-path:polygon(0 0,100% 8%,69% 100%,0 100%);
+}
+.menuBGWallR{
+  position:absolute;
+  right:-8%;
+  top:22%;
+  width:58%;
+  height:84%;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 16%,rgba(204,195,153,.032) 16.2% 16.5%),
+    linear-gradient(270deg,rgba(13,14,11,.96),rgba(101,98,70,.10) 72%,transparent);
+  clip-path:polygon(12% 8%,100% 0,100% 100%,34% 100%);
+}
+.menuBGLight{
+  position:absolute;
+  width:min(220px,18vw);
+  height:8px;
+  border-radius:999px;
+  background:#eee7c8;
+  box-shadow:0 0 12px rgba(241,228,174,.75),0 0 46px rgba(241,228,174,.25);
+  transform:rotate(-8deg);
+  animation:menuFluoro 4.8s ease-in-out infinite;
+}
+.menuBGLight.one{right:24%;top:15%}
+.menuBGLight.two{right:7%;top:31%;width:min(130px,11vw);opacity:.55;animation-delay:1.8s}
+@keyframes menuFluoro{
+  0%,100%{opacity:.72}
+  47%{opacity:.9}
+  49%{opacity:.38}
+  51%{opacity:.82}
+  72%{opacity:.62}
+}
+.menuBGGlow{
+  position:absolute;
+  right:21%;
+  top:23%;
+  width:min(430px,35vw);
+  height:min(430px,35vw);
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(237,219,160,.11),rgba(237,219,160,.02) 40%,transparent 72%);
+  filter:blur(18px);
+  mix-blend-mode:screen;
+  animation:menuGlow 8s ease-in-out infinite alternate;
+}
+.menuBGScan{
+  position:absolute;
+  top:-10%;
+  bottom:-10%;
+  left:-26%;
+  width:23vw;
+  background:linear-gradient(90deg,transparent,rgba(226,213,166,.05),transparent);
+  transform:skewX(-12deg);
+  animation:menuSweep 18s ease-in-out infinite;
+}
+@keyframes menuGlow{
+  from{transform:translate3d(-1%,1%,0) scale(.96);opacity:.38}
+  to{transform:translate3d(2%,-2%,0) scale(1.06);opacity:.84}
+}
+@keyframes menuSweep{
+  0%{transform:translateX(-10vw) skewX(-12deg);opacity:0}
+  18%{opacity:.3}
+  48%,100%{transform:translateX(150vw) skewX(-12deg);opacity:0}
 }
 
 #homeScreen.menuHomeRedesign{
   position:absolute;
   inset:0;
-  z-index:4;
+  z-index:3;
   display:block;
   width:100vw;
   height:100vh;
@@ -903,30 +999,28 @@ function installMainMenuRedesign(){
 
 .menuHomeLayout{
   position:relative;
-  z-index:5;
+  z-index:4;
   width:100%;
   height:100%;
 }
-
 .menuHomeLayout::before{
   content:"";
   position:absolute;
   left:0;
   top:0;
   bottom:0;
-  width:min(510px,43vw);
-  background:
-    linear-gradient(90deg,rgba(4,5,4,.94),rgba(4,5,4,.72) 67%,transparent 100%);
+  width:min(500px,46vw);
+  background:linear-gradient(90deg,rgba(3,4,3,.96),rgba(3,4,3,.72) 65%,transparent 100%);
   pointer-events:none;
 }
 
 .menuLogo{
   position:absolute;
-  left:clamp(28px,4vw,64px);
-  top:clamp(28px,4.5vh,52px);
-  max-width:410px;
+  left:clamp(24px,4vw,60px);
+  top:clamp(24px,4vh,48px);
+  max-width:420px;
   color:#f2ead1;
-  text-shadow:0 3px 22px #000,0 0 40px rgba(0,0,0,.65);
+  text-shadow:0 3px 22px #000;
 }
 .menuLogoMain{
   display:flex;
@@ -942,39 +1036,35 @@ function installMainMenuRedesign(){
 .menuLogoMain strong{
   margin-top:6px;
   font-size:clamp(31px,3.6vw,58px);
-  font-weight:600;
   color:#d8b865;
+  font-weight:600;
   letter-spacing:clamp(4px,.58vw,9px);
 }
 .menuLogoSub{
   margin-top:12px;
   padding-left:2px;
   font-size:8px;
-  letter-spacing:3.1px;
+  letter-spacing:3px;
   color:#8d8979;
 }
 
-/* The terminal now sits directly below the title. */
+/* Terminal directly below the title. */
 .menuRightPanel{
   position:absolute;
-  left:clamp(28px,4vw,64px);
-  right:auto;
-  top:clamp(166px,19vh,190px);
-  bottom:auto;
-  width:min(390px,calc(100vw - 56px));
-  padding:12px 0 0 15px;
-  border:0;
-  border-left:1px solid rgba(223,173,69,.30);
+  left:clamp(24px,4vw,60px);
+  top:clamp(165px,19vh,190px);
+  width:min(390px,calc(100vw - 48px));
+  box-sizing:border-box;
+  padding:11px 0 0 14px;
+  border-left:1px solid rgba(223,173,69,.32);
   color:#918b79;
   text-shadow:0 2px 8px #000;
-  opacity:.94;
 }
 .menuRightHeader{
   display:flex;
-  align-items:center;
   justify-content:space-between;
   gap:12px;
-  margin-bottom:11px;
+  margin-bottom:9px;
   font-size:7px;
   letter-spacing:2px;
   color:#8b8573;
@@ -996,16 +1086,16 @@ function installMainMenuRedesign(){
   box-shadow:0 0 10px rgba(223,173,69,.55);
 }
 .menuRightLead{
-  margin:0 0 10px;
-  max-width:370px;
+  margin:0 0 9px;
+  max-width:360px;
   font-size:9px;
-  line-height:1.7;
+  line-height:1.65;
   color:#777165;
 }
 .menuRightRule{
   height:1px;
   background:rgba(226,211,164,.08);
-  margin:9px 0 11px;
+  margin:9px 0 10px;
 }
 .menuRightSectionLabel{
   margin-bottom:5px;
@@ -1015,53 +1105,44 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .houseLoader{
   width:100%;
-  margin:8px 0 0;
+  margin:7px 0 0;
   text-align:left;
 }
-.menuHomeRedesign .houseLoaderTop{
-  color:#817b6c;
-}
-.menuHomeRedesign .houseLoaderStatus{
-  color:#646055;
-  min-height:14px;
-}
+.menuHomeRedesign .houseLoaderTop{color:#817b6c}
+.menuHomeRedesign .houseLoaderStatus{color:#646055;min-height:14px}
 .menuRightMeta{
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:10px;
-  margin-top:10px;
+  margin-top:9px;
 }
 .menuRightMetaRow{
   display:flex;
   justify-content:space-between;
-  gap:7px;
+  gap:6px;
   font-size:7px;
-  letter-spacing:1.2px;
+  letter-spacing:1.1px;
 }
 .menuRightMetaRow span:first-child{color:#514e46}
 .menuRightMetaRow span:last-child{color:#878071}
 
-/* Play things directly below the terminal. */
+/* Play buttons below the terminal. */
 .menuNav{
   position:absolute;
-  left:clamp(28px,4vw,64px);
-  top:clamp(338px,39vh,385px);
-  width:min(390px,calc(100vw - 56px));
+  left:clamp(24px,4vw,60px);
+  top:clamp(338px,39vh,382px);
+  width:min(390px,calc(100vw - 48px));
   display:flex;
   flex-direction:column;
-  gap:14px;
+  gap:12px;
 }
-.menuNavGroup{
-  position:relative;
-}
-.menuNavGroup + .menuNavGroup{
-  margin-top:0;
-}
+.menuNavGroup{position:relative}
+.menuNavGroup + .menuNavGroup{margin-top:0}
 .menuNavGroupLabel{
   display:flex;
   align-items:center;
-  gap:10px;
-  margin:0 0 5px 3px;
+  gap:9px;
+  margin:0 0 5px 2px;
   font-size:7px;
   letter-spacing:2.5px;
   color:#777363;
@@ -1081,37 +1162,24 @@ function installMainMenuRedesign(){
   background:linear-gradient(90deg,rgba(226,211,164,.14),transparent);
 }
 .menuNavButton{
-  position:relative;
   width:100%;
-  min-height:44px;
-  padding:0 14px 0 17px;
+  min-height:43px;
+  padding:0 14px 0 16px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   border:1px solid rgba(235,224,179,.09);
   border-left:2px solid transparent;
   border-radius:4px;
-  background:linear-gradient(90deg,rgba(13,14,12,.52),rgba(13,14,12,.18));
+  background:linear-gradient(90deg,rgba(13,14,12,.54),rgba(13,14,12,.18));
   color:#cbc5b2;
   font:inherit;
-  text-align:left;
   font-size:clamp(11px,.82vw,14px);
   letter-spacing:1.8px;
   cursor:pointer;
   transition:background .16s,color .16s,border-color .16s,transform .16s,box-shadow .16s;
   text-shadow:0 2px 8px #000;
   backdrop-filter:blur(3px);
-}
-.menuNavButton::before{
-  content:"";
-  position:absolute;
-  left:0;
-  top:8px;
-  bottom:8px;
-  width:2px;
-  background:#d7b35d;
-  opacity:0;
-  transition:opacity .16s;
 }
 .menuNavButton:hover{
   background:linear-gradient(90deg,rgba(31,31,25,.72),rgba(31,31,25,.25));
@@ -1120,40 +1188,30 @@ function installMainMenuRedesign(){
   transform:translateX(4px);
   box-shadow:0 7px 24px rgba(0,0,0,.25);
 }
-.menuNavButton:hover::before,
-.menuNavButton.active::before{opacity:1}
-.menuNavButton.active,
-.menuNavButton:focus-visible{
+.menuNavButton.active{
   background:linear-gradient(90deg,rgba(114,88,34,.38),rgba(47,39,23,.13));
   border-color:rgba(223,190,107,.30);
   border-left-color:#d7b35d;
   color:#fff3cb;
-  outline:none;
-  box-shadow:0 8px 28px rgba(0,0,0,.30),inset 0 1px rgba(255,255,255,.05);
+  box-shadow:0 8px 28px rgba(0,0,0,.30);
 }
+.menuNavButton:focus-visible{outline:1px solid rgba(223,190,107,.45);outline-offset:2px}
 .menuNavButton:disabled{opacity:.34;cursor:not-allowed;transform:none!important}
-.menuNavArrow{
-  font-size:21px;
-  line-height:1;
-  color:#666254;
-  transition:transform .16s,color .16s;
-}
+.menuNavArrow{font-size:21px;line-height:1;color:#666254}
 .menuNavButton:hover .menuNavArrow{transform:translateX(4px);color:#e7be68}
 .menuNavButton.active .menuNavArrow{color:#e2b253}
 
-/* Save slots under the play buttons, stacked vertically. */
+/* Save slots stacked vertically beneath the play section. */
 .menuSlotBar{
   position:absolute;
-  left:clamp(28px,4vw,64px);
+  left:clamp(24px,4vw,60px);
   top:clamp(660px,74vh,700px);
-  bottom:auto;
-  width:min(390px,calc(100vw - 56px));
+  width:min(390px,calc(100vw - 48px));
   color:#8c8675;
   text-shadow:0 2px 8px #000;
 }
 .menuSlotHeader{
   display:flex;
-  align-items:center;
   justify-content:space-between;
   margin-bottom:7px;
   padding:0 1px;
@@ -1167,6 +1225,7 @@ function installMainMenuRedesign(){
   grid-template-columns:1fr;
   gap:6px;
   max-height:270px;
+  overflow:auto;
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
@@ -1174,7 +1233,7 @@ function installMainMenuRedesign(){
   padding:9px 11px;
   border:1px solid rgba(231,220,171,.09);
   border-radius:4px;
-  background:rgba(5,6,5,.32);
+  background:rgba(5,6,5,.34);
   color:#b2ac99;
   display:flex;
   flex-direction:column;
@@ -1189,12 +1248,10 @@ function installMainMenuRedesign(){
 .menuHomeRedesign .saveSlotCard.selected{
   border-color:rgba(223,173,69,.66);
   background:rgba(223,173,69,.11);
-  box-shadow:0 0 18px rgba(223,173,69,.05);
 }
 .menuHomeRedesign .saveSlotTitle{font-size:9px;letter-spacing:1.7px;color:#ddd4b9}
 .menuHomeRedesign .saveSlotMode{font-size:7px;color:#7e796d}
 .menuHomeRedesign .saveSlotDetail{
-  display:block;
   margin-top:4px;
   font-size:8px;
   color:#676258;
@@ -1219,10 +1276,7 @@ function installMainMenuRedesign(){
   letter-spacing:1px;
   cursor:pointer;
 }
-.menuHomeRedesign .saveSlotActions button:hover{
-  background:rgba(223,173,69,.075);
-  color:#e7dabd;
-}
+.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.075);color:#e7dabd}
 .menuHomeRedesign .saveSlotActions button:disabled{opacity:.27;cursor:not-allowed}
 .menuSaveStatus{
   margin-top:5px;
@@ -1232,343 +1286,35 @@ function installMainMenuRedesign(){
   color:#625e54;
 }
 
-@media(max-width:1000px){
-  .menuLogo{left:24px}
-  .menuRightPanel,.menuNav,.menuSlotBar{
-    left:24px;
-    width:min(390px,calc(100vw - 48px));
-  }
-}
 @media(max-width:750px){
-  .menuLogo{left:20px;top:22px}
-  .menuRightPanel{top:145px;width:calc(100vw - 40px)}
-  .menuNav{top:330px;width:calc(100vw - 40px)}
-  .menuSlotBar{
+  .menuHomeLayout::before{width:100%;background:linear-gradient(90deg,rgba(3,4,3,.93),rgba(3,4,3,.58) 80%,transparent)}
+  .menuLogo{left:20px;top:20px}
+  .menuRightPanel,.menuNav,.menuSlotBar{
     left:20px;
-    top:650px;
     width:calc(100vw - 40px);
   }
-  .menuHomeRedesign #saveSlots{max-height:none}
-  .menuHomeLayout::before{width:100%;background:linear-gradient(90deg,rgba(4,5,4,.88),rgba(4,5,4,.50) 78%,transparent)}
+  .menuRightPanel{top:145px}
+  .menuNav{top:330px}
+  .menuSlotBar{top:650px}
   .menuRightMeta{grid-template-columns:1fr 1fr 1fr}
-}
-
-.menuHomeLayout.menuLayoutEditing .menuEditableElement{
-  outline:1px dashed rgba(222,179,91,.62);
-  outline-offset:4px;
-  cursor:move;
-}
-.menuHomeLayout.menuLayoutEditing .menuEditableElement:hover{
-  outline-color:rgba(243,205,119,.92);
-  z-index:15;
-}
-.menuResizeHandle{
-  display:none;
-  position:absolute;
-  right:-6px;
-  bottom:-6px;
-  width:14px;
-  height:14px;
-  border:1px solid rgba(235,219,163,.7);
-  border-radius:2px;
-  background:rgba(8,8,6,.94);
-  box-shadow:0 2px 10px rgba(0,0,0,.4);
-  cursor:nwse-resize;
-  z-index:40;
-}
-.menuResizeHandle::before,.menuResizeHandle::after{
-  content:"";
-  position:absolute;
-  right:2px;
-  bottom:2px;
-  width:8px;
-  height:1px;
-  background:#d8b865;
-  transform:rotate(-45deg);
-  transform-origin:right center;
-}
-.menuResizeHandle::after{
-  right:2px;
-  bottom:5px;
-  width:5px;
-  opacity:.6;
-}
-.menuHomeLayout.menuLayoutEditing .menuResizeHandle{display:block}
-.menuLayoutHint{
-  margin-top:12px;
-  padding:9px 10px;
-  border:1px solid rgba(231,220,171,.08);
-  border-radius:4px;
-  background:rgba(255,255,255,.025);
-  color:#77705f;
-  font-size:7px;
-  line-height:1.7;
-  letter-spacing:1px;
-}
-.menuLayoutSelection{
-  margin-top:8px;
-  color:#bfb18d;
-  min-height:12px;
-}
-.menuElementEditor{
-  margin-top:14px;
-  padding-top:13px;
-  border-top:1px solid rgba(231,220,171,.08);
-}
-.menuEditorSectionTitle{
-  font-size:8px;
-  letter-spacing:2px;
-  color:#c7b991;
-}
-.menuElementControlGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:7px;
-  margin-top:10px;
-}
-.menuElementControlGrid label{
-  display:grid;
-  gap:4px;
-  font-size:6px;
-  letter-spacing:1.2px;
-  color:#77705f;
-}
-.menuElementControlGrid input,
-.menuElementControlGrid select,
-.menuElementEditor textarea{
-  width:100%;
-  box-sizing:border-box;
-  padding:7px 8px;
-  border:1px solid rgba(231,220,171,.11);
-  border-radius:4px;
-  background:#020302;
-  color:#e4dbc0;
-  font:inherit;
-  font-size:8px;
-  outline:none;
-}
-.menuElementEditor textarea{
-  min-height:62px;
-  resize:vertical;
-  line-height:1.5;
-}
-.menuElementActions{
-  display:grid;
-  grid-template-columns:1fr 1fr 1fr;
-  gap:6px;
-  margin-top:9px;
-}
-.menuElementActions button{
-  min-height:32px;
-  border:1px solid rgba(231,220,171,.11);
-  border-radius:4px;
-  background:rgba(255,255,255,.035);
-  color:#cfc5a8;
-  font:inherit;
-  font-size:7px;
-  letter-spacing:1px;
-  cursor:pointer;
-}
-.menuElementActions button:hover{
-  background:rgba(223,173,69,.10);
-  border-color:rgba(223,173,69,.28);
-}
-.menuElementSelected{
-  outline:1px solid rgba(245,205,116,.95)!important;
-  outline-offset:3px;
-  z-index:35;
-}
-.menuElementResizeHandle{
-  display:none;
-  position:absolute;
-  right:-7px;
-  bottom:-7px;
-  width:14px;
-  height:14px;
-  border:1px solid rgba(245,214,143,.9);
-  border-radius:2px;
-  background:#090a07;
-  box-shadow:0 3px 12px rgba(0,0,0,.5);
-  cursor:nwse-resize;
-  z-index:90;
-}
-.menuElementResizeHandle::before{
-  content:"";
-  position:absolute;
-  right:2px;
-  bottom:3px;
-  width:8px;
-  height:1px;
-  background:#d8b865;
-  transform:rotate(-45deg);
-  transform-origin:right center;
-  box-shadow:0 -3px 0 rgba(216,184,101,.7);
-}
-.menuHomeLayout.menuLayoutEditing .menuElementSelected .menuElementResizeHandle{
-  display:block;
-}
-.menuElementBeingEdited{box-sizing:border-box;}
-
-.menuEditButton{
-  position:absolute;
-  top:18px;
-  right:20px;
-  z-index:12;
-  min-width:78px;
-  height:34px;
-  padding:0 13px;
-  border:1px solid rgba(235,224,179,.20);
-  border-radius:4px;
-  background:rgba(5,6,5,.55);
-  color:#d8cfb5;
-  font:inherit;
-  font-size:8px;
-  letter-spacing:2px;
-  cursor:pointer;
-  backdrop-filter:blur(8px);
-  box-shadow:0 7px 24px rgba(0,0,0,.28);
-}
-.menuEditButton:hover{
-  color:#fff3cf;
-  border-color:rgba(223,190,107,.48);
-  background:rgba(31,31,25,.72);
-}
-.menuEditor{
-  position:absolute;
-  top:60px;
-  right:20px;
-  z-index:20;
-  display:none;
-  width:min(390px,calc(100vw - 40px));
-  max-height:calc(100vh - 82px);
-  overflow:auto;
-  padding:18px;
-  box-sizing:border-box;
-  border:1px solid rgba(231,220,171,.17);
-  border-radius:7px;
-  background:rgba(7,8,6,.95);
-  box-shadow:0 24px 80px rgba(0,0,0,.58);
-  backdrop-filter:blur(14px);
-  color:#c8c0a7;
-}
-.menuEditor.open{display:block}
-.menuEditorTitle{font-size:11px;letter-spacing:2.3px;color:#eee5ca}
-.menuEditorSub{margin-top:5px;font-size:8px;line-height:1.6;color:#777261}
-.menuEditorGrid{display:grid;gap:11px;margin-top:15px}
-.menuEditorRow{display:grid;gap:5px}
-.menuEditorRow label{font-size:7px;letter-spacing:1.7px;color:#938b76}
-.menuEditorRow input[type="text"]{
-  width:100%;
-  box-sizing:border-box;
-  padding:9px 10px;
-  border:1px solid rgba(231,220,171,.11);
-  border-radius:4px;
-  background:#020302;
-  color:#e5ddc4;
-  font:inherit;
-  font-size:9px;
-  outline:none;
-}
-.menuEditorRow input[type="text"]:focus{border-color:rgba(223,190,107,.42)}
-.menuEditorRange{display:grid;grid-template-columns:1fr 48px;gap:8px;align-items:center}
-.menuEditorRange input[type="range"]{width:100%;accent-color:#d3ad58}
-.menuEditorRange output{text-align:right;font-size:8px;color:#b9af93}
-.menuEditorActions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:15px}
-.menuEditorActions button{
-  min-height:35px;
-  border:1px solid rgba(231,220,171,.12);
-  border-radius:4px;
-  background:rgba(255,255,255,.035);
-  color:#cfc5a8;
-  font:inherit;
-  font-size:8px;
-  letter-spacing:1.3px;
-  cursor:pointer;
-}
-.menuEditorActions button:hover{background:rgba(223,173,69,.10);border-color:rgba(223,173,69,.28)}
-.menuEditorStatus{min-height:13px;margin-top:9px;font-size:7px;letter-spacing:1px;color:#77705e}
-.menuEditorIconGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:7px;
-  margin-top:14px;
-  padding-top:12px;
-  border-top:1px solid rgba(231,220,171,.08);
-}
-.menuEditorIconRow{
-  display:grid;
-  grid-template-columns:1fr 58px;
-  align-items:center;
-  gap:7px;
-}
-.menuEditorIconRow label{
-  font-size:7px;
-  letter-spacing:1.2px;
-  color:#77705e;
-}
-.menuEditorIconRow input{
-  width:58px;
-  box-sizing:border-box;
-  padding:7px 4px;
-  border:1px solid rgba(231,220,171,.11);
-  border-radius:4px;
-  background:#020302;
-  color:#f0e5c5;
-  font:inherit;
-  font-size:16px;
-  line-height:1;
-  text-align:center;
-  outline:none;
-}
-.menuEditorIconRow input:focus{border-color:rgba(223,190,107,.42)}
-.menuNavIcon{
-  display:inline-grid;
-  place-items:center;
-  width:21px;
-  min-width:21px;
-  margin-right:10px;
-  font-size:15px;
-  line-height:1;
-  color:#9f956f;
-  opacity:.9;
-}
-.menuNavButton.active .menuNavIcon,
-.menuNavButton:hover .menuNavIcon{color:#e1b968}
-.menuNavLabel{
-  display:flex;
-  align-items:center;
-  min-width:0;
-  flex:1;
-}
-
-@media(max-width:1000px){
-  .menuNav{width:min(320px,38vw)}
-  .menuSlotBar{width:min(480px,50vw)}
-  .menuRightPanel{right:20px;width:min(250px,30vw)}
-}
-@media(max-width:750px){
-  .menuLogoMain span{font-size:23px}
-  .menuLogoMain strong{font-size:31px}
-  .menuNav{top:170px;left:20px;width:min(320px,82vw)}
-  .menuSlotBar{left:20px;bottom:62px;width:calc(100vw - 40px)}
-  .menuHomeRedesign #saveSlots{grid-template-columns:1fr}
-  .menuRightPanel{display:none}
-  .menuFooter{left:20px;right:20px;bottom:17px}
-  .menuFooter span:last-child{display:none}
-  .menuHomeLayout::before{left:18px;top:160px;bottom:60px}
-  .menuLogo{left:20px;top:22px}
 }
 `;
   document.head.appendChild(style);
 
-  if(!document.getElementById("menuBackdrop")){
-    const backdrop=document.createElement("div");
-    backdrop.id="menuBackdrop";
-    backdrop.innerHTML=`
-      <div class="menuSignalNoise"></div>
-    `;
-    overlay.insertBefore(backdrop,homeScreen);
-  }
+  const backdrop=document.createElement("div");
+  backdrop.id="menuBackdrop";
+  backdrop.innerHTML=`
+    <div class="menuBGHall"></div>
+    <div class="menuBGCeiling"></div>
+    <div class="menuBGFloor"></div>
+    <div class="menuBGWallL"></div>
+    <div class="menuBGWallR"></div>
+    <div class="menuBGLight one"></div>
+    <div class="menuBGLight two"></div>
+    <div class="menuBGGlow"></div>
+    <div class="menuBGScan"></div>
+  `;
+  overlay.insertBefore(backdrop,homeScreen);
 
   homeScreen.innerHTML="";
   const layout=document.createElement("div");
@@ -1585,52 +1331,15 @@ function installMainMenuRedesign(){
   nav.className="menuNav";
   nav.setAttribute("aria-label","Main menu");
 
-  const defaultMenuIcons={
-    continue:"▶",
-    newGame:"✦",
-    hostLobby:"◉",
-    joinLobby:"↗",
-    controls:"⚙"
-  };
-  let menuIcons={...defaultMenuIcons};
-  try{
-    const savedIcons=JSON.parse(localStorage.getItem("deepseeker-menu-icons")||"null");
-    if(savedIcons && typeof savedIcons==="object"){
-      menuIcons={...menuIcons,...savedIcons};
-    }
-  }catch{}
-
   const configureButton=(button,label,active=false)=>{
     button.className="menuNavButton"+(active?" active":"");
     button.type="button";
-    const key=
-      button===continueButton ? "continue" :
-      button===newGameButton ? "newGame" :
-      button===createLobbyButton ? "hostLobby" :
-      button===joinLobbyButton ? "joinLobby" :
-      "controls";
-
     const labelHtml=button===continueButton
       ? '<span id="continueSlotLabel">CONTINUE SLOT '+selectedSaveSlot+'</span>'
       : '<span>'+label+'</span>';
-
     button.innerHTML=
-      '<span class="menuNavLabel">'+
-        '<span class="menuNavIcon" data-menu-icon="'+key+'">'+
-          String(menuIcons[key]||defaultMenuIcons[key])+
-        '</span>'+
-        labelHtml+
-      '</span>'+
+      '<span class="menuNavLabel">'+labelHtml+'</span>'+
       '<span class="menuNavArrow">›</span>';
-  };
-
-  const refreshMenuIcons=()=>{
-    document.querySelectorAll("[data-menu-icon]").forEach(icon=>{
-      const key=icon.dataset.menuIcon;
-      if(key && menuIcons[key]!==undefined){
-        icon.textContent=String(menuIcons[key]);
-      }
-    });
   };
 
   const createNavGroup=(label)=>{
@@ -1675,22 +1384,24 @@ function installMainMenuRedesign(){
   saveStatus.appendChild(saveInfo);
   slotBar.appendChild(saveStatus);
 
-  const right=document.createElement("aside");
-  right.className="menuRightPanel";
-  right.innerHTML=`
+  const terminal=document.createElement("aside");
+  terminal.className="menuRightPanel";
+  terminal.innerHTML=`
     <div class="menuRightHeader"><span>FIELD TERMINAL</span><span>DS-01</span></div>
     <div class="menuSignalState"><span class="menuSignalDot"></span><span>SIGNAL: LOST</span></div>
     <p class="menuRightLead">The apartment is only the entrance. Something is waiting in the halls beyond it.</p>
     <div class="menuRightRule"></div>
     <div class="menuRightSectionLabel">ENTRY SYSTEM</div>
   `;
+
   if(houseLoader){
     const loaderLabel=document.createElement("div");
     loaderLabel.style.cssText="margin-top:13px;font-size:8px;letter-spacing:2px;color:#b5ae96;";
     loaderLabel.textContent="APARTMENT";
-    right.appendChild(loaderLabel);
-    right.appendChild(houseLoader);
+    terminal.appendChild(loaderLabel);
+    terminal.appendChild(houseLoader);
   }
+
   const meta=document.createElement("div");
   meta.className="menuRightMeta";
   meta.innerHTML=`
@@ -1698,593 +1409,14 @@ function installMainMenuRedesign(){
     <div class="menuRightMetaRow"><span>ENTRY</span><span>APARTMENT</span></div>
     <div class="menuRightMetaRow"><span>LINK</span><span>STANDBY</span></div>
   `;
-  right.appendChild(meta);
+  terminal.appendChild(meta);
 
-
-
-  const footer=document.createElement("div");
-  footer.className="menuFooter";
-  footer.innerHTML=`<span>TAB · CONTROLS &nbsp;&nbsp; ESC · RELEASE MOUSE</span><span>STAY IN THE LIGHT. KEEP MOVING.</span>`;
-
-  const editButton=document.createElement("button");
-  editButton.type="button";
-  editButton.className="menuEditButton";
-  editButton.textContent="EDIT";
-
-  const editor=document.createElement("section");
-  editor.className="menuEditor";
-  editor.innerHTML=
-    '<div class="menuEditorTitle">MENU EDITOR</div>'+
-    '<div class="menuEditorSub">Edit the background and icons here. Open EDIT to drag menu panels and resize them from the bottom-right corner.</div>'+
-    '<div class="menuLayoutHint">LAYOUT EDIT MODE: DRAG A PANEL TO MOVE IT · DRAG ITS CORNER TO RESIZE IT.</div>'+
-    '<div id="menuEditorLayoutSelection" class="menuLayoutSelection">Selected: NONE</div>'+
-    '<div class="menuElementEditor">'+
-      '<div class="menuEditorSectionTitle">ELEMENT EDITOR</div>'+
-      '<div class="menuEditorSub">Select any visible menu element. Drag it directly, resize it with the corner handle, or edit every value below.</div>'+
-      '<div class="menuEditorRow"><label>ELEMENT</label><select id="menuElementSelect"></select></div>'+
-      '<div class="menuElementControlGrid">'+
-        '<label>X <input id="elX" type="number" step="1"></label><label>Y <input id="elY" type="number" step="1"></label>'+
-        '<label>WIDTH <input id="elW" type="number" min="1" step="1"></label><label>HEIGHT <input id="elH" type="number" min="1" step="1"></label>'+
-        '<label>FONT SIZE <input id="elFontSize" type="number" min="1" step="1"></label><label>LETTER SPACING <input id="elLetterSpacing" type="number" step=".1"></label>'+
-        '<label>LINE HEIGHT <input id="elLineHeight" type="text"></label><label>OPACITY <input id="elOpacity" type="number" min="0" max="100" step="1"></label>'+
-        '<label>PADDING <input id="elPadding" type="text"></label><label>MARGIN <input id="elMargin" type="text"></label>'+
-        '<label>GAP <input id="elGap" type="text"></label><label>BORDER RADIUS <input id="elRadius" type="number" min="0" step="1"></label>'+
-        '<label>FONT WEIGHT <input id="elWeight" type="text"></label><label>TEXT ALIGN <input id="elAlign" type="text"></label>'+
-        '<label>TEXT COLOR <input id="elColor" type="text" spellcheck="false"></label><label>BACKGROUND <input id="elBackground" type="text" spellcheck="false"></label>'+
-      '</div>'+
-      '<div class="menuEditorRow"><label>CUSTOM CSS</label><textarea id="elCustomCss" spellcheck="false" placeholder="color:#fff; transform:rotate(-2deg);"></textarea></div>'+
-      '<div class="menuElementActions">'+
-        '<button id="elApply" type="button">APPLY ELEMENT</button><button id="elReset" type="button">RESET ELEMENT</button><button id="elResetAll" type="button">RESET ALL ELEMENTS</button>'+
-      '</div>'+ 
-      '<div id="menuElementStatus" class="menuEditorStatus"></div>'+ 
-    '</div>'+
-    '<div class="menuEditorGrid">'+
-      '<div class="menuEditorRow"><label>BACKGROUND IMAGE URL</label><input id="menuEditorUrl" type="text" spellcheck="false"></div>'+
-      '<div class="menuEditorRow"><label>HORIZONTAL POSITION</label><div class="menuEditorRange"><input id="menuEditorX" type="range" min="0" max="100" value="50"><output id="menuEditorXOut">50%</output></div></div>'+
-      '<div class="menuEditorRow"><label>VERTICAL POSITION</label><div class="menuEditorRange"><input id="menuEditorY" type="range" min="0" max="100" value="50"><output id="menuEditorYOut">50%</output></div></div>'+
-      '<div class="menuEditorRow"><label>BRIGHTNESS</label><div class="menuEditorRange"><input id="menuEditorBrightness" type="range" min="40" max="120" value="72"><output id="menuEditorBrightnessOut">72%</output></div></div>'+
-      '<div class="menuEditorRow"><label>SATURATION</label><div class="menuEditorRange"><input id="menuEditorSaturation" type="range" min="50" max="160" value="118"><output id="menuEditorSaturationOut">118%</output></div></div>'+
-      '<div class="menuEditorRow"><label>SEPIA</label><div class="menuEditorRange"><input id="menuEditorSepia" type="range" min="0" max="100" value="38"><output id="menuEditorSepiaOut">38%</output></div></div>'+
-    '</div>'+
-    '<div class="menuEditorIconGrid">'+
-      '<div class="menuEditorIconRow"><label>CONTINUE</label><input id="menuIconContinue" maxlength="2"></div>'+
-      '<div class="menuEditorIconRow"><label>NEW GAME</label><input id="menuIconNewGame" maxlength="2"></div>'+
-      '<div class="menuEditorIconRow"><label>HOST LOBBY</label><input id="menuIconHostLobby" maxlength="2"></div>'+
-      '<div class="menuEditorIconRow"><label>JOIN LOBBY</label><input id="menuIconJoinLobby" maxlength="2"></div>'+
-      '<div class="menuEditorIconRow"><label>CONTROLS</label><input id="menuIconControls" maxlength="2"></div>'+
-    '</div>'+
-    '<div class="menuEditorActions">'+
-      '<button id="menuEditorApply" type="button">APPLY</button>'+
-      '<button id="menuEditorReset" type="button">RESET</button>'+
-      '<button id="menuEditorLocal" type="button">SAVE LOCAL</button>'+
-      '<button id="menuEditorGithub" type="button">GITHUB EXPORT</button>'+
-      '<button id="menuEditorOpenGithub" type="button">OPEN GITHUB</button>'+
-    '</div>'+
-    '<div id="menuEditorStatus" class="menuEditorStatus"></div>';
-
-  const applyButton=editor.querySelector("#menuEditorApply");
-  const resetButton=editor.querySelector("#menuEditorReset");
-  const localButton=editor.querySelector("#menuEditorLocal");
-  const githubButton=editor.querySelector("#menuEditorGithub");
-  const openGithubButton=editor.querySelector("#menuEditorOpenGithub");
-  const urlInput=editor.querySelector("#menuEditorUrl");
-  const xInput=editor.querySelector("#menuEditorX");
-  const yInput=editor.querySelector("#menuEditorY");
-  const brightnessInput=editor.querySelector("#menuEditorBrightness");
-  const saturationInput=editor.querySelector("#menuEditorSaturation");
-  const sepiaInput=editor.querySelector("#menuEditorSepia");
-  const status=editor.querySelector("#menuEditorStatus");
-  const layoutSelection=editor.querySelector("#menuEditorLayoutSelection");
-  const elementSelect=editor.querySelector("#menuElementSelect");
-  const elementInputs={
-    x:editor.querySelector("#elX"),y:editor.querySelector("#elY"),w:editor.querySelector("#elW"),h:editor.querySelector("#elH"),
-    fontSize:editor.querySelector("#elFontSize"),letterSpacing:editor.querySelector("#elLetterSpacing"),lineHeight:editor.querySelector("#elLineHeight"),
-    opacity:editor.querySelector("#elOpacity"),padding:editor.querySelector("#elPadding"),margin:editor.querySelector("#elMargin"),gap:editor.querySelector("#elGap"),
-    radius:editor.querySelector("#elRadius"),weight:editor.querySelector("#elWeight"),align:editor.querySelector("#elAlign"),color:editor.querySelector("#elColor"),
-    background:editor.querySelector("#elBackground"),customCss:editor.querySelector("#elCustomCss")
-  };
-  const elementApplyButton=editor.querySelector("#elApply");
-  const elementResetButton=editor.querySelector("#elReset");
-  const elementResetAllButton=editor.querySelector("#elResetAll");
-  const elementStatus=editor.querySelector("#menuElementStatus");
-  const elementStyles={};
-  let selectedElement=null;
-  let selectedElementId="";
-  let menuLayoutState=null;
-  let resetMenuLayoutEditor=()=>{};
-  const iconInputs={
-    continue:editor.querySelector("#menuIconContinue"),
-    newGame:editor.querySelector("#menuIconNewGame"),
-    hostLobby:editor.querySelector("#menuIconHostLobby"),
-    joinLobby:editor.querySelector("#menuIconJoinLobby"),
-    controls:editor.querySelector("#menuIconControls")
-  };
-  const outputX=editor.querySelector("#menuEditorXOut");
-  const outputY=editor.querySelector("#menuEditorYOut");
-  const outputB=editor.querySelector("#menuEditorBrightnessOut");
-  const outputS=editor.querySelector("#menuEditorSaturationOut");
-  const outputP=editor.querySelector("#menuEditorSepiaOut");
-
-  const defaultMenuLayout={
-    logo:{x:3,y:3,w:34,h:18},
-    nav:{x:3,y:25,w:30,h:49},
-    saves:{x:3,y:72,w:46,h:21},
-    terminal:{x:30.5,y:23,w:25,h:44},
-    footer:{x:3,y:93,w:94,h:6}
-  };
-
-  const isPanelElement=(element)=>Boolean(element && (element.classList.contains("menuLogo") || element.classList.contains("menuNav") || element.classList.contains("menuSlotBar") || element.classList.contains("menuRightPanel") || element.classList.contains("menuFooter")));
- 
-  const defaultMenuConfig={
-    url:"https://images.unsplash.com/photo-1761251946420-8b65ad19f2e7?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400",
-    x:50,
-    y:50,
-    brightness:72,
-    saturation:118,
-    sepia:38,
-    icons:{...defaultMenuIcons},
-    layout:defaultMenuLayout,
-    elements:{}
-  };
-  let menuConfig={...defaultMenuConfig};
-  try{
-    const saved=JSON.parse(localStorage.getItem("deepseeker-menu-config")||"null");
-    if(saved && typeof saved==="object") menuConfig={...menuConfig,...saved,icons:{...defaultMenuIcons,...(saved.icons||{})},layout:{...defaultMenuLayout,...(saved.layout||{})},elements:{...(saved.elements||{})}};
-  }catch{}
-  Object.assign(elementStyles,menuConfig.elements||{});
-
-  function syncMenuEditor(){
-    urlInput.value=String(menuConfig.url||defaultMenuConfig.url);
-    xInput.value=String(menuConfig.x);
-    yInput.value=String(menuConfig.y);
-    brightnessInput.value=String(menuConfig.brightness);
-    saturationInput.value=String(menuConfig.saturation);
-    sepiaInput.value=String(menuConfig.sepia);
-    outputX.textContent=xInput.value+"%";
-    outputY.textContent=yInput.value+"%";
-    outputB.textContent=brightnessInput.value+"%";
-    outputS.textContent=saturationInput.value+"%";
-    outputP.textContent=sepiaInput.value+"%";
-    for(const [key,input] of Object.entries(iconInputs)){
-      if(input) input.value=String(menuIcons[key]||defaultMenuIcons[key]);
-    }
-  }
-
-  function readMenuEditor(){
-    return {
-      url:String(urlInput.value||"").trim(),
-      x:Number(xInput.value),
-      y:Number(yInput.value),
-      brightness:Number(brightnessInput.value),
-      saturation:Number(saturationInput.value),
-      sepia:Number(sepiaInput.value),
-      layout:menuLayoutState ? Object.fromEntries(Object.entries(menuLayoutState).map(([key,rect])=>[key,{...rect}])) : menuConfig.layout,
-      elements:{...elementStyles},
-      icons:Object.fromEntries(
-        Object.entries(iconInputs).map(([key,input])=>[
-          key,
-          String(input?.value||defaultMenuIcons[key]).slice(0,2)
-        ])
-      )
-    };
-  }
-
-  const menuEditableRootIds=new Set(["menuEditor","menuEditButton"]);
-
-  function getElementLabel(element,index){
-    const explicit=element.dataset.menuEditLabel;
-    if(explicit) return explicit;
-    const cls=String(element.className||"").split(/\s+/).filter(Boolean)[0];
-    const text=String(element.textContent||"").replace(/\s+/g," ").trim().slice(0,36);
-    return (element.tagName?.toLowerCase()||"element")+" "+(cls?("· "+cls+" "):"")+" "+(text?('· "'+text+'"'):"")+" ["+(index+1)+"]";
-  }
-
-  function collectMenuEditableElements(){
-    const all=[...layout.querySelectorAll("*")].filter(element=>{
-      if(element===editor || element.closest(".menuEditor") || element===editButton || element.classList.contains("menuResizeHandle") || element.classList.contains("menuElementResizeHandle")) return false;
-      return element!==layout;
-    });
-
-    all.forEach((element,index)=>{
-      if(!element.dataset.menuEditId) element.dataset.menuEditId="el-"+index;
-      if(!element.dataset.menuEditLabel) element.dataset.menuEditLabel=getElementLabel(element,index);
-    });
-
-    return all;
-  }
-
-  function getElementById(id){
-    return layout.querySelector('[data-menu-edit-id="'+CSS.escape(id)+'"]');
-  }
-
-  function readComputedElementState(element){
-    const style=getComputedStyle(element);
-    const rect=element.getBoundingClientRect();
-    const rootRect=layout.getBoundingClientRect();
-    return {
-      x:Math.round(rect.left-rootRect.left),
-      y:Math.round(rect.top-rootRect.top),
-      w:Math.round(rect.width),
-      h:Math.round(rect.height),
-      fontSize:parseFloat(style.fontSize)||0,
-      letterSpacing:style.letterSpacing==="normal"?0:(parseFloat(style.letterSpacing)||0),
-      lineHeight:style.lineHeight,
-      opacity:Math.round((parseFloat(style.opacity)||1)*100),
-      padding:style.padding,
-      margin:style.margin,
-      gap:style.gap==="normal"?"":style.gap,
-      radius:parseFloat(style.borderRadius)||0,
-      weight:style.fontWeight,
-      align:style.textAlign,
-      color:style.color,
-      background:style.backgroundColor,
-      customCss:element.dataset.menuCustomCss||""
-    };
-  }
-
-  function applyElementStyle(element,id,state){
-    if(!element||!state) return;
-    if(!element.dataset.menuOriginalStyle) element.dataset.menuOriginalStyle=element.getAttribute("style")||"";
-    element.classList.add("menuElementBeingEdited");
-    if(!isPanelElement(element)){
-      element.style.position="relative";
-      element.style.left=Number.isFinite(Number(state.x))?Number(state.x)+"px":"0px";
-      element.style.top=Number.isFinite(Number(state.y))?Number(state.y)+"px":"0px";
-      if(Number.isFinite(Number(state.w))){element.style.width=Math.max(1,Number(state.w))+"px";}
-      if(Number.isFinite(Number(state.h))){element.style.height=Math.max(1,Number(state.h))+"px";}
-    }
-    if(Number.isFinite(Number(state.fontSize)) && Number(state.fontSize)>0) element.style.fontSize=Number(state.fontSize)+"px";
-    if(state.letterSpacing!==undefined && state.letterSpacing!=="") element.style.letterSpacing=Number(state.letterSpacing)+"px";
-    if(state.lineHeight!==undefined && state.lineHeight!=="") element.style.lineHeight=String(state.lineHeight);
-    if(state.opacity!==undefined && state.opacity!=="") element.style.opacity=Math.max(0,Math.min(100,Number(state.opacity)))/100;
-    if(state.padding!==undefined) element.style.padding=String(state.padding);
-    if(state.margin!==undefined) element.style.margin=String(state.margin);
-    if(state.gap!==undefined && state.gap!=="") element.style.gap=String(state.gap);
-    if(state.radius!==undefined && state.radius!=="") element.style.borderRadius=Math.max(0,Number(state.radius))+"px";
-    if(state.weight!==undefined && state.weight!=="") element.style.fontWeight=String(state.weight);
-    if(state.align!==undefined && state.align!=="") element.style.textAlign=String(state.align);
-    if(state.color!==undefined && state.color!=="") element.style.color=String(state.color);
-    if(state.background!==undefined && state.background!=="") element.style.background=String(state.background);
-    if(state.customCss!==undefined){
-      element.dataset.menuCustomCss=String(state.customCss);
-      for(const declaration of String(state.customCss).split(";")){
-        const colon=declaration.indexOf(":");
-        if(colon<=0) continue;
-        const prop=declaration.slice(0,colon).trim();
-        const value=declaration.slice(colon+1).trim();
-        if(prop) element.style.setProperty(prop,value);
-      }
-    }
-    if(element.tagName==="SPAN" && (state.w!==undefined || state.h!==undefined)) element.style.display="inline-block";
-    element.dataset.menuEdited="1";
-    elementStyles[id]={...state};
-  }
-
-  function syncElementInputs(element){
-    if(!element) return;
-    const id=element.dataset.menuEditId;
-    const state={...readComputedElementState(element),...(elementStyles[id]||{})};
-    for(const [key,input] of Object.entries(elementInputs)) if(input) input.value=state[key]===undefined?"":String(state[key]);
-    selectedElementId=id||"";
-    selectedElement=element;
-    if(elementSelect) elementSelect.value=id||"";
-    if(elementStatus) elementStatus.textContent=(element.dataset.menuEditLabel||id||"")+(isPanelElement(element)?" · PANEL GEOMETRY USES DRAG/RESIZE":"");
-    for(const key of ["x","y","w","h"]) if(elementInputs[key]) elementInputs[key].disabled=isPanelElement(element);
-  }
-
-  function populateElementSelect(){
-    if(!elementSelect) return;
-    const elements=collectMenuEditableElements();
-    attachDirectElementEditors(elements);
-    for(const [id,state] of Object.entries(elementStyles)){
-      const savedElement=getElementById(id);
-      if(savedElement) applyElementStyle(savedElement,id,state);
-    }
-    elementSelect.innerHTML="";
-    elements.forEach((element,index)=>{
-      const option=document.createElement("option");
-      option.value=element.dataset.menuEditId;
-      option.textContent=element.dataset.menuEditLabel||getElementLabel(element,index);
-      elementSelect.appendChild(option);
-    });
-    if(selectedElementId && getElementById(selectedElementId)) elementSelect.value=selectedElementId;
-    else if(elements[0]) elementSelect.value=elements[0].dataset.menuEditId;
-    const current=getElementById(elementSelect.value);
-    if(current) syncElementInputs(current);
-  }
-
-  function applySelectedElement(){
-    const element=getElementById(elementSelect?.value||selectedElementId);
-    if(!element) return;
-    const state={};
-    for(const [key,input] of Object.entries(elementInputs)) state[key]=String(input?.value??"");
-    applyElementStyle(element,element.dataset.menuEditId,state);
-    if(elementStatus) elementStatus.textContent="APPLIED · "+(element.dataset.menuEditLabel||element.dataset.menuEditId);
-  }
-
-  function attachDirectElementEditors(elements){
-    for(const element of elements){
-      if(element.dataset.menuDirectEditor==="1" || isPanelElement(element)) continue;
-      element.dataset.menuDirectEditor="1";
-      let handle=element.querySelector(":scope > .menuElementResizeHandle");
-      if(!handle){
-        handle=document.createElement("span");
-        handle.className="menuElementResizeHandle";
-        handle.title="Resize element";
-        element.appendChild(handle);
-        handle.addEventListener("pointerdown",event=>{
-          if(!menuLayoutEditing) return;
-          event.preventDefault();event.stopPropagation();
-          syncElementInputs(element);
-          const id=element.dataset.menuEditId;
-          const base={...readComputedElementState(element),...(elementStyles[id]||{})};
-          const sx=event.clientX,sy=event.clientY;
-          const sw=Number(base.w)||element.getBoundingClientRect().width;
-          const sh=Number(base.h)||element.getBoundingClientRect().height;
-          const move=ev=>applyElementStyle(element,id,{...base,w:Math.max(12,sw+(ev.clientX-sx)),h:Math.max(8,sh+(ev.clientY-sy))});
-          const stop=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",stop);syncElementInputs(element);};
-          document.addEventListener("pointermove",move);document.addEventListener("pointerup",stop,{once:true});
-        });
-      }
-      element.addEventListener("pointerdown",event=>{
-        if(!menuLayoutEditing || event.target.closest(".menuElementResizeHandle")) return;
-        event.preventDefault();event.stopPropagation();
-        syncElementInputs(element);
-        element.classList.add("menuElementSelected");
-        const id=element.dataset.menuEditId;
-        const base={...readComputedElementState(element),...(elementStyles[id]||{})};
-        const sx=event.clientX,sy=event.clientY;
-        const sl=Number(base.x)||0,st=Number(base.y)||0;
-        const move=ev=>applyElementStyle(element,id,{...base,x:sl+(ev.clientX-sx),y:st+(ev.clientY-sy)});
-        const stop=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",stop);syncElementInputs(element);};
-        document.addEventListener("pointermove",move);document.addEventListener("pointerup",stop,{once:true});
-      });
-    }
-  }
-
-  function resetSelectedElement(){
-    const element=getElementById(elementSelect?.value||selectedElementId);
-    if(!element) return;
-    const id=element.dataset.menuEditId;
-    if(!isPanelElement(element)){
-      element.setAttribute("style",element.dataset.menuOriginalStyle||"");
-      delete element.dataset.menuCustomCss;
-      element.classList.remove("menuElementBeingEdited");
-    }
-    delete elementStyles[id];
-    element.classList.remove("menuElementSelected");
-    syncElementInputs(element);
-    if(elementStatus) elementStatus.textContent="RESET · "+(element.dataset.menuEditLabel||id);
-  }
-
-  function resetAllElements(){
-    collectMenuEditableElements().forEach(element=>{
-      if(!isPanelElement(element)){
-        element.setAttribute("style",element.dataset.menuOriginalStyle||"");
-        delete element.dataset.menuCustomCss;
-        element.classList.remove("menuElementBeingEdited");
-      }
-      element.classList.remove("menuElementSelected");
-    });
-    for(const key of Object.keys(elementStyles)) delete elementStyles[key];
-    if(elementStatus) elementStatus.textContent="ALL ELEMENTS RESET";
-    populateElementSelect();
-  }
-
-  function applyMenuEditor(config){
-    menuConfig={...defaultMenuConfig,...config};
-    const safeUrl=String(menuConfig.url||defaultMenuConfig.url).replace(/"/g,"");
-    backdrop.style.backgroundImage=
-      "linear-gradient(90deg,rgba(5,6,4,.86) 0%,rgba(8,9,6,.54) 24%,rgba(12,11,7,.12) 55%,rgba(5,5,4,.28) 100%),"+
-      "linear-gradient(180deg,rgba(58,46,17,.28),rgba(93,73,25,.12) 42%,rgba(5,5,4,.58) 100%),"+
-      "url(\"" + safeUrl + "\")";
-    backdrop.style.backgroundPosition=String(menuConfig.x)+"% "+String(menuConfig.y)+"%";
-    backdrop.style.backgroundSize="cover";
-    backdrop.style.filter=
-      "sepia("+String(menuConfig.sepia)+"%) saturate("+String(menuConfig.saturation)+"%) contrast(1.08) brightness("+String(menuConfig.brightness)+"%)";
-    if(menuConfig.icons && typeof menuConfig.icons==="object"){
-      menuIcons={...defaultMenuIcons,...menuConfig.icons};
-    }
-    Object.assign(elementStyles,menuConfig.elements||{});
-    refreshMenuIcons();
-    syncMenuEditor();
-    populateElementSelect();
-  }
-
-  for(const input of [xInput,yInput,brightnessInput,saturationInput,sepiaInput]){
-    input.addEventListener("input",()=>{
-      outputX.textContent=xInput.value+"%";
-      outputY.textContent=yInput.value+"%";
-      outputB.textContent=brightnessInput.value+"%";
-      outputS.textContent=saturationInput.value+"%";
-      outputP.textContent=sepiaInput.value+"%";
-      applyMenuEditor(readMenuEditor());
-    });
-  }
-
-  elementSelect.addEventListener("change",()=>{
-    const element=getElementById(elementSelect.value);
-    if(element) syncElementInputs(element);
-  });
-  elementApplyButton.addEventListener("click",applySelectedElement);
-  elementResetButton.addEventListener("click",resetSelectedElement);
-  elementResetAllButton.addEventListener("click",resetAllElements);
-
-  applyButton.addEventListener("click",()=>{
-    applyMenuEditor(readMenuEditor());
-    status.textContent="APPLIED";
-  });
-
-  resetButton.addEventListener("click",()=>{
-    menuIcons={...defaultMenuIcons};
-    resetMenuLayoutEditor();
-    menuConfig={...defaultMenuConfig,icons:{...menuIcons},layout:menuLayoutState||defaultMenuLayout};
-    applyMenuEditor(menuConfig);
-    for(const [id,state] of Object.entries(elementStyles)){
-      const element=getElementById(id);
-      if(element) applyElementStyle(element,id,state);
-    }
-    populateElementSelect();
-    status.textContent="RESET";
-  });
-
-  localButton.addEventListener("click",()=>{
-    menuConfig=readMenuEditor();
-    menuIcons={...defaultMenuIcons,...menuConfig.icons};
-    applyMenuEditor(menuConfig);
-    localStorage.setItem("deepseeker-menu-config",JSON.stringify(menuConfig));
-    localStorage.setItem("deepseeker-menu-icons",JSON.stringify(menuIcons));
-    localStorage.setItem("deepseeker-menu-elements",JSON.stringify(elementStyles));
-    status.textContent="SAVED ON THIS BROWSER";
-  });
-
-  openGithubButton.addEventListener("click",()=>{
-    window.open(
-      "https://github.com/kaydenhaas49-sys/DeepSeeker/edit/main/main.js",
-      "_blank",
-      "noopener,noreferrer"
-    );
-    status.textContent="GITHUB EDITOR OPENED";
-  });
-
-  githubButton.addEventListener("click",async()=>{
-    menuConfig=readMenuEditor();
-    const snippet=
-      "const MENU_BACKGROUND_CONFIG="+JSON.stringify(menuConfig,null,2)+";\n"+
-      "const MENU_ICONS="+JSON.stringify(menuConfig.icons,null,2)+";\n"+
-      "const MENU_LAYOUT="+JSON.stringify(menuConfig.layout,null,2)+";\n"+
-      "const MENU_ELEMENTS="+JSON.stringify(menuConfig.elements,null,2)+";";
-    try{
-      await navigator.clipboard.writeText(snippet);
-      status.textContent="GITHUB CONFIG COPIED";
-    }catch{
-      window.prompt("Copy this config into the repo:",snippet);
-    }
-  });
-
-  let menuLayoutEditing=false;
-  const setLayoutEditing=(open)=>{
-    menuLayoutEditing=open;
-    editor.classList.toggle("open",open);
-    layout.classList.toggle("menuLayoutEditing",open);
-    editButton.textContent=open?"CLOSE":"EDIT";
-    if(!open && layoutSelection) layoutSelection.textContent="Selected: NONE";
-  };
-  editButton.addEventListener("click",()=>setLayoutEditing(!menuLayoutEditing));
-
-  layout.append(editButton,editor);
-  layout.append(logo,nav,slotBar,right,footer);
-
-
-
+  layout.append(logo,terminal,nav,slotBar);
   homeScreen.appendChild(layout);
 
-  // Layout editor is initialized only after all menu elements are in the DOM.
-  // It is guarded so an editor failure can never blank the actual menu.
-  try{
-    const layoutElements={logo,nav,saves:slotBar,terminal:right,footer};
-    const bounds=layout.getBoundingClientRect();
-    const measure=()=>{
-      const base=layout.getBoundingClientRect();
-      const result={};
-      for(const [key,element] of Object.entries(layoutElements)){
-        const box=element.getBoundingClientRect();
-        result[key]={
-          x:Math.max(0,Math.min(100,(box.left-base.left)/base.width*100)),
-          y:Math.max(0,Math.min(100,(box.top-base.top)/base.height*100)),
-          w:Math.max(8,Math.min(100,box.width/base.width*100)),
-          h:Math.max(4,Math.min(100,box.height/base.height*100))
-        };
-      }
-      return result;
-    };
-
-    menuLayoutState=menuConfig.layout && typeof menuConfig.layout==="object"
-      ? Object.fromEntries(Object.entries(defaultMenuLayout).map(([key,base])=>[key,{...base,...(menuConfig.layout[key]||{})}]))
-      : measure();
-
-    const applyLayout=()=>{
-      for(const [key,element] of Object.entries(layoutElements)){
-        const rect=menuLayoutState[key];
-        if(!rect) continue;
-        element.style.left=rect.x+"%";
-        element.style.top=rect.y+"%";
-        element.style.width=rect.w+"%";
-        element.style.height=rect.h+"%";
-        element.style.right="auto";
-        element.style.bottom="auto";
-        element.style.boxSizing="border-box";
-        if(key==="logo") element.style.maxWidth="none";
-      }
-    };
-
-    const clampRect=(rect)=>{
-      const w=Math.max(8,Math.min(100,Number(rect.w)||8));
-      const h=Math.max(4,Math.min(100,Number(rect.h)||4));
-      return {x:Math.max(0,Math.min(100-w,Number(rect.x)||0)),y:Math.max(0,Math.min(100-h,Number(rect.y)||0)),w,h};
-    };
-
-    const updateSelection=(key)=>{
-      if(layoutSelection) layoutSelection.textContent=key ? "Selected: "+key.toUpperCase()+" · DRAG TO MOVE · CORNER TO RESIZE" : "Selected: NONE";
-    };
-
-    const activateElement=(key,element)=>{
-      element.classList.add("menuEditableElement");
-      const handle=document.createElement("span");
-      handle.className="menuResizeHandle";
-      handle.title="Resize "+key;
-      element.appendChild(handle);
-
-      let drag=null;
-      const start=(event,mode)=>{
-        if(!menuLayoutEditing || event.button!==0) return;
-        event.preventDefault(); event.stopPropagation();
-        const current=menuLayoutState[key];
-        if(!current) return;
-        updateSelection(key);
-        drag={mode,startX:event.clientX,startY:event.clientY,base:{...current}};
-        element.setPointerCapture?.(event.pointerId);
-      };
-
-      element.addEventListener("pointerdown",event=>{
-        if(event.target.closest(".menuResizeHandle")) return;
-        start(event,"move");
-      });
-      handle.addEventListener("pointerdown",event=>start(event,"resize"));
-      element.addEventListener("pointermove",event=>{
-        if(!drag) return;
-        const base=layout.getBoundingClientRect();
-        const dx=(event.clientX-drag.startX)/base.width*100;
-        const dy=(event.clientY-drag.startY)/base.height*100;
-        const next={...drag.base};
-        if(drag.mode==="move"){next.x=drag.base.x+dx;next.y=drag.base.y+dy;}
-        else{next.w=drag.base.w+dx;next.h=drag.base.h+dy;}
-        menuLayoutState[key]=clampRect(next);
-        applyLayout();
-      });
-      const stop=()=>{drag=null;menuConfig={...menuConfig,layout:menuLayoutState};};
-      element.addEventListener("pointerup",stop);
-      element.addEventListener("pointercancel",stop);
-      element.addEventListener("click",event=>{
-        if(menuLayoutEditing){event.preventDefault();event.stopPropagation();}
-      },true);
-    };
-
-    for(const [key,element] of Object.entries(layoutElements)) activateElement(key,element);
-    applyLayout();
-
-    resetMenuLayoutEditor=()=>{
-      menuLayoutState=Object.fromEntries(Object.entries(defaultMenuLayout).map(([key,rect])=>[key,{...rect}]));
-      applyLayout();
-    };
-  }catch(error){
-    console.warn("[DeepSeeker] Menu layout editor disabled:",error);
-  }
-
-  populateElementSelect();
   window.__deepseekerMenu={
-    refreshElementEditor:populateElementSelect,
-    getElementStyles:()=>JSON.parse(JSON.stringify(elementStyles))
+    refreshElementEditor:()=>{},
+    getElementStyles:()=>({})
   };
 }
 
