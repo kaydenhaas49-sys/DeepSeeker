@@ -244,7 +244,7 @@ menuScene.fog=new THREE.Fog(0x746d50,12,68);
 const menuSet=new THREE.Group();
 menuSet.name="RuinedBackroomsMenuSet";
 menuSet.visible=false;
-menuScene.add(menuSet);
+scene.add(menuSet);
 
 const menuWallMaterial=new THREE.MeshStandardMaterial({
   map:menuWallTexture,
@@ -445,7 +445,7 @@ function updateMenuScene(t,dt){
     if(menuBackdropWasActive){
       menuBackdropWasActive=false;
       menuSet.visible=false;
-      if(menuBackdropElement) menuBackdropElement.style.display="none";
+      world.root.visible=true;
       menuScene.fog.color.set(0x030302);
       menuScene.fog.near=14;
       menuScene.fog.far=62;
