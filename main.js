@@ -850,26 +850,29 @@ function installMainMenuRedesign(){
   overflow:hidden;
   pointer-events:none;
   background:
-    radial-gradient(ellipse at 72% 35%,rgba(92,112,105,.16),transparent 20%),
-    radial-gradient(ellipse at 91% 55%,rgba(160,118,54,.11),transparent 17%),
-    linear-gradient(180deg,#080b0a 0%,#111713 42%,#040605 100%);
+    radial-gradient(ellipse at 74% 33%,rgba(186,170,113,.13),transparent 18%),
+    radial-gradient(ellipse at 92% 58%,rgba(92,83,55,.14),transparent 16%),
+    radial-gradient(ellipse at 18% 74%,rgba(18,20,17,.72),transparent 34%),
+    linear-gradient(180deg,#171712 0%,#333126 38%,#171813 72%,#070806 100%);
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
   inset:0;
   background:
-    linear-gradient(90deg,rgba(0,0,0,.48),transparent 44%,rgba(0,0,0,.18)),
-    radial-gradient(ellipse at 74% 48%,transparent 0 13%,rgba(0,0,0,.08) 31%,rgba(0,0,0,.76) 100%);
+    linear-gradient(90deg,rgba(0,0,0,.62),rgba(0,0,0,.10) 42%,rgba(0,0,0,.28)),
+    radial-gradient(ellipse at 76% 46%,transparent 0 11%,rgba(0,0,0,.16) 32%,rgba(0,0,0,.84) 100%),
+    linear-gradient(180deg,rgba(0,0,0,.08),transparent 42%,rgba(0,0,0,.38));
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
   background:
-    repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.012) 7px,transparent 8px),
-    linear-gradient(180deg,rgba(0,0,0,.08),transparent 34%,rgba(0,0,0,.52) 100%);
-  opacity:.72;
+    repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.009) 7px,transparent 8px),
+    repeating-linear-gradient(92deg,transparent 0 17%,rgba(18,19,15,.10) 17.3% 17.7%,transparent 18% 36%),
+    linear-gradient(180deg,rgba(0,0,0,.10),transparent 30%,rgba(0,0,0,.64) 100%);
+  opacity:.9;
 }
 .menuBGHall{
   position:absolute;
@@ -878,8 +881,9 @@ function installMainMenuRedesign(){
   width:48%;
   height:70%;
   background:
-    linear-gradient(90deg,rgba(196,187,140,.08),transparent 13%),
-    linear-gradient(180deg,rgba(32,34,26,.25),rgba(2,3,2,.94));
+    linear-gradient(90deg,rgba(182,171,126,.09),rgba(74,69,50,.07) 24%,transparent 48%),
+    repeating-linear-gradient(172deg,transparent 0 18%,rgba(35,33,25,.12) 18.4% 18.9%,transparent 19.2% 31%),
+    linear-gradient(180deg,rgba(66,63,49,.28),rgba(8,8,6,.96));
   clip-path:polygon(29% 0,71% 0,100% 100%,0 100%);
   box-shadow:0 0 100px rgba(0,0,0,.72);
 }
@@ -890,8 +894,9 @@ function installMainMenuRedesign(){
   top:-4%;
   height:50%;
   background:
-    repeating-linear-gradient(90deg,transparent 0 14%,rgba(169,188,175,.035) 14.2% 14.7%,transparent 15% 28%),
-    linear-gradient(170deg,rgba(154,171,159,.09),rgba(26,34,30,.04) 60%,transparent 100%);
+    repeating-linear-gradient(90deg,transparent 0 14%,rgba(142,137,113,.035) 14.2% 14.7%,transparent 15% 28%),
+    repeating-linear-gradient(8deg,transparent 0 21%,rgba(31,30,23,.08) 21.2% 21.8%,transparent 22% 43%),
+    linear-gradient(170deg,rgba(123,117,92,.13),rgba(38,37,29,.08) 60%,transparent 100%);
   transform:skewX(-15deg);
 }
 .menuBGFloor{
@@ -901,9 +906,10 @@ function installMainMenuRedesign(){
   bottom:-13%;
   height:64%;
   background:
-    repeating-linear-gradient(90deg,transparent 0 12%,rgba(205,195,151,.032) 12.1% 12.3%),
-    repeating-linear-gradient(0deg,transparent 0 12%,rgba(205,195,151,.022) 12.1% 12.4%),
-    linear-gradient(180deg,rgba(112,105,72,.08),rgba(4,5,4,.94) 76%);
+    repeating-linear-gradient(90deg,transparent 0 12%,rgba(155,143,103,.032) 12.1% 12.3%),
+    repeating-linear-gradient(0deg,transparent 0 12%,rgba(91,84,61,.028) 12.1% 12.4%),
+    radial-gradient(ellipse at 56% 28%,rgba(62,57,40,.20),transparent 22%),
+    linear-gradient(180deg,rgba(103,96,66,.11),rgba(5,5,4,.96) 76%);
   transform:perspective(900px) rotateX(62deg);
   transform-origin:bottom center;
 }
@@ -914,8 +920,9 @@ function installMainMenuRedesign(){
   width:62%;
   height:84%;
   background:
-    repeating-linear-gradient(0deg,transparent 0 18%,rgba(151,170,158,.035) 18.2% 18.5%),
-    linear-gradient(90deg,rgba(7,11,9,.98),rgba(69,84,74,.10) 76%,transparent);
+    repeating-linear-gradient(0deg,transparent 0 18%,rgba(128,119,91,.045) 18.2% 18.6%),
+    radial-gradient(ellipse at 34% 30%,rgba(143,126,79,.09),transparent 24%),
+    linear-gradient(90deg,rgba(10,10,8,.99),rgba(73,69,52,.12) 76%,transparent);
   clip-path:polygon(0 0,100% 8%,69% 100%,0 100%);
 }
 .menuBGWallR{
@@ -925,8 +932,9 @@ function installMainMenuRedesign(){
   width:58%;
   height:84%;
   background:
-    repeating-linear-gradient(0deg,transparent 0 16%,rgba(151,170,158,.03) 16.2% 16.5%),
-    linear-gradient(270deg,rgba(5,7,6,.98),rgba(67,80,71,.08) 72%,transparent);
+    repeating-linear-gradient(0deg,transparent 0 16%,rgba(126,117,87,.04) 16.2% 16.5%),
+    radial-gradient(ellipse at 65% 38%,rgba(126,108,63,.08),transparent 22%),
+    linear-gradient(270deg,rgba(7,7,6,.99),rgba(66,61,45,.10) 72%,transparent);
   clip-path:polygon(12% 8%,100% 0,100% 100%,34% 100%);
 }
 .menuBGLight{
@@ -934,19 +942,21 @@ function installMainMenuRedesign(){
   width:min(220px,18vw);
   height:8px;
   border-radius:999px;
-  background:#dbe8dc;
-  box-shadow:0 0 14px rgba(211,232,217,.7),0 0 52px rgba(196,224,202,.22);
+  background:linear-gradient(90deg,#b8b9a7,#e2dfc5 45%,#6d7064 100%);
+  box-shadow:0 0 12px rgba(216,214,184,.46),0 0 44px rgba(196,184,139,.18);
   transform:rotate(-8deg);
   animation:menuFluoro 4.8s ease-in-out infinite;
 }
-.menuBGLight.one{right:24%;top:15%}
-.menuBGLight.two{right:7%;top:31%;width:min(130px,11vw);opacity:.55;animation-delay:1.8s}
+.menuBGLight.one{right:24%;top:15%;opacity:.68}
+.menuBGLight.two{right:7%;top:31%;width:min(130px,11vw);opacity:.28;animation-delay:1.8s}
 @keyframes menuFluoro{
-  0%,100%{opacity:.72}
-  47%{opacity:.9}
-  49%{opacity:.38}
-  51%{opacity:.82}
-  72%{opacity:.62}
+  0%,100%{opacity:.68}
+  46%{opacity:.74}
+  47%{opacity:.25}
+  49%{opacity:.62}
+  51%{opacity:.14}
+  54%{opacity:.58}
+  72%{opacity:.42}
 }
 .menuBGGlow{
   position:absolute;
@@ -955,7 +965,7 @@ function installMainMenuRedesign(){
   width:min(430px,35vw);
   height:min(430px,35vw);
   border-radius:50%;
-  background:radial-gradient(circle,rgba(166,196,177,.10),rgba(166,196,177,.018) 40%,transparent 72%);
+  background:radial-gradient(circle,rgba(180,158,103,.09),rgba(137,119,74,.018) 40%,transparent 72%);
   filter:blur(18px);
   mix-blend-mode:screen;
   animation:menuGlow 8s ease-in-out infinite alternate;
@@ -966,7 +976,7 @@ function installMainMenuRedesign(){
   bottom:-10%;
   left:-26%;
   width:23vw;
-  background:linear-gradient(90deg,transparent,rgba(226,213,166,.05),transparent);
+  background:linear-gradient(90deg,transparent,rgba(191,176,128,.035),transparent);
   transform:skewX(-12deg);
   animation:menuSweep 18s ease-in-out infinite;
 }
