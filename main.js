@@ -2022,9 +2022,11 @@ let spiderJumpscareTimer=0;
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
 let spiderJumpscareScale=1;
-let spiderLookConfirmTime=0;
+let spiderAutoLookTimer=0;
+let spiderAutoLookStarted=false;
 
 const SPIDER_STALK_TIME=2.0;
+const SPIDER_AUTO_LOOK_DURATION=1.0;
 const SPIDER_ATTACK_RANGE=1.65;
 const SPIDER_SPEED=2.35;
 const SPIDER_RADIUS=.55;
@@ -2164,23 +2166,18 @@ const spiderSightRaycaster=new THREE.Raycaster();
 const spiderSightOrigin=new THREE.Vector3();
 const spiderSightTarget=new THREE.Vector3();
 
-function spiderHasLineOfSight(){
-  const dx=player.pos.x-spiderEntity.position.x;
-  const dz=player.pos.z-spiderEntity.position.z;
+function playerHasLineOfSightToSpider(){
+  const dx=spiderEntity.position.x-camera.position.x;
+  const dz=spiderEntity.position.z-camera.position.z;
   const distance=Math.hypot(dx,dz);
 
   if(distance<.25 || distance>18) return false;
 
-  spiderSightOrigin.set(
-    spiderEntity.position.x,
-    Math.max(.65,player.pos.y-.35),
-    spiderEntity.position.z
-  );
-
+  spiderSightOrigin.copy(camera.position);
   spiderSightTarget.set(
-    player.pos.x,
-    EYE,
-    player.pos.z
+    spiderEntity.position.x,
+    spiderEntity.position.y+.8,
+    spiderEntity.position.z
   );
 
   const direction=spiderSightTarget.clone().sub(spiderSightOrigin);
@@ -2196,8 +2193,6 @@ function spiderHasLineOfSight(){
 }
 
 function rotatePlayerTowardSpider(dt){
-  if(performance.now()-player.lastLookInputAt<280) return;
-
   const dx=spiderEntity.position.x-player.pos.x;
   const dz=spiderEntity.position.z-player.pos.z;
   if(dx*dx+dz*dz<.0001) return;
@@ -2208,7 +2203,7 @@ function rotatePlayerTowardSpider(dt){
   while(delta>Math.PI) delta-=Math.PI*2;
   while(delta<-Math.PI) delta+=Math.PI*2;
 
-  const turnSpeed=2.35;
+  const turnSpeed=7.0;
   player.yaw+=delta*Math.min(1,dt*turnSpeed);
 }
 
@@ -2349,7 +2344,8 @@ function resetPlayerAfterSpiderCatch(){
   spiderJumpscareScale=1;
   spiderBehaviorState="chase";
   spiderBehaviorTime=0;
-  spiderLookConfirmTime=0;
+  spiderAutoLookTimer=0;
+  spiderAutoLookStarted=true;
   spiderEntity.scale.setScalar(1);
   spiderEntity.position.y=SPIDER_GROUND_OFFSET;
   setSpiderAnimation("chase");
@@ -2375,7 +2371,8 @@ function spawnSpiderAtPlayer(){
 
   spiderBehaviorState="stalk";
   spiderBehaviorTime=0;
-  spiderLookConfirmTime=0;
+  spiderAutoLookTimer=0;
+  spiderAutoLookStarted=false;
   spiderAttackPlayed=false;
   spiderActive=true;
   spiderEntity.visible=true;
@@ -3119,31 +3116,24 @@ function animate(){
       player.pos.z-spiderEntity.position.z
     );
 
-    const spiderSeesPlayer=
+    const playerSeesSpider=
+      (spiderBehaviorState==="stalk" || spiderBehaviorState==="chase") &&
       targetDistance<=18 &&
-      spiderHasLineOfSight();
+      playerHasLineOfSightToSpider();
 
     if(
-      spiderBehaviorState==="chase" &&
-      spiderSeesPlayer &&
-      spiderBehaviorTime>=0.75
+      !spiderAutoLookStarted &&
+      playerSeesSpider
     ){
-      spiderLookConfirmTime=Math.min(
-        1.2,
-        spiderLookConfirmTime+dt
-      );
-    }else{
-      spiderLookConfirmTime=Math.max(
-        0,
-        spiderLookConfirmTime-dt*2.5
-      );
+      spiderAutoLookStarted=true;
+      spiderAutoLookTimer=SPIDER_AUTO_LOOK_DURATION;
     }
 
-    if(
-      spiderLookConfirmTime>=0.3 &&
-      targetDistance<=12 &&
-      spiderBehaviorState==="chase"
-    ){
+    if(spiderAutoLookTimer>0){
+      spiderAutoLookTimer=Math.max(
+        0,
+        spiderAutoLookTimer-dt
+      );
       rotatePlayerTowardSpider(dt);
     }
 
@@ -3190,7 +3180,8 @@ function animate(){
     spiderEntity.visible=false;
     spiderBehaviorState="idle";
     spiderBehaviorTime=0;
-    spiderLookConfirmTime=0;
+    spiderAutoLookTimer=0;
+    spiderAutoLookStarted=false;
   }
   if(eventCooldown>0) eventCooldown-=dt;
   if(!houseMode && eventCooldown<=0 && t>nextEvent){
