@@ -296,186 +296,144 @@ function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotation
   return mesh;
 }
 
-// New menu composition: a broad, diagonal Level-0 chamber with a massive collapsed
-// ceiling bay, a flooded center, broken support walls, and much deeper sightlines.
-addMenuBox("Floor",new THREE.Vector3(90,.20,94),new THREE.Vector3(0,-.10,-10),menuFloorMaterial);
-addMenuBox("Ceiling",new THREE.Vector3(90,.20,94),new THREE.Vector3(0,9.25,-10),menuCeilingMaterial);
-addMenuBox("LeftWall",new THREE.Vector3(.25,9.25,94),new THREE.Vector3(-45,4.62,-10),menuWallMaterial);
-addMenuBox("RightWall",new THREE.Vector3(.25,9.25,94),new THREE.Vector3(45,4.62,-10),menuWallMaterial);
-addMenuBox("FarWall",new THREE.Vector3(90,9.25,.25),new THREE.Vector3(0,4.62,-57),menuWallMaterial);
+// Rebuilt true-3D menu: a wide ruined Level-0 office space with damaged ceiling,
+// repeating yellow walls, irregular columns, office debris, damp carpet, and deep side rooms.
+addMenuBox("Floor",new THREE.Vector3(104,.20,104),new THREE.Vector3(0,-.10,-7),menuFloorMaterial);
+addMenuBox("LeftWall",new THREE.Vector3(.30,9.2,104),new THREE.Vector3(-52,4.6,-7),menuWallMaterial);
+addMenuBox("RightWall",new THREE.Vector3(.30,9.2,104),new THREE.Vector3(52,4.6,-7),menuWallMaterial);
+addMenuBox("FarWall",new THREE.Vector3(104,9.2,.30),new THREE.Vector3(0,4.6,-59),menuWallMaterial);
+addMenuBox("FarWallLeft",new THREE.Vector3(28,9.2,.34),new THREE.Vector3(-38,4.6,-59),menuWallMaterial);
+addMenuBox("FarWallRight",new THREE.Vector3(30,9.2,.34),new THREE.Vector3(37,4.6,-59),menuWallMaterial);
+addMenuBox("FarOpeningTop",new THREE.Vector3(46,1.2,.4),new THREE.Vector3(-.5,8.1,-59),menuRuinMaterial,.01);
 
-// Large broken partitions cross the room at different depths. They are staggered
-// instead of forming a corridor, leaving a huge open playable-looking space.
-for(const [x,z,w,d,h,rot] of [
-  [-28,0,20,.34,6.4,-.02],
-  [-3,-8,15,.34,6.9,.035],
-  [23,-2,18,.34,6.1,-.025],
-  [-19,-18,.34,15,6.5,.035],
-  [15,-21,.34,20,6.2,-.03],
-  [-27,-33,15,.34,5.8,-.02],
-  [4,-36,22,.34,5.6,.025],
-  [27,-43,.34,15,5.2,-.03]
-]){
-  addMenuBox("BrokenPartition",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuWallMaterial,rot);
+const ceilingXs=[-45,-36,-27,-18,-9,0,9,18,27,36,45];
+const ceilingZs=[-54,-45,-36,-27,-18,-9,0,9,18,27,36,45];
+for(const z of ceilingZs){
+  for(const x of ceilingXs){
+    const missing=(x===0&&z===-27)||(x===9&&z===-18)||(x===-18&&z===9)||(x===27&&z===0)||(x===-36&&z===-45);
+    if(missing) continue;
+    addMenuBox("CeilingTile",new THREE.Vector3(8.2,.12,7.7),new THREE.Vector3(x,9.08,z),menuCeilingMaterial,0,
+      (x+z)%3===0?.018:0,(x-z)%4===0?-0.012:0);
+  }
+}
+for(const [x,z,w,d] of [[0,-27,8.4,7.9],[9,-18,8.3,7.7],[-18,9,8.3,7.8],[27,0,8.2,7.8],[-36,-45,8.2,7.7]]){
+  addMenuBox("CeilingVoid",new THREE.Vector3(w,.16,d),new THREE.Vector3(x,9.03,z),menuDarkMaterial);
+}
+for(const z of [-49.5,-40.5,-31.5,-22.5,-13.5,-4.5,4.5,13.5,22.5,31.5,40.5]){
+  addMenuBox("CeilingRailX",new THREE.Vector3(100,.07,.07),new THREE.Vector3(0,8.99,z),menuTrimMaterial);
+}
+for(const x of [-49.5,-40.5,-31.5,-22.5,-13.5,-4.5,4.5,13.5,22.5,31.5,40.5,49.5]){
+  addMenuBox("CeilingRailZ",new THREE.Vector3(.07,.07,100),new THREE.Vector3(x,8.99,-7),menuTrimMaterial);
 }
 
-// A giant collapsed ceiling section hangs diagonally over the flooded center.
-addMenuBox("CollapseMain",new THREE.Vector3(24,.72,2.0),new THREE.Vector3(1,7.0,-14),menuRuinMaterial,-.20,.10,.04);
-addMenuBox("CollapseCross",new THREE.Vector3(16,.58,1.3),new THREE.Vector3(-11,7.45,-22),menuRuinMaterial,.34,.08,.03);
-addMenuBox("CollapseDeep",new THREE.Vector3(19,.52,1.1),new THREE.Vector3(16,7.10,-31),menuRuinMaterial,-.14,-.12,-.05);
-
-// Exposed black space above the collapse.
-for(const [x,z,w,d,rx,rz] of [
-  [-18,2,10,4.2,.06,.02],
-  [2,-14,12,5.2,-.12,.05],
-  [18,-29,9,4.0,.10,-.06],
-  [-10,-39,8,3.6,.13,.04],
-  [17,-49,11,4.0,-.08,-.05]
+for(const [x,z,h,w] of [
+  [-34,11,7.7,2.6],[-17,-2,7.1,2.3],[1,10,7.8,2.7],[20,3,6.8,2.4],[36,16,7.5,2.5],
+  [-31,-24,7.0,2.4],[-10,-20,7.6,2.6],[13,-27,6.7,2.2],[32,-34,6.1,2.3],
+  [-23,-44,6.4,2.5],[4,-48,5.9,2.4],[27,-49,5.6,2.1]
 ]){
-  addMenuBox("OpenCeiling",new THREE.Vector3(w,.12,d),new THREE.Vector3(x,9.08,z),menuDarkMaterial,0,rx,rz);
+  addMenuBox("Column",new THREE.Vector3(w,h,w),new THREE.Vector3(x,h/2,z),menuWallMaterial,(x+z)*.001);
+  addMenuBox("ColumnBase",new THREE.Vector3(w+0.16,.22,w+0.16),new THREE.Vector3(x,.11,z),menuTrimMaterial);
 }
 
-// Broken support towers create a new silhouette without enclosing the camera.
-for(const [x,z,w,d,h,rot] of [
-  [-33,-11,2.3,2.3,7.7,.00],
-  [30,-15,2.0,2.0,6.9,.03],
-  [-25,-31,2.4,2.4,6.5,-.02],
-  [24,-34,2.2,2.2,6.1,.04],
-  [-4,-47,2.6,2.6,5.8,-.03]
+for(const [x,z,w,d,h,ry] of [
+  [-43,-4,.34,17,5.5,.02],[-33,-42,15,.34,5.4,-.02],
+  [-4,-8,13,.34,4.8,.03],[19,-10,.34,15,5.0,-.03],
+  [42,-24,.34,16,4.8,.02],[11,-39,17,.34,4.4,-.02]
 ]){
-  addMenuBox("RuinedSupport",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuRuinMaterial,rot);
+  addMenuBox("Partition",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuWallMaterial,ry);
 }
 
-// A huge partially-opened wall frame at the far end acts as the focal landmark.
-addMenuBox("FarFrameLeft",new THREE.Vector3(5.0,8.1,.48),new THREE.Vector3(-16,4.05,-55.8),menuRuinMaterial);
-addMenuBox("FarFrameRight",new THREE.Vector3(5.0,6.3,.48),new THREE.Vector3(17,3.15,-55.8),menuRuinMaterial);
-addMenuBox("FarFrameTop",new THREE.Vector3(28,1.65,.48),new THREE.Vector3(.5,7.75,-55.8),menuRuinMaterial,.03,.03,.01);
-addMenuBox("FarFrameVoid",new THREE.Vector3(24,6.0,.08),new THREE.Vector3(.5,3.0,-55.5),menuDarkMaterial);
+addMenuBox("SideVoidL",new THREE.Vector3(.08,5.4,13),new THREE.Vector3(-51.6,2.9,-18),menuDarkMaterial);
+addMenuBox("SideVoidR",new THREE.Vector3(.08,5.7,14),new THREE.Vector3(51.6,3.0,-38),menuDarkMaterial);
+addMenuBox("FarVoid",new THREE.Vector3(24,6.2,.10),new THREE.Vector3(4,3.1,-58.7),menuDarkMaterial);
 
-// A broad flooded section breaks up the carpet plane and catches the surviving light.
-addMenuBox("FloodedSection",new THREE.Vector3(24,.025,15),new THREE.Vector3(10,.018,-12),menuWetMaterial,.06);
-addMenuBox("FloodedSectionEdge",new THREE.Vector3(27,.045,.20),new THREE.Vector3(10,.042,-19.4),menuRuinMaterial,.06);
-addMenuBox("FloodedSectionEdge2",new THREE.Vector3(.20,.045,15),new THREE.Vector3(-1.8,.042,-12),menuRuinMaterial,.06);
-
-// Dirty carpet islands and water stains.
-for(const [x,z,w,d,ry] of [
-  [-22,8,7.0,2.0,.22],
-  [21,9,6.0,1.7,-.18],
-  [-29,-10,5.5,1.6,.30],
-  [-14,-25,6.8,1.8,-.20],
-  [25,-28,5.0,1.5,.26],
-  [-20,-43,6.3,1.8,-.18],
-  [9,-46,7.0,1.7,.22]
+for(const [x,z,w,d,ry,rx,rz,y] of [
+  [-14,-18,10,2.8,.13,.08,.03,7.72],
+  [12,-27,8.5,2.5,-.18,-.06,.04,7.45],
+  [27,-41,11,2.9,.16,.09,-.05,7.12],
+  [-6,-50,8.5,2.4,-.12,.04,.07,7.55]
 ]){
-  addMenuBox("DampCarpet",new THREE.Vector3(w,.028,d),new THREE.Vector3(x,.016,z),menuStainMaterial,ry);
-  addMenuBox("Puddle",new THREE.Vector3(w*.60,.012,d*.50),new THREE.Vector3(x,.035,z),menuWetMaterial,ry);
+  addMenuBox("CollapsedCeiling",new THREE.Vector3(w,.20,d),new THREE.Vector3(x,y,z),menuRuinMaterial,ry,rx,rz);
+}
+for(const [x,z,len,ry] of [[-10,-17,13,.10],[15,-24,11,-.13],[-22,-35,15,.07],[4,-44,12,-.10]]){
+  addMenuBox("ExposedBeam",new THREE.Vector3(len,.34,.30),new THREE.Vector3(x,7.9,z),menuRuinMaterial,ry,.02,.03);
 }
 
-// Long water streaks and peeled wallpaper remain visible on the perimeter.
-for(const [x,z,w,h,rot] of [
-  [-44,-5,.22,5.3,.01],
-  [-44,-28,.16,4.0,-.02],
-  [-44,-49,.18,4.7,.04],
-  [44,-10,.18,4.8,-.02],
-  [44,-36,.15,3.8,.03],
-  [44,-52,.16,2.9,-.04]
-]){
-  addMenuBox("WaterDamage",new THREE.Vector3(w,h,.04),new THREE.Vector3(x,3.1,z),menuStainMaterial,rot);
-}
-for(const [x,z,w,h,rx,rz] of [
-  [-44,-17,1.3,3.1,.03,.06],
-  [-44,-58,1.0,2.4,.06,.08],
-  [44,-24,1.2,3.3,-.03,-.07],
-  [44,-57,1.0,2.2,-.04,-.08]
-]){
-  addMenuBox("WallpaperPeel",new THREE.Vector3(w,h,.05),new THREE.Vector3(x,4.0,z),menuRuinMaterial,0,rx,rz);
-}
-
-// Fallen panels and ceiling chunks.
-for(const [x,z,len,rot,y,rx,rz] of [
-  [-19,-7,7.8,.18,7.88,.08,.02],
-  [5,-18,8.6,-.26,7.62,-.11,.04],
-  [25,-25,6.5,.22,7.50,.14,-.05],
-  [-6,-34,9.5,-.16,7.25,.05,.07],
-  [15,-45,7.4,.30,7.78,-.10,-.04]
-]){
-  addMenuBox("FallenBeam",new THREE.Vector3(len,.30,.38),new THREE.Vector3(x,y,z),menuRuinMaterial,rot,rx,rz);
-}
-for(const [x,z,w,d,rx,rz] of [
-  [-31,-5,4.0,2.5,.09,.04],
-  [20,-13,4.2,2.5,-.11,-.05],
-  [-19,-32,4.8,2.8,.12,.08],
-  [1,-42,4.3,2.6,-.08,-.06],
-  [-12,-52,4.8,2.5,.13,.05]
-]){
-  addMenuBox("BrokenCeilingTile",new THREE.Vector3(w,.14,d),new THREE.Vector3(x,7.72,z),menuRuinMaterial,0,rx,rz);
-}
-
-// Hanging cables frame the collapse and the far opening.
 function addHangingCable(x,z,length,sway){
   const curve=new THREE.CatmullRomCurve3([
-    new THREE.Vector3(x,9.05,z),
-    new THREE.Vector3(x+sway*.22,8.0,z),
-    new THREE.Vector3(x+sway*.62,7.0,z+.30),
-    new THREE.Vector3(x+sway,9.05-length,z+.60)
+    new THREE.Vector3(x,8.98,z),
+    new THREE.Vector3(x+sway*.18,8.05,z),
+    new THREE.Vector3(x+sway*.56,7.0,z+.35),
+    new THREE.Vector3(x+sway,8.98-length,z+.62)
   ]);
-  const geometry=new THREE.TubeGeometry(curve,18,.035,6,false);
+  const geometry=new THREE.TubeGeometry(curve,18,.045,6,false);
   const mesh=new THREE.Mesh(geometry,menuRuinMaterial);
+  mesh.name="HangingCable";
   menuSet.add(mesh);
 }
-addHangingCable(-16,-2,3.7,-.95);
-addHangingCable(1,-12,3.4,.72);
-addHangingCable(19,-24,4.5,-.88);
-addHangingCable(-9,-35,3.1,-.68);
-addHangingCable(18,-49,4.0,.92);
+for(const args of [[-15,-17,3.8,-1.0],[2,-26,3.5,.8],[18,-38,4.3,-.9],[-6,-47,3.0,-.7],[28,-53,3.8,.9]]) addHangingCable(...args);
 
-// Fluorescent survivors are arranged diagonally to reinforce the new composition.
-const menuLightData=[
-  [-18,7,10,.15],
-  [8,5,15,.9],
-  [-7,-8,7,1.8],
-  [20,-15,12,2.6],
-  [-20,-26,9,3.5],
-  [4,-35,6.5,4.2],
-  [-17,-45,4.2,5.0],
-  [13,-53,3.6,5.8]
+const menuLightFixtures3D=[
+  [-40,9,5.5,.2],[-22,7,11,.8],[-4,4,15,1.6],[14,5,7.2,2.5],[31,9,12,3.3],
+  [-34,-12,9,4.1],[-12,-15,4.8,4.8],[11,-13,13,5.5],[34,-17,6,6.2],
+  [-23,-31,10,7.0],[2,-31,15,7.8],[25,-33,5.4,8.4],[-7,-46,9,9.0],[18,-48,3.8,9.6]
 ];
-
-for(const [x,z,power,phase] of menuLightData){
-  const fixture=addMenuBox("Fluorescent",new THREE.Vector3(3.4,.10,.90),new THREE.Vector3(x,9.02,z),menuLightMaterial);
+for(const [x,z,power,phase] of menuLightFixtures3D){
+  const fixture=addMenuBox("Fluorescent",new THREE.Vector3(3.5,.10,.95),new THREE.Vector3(x,8.97,z),menuLightMaterial);
   fixture.userData.basePower=power;
   fixture.userData.phase=phase;
-
-  const point=new THREE.PointLight(0xffe9ae,power,18,2);
-  point.position.set(x,8.15,z);
+  const point=new THREE.PointLight(0xffe6a8,power,18,2);
+  point.position.set(x,8.08,z);
   point.userData.basePower=power;
   point.userData.phase=phase;
   menuSet.add(point);
 }
-
-const menuAmbient=new THREE.HemisphereLight(0xd0c28b,0x11120f,.56);
+for(const [x,z,w,d] of [[-18,-27,8.3,7.8],[9,-18,8.2,7.6],[27,0,8.1,7.5]]){
+  addMenuBox("OpenRecess",new THREE.Vector3(w,.08,d),new THREE.Vector3(x,8.97,z),menuDarkMaterial);
+}
+for(const [x,z,w,d,ry] of [
+  [-28,13,7.4,2.2,.18],[25,10,6.6,1.9,-.16],[-38,-10,6.0,2.0,.25],
+  [-15,-27,7.0,2.1,-.18],[27,-30,6.0,1.8,.22],[-23,-43,6.8,2.0,-.16],[8,-47,7.4,1.9,.20]
+]){
+  addMenuBox("DampCarpet",new THREE.Vector3(w,.028,d),new THREE.Vector3(x,.016,z),menuStainMaterial,ry);
+  addMenuBox("Puddle",new THREE.Vector3(w*.63,.014,d*.52),new THREE.Vector3(x,.035,z),menuWetMaterial,ry);
+}
+for(const [x,z,rot] of [[-30,21,.08],[-4,15,-.14],[29,18,.10],[-40,-28,.2],[37,-43,-.1]]){
+  addMenuBox("Cabinet",new THREE.Vector3(1.8,2.4,1.1),new THREE.Vector3(x,1.2,z),menuRuinMaterial,rot);
+  addMenuBox("CabinetTop",new THREE.Vector3(2.0,.12,1.2),new THREE.Vector3(x,2.42,z),menuTrimMaterial,rot);
+}
+for(const [x,z,rot] of [[-8,25,.08],[18,19,-.12],[-26,-34,.17],[20,-45,-.16]]){
+  addMenuBox("DeskBlock",new THREE.Vector3(3.8,.25,1.7),new THREE.Vector3(x,1.65,z),menuRuinMaterial,rot);
+  addMenuBox("DeskLegA",new THREE.Vector3(.18,1.6,.18),new THREE.Vector3(x-1.5,.82,z-.55),menuTrimMaterial,rot);
+  addMenuBox("DeskLegB",new THREE.Vector3(.18,1.6,.18),new THREE.Vector3(x+1.5,.82,z+.55),menuTrimMaterial,rot);
+}
+for(const [x,z,rot] of [[-18,26,.3],[7,22,-.2],[35,24,.1],[-28,-14,-.25],[14,-36,.18]]){
+  addMenuBox("DebrisSlab",new THREE.Vector3(1.8,.06,1.2),new THREE.Vector3(x,.08,z),menuTrimMaterial,rot,.03,.05);
+}
+for(const [x,z,sx,sz,ry] of [
+  [-42,24,1.8,1.1,.1],[-25,17,1.2,.8,-.2],[-2,20,1.6,.9,.2],[23,13,1.0,1.7,-.1],
+  [-36,-2,1.3,.9,.3],[3,-5,1.8,.7,-.2],[29,-11,1.4,1.0,.1],
+  [-17,-22,1.6,.8,-.2],[31,-26,1.3,.9,.15],[-29,-38,1.8,1.0,.3],[5,-53,1.4,.8,-.1]
+]){
+  addMenuBox("FloorDebris",new THREE.Vector3(sx,.05,sz),new THREE.Vector3(x,.03,z),menuTrimMaterial,ry);
+}
+const menuAmbient=new THREE.HemisphereLight(0xd5c995,0x10110e,.48);
 menuSet.add(menuAmbient);
-
-const menuFill=new THREE.PointLight(0xd0b86d,3.5,44,2);
-menuFill.position.set(-4,4,-8);
+const menuFill=new THREE.PointLight(0xd5b96f,2.6,50,2);
+menuFill.position.set(-8,4,-10);
 menuSet.add(menuFill);
-
-const menuFarLight=new THREE.PointLight(0xc5a85e,1.7,40,2);
-menuFarLight.position.set(6,3,-48);
+const menuFarLight=new THREE.PointLight(0xffe2a0,1.25,46,2);
+menuFarLight.position.set(3,3,-49);
 menuSet.add(menuFarLight);
-
-// New diagonal camera composition. The room is viewed across its width rather than
-// straight down a corridor, making the open space and collapsed bay immediately visible.
-const menuCameraStart=new THREE.Vector3(-17.8,2.30,17.5);
-const menuCameraTarget=new THREE.Vector3(5.5,2.90,-17.5);
-menuCamera.fov=72;
+const menuCameraStart=new THREE.Vector3(-18.5,2.55,20.5);
+const menuCameraTarget=new THREE.Vector3(4.0,3.15,-25.5);
+menuCamera.fov=76;
 menuCamera.updateProjectionMatrix();
 
 let menuBackdropWasActive=false;
 
 function updateMenuScene(t,dt){
   const menuBackdropElement=document.getElementById("menuBackdrop");
-
   if(gameStarted || !homeScreen || homeScreen.classList.contains("hidden")){
     if(menuBackdropWasActive){
       menuBackdropWasActive=false;
@@ -489,23 +447,37 @@ function updateMenuScene(t,dt){
     }
     return false;
   }
-
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
-    menuSet.visible=false;
-    world.root.visible=true;
-    if(menuBackdropElement) menuBackdropElement.style.display="block";
+    menuSet.visible=true;
+    world.root.visible=false;
+    if(menuBackdropElement) menuBackdropElement.style.display="none";
+    menuScene.background.set(0x303129);
+    menuScene.fog.color.set(0x4a4938);
+    menuScene.fog.near=19;
+    menuScene.fog.far=96;
   }
-
-  // The menu illustration is animated in CSS; keep a tiny camera-independent
-  // flicker on the SVG fixtures so the scene feels alive.
-  if(menuBackdropElement){
-    menuBackdropElement.style.filter=
-      "saturate(.90) contrast(1.06) brightness("+
-      (0.84+Math.sin(t*0.37)*0.015).toFixed(3)+")";
-  }
-
-  return false;
+  menuCamera.position.x=menuCameraStart.x+Math.sin(t*.031)*.18;
+  menuCamera.position.y=menuCameraStart.y+Math.sin(t*.068)*.035;
+  menuCamera.position.z=menuCameraStart.z+Math.cos(t*.027)*.16;
+  menuCamera.lookAt(
+    menuCameraTarget.x+Math.sin(t*.025)*.30,
+    menuCameraTarget.y+Math.sin(t*.033)*.025,
+    menuCameraTarget.z
+  );
+  menuSet.traverse(node=>{
+    if(node.userData?.basePower===undefined) return;
+    const phase=node.userData.phase||0;
+    const base=node.userData.basePower;
+    const wave=Math.sin(t*1.55+phase)*.06;
+    const dropout=Math.sin(t*3.9+phase*3.7)>.994 ? -.78 : 0;
+    if(node.isLight){
+      node.intensity=Math.max(.10,base*(1+wave+dropout));
+    }else if(node.material?.emissiveIntensity!==undefined){
+      node.material.emissiveIntensity=Math.max(.12,3.15*(1+Math.sin(t*1.55+phase)*.045));
+    }
+  });
+  return true;
 }
 const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
@@ -958,7 +930,7 @@ function installMainMenuRedesign(){
     linear-gradient(180deg,rgba(0,0,0,.16) 0%,transparent 35%,rgba(0,0,0,.54) 100%);
 }
 #menuBackdrop{
-  display:block!important;
+  display:none!important;
   position:absolute;
   inset:0;
   z-index:0;
