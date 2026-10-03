@@ -529,23 +529,38 @@ function installMainMenuRedesign(){
   style.id="deepseeker-menu-redesign";
   style.textContent=`
 #menuBackdrop{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;background:
-  radial-gradient(circle at 71% 42%,rgba(205,190,117,.13),transparent 17%),
-  radial-gradient(circle at 28% 78%,rgba(46,71,55,.22),transparent 25%),
-  linear-gradient(180deg,#050806 0%,#020302 100%)}
-#menuBackdrop::before{content:"";position:absolute;inset:-12%;opacity:.32;background:
-  linear-gradient(90deg,transparent 0 12%,rgba(220,208,158,.055) 12.1%,transparent 12.2% 38%,rgba(220,208,158,.04) 38.1%,transparent 38.2% 71%,rgba(220,208,158,.05) 71.1%,transparent 71.2%),
-  linear-gradient(180deg,transparent 0 18%,rgba(220,208,158,.035) 18.1%,transparent 18.2% 74%,rgba(220,208,158,.045) 74.1%,transparent 74.2%);
-transform:perspective(900px) rotateX(62deg) translateY(11%);transform-origin:center bottom}
+  radial-gradient(circle at 72% 34%,rgba(214,198,124,.17),transparent 18%),
+  radial-gradient(circle at 20% 78%,rgba(34,65,47,.30),transparent 30%),
+  radial-gradient(circle at 52% 44%,rgba(107,98,65,.08),transparent 34%),
+  linear-gradient(180deg,#070a08 0%,#030503 55%,#010201 100%)}
+#menuBackdrop::before{content:"";position:absolute;inset:-18%;opacity:.40;background:
+  linear-gradient(90deg,transparent 0 7%,rgba(223,211,162,.045) 7.1%,transparent 7.25% 18%,rgba(223,211,162,.028) 18.1%,transparent 18.25% 33%,rgba(223,211,162,.04) 33.1%,transparent 33.25% 51%,rgba(223,211,162,.022) 51.1%,transparent 51.25% 72%,rgba(223,211,162,.04) 72.1%,transparent 72.25%),
+  linear-gradient(180deg,transparent 0 15%,rgba(223,211,162,.028) 15.1%,transparent 15.25% 41%,rgba(223,211,162,.04) 41.1%,transparent 41.25% 68%,rgba(223,211,162,.028) 68.1%,transparent 68.25%);
+transform:perspective(900px) rotateX(61deg) translateY(12%);transform-origin:center bottom}
 #menuBackdrop::after{content:"";position:absolute;inset:0;background:
-  linear-gradient(90deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.18) 26%,transparent 55%),
-  radial-gradient(circle at 72% 48%,transparent 0 15%,rgba(0,0,0,.52) 52%,rgba(0,0,0,.86) 100%)}
-.menuBackdropGlow{position:absolute;width:46vw;height:46vw;min-width:420px;min-height:420px;right:-8vw;top:-15vw;border-radius:50%;background:radial-gradient(circle,rgba(215,201,138,.13),rgba(215,201,138,0) 68%);filter:blur(10px);animation:menuGlow 7s ease-in-out infinite alternate}
-.menuBackdropScan{position:absolute;inset:0;background:repeating-linear-gradient(180deg,transparent 0 3px,rgba(255,255,255,.012) 4px,transparent 5px);opacity:.45}
-@keyframes menuGlow{from{transform:translate3d(-2%,2%,0) scale(.94);opacity:.7}to{transform:translate3d(3%,-1%,0) scale(1.04);opacity:1}}
-#homeScreen.menuHomeRedesign{position:relative;z-index:2;display:block;width:min(1180px,calc(100vw - 52px));height:min(760px,calc(100vh - 52px));padding:0;box-sizing:border-box;border:1px solid rgba(235,225,184,.15);border-radius:20px;background:rgba(7,10,8,.80);box-shadow:0 38px 120px rgba(0,0,0,.66),inset 0 1px rgba(255,255,255,.045);backdrop-filter:blur(13px);overflow:hidden}
+  linear-gradient(90deg,rgba(1,3,2,.90) 0%,rgba(2,4,3,.58) 19%,rgba(0,0,0,.16) 49%,rgba(0,0,0,.34) 75%,rgba(0,0,0,.82) 100%),
+  linear-gradient(180deg,rgba(0,0,0,.66) 0%,transparent 20%,transparent 63%,rgba(0,0,0,.88) 100%),
+  radial-gradient(circle at 70% 40%,transparent 0 14%,rgba(0,0,0,.10) 33%,rgba(0,0,0,.72) 100%)}
+.menuBackdropGlow{position:absolute;width:52vw;height:52vw;min-width:480px;min-height:480px;right:-8vw;top:-17vw;border-radius:50%;background:radial-gradient(circle,rgba(221,205,136,.16),rgba(221,205,136,.045) 26%,rgba(221,205,136,0) 68%);filter:blur(14px);animation:menuGlow 8s ease-in-out infinite alternate}
+.menuBackdropScan{position:absolute;inset:0;background:
+  repeating-linear-gradient(180deg,transparent 0 4px,rgba(255,255,255,.012) 5px,transparent 6px),
+  radial-gradient(ellipse at 74% 70%,rgba(214,201,138,.075),transparent 32%);opacity:.48;mix-blend-mode:screen}
+#menuBackdrop .menuBackdropArchitecture{position:absolute;inset:0;opacity:.74;background:
+  linear-gradient(90deg,transparent 0 56%,rgba(210,198,151,.075) 56.15%,transparent 56.35% 67%,rgba(210,198,151,.05) 67.15%,transparent 67.35%),
+  linear-gradient(180deg,transparent 0 34%,rgba(210,198,151,.055) 34.15%,transparent 34.35% 68%,rgba(210,198,151,.045) 68.15%,transparent 68.35%);
+filter:blur(.2px)}
+#menuBackdrop .menuBackdropLight{position:absolute;right:11vw;top:12vh;width:min(38vw,520px);height:4px;background:linear-gradient(90deg,transparent,rgba(245,236,193,.18),rgba(245,236,193,.72),rgba(245,236,193,.12),transparent);box-shadow:0 0 34px rgba(233,219,161,.18),0 0 90px rgba(233,219,161,.08);transform:rotate(-2deg);opacity:.8;animation:menuLightPulse 5.5s ease-in-out infinite}
+#menuBackdrop .menuBackdropLight:nth-child(2){top:22vh;right:24vw;width:min(26vw,360px);opacity:.34;animation-delay:-2s}
+#menuBackdrop .menuBackdropHaze{position:absolute;inset:0;background:
+  radial-gradient(ellipse at 72% 40%,rgba(214,201,138,.055),transparent 21%),
+  linear-gradient(90deg,transparent 48%,rgba(204,196,165,.035) 70%,transparent 100%);filter:blur(22px);animation:menuHaze 13s ease-in-out infinite alternate}
+@keyframes menuGlow{from{transform:translate3d(-2%,2%,0) scale(.94);opacity:.68}to{transform:translate3d(3%,-1%,0) scale(1.06);opacity:1}}
+@keyframes menuLightPulse{0%,100%{opacity:.55;filter:brightness(.86)}48%{opacity:.92;filter:brightness(1.16)}51%{opacity:.68;filter:brightness(.72)}54%{opacity:.9;filter:brightness(1.08)}}
+@keyframes menuHaze{from{transform:translate3d(-2%,0,0) scale(1)}to{transform:translate3d(2%,-1%,0) scale(1.04)}}
+#homeScreen.menuHomeRedesign{position:absolute;inset:0;z-index:2;display:block;width:100vw;height:100vh;padding:0;box-sizing:border-box;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;overflow:hidden}
 #homeScreen.menuHomeRedesign.hidden{display:none}
-.menuShell{display:grid;grid-template-columns:270px minmax(0,1fr);height:100%;min-height:0}
-.menuSidebar{display:flex;flex-direction:column;padding:28px 18px 18px;background:linear-gradient(180deg,rgba(11,15,12,.94),rgba(4,6,5,.88));border-right:1px solid rgba(231,220,171,.09);min-width:0}
+.menuShell{display:grid;grid-template-columns:minmax(250px,18vw) minmax(0,1fr);height:100%;min-height:0}
+.menuSidebar{display:flex;flex-direction:column;padding:clamp(24px,4vh,42px) 18px 18px;background:linear-gradient(180deg,rgba(6,10,8,.86),rgba(3,5,4,.72));border-right:1px solid rgba(231,220,171,.10);box-shadow:18px 0 60px rgba(0,0,0,.28);min-width:0;backdrop-filter:blur(10px)}
 .menuBrand{padding:2px 12px 26px;border-bottom:1px solid rgba(231,220,171,.09)}
 .menuBrandMark{width:34px;height:34px;display:grid;place-items:center;margin-bottom:13px;border:1px solid rgba(218,203,143,.34);border-radius:10px;color:#e8dfb8;font-size:12px;letter-spacing:2px;background:linear-gradient(145deg,rgba(216,201,138,.13),rgba(255,255,255,.025));box-shadow:0 0 28px rgba(216,201,138,.05)}
 .menuBrandName{font-size:23px;letter-spacing:5px;color:#f1e9c6;text-shadow:0 0 22px rgba(220,202,137,.12)}
@@ -561,7 +576,7 @@ transform:perspective(900px) rotateX(62deg) translateY(11%);transform-origin:cen
 .menuNavButton:hover .menuNavArrow{transform:translateX(3px);color:#d4c898}
 .menuSideStatus{margin-top:auto;padding:15px 12px;border-top:1px solid rgba(231,220,171,.08);font-size:8px;line-height:1.8;letter-spacing:1.5px;color:#66675d}
 .menuSideStatus strong{display:block;margin-bottom:3px;color:#98947d;font-weight:600}
-.menuMainPanel{position:relative;min-width:0;overflow:auto;padding:48px 52px 34px}
+.menuMainPanel{position:relative;min-width:0;overflow:auto;padding:clamp(48px,7vh,82px) clamp(34px,5vw,78px) 38px;background:linear-gradient(90deg,rgba(3,5,4,.20),rgba(3,5,4,.05));}
 .menuMainPanel::before{content:"";position:absolute;top:0;right:0;width:54%;height:1px;background:linear-gradient(90deg,transparent,rgba(216,201,138,.24));opacity:.7}
 .menuMainEyebrow{display:flex;justify-content:space-between;gap:20px;font-size:8px;letter-spacing:2.8px;color:#777568;text-transform:uppercase}
 .menuMainTitle{margin:26px 0 10px;max-width:760px;font-size:clamp(42px,6vw,74px);font-weight:500;line-height:.95;letter-spacing:8px;color:#eee7c7;text-shadow:0 7px 35px rgba(0,0,0,.8)}
@@ -594,6 +609,10 @@ transform:perspective(900px) rotateX(62deg) translateY(11%);transform-origin:cen
     backdrop.innerHTML=`
       <div class="menuBackdropGlow"></div>
       <div class="menuBackdropScan"></div>
+      <div class="menuBackdropArchitecture"></div>
+      <div class="menuBackdropLight"></div>
+      <div class="menuBackdropLight"></div>
+      <div class="menuBackdropHaze"></div>
     `;
     overlay.insertBefore(backdrop,homeScreen);
   }
