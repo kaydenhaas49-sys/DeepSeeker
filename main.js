@@ -383,46 +383,14 @@ function updateMenuScene(t,dt){
     return false;
   }
 
+  // The title screen uses a real photographic liminal-space background.
+  // Keep the procedural menu geometry hidden so it cannot black out the image.
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
-    menuSet.visible=true;
-
-    // Keep the gameplay world and apartment out of the menu render.
-    world.root.visible=false;
-    if(typeof houseRoot!=="undefined") houseRoot.visible=false;
-
-    scene.background.set(0x17170f);
-    scene.fog.color.set(0x27271d);
-    scene.fog.near=11;
-    scene.fog.far=48;
+    menuSet.visible=false;
   }
 
-  const sway=Math.sin(t*.105)*.16+Math.sin(t*.043)*.08;
-  const zDrift=Math.sin(t*.075+1.2)*.26;
-  const yDrift=Math.sin(t*.17)*.018;
-
-  menuCamera.position.set(
-    menuCameraStart.x+sway,
-    menuCameraStart.y+yDrift,
-    menuCameraStart.z+zDrift
-  );
-
-  menuCamera.lookAt(
-    menuCameraTarget.x+Math.sin(t*.09)*.35,
-    menuCameraTarget.y,
-    menuCameraTarget.z
-  );
-
-  for(const child of menuSet.children){
-    if(!child.isPointLight) continue;
-    const base=child.userData.basePower||0;
-    const phase=child.userData.phase||0;
-    const flicker=.96+Math.sin(t*3.2+phase)*.02+Math.sin(t*11.5+phase)*.025;
-    child.intensity=base*flicker;
-  }
-
-  menuSceneReady=true;
-  return true;
+  return false;
 }
 
 const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
@@ -888,22 +856,25 @@ function installMainMenuRedesign(){
   inset:0;
   pointer-events:none;
   z-index:2;
-  background:transparent;
-}
-#menuBackdrop::before{
-  content:"";
-  position:absolute;
-  inset:0;
   background:
-    linear-gradient(90deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.30) 22%,transparent 52%,rgba(0,0,0,.16) 100%),
-    linear-gradient(180deg,rgba(0,0,0,.16),transparent 38%,rgba(0,0,0,.40) 100%);
+    linear-gradient(90deg,rgba(0,0,0,.68) 0%,rgba(0,0,0,.36) 24%,rgba(0,0,0,.05) 55%,rgba(0,0,0,.20) 100%),
+    linear-gradient(180deg,rgba(0,0,0,.18),transparent 34%,rgba(0,0,0,.42) 100%),
+    url("https://images.unsplash.com/photo-1784231209207-40f1e53d2f3f?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400")
+    center center / cover no-repeat;
+  background-color:#17170f;
+  filter:saturate(.92) contrast(1.04);
 }
 #menuBackdrop::after{
   content:"";
   position:absolute;
   inset:0;
-  background:repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.005) 7px,transparent 8px);
-  opacity:.28;
+  background:
+    radial-gradient(ellipse at 66% 46%,transparent 0 26%,rgba(0,0,0,.34) 100%),
+    repeating-linear-gradient(180deg,transparent 0 6px,rgba(255,255,255,.005) 7px,transparent 8px);
+  opacity:.72;
+}
+#menuBackdrop .menuSignalNoise{
+  display:none;
 }
 
 #homeScreen.menuHomeRedesign{
