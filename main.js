@@ -3540,13 +3540,29 @@ function startSpiderJumpscare(){
   );
 
   spiderEntity.position.copy(scarePosition);
-  spiderEntity.position.y=camera.position.y-.82;
+  spiderJumpscareScale=1.16;
+  spiderEntity.scale.setScalar(spiderJumpscareScale);
   spiderEntity.rotation.y=Math.atan2(
     camera.position.x-spiderEntity.position.x,
     camera.position.z-spiderEntity.position.z
   );
-  spiderJumpscareScale=1.16;
-  spiderEntity.scale.setScalar(spiderJumpscareScale);
+
+  // Center the actual rendered spider on the camera, rather than relying on
+  // the model's imported pivot/ground offset. This keeps the jumpscare aimed
+  // directly at the camera instead of appearing above the player's head.
+  if(spiderModel){
+    spiderModel.updateMatrixWorld(true);
+    const scareBox=new THREE.Box3().setFromObject(spiderModel);
+    if(Number.isFinite(scareBox.min.y) && Number.isFinite(scareBox.max.y)){
+      const modelCenterY=(scareBox.min.y+scareBox.max.y)*.5;
+      spiderEntity.position.y += camera.position.y-modelCenterY;
+    }else{
+      spiderEntity.position.y=camera.position.y;
+    }
+  }else{
+    spiderEntity.position.y=camera.position.y;
+  }
+
   spiderEntity.visible=true;
 
   setSpiderAnimation("attack2");
