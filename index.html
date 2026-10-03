@@ -131,6 +131,22 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 .storyLocked{color:#57584e;font-size:10px;letter-spacing:1px;padding:8px 0}
 
 #phoneHome::after{content:"";position:absolute;left:0;top:6px;width:105px;height:4px;border-radius:8px;background:#ffffff55}
+#adminIcon{position:absolute;right:13px;bottom:30px;width:38px;height:38px;padding:0;border:1px solid #ffffff14;border-radius:12px;background:#ffffff06;color:#aaa477;font:inherit;font-size:12px;letter-spacing:1px;cursor:pointer;z-index:4;box-shadow:0 5px 15px #0006}
+#adminIcon:hover{background:#ffffff10;border-color:#d8c98a44}
+.adminOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;background:rgba(4,5,4,.92);z-index:8}
+.adminOverlay.open{display:flex}
+.adminCard{width:100%;padding:16px;border:1px solid #ffffff14;border-radius:14px;background:#090a08;box-shadow:0 14px 34px #0008}
+.adminTitle{font-size:10px;letter-spacing:3px;color:#d8c98a;margin-bottom:8px}
+.adminSub{font-size:9px;line-height:1.5;color:#7d7d70;margin-bottom:12px}
+.adminInput{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ffffff14;border-radius:8px;background:#050605;color:#ece7cb;font:inherit;font-size:11px;outline:none}
+.adminRow{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
+.adminButton{padding:9px 7px;border:1px solid #ffffff14;border-radius:8px;background:#ffffff06;color:#bdb38c;font:inherit;font-size:8px;letter-spacing:1px;cursor:pointer}
+.adminButton:hover{background:#ffffff10;border-color:#d8c98a44}
+.adminButton.active{background:rgba(216,201,138,.12);border-color:rgba(216,201,138,.45);color:#e9e1be}
+.adminStatus{min-height:14px;margin-top:9px;font-size:8px;line-height:1.4;letter-spacing:1px;color:#777767;text-align:center}
+.adminHint{margin-top:9px;font-size:8px;line-height:1.45;color:#69695f}
+.adminPanel{display:none}
+.adminPanel.open{display:block}
 #phoneHint{position:fixed;left:50%;bottom:3%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#77745f;z-index:16;opacity:0;pointer-events:none;transition:opacity .2s}
 .usernameRow{display:flex;gap:8px;width:min(420px,88vw)}
 .usernameInput{flex:1;min-width:0;padding:12px 13px;border:1px solid #ffffff18;border-radius:10px;background:#050605;color:#e2ddbe;font:inherit;font-size:12px;letter-spacing:1.5px;outline:none}
@@ -160,6 +176,25 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
   <div id="phoneScreen">
     <div id="phoneNotch"></div>
     <div id="phoneStatus"><span>9:41</span><span>NO SIGNAL&nbsp;&nbsp;▮▮▮</span></div>
+    <button id="adminIcon" type="button" aria-label="Open Admin">A</button>
+    <div id="adminOverlay" class="adminOverlay" aria-hidden="true">
+      <div id="adminAuthCard" class="adminCard">
+        <div class="adminTitle">ADMIN ACCESS</div>
+        <div class="adminSub">PASSWORD REQUIRED</div>
+        <input id="adminPassword" class="adminInput" type="password" maxlength="40" autocomplete="off" placeholder="PASSWORD">
+        <div class="adminRow"><button id="adminUnlockButton" class="adminButton" type="button">UNLOCK</button><button id="adminCloseButton" class="adminButton" type="button">CLOSE</button></div>
+        <div id="adminAuthStatus" class="adminStatus"></div>
+      </div>
+      <div id="adminPanelCard" class="adminCard adminPanel">
+        <div class="adminTitle">ADMIN</div>
+        <div class="adminSub">FUN COMMANDS · LOCAL ONLY</div>
+        <div class="adminRow"><button id="adminFlyButton" class="adminButton" type="button">FLY: OFF</button><button id="adminWaterGunButton" class="adminButton" type="button">WATER GUN</button></div>
+        <div class="adminRow"><button id="adminWaterRpgButton" class="adminButton" type="button">WATER RPG</button><button id="adminClearWaterButton" class="adminButton" type="button">CLEAR WATER</button></div>
+        <div class="adminRow"><button id="adminLockButton" class="adminButton" type="button">LOCK ADMIN</button><button id="adminAdminCloseButton" class="adminButton" type="button">CLOSE</button></div>
+        <div id="adminPanelStatus" class="adminStatus"></div>
+        <div class="adminHint">FLY: SPACE = UP · CTRL = DOWN · WATER TOOLS FIRE WITH LEFT CLICK.</div>
+      </div>
+    </div>
     <div id="phoneHomeScreen">
       <div id="phoneHomeHeader">WEDNESDAY · 9:41</div>
       <div id="phoneApps">

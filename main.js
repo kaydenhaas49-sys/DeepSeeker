@@ -41,6 +41,7 @@ const batteryBar=document.getElementById("batteryBar");
 const batteryValue=document.getElementById("batteryValue");
 const eventText=document.getElementById("event");
 const objective=document.getElementById("objective");
+const hudRight=document.getElementById("hudRight");
 const vignette=document.getElementById("vignette");
 const phone=document.getElementById("phone");
 const phoneAppName=document.getElementById("phoneAppName");
@@ -51,6 +52,21 @@ const phoneCardText=document.getElementById("phoneCardText");
 const phoneStory=document.getElementById("phoneStory");
 const deepseekerIcon=document.getElementById("deepseekerIcon");
 const phoneHome=document.getElementById("phoneHome");
+const adminIcon=document.getElementById("adminIcon");
+const adminOverlay=document.getElementById("adminOverlay");
+const adminAuthCard=document.getElementById("adminAuthCard");
+const adminPanelCard=document.getElementById("adminPanelCard");
+const adminPasswordInput=document.getElementById("adminPassword");
+const adminUnlockButton=document.getElementById("adminUnlockButton");
+const adminCloseButton=document.getElementById("adminCloseButton");
+const adminAdminCloseButton=document.getElementById("adminAdminCloseButton");
+const adminLockButton=document.getElementById("adminLockButton");
+const adminFlyButton=document.getElementById("adminFlyButton");
+const adminWaterGunButton=document.getElementById("adminWaterGunButton");
+const adminWaterRpgButton=document.getElementById("adminWaterRpgButton");
+const adminClearWaterButton=document.getElementById("adminClearWaterButton");
+const adminAuthStatus=document.getElementById("adminAuthStatus");
+const adminPanelStatus=document.getElementById("adminPanelStatus");
 const houseLoadFillHome=document.getElementById("houseLoadFillHome");
 const houseLoadPercentHome=document.getElementById("houseLoadPercentHome");
 const houseLoadStatusHome=document.getElementById("houseLoadStatusHome");
@@ -598,6 +614,7 @@ function updateMenuScene(t,dt){
   menuDust.position.x=Math.sin(t*.035)*.7;
   menuDust.position.y=Math.sin(t*.052)*.12;
   menuDust.position.z=Math.cos(t*.029)*.55;
+  menuSet.rotation.y=Math.sin(t*.008)*.004;
 
   menuSet.traverse(node=>{
     if(node.userData?.basePower===undefined) return;
@@ -1777,8 +1794,15 @@ function updateHouseLoadingUI(progress=null,status=null){
   }
 }
 
-async function saveGame(slot=selectedSaveSlot){
+async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
   const targetSlot=normalizeSaveSlot(slot);
+
+  if(confirmOverwrite && getSavedGame(targetSlot) && !window.confirm("SLOT "+targetSlot+" ALREADY HAS A SAVE. OVERWRITE IT?")){
+    eventText.textContent="SAVE CANCELLED · SLOT "+targetSlot;
+    eventText.style.opacity="1";
+    return false;
+  }
+
   setSelectedSaveSlot(targetSlot,false);
 
   const params=new URLSearchParams(location.search);
@@ -2039,7 +2063,7 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   // Creating a new slot immediately writes an initial checkpoint instead of
   // leaving the slot empty until the 20-second autosave.
   if(!save){
-    saveGame(saveSlot);
+    saveGame(saveSlot,{confirmOverwrite:false});
   }
 
   return true;
@@ -2064,6 +2088,12 @@ function continueGame(slot=selectedSaveSlot){
 
 function resetForNewGame(slot=selectedSaveSlot){
   const targetSlot=normalizeSaveSlot(slot);
+
+  if(getSavedGame(targetSlot) && !window.confirm("SLOT "+targetSlot+" ALREADY HAS A SAVE. STARTING NEW GAME WILL OVERWRITE IT. CONTINUE?")){
+    eventText.textContent="NEW GAME CANCELLED · SLOT "+targetSlot;
+    eventText.style.opacity="1";
+    return;
+  }
 
   // A NEW slot must always be a fresh run, even when another game or
   // an unfinished apartment load is still active.
@@ -2885,6 +2915,18 @@ function placeHouseMagazineTeleporter(root){
     );
     houseReturnPortal.rotation.y=0;
     houseReturnPortal.userData.active=true;
+    const interactionBox={minX:best.box.min.x,maxX:best.box.max.x,minZ:best.box.min.z,maxZ:best.box.max.z};
+    for(const part of candidates){
+      const nearX=Math.abs(part.center.x-best.center.x)<=Math.max(best.size.x,part.size.x)+.75;
+      const nearZ=Math.abs(part.center.z-best.center.z)<=Math.max(best.size.z,part.size.z)+.75;
+      if(nearX && nearZ){
+        interactionBox.minX=Math.min(interactionBox.minX,part.box.min.x);
+        interactionBox.maxX=Math.max(interactionBox.maxX,part.box.max.x);
+        interactionBox.minZ=Math.min(interactionBox.minZ,part.box.min.z);
+        interactionBox.maxZ=Math.max(interactionBox.maxZ,part.box.max.z);
+      }
+    }
+    houseReturnPortal.userData.interactionBounds=interactionBox;
     houseReturnPortal.userData.targetType="magazine";
     houseReturnPortal.userData.targetName=best.name;
 
@@ -2908,6 +2950,7 @@ function placeHouseMagazineTeleporter(root){
     );
     houseReturnPortal.rotation.y=0;
     houseReturnPortal.userData.active=true;
+    houseReturnPortal.userData.interactionBounds={minX:couch.box.min.x,maxX:couch.box.max.x,minZ:couch.box.min.z,maxZ:couch.box.max.z};
     houseReturnPortal.userData.targetType="couch";
     houseReturnPortal.userData.targetName=String(couch.object.name||"couch");
     console.warn("[DeepSeeker] magazine mesh was not named; using couch target");
@@ -2915,6 +2958,7 @@ function placeHouseMagazineTeleporter(root){
   }
 
   houseReturnPortal.userData.active=false;
+  houseReturnPortal.userData.interactionBounds=null;
   console.warn("[DeepSeeker] could not locate magazine/couch target");
   return false;
 }
@@ -2922,12 +2966,15 @@ function placeHouseMagazineTeleporter(root){
 function useHouseReturnTeleporter(){
   if(!houseMode || backroomsFallTimer>0) return false;
 
-  const d=Math.hypot(
-    player.pos.x-houseReturnPortal.position.x,
-    player.pos.z-houseReturnPortal.position.z
-  );
-
-  if(d>2.2) return false;
+  const bounds=houseReturnPortal.userData.interactionBounds;
+  if(bounds){
+    const nx=THREE.MathUtils.clamp(player.pos.x,bounds.minX,bounds.maxX);
+    const nz=THREE.MathUtils.clamp(player.pos.z,bounds.minZ,bounds.maxZ);
+    if(Math.hypot(player.pos.x-nx,player.pos.z-nz)>1.6) return false;
+  }else{
+    const d=Math.hypot(player.pos.x-houseReturnPortal.position.x,player.pos.z-houseReturnPortal.position.z);
+    if(d>2.2) return false;
+  }
 
   player.keys.clear();
   player.vel.set(0,0,0);
@@ -2984,7 +3031,7 @@ function ensureHouseCollisionSetup(){
       if(pendingNewGameSlot!==null){
         const newSlot=pendingNewGameSlot;
         pendingNewGameSlot=null;
-        saveGame(newSlot);
+        saveGame(newSlot,{confirmOverwrite:false});
       }
     }else if(gameStarted){
       if(pendingHouseStart){
@@ -3261,11 +3308,11 @@ let spiderAutoLookStarted=false;
 
 const SPIDER_STALK_TIME=4.5;
 const SPIDER_AUTO_LOOK_DURATION=1.0;
-const SPIDER_ATTACK_RANGE=1.65;
+const SPIDER_ATTACK_RANGE=2.4;
 const SPIDER_SPEED=2.35;
-const SPIDER_RADIUS=.55;
+const SPIDER_RADIUS=.85;
 const SPIDER_GROUND_OFFSET=.08;
-const SPIDER_TARGET_SPAN=3.4;
+const SPIDER_TARGET_SPAN=6.2;
 
 const SPIDER_ANIMATION_RANGES={
   idle1:[164,213],
@@ -3288,9 +3335,7 @@ const SPIDER_ANIMATION_RANGES={
 const SPIDER_ANIMATION_ALIAS={
   idle:"idle1",
   stalk:"idle2",
-  // Walk is currently isolated because that clip is the one suspected of
-  // breaking the FBX rig. The spider still physically chases the player.
-  chase:"idle2",
+  chase:"walk",
   attack:"attack1",
   hit:"hit1",
   death:"die1"
@@ -3538,17 +3583,17 @@ function startSpiderJumpscare(){
   // Keep the spider in a simple, stable position directly in front of the
   // camera. The old bounding-box recentering caused the model to jump/glitch
   // whenever the animated pose changed.
-  const offsetX=-spiderJumpscareDirection.x*5;
-  const offsetZ=-spiderJumpscareDirection.z*5;
+  const offsetX=-spiderJumpscareDirection.x*2;
+  const offsetZ=-spiderJumpscareDirection.z*2;
 
   player.pos.x+=offsetX;
   player.pos.z+=offsetZ;
-  player.jumpY=2;
+  player.jumpY=1;
   player.jumpVelocity=0;
 
   camera.position.x+=offsetX;
   camera.position.z+=offsetZ;
-  camera.position.y+=2;
+  camera.position.y+=1;
 
   const scarePosition=camera.position.clone().add(
     spiderJumpscareDirection.clone().multiplyScalar(1.15)
@@ -4002,7 +4047,7 @@ function finishSpiderModel(model,animations,sourceName){
       .toLowerCase();
   };
 
-  const makeStableSpiderClip=(clip)=>{
+  const makeStableSpiderClip=(clip,animationName="")=>{
     if(!clip) return null;
     const stable=clip.clone();
 
@@ -4014,6 +4059,7 @@ function finishSpiderModel(model,animations,sourceName){
       if(!animatedNodeNames.has(target)) return false;
 
       if(track.name.endsWith(".position")){
+        if(animationName==="walk") return false;
         return !rootBoneNames.has(target);
       }
 
@@ -4047,7 +4093,7 @@ function finishSpiderModel(model,animations,sourceName){
       if(match){
         const index=animations.indexOf(match);
         claimedAnimations.add(index);
-        directClips.set(documentedName,makeStableSpiderClip(match));
+        directClips.set(documentedName,makeStableSpiderClip(match,documentedName));
       }
     }
 
@@ -4080,7 +4126,7 @@ function finishSpiderModel(model,animations,sourceName){
         endFrame+1,
         sourceFPS
       );
-      directClips.set(name,makeStableSpiderClip(clip));
+      directClips.set(name,makeStableSpiderClip(clip,name));
     }
   }
 
@@ -4339,6 +4385,11 @@ let muted=false;
 let phoneOpen=false;
 
 let deepseekerAppOpen=false;
+let adminUnlocked=false;
+let adminFlyEnabled=false;
+let adminTool=null;
+const adminProjectiles=[];
+const ADMIN_PASSWORD="DEEPSEEKER";
 let storyStage=0;
 let maxStoryDistance=0;
 
@@ -4480,6 +4531,89 @@ function showHouseIntroPhoneMessage(){
   `);
 }
 
+function setAdminStatus(message){
+  if(adminAuthStatus) adminAuthStatus.textContent=message;
+  if(adminPanelStatus) adminPanelStatus.textContent=message;
+}
+function openAdminAccess(){
+  if(!phoneOpen) return;
+  adminOverlay.classList.add("open");
+  adminOverlay.setAttribute("aria-hidden","false");
+  adminAuthCard.style.display=adminUnlocked ? "none" : "block";
+  adminPanelCard.classList.toggle("open",adminUnlocked);
+  adminPasswordInput.value="";
+  setAdminStatus(adminUnlocked ? "ADMIN UNLOCKED" : "");
+  if(!adminUnlocked) setTimeout(()=>adminPasswordInput.focus(),0);
+}
+function closeAdminAccess(){
+  adminOverlay.classList.remove("open");
+  adminOverlay.setAttribute("aria-hidden","true");
+  adminPasswordInput.value="";
+}
+function lockAdminAccess(){
+  adminUnlocked=false;
+  adminFlyEnabled=false;
+  adminTool=null;
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  adminFlyButton.textContent="FLY: OFF";
+  adminWaterGunButton.classList.remove("active");
+  adminWaterRpgButton.classList.remove("active");
+  adminAuthCard.style.display="block";
+  adminPanelCard.classList.remove("open");
+  setAdminStatus("ADMIN LOCKED");
+}
+function setAdminTool(tool){
+  adminTool=adminTool===tool ? null : tool;
+  adminWaterGunButton.classList.toggle("active",adminTool==="waterGun");
+  adminWaterRpgButton.classList.toggle("active",adminTool==="waterRpg");
+  adminPanelStatus.textContent=adminTool ? (adminTool==="waterGun" ? "WATER GUN ARMED" : "WATER RPG ARMED") : "TOOL DISARMED";
+}
+function clearAdminProjectiles(){
+  for(const item of adminProjectiles){
+    scene.remove(item.mesh);
+    item.mesh.geometry.dispose();
+    item.mesh.material.dispose();
+  }
+  adminProjectiles.length=0;
+}
+function fireAdminWater(kind){
+  if(!adminUnlocked || !gameStarted || phoneOpen) return;
+  const direction=new THREE.Vector3();
+  camera.getWorldDirection(direction);
+  const isRpg=kind==="waterRpg";
+  const material=new THREE.MeshBasicMaterial({color:isRpg ? 0x8fcce8 : 0x6fb8d1,transparent:true,opacity:isRpg ? .88 : .78});
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(isRpg ? .24 : .075,isRpg ? 12 : 8,isRpg ? 12 : 8),material);
+  mesh.position.copy(camera.position).addScaledVector(direction,.75);
+  scene.add(mesh);
+  adminProjectiles.push({mesh,direction:direction.clone(),velocity:isRpg ? 17 : 28,life:isRpg ? 1.8 : 1.0,gravity:isRpg ? 1.5 : .35});
+}
+function updateAdminProjectiles(dt){
+  for(let i=adminProjectiles.length-1;i>=0;i--){
+    const item=adminProjectiles[i];
+    item.life-=dt;
+    item.direction.y-=item.gravity*dt;
+    item.direction.normalize();
+    item.mesh.position.addScaledVector(item.direction,item.velocity*dt);
+    if(item.life<=0){
+      scene.remove(item.mesh);
+      item.mesh.geometry.dispose();
+      item.mesh.material.dispose();
+      adminProjectiles.splice(i,1);
+    }
+  }
+}
+function updateAdminFly(dt){
+  if(!adminFlyEnabled || !gameStarted || houseMode) return;
+  const rise=player.keys.has("Space") ? 1 : ((player.keys.has("ControlLeft") || player.keys.has("ControlRight")) ? -1 : 0);
+  if(rise!==0){
+    const amount=7*dt*rise;
+    player.jumpY=THREE.MathUtils.clamp(player.jumpY+amount,0,20);
+    player.jumpVelocity=0;
+    camera.position.y+=amount;
+  }
+}
+
 function togglePhone(){
   phoneOpen=!phoneOpen;
   deepseekerAppOpen=false;
@@ -4491,8 +4625,10 @@ function togglePhone(){
     if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
     crosshair.style.display="none";
     refreshPhoneContent();
-  }else if(!controlsOpen){
-    player.lock();
+  }else{
+    adminOverlay.classList.remove("open");
+    adminOverlay.setAttribute("aria-hidden","true");
+    if(!controlsOpen) player.lock();
   }
 }
 
@@ -4598,6 +4734,32 @@ phoneHome.addEventListener("click",()=>{
   deepseekerAppOpen=false;
   phone.classList.remove("app-open");
 });
+adminIcon.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); openAdminAccess(); });
+adminCloseButton.addEventListener("click",closeAdminAccess);
+adminAdminCloseButton.addEventListener("click",closeAdminAccess);
+adminUnlockButton.addEventListener("click",()=>{
+  if(adminPasswordInput.value===ADMIN_PASSWORD){
+    adminUnlocked=true;
+    adminAuthCard.style.display="none";
+    adminPanelCard.classList.add("open");
+    adminPasswordInput.value="";
+    setAdminStatus("ADMIN UNLOCKED");
+  }else{
+    setAdminStatus("WRONG PASSWORD");
+    adminPasswordInput.select();
+  }
+});
+adminPasswordInput.addEventListener("keydown",e=>{ if(e.code==="Enter"){ e.preventDefault(); adminUnlockButton.click(); } });
+adminLockButton.addEventListener("click",lockAdminAccess);
+adminFlyButton.addEventListener("click",()=>{
+  if(!adminUnlocked) return;
+  adminFlyEnabled=!adminFlyEnabled;
+  adminFlyButton.textContent="FLY: "+(adminFlyEnabled ? "ON" : "OFF");
+  adminPanelStatus.textContent=adminFlyEnabled ? "FLY ENABLED" : "FLY DISABLED";
+});
+adminWaterGunButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterGun"); });
+adminWaterRpgButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterRpg"); });
+adminClearWaterButton.addEventListener("click",()=>{ if(adminUnlocked){ clearAdminProjectiles(); adminPanelStatus.textContent="WATER CLEARED"; } });
 
 
 function showControls(){
@@ -4611,6 +4773,7 @@ function hideControls(){
 }
 
 player.attach();
+if(hudRight) hudRight.style.display="none";
 prompt.textContent="READY — START A GAME";
 applyStoryStage(0,false);
 
@@ -4625,6 +4788,13 @@ overlay.addEventListener("click",(e)=>{
   if(gameStarted){
     audio.start();
     player.lock();
+  }
+});
+
+renderer.domElement.addEventListener("mousedown",e=>{
+  if(e.button===0 && adminUnlocked && adminTool && gameStarted && !phoneOpen){
+    fireAdminWater(adminTool);
+    e.preventDefault();
   }
 });
 
@@ -4734,6 +4904,7 @@ function animate(){
 
   // The title screen is independent of gameplay. Render it before the
   // gameplay simulation so an unrelated gameplay error cannot black out the menu.
+  if(hudRight) hudRight.style.display=gameStarted ? "block" : "none";
   const menuIsVisible=!gameStarted && !homeScreen.classList.contains("hidden");
   if(menuIsVisible){
     try{
@@ -4850,6 +5021,8 @@ function animate(){
   }
 
   player.update(dt);
+  updateAdminFly(dt);
+  updateAdminProjectiles(dt);
 
   if(backroomsFallTimer>0 && gameStarted && houseMode){
     camera.position.y+=fallCameraOffset;
@@ -4864,7 +5037,7 @@ function animate(){
   if(gameStarted){
     if(t-lastAutoSave>20){
       lastAutoSave=t;
-      saveGame();
+      saveGame(undefined,{confirmOverwrite:false});
     }
   }
 
@@ -4894,7 +5067,10 @@ function animate(){
   }
 
   const flicker=flashlightFlicker(t);
-  let flashlightStrength=68.0*flicker;
+  const lowBattery=Math.pow(THREE.MathUtils.clamp((35-battery)/35,0,1),1.15);
+  const lowBatteryWave=Math.sin(t*(9+lowBattery*28)+battery*.19);
+  const lowBatteryDrop=lowBattery>0 && lowBatteryWave>.35 ? THREE.MathUtils.lerp(1,.20,lowBattery) : 1;
+  let flashlightStrength=68.0*flicker*lowBatteryDrop;
 
   if(flashlightOn && !houseMode && spiderActive){
     const spiderDistance=Math.hypot(
@@ -4904,13 +5080,13 @@ function animate(){
 
     // Normal outside the danger zone, then rapidly dim as the spider closes in.
     const proximity=THREE.MathUtils.clamp(
-      (12-spiderDistance)/10,
+      (16-spiderDistance)/14,
       0,
       1
     );
     const dimmedStrength=THREE.MathUtils.lerp(
       flashlightStrength,
-      18.0*flicker,
+      7.0*flicker,
       proximity*proximity
     );
 
@@ -5057,7 +5233,7 @@ function animate(){
 animate();
 
 window.addEventListener("beforeunload",()=>{
-  if(gameStarted) saveGame();
+  if(gameStarted) saveGame(undefined,{confirmOverwrite:false});
 });
 
 if(pendingSaveLoad){
