@@ -108,61 +108,115 @@ function makeMenuTexture(kind){
   const ctx=canvas.getContext("2d");
 
   if(kind==="wall"){
-    ctx.fillStyle="#a39d6b";
+    ctx.fillStyle="#aaa16f";
     ctx.fillRect(0,0,512,512);
 
-    // Old vinyl/paper wallpaper with a very subtle repeating pattern.
-    for(let x=0;x<512;x+=42){
-      ctx.fillStyle="rgba(65,62,40,.10)";
-      ctx.fillRect(x,0,2,512);
-      ctx.fillStyle="rgba(232,225,180,.10)";
-      ctx.fillRect(x+3,0,1,512);
-    }
-    for(let y=0;y<512;y+=58){
-      ctx.fillStyle="rgba(56,53,35,.06)";
-      ctx.fillRect(0,y,512,2);
+    // Small repeating 90s geometric wallcovering inspired by the original
+    // Backrooms room, with age-yellowing and water damage.
+    for(let y=0;y<512;y+=64){
+      for(let x=0;x<512;x+=64){
+        ctx.strokeStyle="rgba(82,79,48,.30)";
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.moveTo(x+4,y+32);
+        ctx.lineTo(x+20,y+12);
+        ctx.lineTo(x+36,y+32);
+        ctx.lineTo(x+52,y+12);
+        ctx.stroke();
+
+        ctx.strokeStyle="rgba(220,211,153,.16)";
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.moveTo(x+4,y+34);
+        ctx.lineTo(x+20,y+54);
+        ctx.lineTo(x+36,y+34);
+        ctx.lineTo(x+52,y+54);
+        ctx.stroke();
+      }
     }
 
-    for(let i=0;i<1500;i++){
+    for(let i=0;i<1700;i++){
       const x=Math.random()*512;
       const y=Math.random()*512;
-      const tone=Math.random()>.5?"rgba(55,52,34,.10)":"rgba(237,229,182,.08)";
-      ctx.fillStyle=tone;
+      const dark=Math.random()>.55;
+      ctx.fillStyle=dark
+        ? "rgba(54,53,38,.10)"
+        : "rgba(234,225,176,.07)";
       ctx.fillRect(x,y,1+Math.random()*2,1+Math.random()*2);
     }
+
+    for(let i=0;i<18;i++){
+      const x=Math.random()*512;
+      const y=Math.random()*512;
+      const w=20+Math.random()*70;
+      const h=18+Math.random()*65;
+      const g=ctx.createRadialGradient(x,y,2,x+w*.5,y+h*.5,w);
+      g.addColorStop(0,"rgba(65,62,40,.10)");
+      g.addColorStop(1,"rgba(65,62,40,0)");
+      ctx.fillStyle=g;
+      ctx.fillRect(x-w,y-h,w*2,h*2);
+    }
   }else if(kind==="carpet"){
-    ctx.fillStyle="#4d4935";
+    ctx.fillStyle="#54503d";
     ctx.fillRect(0,0,512,512);
 
-    for(let i=0;i<26000;i++){
+    for(let i=0;i<30000;i++){
       const x=Math.random()*512;
       const y=Math.random()*512;
       const r=Math.random();
-      ctx.fillStyle=r>.52
-        ?"rgba(119,111,77,.13)"
-        :"rgba(20,21,17,.16)";
+      ctx.fillStyle=r>.62
+        ? "rgba(132,123,83,.12)"
+        : "rgba(25,26,21,.18)";
       ctx.fillRect(x,y,1,1);
     }
 
-    for(let y=0;y<512;y+=8){
-      ctx.fillStyle="rgba(180,169,118,.025)";
+    for(let y=0;y<512;y+=9){
+      ctx.fillStyle="rgba(208,196,142,.018)";
       ctx.fillRect(0,y,512,1);
     }
-  }else{
-    ctx.fillStyle="#777560";
+
+    for(let i=0;i<20;i++){
+      const x=Math.random()*512;
+      const y=Math.random()*512;
+      const rx=10+Math.random()*55;
+      const ry=5+Math.random()*22;
+      const g=ctx.createRadialGradient(x,y,1,x,y,Math.max(rx,ry));
+      g.addColorStop(0,"rgba(15,16,13,.30)");
+      g.addColorStop(1,"rgba(15,16,13,0)");
+      ctx.fillStyle=g;
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.scale(rx/Math.max(rx,ry),ry/Math.max(rx,ry));
+      ctx.beginPath();
+      ctx.arc(0,0,Math.max(rx,ry),0,Math.PI*2);
+      ctx.restore();
+      ctx.fill();
+    }
+  else{
+    ctx.fillStyle="#878675";
     ctx.fillRect(0,0,512,512);
+
     for(let y=0;y<512;y+=64){
       for(let x=0;x<512;x+=64){
-        ctx.strokeStyle="rgba(35,35,30,.28)";
+        ctx.strokeStyle="rgba(39,40,34,.30)";
         ctx.lineWidth=3;
         ctx.strokeRect(x+1,y+1,62,62);
-        ctx.fillStyle="rgba(212,205,169,.035)";
-        ctx.fillRect(x+4,y+4,56,56);
+        ctx.fillStyle="rgba(217,211,183,.04)";
+        ctx.fillRect(x+5,y+5,54,54);
       }
     }
-    for(let i=0;i<900;i++){
-      ctx.fillStyle="rgba(30,30,25,.07)";
-      ctx.fillRect(Math.random()*512,Math.random()*512,1,1);
+
+    for(let i=0;i<24;i++){
+      const x=20+Math.random()*472;
+      const y=20+Math.random()*472;
+      const rx=7+Math.random()*26;
+      const g=ctx.createRadialGradient(x,y,1,x,y,rx);
+      g.addColorStop(0,"rgba(48,48,42,.24)");
+      g.addColorStop(1,"rgba(48,48,42,0)");
+      ctx.fillStyle=g;
+      ctx.beginPath();
+      ctx.arc(x,y,rx,0,Math.PI*2);
+      ctx.fill();
     }
   }
 
@@ -333,6 +387,67 @@ for(const [x,z] of [[-10,1],[3,-7],[14,-18],[-9,-27],[7,-34],[-17,-1]]){
   );
 }
 
+
+// Ruined details: collapsed ceiling plates, damp wall sections, and broken
+// partitions keep the space recognizable as Backrooms while making it feel
+// neglected rather than pristine.
+const menuRuinMaterial=new THREE.MeshStandardMaterial({
+  color:0x3a392d,
+  roughness:1
+});
+
+const menuStainMaterial=new THREE.MeshStandardMaterial({
+  color:0x5b553e,
+  roughness:1,
+  transparent:true,
+  opacity:.72
+});
+
+for(const [x,z,sx,sz,rot] of [
+  [-16,-4,3.6,2.3,.12],
+  [13,-11,4.2,1.9,-.18],
+  [-8,-25,3.0,2.2,.08],
+  [15,-30,4.5,2.4,-.10]
+]){
+  addMenuBox(
+    "MenuCollapsedWall",
+    new THREE.Vector3(sx,2.1,sz),
+    new THREE.Vector3(x,5.9,z),
+    menuRuinMaterial,
+    rot
+  );
+}
+
+for(const [x,z,sx,sz] of [
+  [-6,-2,3.4,1.2],
+  [8,-16,2.8,1.0],
+  [-13,-28,3.6,1.1],
+  [7,-33,2.4,1.0]
+]){
+  addMenuBox(
+    "MenuCeilingDamage",
+    new THREE.Vector3(sx,.12,sz),
+    new THREE.Vector3(x,7.94,z),
+    menuRuinMaterial,
+    Math.sin(x)*.04
+  );
+}
+
+for(const [x,z,sx,sz] of [
+  [-20,-8,2.8,1.2],
+  [18,-16,3.0,1.3],
+  [-11,-21,2.4,1.0],
+  [12,-29,2.6,1.1]
+]){
+  addMenuBox(
+    "MenuWaterStain",
+    new THREE.Vector3(sx,.025,sz),
+    new THREE.Vector3(x,.02,z),
+    menuStainMaterial,
+    Math.random()*Math.PI
+  );
+}
+
 const menuLights=[
   {x:-10,z:1,power:11},
   {x:3,z:-7,power:13},
@@ -360,22 +475,25 @@ for(let i=0;i<menuLights.length;i++){
   menuSet.add(point);
 }
 
-const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x28281d,.95);
-const menuFill=new THREE.PointLight(0xd4c694,7.5,26,2);
+const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x28281d,.62);
+const menuFill=new THREE.PointLight(0xd4c694,4.2,30,2);
 menuFill.position.set(-4,4,-4);
 menuSet.add(menuAmbient,menuFill);
 
-const menuCameraStart=new THREE.Vector3(0,2.05,10.8);
-const menuCameraTarget=new THREE.Vector3(-1.2,2.45,-15.5);
+const menuCameraStart=new THREE.Vector3(-1.8,2.15,9.6);
+const menuCameraTarget=new THREE.Vector3(1.6,2.55,-18.5);
 
 let menuSceneReady=false;
 let menuBackdropWasActive=false;
 
 function updateMenuScene(t,dt){
+  const menuBackdropElement=document.getElementById("menuBackdrop");
+
   if(gameStarted || !homeScreen || homeScreen.classList.contains("hidden")){
     if(menuBackdropWasActive){
       menuBackdropWasActive=false;
       menuSet.visible=false;
+      if(menuBackdropElement) menuBackdropElement.style.display="none";
       scene.fog.color.set(0x030302);
       scene.fog.near=14;
       scene.fog.far=62;
@@ -383,14 +501,38 @@ function updateMenuScene(t,dt){
     return false;
   }
 
-  // The title screen uses a real photographic liminal-space background.
-  // Keep the procedural menu geometry hidden so it cannot black out the image.
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
-    menuSet.visible=false;
+    if(menuBackdropElement) menuBackdropElement.style.display="none";
+    menuSet.visible=true;
+    scene.fog.color.set(0x7c7658);
+    scene.fog.near=9;
+    scene.fog.far=54;
+    menuCamera.position.copy(menuCameraStart);
+    menuCamera.lookAt(menuCameraTarget);
   }
 
-  return false;
+  // Gentle camera drift keeps the menu space alive without feeling like a
+  // cinematic fly-through.
+  menuCamera.position.x=menuCameraStart.x+Math.sin(t*.08)*.18;
+  menuCamera.position.y=menuCameraStart.y+Math.sin(t*.11)*.035;
+  menuCamera.position.z=menuCameraStart.z+Math.cos(t*.07)*.10;
+  menuCamera.lookAt(
+    menuCameraTarget.x+Math.sin(t*.06)*.18,
+    menuCameraTarget.y,
+    menuCameraTarget.z
+  );
+
+  menuSet.traverse(node=>{
+    if(node.userData?.basePower!==undefined){
+      const phase=node.userData.phase||0;
+      const wave=Math.sin(t*1.7+phase)*.08;
+      const hardFlicker=(Math.sin(t*5.6+phase*7.1)>0.982)?-.56:0;
+      node.intensity=Math.max(.7,node.userData.basePower*(1+wave+hardFlicker));
+    }
+  });
+
+  return true;
 }
 
 const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
