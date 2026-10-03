@@ -789,7 +789,7 @@ function installMainMenuRedesign(){
   position:absolute;
   left:clamp(20px,3vw,52px);
   top:calc(clamp(155px,25vh,250px) + 255px);
-  width:min(470px,39vw);
+  width:min(500px,41vw);
   color:#989381;
   text-shadow:0 2px 8px #000;
 }
@@ -810,8 +810,8 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:92px;
-  padding:13px 12px;
+  min-height:104px;
+  padding:14px 13px;
   border:1px solid rgba(231,220,171,.14);
   border-radius:2px;
   background:rgba(4,6,5,.38);
@@ -866,7 +866,7 @@ function installMainMenuRedesign(){
 .menuRightPanel{
   position:absolute;
   left:clamp(20px,3vw,52px);
-  bottom:clamp(22px,4vh,48px);
+  bottom:clamp(18px,3vh,38px);
   width:min(390px,31vw);
   padding:15px 16px;
   border-left:3px solid rgba(223,173,69,.34);
