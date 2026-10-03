@@ -3542,9 +3542,11 @@ function startSpiderJumpscare(){
   spiderEntity.position.copy(scarePosition);
   spiderJumpscareScale=1.16;
   spiderEntity.scale.setScalar(spiderJumpscareScale);
+  // The spider faces along its -Z axis, so aim that axis directly
+  // at the camera instead of turning the back toward the player.
   spiderEntity.rotation.y=Math.atan2(
-    camera.position.x-spiderEntity.position.x,
-    camera.position.z-spiderEntity.position.z
+    -(camera.position.x-spiderEntity.position.x),
+    -(camera.position.z-spiderEntity.position.z)
   );
 
   // Center the actual rendered spider on the camera, rather than relying on
@@ -4949,8 +4951,6 @@ function animate(){
         spiderJumpscareDirection,
         THREE.MathUtils.lerp(1.22,.56,easeOut)
       );
-      spiderEntity.position.y=
-        camera.position.y-.82+Math.sin(jumpProgress*Math.PI)*.06;
 
       const scale=THREE.MathUtils.lerp(
         spiderJumpscareScale,
@@ -4959,16 +4959,29 @@ function animate(){
       ) + Math.sin(spiderBehaviorTime*34)*.035;
 
       spiderEntity.scale.setScalar(scale);
+
+      // Re-center the rendered model every frame because the camera moves
+      // during the scare and the animation can change the model bounds.
+      if(spiderModel){
+        spiderModel.updateMatrixWorld(true);
+        const scareBox=new THREE.Box3().setFromObject(spiderModel);
+        if(Number.isFinite(scareBox.min.y) && Number.isFinite(scareBox.max.y)){
+          const modelCenterY=(scareBox.min.y+scareBox.max.y)*.5;
+          spiderEntity.position.y += camera.position.y-modelCenterY;
+        }else{
+          spiderEntity.position.y=camera.position.y;
+        }
+      }else{
+        spiderEntity.position.y=camera.position.y;
+      }
+
       spiderEntity.rotation.y=Math.atan2(
-        camera.position.x-spiderEntity.position.x,
-        camera.position.z-spiderEntity.position.z
+        -(camera.position.x-spiderEntity.position.x),
+        -(camera.position.z-spiderEntity.position.z)
       );
 
-      if(jumpProgress<.42){
-        setSpiderAnimation("attack2");
-      }else{
-        setSpiderAnimation("attack1");
-      }
+      // Keep the face-forward Attack 2 clip for the full jumpscare.
+      setSpiderAnimation("attack2");
 
       player.keys.clear();
       player.vel.set(0,0,0);
