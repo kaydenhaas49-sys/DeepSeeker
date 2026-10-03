@@ -580,53 +580,6 @@ function updateMenuScene(t,dt){
 }
 
 
-function updateMenuScene(t,dt){
-  const menuBackdropElement=document.getElementById("menuBackdrop");
-  if(gameStarted || !homeScreen || homeScreen.classList.contains("hidden")){
-    if(menuBackdropWasActive){
-      menuBackdropWasActive=false;
-      menuSet.visible=false;
-      world.root.visible=true;
-      if(menuBackdropElement) menuBackdropElement.style.display="none";
-      scene.background.set(0x000100);
-      scene.fog.color.set(0x030302);
-      scene.fog.near=14;
-      scene.fog.far=62;
-    }
-    return false;
-  }
-  if(!menuBackdropWasActive){
-    menuBackdropWasActive=true;
-    menuSet.visible=true;
-    world.root.visible=false;
-    if(menuBackdropElement) menuBackdropElement.style.display="none";
-    menuScene.background.set(0x303129);
-    menuScene.fog.color.set(0x4a4938);
-    menuScene.fog.near=19;
-    menuScene.fog.far=96;
-  }
-  menuCamera.position.x=menuCameraStart.x+Math.sin(t*.031)*.18;
-  menuCamera.position.y=menuCameraStart.y+Math.sin(t*.068)*.035;
-  menuCamera.position.z=menuCameraStart.z+Math.cos(t*.027)*.16;
-  menuCamera.lookAt(
-    menuCameraTarget.x+Math.sin(t*.025)*.30,
-    menuCameraTarget.y+Math.sin(t*.033)*.025,
-    menuCameraTarget.z
-  );
-  menuSet.traverse(node=>{
-    if(node.userData?.basePower===undefined) return;
-    const phase=node.userData.phase||0;
-    const base=node.userData.basePower;
-    const wave=Math.sin(t*1.55+phase)*.06;
-    const dropout=Math.sin(t*3.9+phase*3.7)>.994 ? -.78 : 0;
-    if(node.isLight){
-      node.intensity=Math.max(.10,base*(1+wave+dropout));
-    }else if(node.material?.emissiveIntensity!==undefined){
-      node.material.emissiveIntensity=Math.max(.12,3.15*(1+Math.sin(t*1.55+phase)*.045));
-    }
-  });
-  return true;
-}
 const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
