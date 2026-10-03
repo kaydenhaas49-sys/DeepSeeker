@@ -3796,9 +3796,18 @@ async function extractSpiderPack(zipUrl){
     }
   }
 
+  const normalizedModelName=basename(modelEntry.name);
+  const normalizedModelPath=normalizeName(modelEntry.name);
+  const slashIndex=normalizedModelPath.lastIndexOf("/");
+  const modelDirectory=slashIndex>=0
+    ? normalizedModelPath.slice(0,slashIndex+1)
+    : "";
+
   return {
     modelType:modelEntry.lower.endsWith(".fbx") ? "fbx" : "glb",
-    modelName:basename(modelEntry.name),
+    modelName:normalizedModelName,
+    modelDirectory,
+    modelBytes:await readEntry(modelEntry),
     sourceName:modelEntry.name,
     resourceBlobs
   };
@@ -3841,6 +3850,27 @@ function finishSpiderModel(model,animations,sourceName){
   if(meshCount===0){
     throw new Error("Spider model contains no meshes.");
   }
+
+  model.updateMatrixWorld(true);
+  const parsedBounds=new THREE.Box3().setFromObject(model);
+  const parsedSize=parsedBounds.getSize(new THREE.Vector3());
+  if(
+    !Number.isFinite(parsedSize.x) ||
+    !Number.isFinite(parsedSize.y) ||
+    !Number.isFinite(parsedSize.z) ||
+    Math.max(parsedSize.x,parsedSize.y,parsedSize.z)<.001
+  ){
+    throw new Error("Spider model parsed, but its geometry has zero or invalid bounds.");
+  }
+
+  console.log("[DeepSeeker] Spider geometry validated before spawn",{
+    meshCount,
+    bounds:{
+      x:parsedSize.x,
+      y:parsedSize.y,
+      z:parsedSize.z
+    }
+  });
 
   fitSpiderModel(model);
 
@@ -4032,13 +4062,18 @@ async function loadSpiderFromPack(){
     };
 
     if(extracted.modelType==="fbx"){
+      // Parse the actual FBX bytes directly. This avoids depending on a blob URL
+      // being fetched back through FileLoader before FBXLoader can build the model.
       const loader=new FBXLoader(packManager);
-      loader.load(
-        extracted.modelName,
-        object=>handleLoaded(object,object.animations||[]),
-        undefined,
-        error=>failSpiderLoad(error,"SPIDER FBX FAILED TO LOAD")
-      );
+      try{
+        const object=loader.parse(
+          extracted.modelBytes.buffer,
+          extracted.modelDirectory
+        );
+        handleLoaded(object,object.animations||[]);
+      }catch(error){
+        failSpiderLoad(error,"SPIDER FBX PARSE FAILED");
+      }
     }else{
       const loader=new GLTFLoader(packManager);
       loader.setDRACOLoader(dracoLoader);
