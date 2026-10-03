@@ -228,6 +228,12 @@ export class World {
       emissiveIntensity: 2.35,
       roughness: 0.28,
     });
+    this.fixtureDimMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfff4ca,
+      emissive: 0xffd990,
+      emissiveIntensity: 1.05,
+      roughness: 0.30,
+    });
     this.fixtureBlackMaterial = new THREE.MeshStandardMaterial({
       color: 0x10100e,
       roughness: 0.96,
@@ -434,58 +440,81 @@ export class World {
       ],
     ];
 
-    for(let index=0; index<fixturePositions.length; index++){
-      const [localX, localZ] = fixturePositions[index];
-      const cracked = rng() < .78;
-      const phase = rng() * Math.PI * 2;
-      const power = 1.4 + rng() * .9;
-      const x = cx * CHUNK_SIZE + localX;
-      const z = cz * CHUNK_SIZE + localZ;
-      const y = WALL_H - .055;
-      const fixtureGroup = new THREE.Group();
+    const intactGeos=[];
+    const dimGeos=[];
+    const blackGeos=[];
+    const lightIndices=new Set([0,3]);
 
-      fixtureGroup.name = cracked ? "FluorescentCracked" : "Fluorescent";
-      fixtureGroup.position.set(x, y, z);
-      fixtureGroup.userData.cracked = cracked;
-      fixtureGroup.userData.phase = phase;
-      fixtureGroup.userData.basePower = cracked ? power * .24 : power;
+    const addBoxGeometry=(target,w,h,d,x,y,z,rx=0,ry=0,rz=0)=>{
+      const geometry=new THREE.BoxGeometry(w,h,d);
+      const rotation=new THREE.Euler(rx,ry,rz,"XYZ");
+      geometry.applyMatrix4(
+        new THREE.Matrix4().compose(
+          new THREE.Vector3(x,y,z),
+          new THREE.Quaternion().setFromEuler(rotation),
+          new THREE.Vector3(1,1,1)
+        )
+      );
+      target.push(geometry);
+    };
+
+    for(let index=0; index<fixturePositions.length; index++){
+      const [localX,localZ]=fixturePositions[index];
+
+      // Keep one strong reference fixture per chunk; the rest are usually damaged.
+      const cracked=index!==0 && rng()<.82;
+      const phase=rng()*Math.PI*2;
+      const power=1.25+rng()*.85;
+      const x=cx*CHUNK_SIZE+localX;
+      const z=cz*CHUNK_SIZE+localZ;
+      const y=WALL_H-.055;
 
       if(cracked){
-        const pieces = crackedPattern[index % crackedPattern.length];
+        const pieces=crackedPattern[index%crackedPattern.length];
         for(const piece of pieces){
-          const mesh = new THREE.Mesh(
-            new THREE.BoxGeometry(piece.w, .065, .84),
-            piece.black ? this.fixtureBlackMaterial : this.fixtureMaterial
+          const target=piece.black ? blackGeos : dimGeos;
+          addBoxGeometry(
+            target,
+            piece.w,.065,.84,
+            x+piece.x,y+piece.y,z+piece.z,
+            piece.rx,0,piece.rz
           );
-          mesh.position.set(piece.x, piece.y, piece.z);
-          mesh.rotation.set(piece.rx, 0, piece.rz);
-          mesh.name = piece.black ? "CrackedBlackSection" : "CrackedDiffuserPiece";
-          fixtureGroup.add(mesh);
         }
       }else{
-        const mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(3.5, .10, .95),
-          this.fixtureMaterial
+        addBoxGeometry(
+          intactGeos,
+          3.5,.10,.95,
+          x,y,z
         );
-        mesh.name = "FluorescentDiffuser";
-        fixtureGroup.add(mesh);
       }
 
-      group.add(fixtureGroup);
-
-      const point = new THREE.PointLight(
-        0xffe6a8,
-        fixtureGroup.userData.basePower,
-        cracked ? 11 : 14,
-        2
-      );
-      point.position.set(x, y - .78, z);
-      point.userData.cracked = cracked;
-      point.userData.basePower = fixtureGroup.userData.basePower;
-      point.userData.phase = phase;
-      point.name = cracked ? "CrackedFluorescentLight" : "FluorescentLight";
-      group.add(point);
+      // Only two actual point lights per chunk. The other fixtures stay emissive,
+      // which preserves the look without multiplying dynamic lighting cost.
+      if(lightIndices.has(index)){
+        const lightPower=cracked ? power*.24 : power;
+        const point=new THREE.PointLight(
+          0xffe6a8,
+          lightPower,
+          cracked ? 9 : 12,
+          2
+        );
+        point.position.set(x,y-.78,z);
+        point.name=cracked ? "CrackedFluorescentLight" : "FluorescentLight";
+        group.add(point);
+      }
     }
-  }
 
+    const mergeFixtureGeometries=(geometries,material,name)=>{
+      if(!geometries.length) return;
+      const merged=mergeGeometries(geometries,false);
+      for(const geometry of geometries) geometry.dispose();
+      const mesh=new THREE.Mesh(merged,material);
+      mesh.name=name;
+      group.add(mesh);
+    };
+
+    mergeFixtureGeometries(intactGeos,this.fixtureMaterial,"FluorescentDiffusers");
+    mergeFixtureGeometries(dimGeos,this.fixtureDimMaterial,"CrackedDiffusers");
+    mergeFixtureGeometries(blackGeos,this.fixtureBlackMaterial,"CrackedBlackSections");
+  }
 }

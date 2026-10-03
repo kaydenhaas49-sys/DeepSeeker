@@ -2020,7 +2020,6 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   }
 
   gameStarted=true;
-  ensureSpiderLoading();
   overlay.classList.add("hidden");
   audio.start();
 
@@ -2080,6 +2079,7 @@ function resetForNewGame(slot=selectedSaveSlot){
   fallCameraOffset=0;
 
   spiderActive=false;
+  spiderSpawnPending=false;
   spiderJumpscareTimer=0;
   spiderBehaviorState="idle";
   spiderBehaviorTime=0;
@@ -2965,7 +2965,6 @@ function ensureHouseCollisionSetup(){
     if(pendingHouseStart && !gameStarted){
       pendingHouseStart=false;
       gameStarted=true;
-      ensureSpiderLoading();
       overlay.classList.add("hidden");
 
       if(pendingSaveLoad){
@@ -2989,7 +2988,6 @@ function ensureHouseCollisionSetup(){
     }else if(gameStarted){
       if(pendingHouseStart){
         pendingHouseStart=false;
-        ensureSpiderLoading();
         setHouseMode(true);
       }else{
         eventText.textContent="APARTMENT READY";
@@ -3163,6 +3161,7 @@ function setHouseMode(enabled,options={}){
   spiderBehaviorTime=0;
 
   if(houseMode){
+    spiderSpawnPending=false;
     renderer.setPixelRatio(housePixelRatio);
     flashlight.castShadow=false;
     playerLight.intensity=0;
@@ -3181,6 +3180,9 @@ function setHouseMode(enabled,options={}){
     renderer.setPixelRatio(currentPixelRatio);
     flashlight.castShadow=ENABLE_SHADOWS;
     playerLight.intensity=0;
+
+    spiderSpawnPending=true;
+    ensureSpiderLoading();
 
     if(options.forceBackroomsSpawn || houseModeWasActive){
       player.pos.set(32,EYE,32);
@@ -3247,6 +3249,7 @@ let spiderBehaviorState="idle";
 let spiderBehaviorTime=0;
 let spiderAttackPlayed=false;
 let spiderActive=false;
+let spiderSpawnPending=false;
 let spiderJumpscareTimer=0;
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
@@ -3605,6 +3608,13 @@ function spawnSpiderAtPlayer(){
   if(!gameStarted || houseMode) return false;
   if(spiderActive) return true;
 
+  if(!spiderLoaded){
+    spiderSpawnPending=true;
+    ensureSpiderLoading();
+    return false;
+  }
+
+
   const spawn=findSpiderSpawnPosition();
   spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
   spiderEntity.rotation.y=Math.atan2(
@@ -3804,6 +3814,11 @@ async function loadSpiderFromPack(){
       URL.revokeObjectURL(spiderUrl);
       spiderLoadStarted=false;
 
+      if(spiderSpawnPending && gameStarted && !houseMode){
+        spiderSpawnPending=false;
+        spawnSpiderAtPlayer();
+      }
+
       eventText.textContent=sourceClip ? "SPIDER READY" : "SPIDER READY (STATIC)";
       eventText.style.opacity="1";
       setTimeout(()=>{
@@ -3823,6 +3838,7 @@ async function loadSpiderFromPack(){
       spiderActions.clear();
       spiderAnimationState="";
       spiderLoadStarted=false;
+      spiderSpawnPending=gameStarted && !houseMode;
       URL.revokeObjectURL(spiderUrl);
       console.error("[DeepSeeker] Spider-Psionic GLB failed to load from ZIP:",error);
       // A missing entity is a gameplay asset problem, not a menu problem.
@@ -3852,7 +3868,13 @@ async function loadSpiderFromPack(){
 function ensureSpiderLoading(){
   if(spiderLoadStarted || spiderLoaded) return;
   spiderLoadStarted=true;
-  loadSpiderFromPack();
+
+  const start=()=>loadSpiderFromPack();
+  if("requestIdleCallback" in window){
+    window.requestIdleCallback(start,{timeout:1800});
+  }else{
+    setTimeout(start,180);
+  }
 }
 
 
