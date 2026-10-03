@@ -788,7 +788,7 @@ function installMainMenuRedesign(){
 .menuSlotBar{
   position:absolute;
   left:clamp(20px,3vw,52px);
-  top:calc(clamp(155px,25vh,250px) + 255px);
+  top:calc(clamp(155px,25vh,250px) + 295px);
   width:min(400px,34vw);
   color:#989381;
   text-shadow:0 2px 8px #000;
