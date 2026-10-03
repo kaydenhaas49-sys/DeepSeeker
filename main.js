@@ -3535,38 +3535,29 @@ function startSpiderJumpscare(){
   spiderJumpscareDirection.set(0,0,-1);
   camera.getWorldDirection(spiderJumpscareDirection);
 
+  // Keep the spider in a simple, stable position directly in front of the
+  // camera. The old bounding-box recentering caused the model to jump/glitch
+  // whenever the animated pose changed.
   const scarePosition=camera.position.clone().add(
-    spiderJumpscareDirection.clone().multiplyScalar(1.22)
+    spiderJumpscareDirection.clone().multiplyScalar(1.15)
   );
 
   spiderEntity.position.copy(scarePosition);
+  spiderEntity.position.y=camera.position.y-.05;
   spiderJumpscareScale=1.16;
   spiderEntity.scale.setScalar(spiderJumpscareScale);
-  // The spider faces along its -Z axis, so aim that axis directly
-  // at the camera instead of turning the back toward the player.
-  spiderEntity.rotation.y=Math.atan2(
-    -(camera.position.x-spiderEntity.position.x),
-    -(camera.position.z-spiderEntity.position.z)
-  );
 
-  // Center the actual rendered spider on the camera, rather than relying on
-  // the model's imported pivot/ground offset. This keeps the jumpscare aimed
-  // directly at the camera instead of appearing above the player's head.
-  if(spiderModel){
-    spiderModel.updateMatrixWorld(true);
-    const scareBox=new THREE.Box3().setFromObject(spiderModel);
-    if(Number.isFinite(scareBox.min.y) && Number.isFinite(scareBox.max.y)){
-      const modelCenterY=(scareBox.min.y+scareBox.max.y)*.5;
-      spiderEntity.position.y += camera.position.y-modelCenterY;
-    }else{
-      spiderEntity.position.y=camera.position.y;
-    }
-  }else{
-    spiderEntity.position.y=camera.position.y;
-  }
+  // In normal gameplay the spider faces the player with this same orientation.
+  // Keep that orientation for the jumpscare rather than rotating it every frame.
+  spiderEntity.rotation.y=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
 
   spiderEntity.visible=true;
 
+  // Attack 2 is the dedicated attack animation; keep it fixed for the whole
+  // scare so the broken Walk clip never enters this state.
   setSpiderAnimation("attack2");
   player.keys.clear();
   player.vel.set(0,0,0);
@@ -4914,29 +4905,6 @@ function animate(){
     flashlightStrength=dimmedStrength;
 
     if(spiderJumpscareTimer>0){
-      flashlightStrength=10.0*flicker;
-    }
-  }
-
-  flashlight.intensity=flashlightOn ? flashlightStrength : 0;
-  if(!houseMode){
-    playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
-  }
-
-  if(!houseMode && spiderMixer && spiderActive){
-    spiderMixer.update(dt);
-  }
-
-  if(spiderJumpscareTimer<=0){
-    groundSpiderEntity();
-  }
-
-  spiderRevealLight.intensity=(!houseMode && spiderActive)
-    ? (spiderJumpscareTimer>0 ? 5.0 : 2.8)
-    : 0;
-
-  if(spiderActive && !houseMode){
-    if(spiderJumpscareTimer>0){
       spiderJumpscareTimer=Math.max(0,spiderJumpscareTimer-dt);
       spiderBehaviorTime+=dt;
 
@@ -4949,26 +4917,38 @@ function animate(){
 
       spiderEntity.position.copy(camera.position).addScaledVector(
         spiderJumpscareDirection,
-        THREE.MathUtils.lerp(1.22,.56,easeOut)
+        THREE.MathUtils.lerp(1.15,.72,easeOut)
+      );
+      spiderEntity.position.y=camera.position.y-.05;
+
+      spiderEntity.scale.setScalar(
+        THREE.MathUtils.lerp(
+          spiderJumpscareScale,
+          1.58,
+          easeOut
+        )
       );
 
-      const scale=THREE.MathUtils.lerp(
-        spiderJumpscareScale,
-        1.72,
-        easeOut
-      ) + Math.sin(spiderBehaviorTime*34)*.035;
+      // Stay aimed at the player for the entire scare. Do not rotate from
+      // changing animation bounds or camera shake.
+      spiderEntity.rotation.y=Math.atan2(
+        player.pos.x-spiderEntity.position.x,
+        player.pos.z-spiderEntity.position.z
+      );
 
-      spiderEntity.scale.setScalar(scale);
+      setSpiderAnimation("attack2");
 
-      // Re-center the rendered model every frame because the camera moves
-      // during the scare and the animation can change the model bounds.
-      if(spiderModel){
-        spiderModel.updateMatrixWorld(true);
-        const scareBox=new THREE.Box3().setFromObject(spiderModel);
-        if(Number.isFinite(scareBox.min.y) && Number.isFinite(scareBox.max.y)){
-          const modelCenterY=(scareBox.min.y+scareBox.max.y)*.5;
-          spiderEntity.position.y += camera.position.y-modelCenterY;
-        }else{
+      player.keys.clear();
+      player.vel.set(0,0,0);
+
+      const shake=jumpProgress*jumpProgress;
+      camera.position.x+=Math.sin(spiderBehaviorTime*76)*.008*shake;
+      camera.position.y+=Math.cos(spiderBehaviorTime*68)*.006*shake;
+
+      if(spiderJumpscareTimer<=0){
+        finishSpiderJumpscare();
+      }
+    }else{
           spiderEntity.position.y=camera.position.y;
         }
       }else{
