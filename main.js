@@ -1076,8 +1076,8 @@ function installMainMenuRedesign(){
 .menuSlotBar{
   position:absolute;
   left:clamp(28px,4.2vw,72px);
-  bottom:clamp(31px,4.5vh,52px);
-  width:min(440px,38vw);
+  bottom:clamp(30px,4vh,48px);
+  width:min(560px,46vw);
   color:#8c8675;
   text-shadow:0 2px 8px #000;
 }
@@ -1098,12 +1098,12 @@ function installMainMenuRedesign(){
   width:100%;
   display:grid;
   grid-template-columns:repeat(3,1fr);
-  gap:6px;
+  gap:10px;
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:68px;
-  padding:8px 9px;
+  min-height:96px;
+  padding:13px 12px;
   border:1px solid rgba(231,220,171,.09);
   border-radius:4px;
   background:rgba(5,6,5,.32);
@@ -1124,7 +1124,7 @@ function installMainMenuRedesign(){
   box-shadow:0 0 18px rgba(223,173,69,.05);
 }
 .menuHomeRedesign .saveSlotTitle{
-  font-size:8px;
+  font-size:9px;
   letter-spacing:1.7px;
   color:#ddd4b9;
 }
@@ -1134,8 +1134,8 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .saveSlotDetail{
   display:block;
-  margin-top:4px;
-  font-size:7px;
+  margin-top:7px;
+  font-size:8px;
   color:#676258;
   white-space:nowrap;
   overflow:hidden;
@@ -1144,11 +1144,11 @@ function installMainMenuRedesign(){
 .menuHomeRedesign .saveSlotActions{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:3px;
-  margin-top:6px;
+  gap:6px;
+  margin-top:9px;
 }
 .menuHomeRedesign .saveSlotActions button{
-  padding:5px 3px;
+  padding:7px 4px;
   border:1px solid rgba(231,220,171,.07);
   border-radius:3px;
   background:rgba(255,255,255,.018);
@@ -1176,11 +1176,12 @@ function installMainMenuRedesign(){
 
 .menuRightPanel{
   position:absolute;
-  right:clamp(30px,4.2vw,72px);
-  bottom:clamp(31px,5vh,56px);
-  top:auto;
-  width:min(280px,23vw);
-  padding:16px 0 0 16px;
+  left:clamp(420px,31vw,540px);
+  right:auto;
+  top:clamp(218px,25vh,275px);
+  bottom:auto;
+  width:min(300px,24vw);
+  padding:14px 0 0 16px;
   border:0;
   border-left:1px solid rgba(223,173,69,.30);
   color:#918b79;
@@ -1395,29 +1396,7 @@ function installMainMenuRedesign(){
   `;
   right.appendChild(meta);
 
-  const nameGate=document.createElement("div");
-  nameGate.className="menuNameGate";
-  nameGate.innerHTML=`
-    <div class="menuNameGateCard">
-      <div class="menuNameGateTitle">IDENTIFY YOURSELF</div>
-      <p class="menuNameGateText">Choose the name that other players will see. Your name is saved locally for future sessions.</p>
-    </div>
-  `;
-  const nameCard=nameGate.firstElementChild;
-  if(usernameRow) nameCard.appendChild(usernameRow);
 
-  const nameActions=document.createElement("div");
-  nameActions.className="menuNameGateActions";
-  const nameCancel=document.createElement("button");
-  nameCancel.type="button";
-  nameCancel.textContent="CANCEL";
-  const nameContinue=document.createElement("button");
-  nameContinue.type="button";
-  nameContinue.className="primary";
-  nameContinue.textContent="CONTINUE";
-  nameActions.append(nameCancel,nameContinue);
-  nameCard.appendChild(nameActions);
-  layout.appendChild(nameGate);
 
   const footer=document.createElement("div");
   footer.className="menuFooter";
@@ -1425,56 +1404,11 @@ function installMainMenuRedesign(){
 
   layout.append(logo,nav,slotBar,right,footer);
 
-  let pendingMenuAction=null;
-  const openNameGate=(action)=>{
-    pendingMenuAction=action;
-    const key="deepseeker-player-name";
-    let current="";
-    try{ current=localStorage.getItem(key)||""; }catch{}
-    const input=usernameRow?.querySelector(".usernameInput");
-    if(input) input.value=current;
-    nameGate.classList.add("open");
-    setTimeout(()=>input?.focus(),0);
-  };
-  const closeNameGate=()=>{
-    pendingMenuAction=null;
-    nameGate.classList.remove("open");
-  };
-  const submitNameGate=()=>{
-    const input=usernameRow?.querySelector(".usernameInput");
-    const name=String(input?.value||"").replace(/[<>]/g,"").replace(/\\s+/g," ").trim().slice(0,20);
-    if(!name){
-      input?.focus();
-      return;
-    }
-    try{ localStorage.setItem("deepseeker-player-name",name); }catch{}
-    const action=pendingMenuAction;
-    pendingMenuAction=null;
-    nameGate.classList.remove("open");
-    if(action) action();
-  };
-  nameCancel.addEventListener("click",closeNameGate);
-  nameContinue.addEventListener("click",submitNameGate);
-  usernameRow?.querySelector(".usernameInput")?.addEventListener("keydown",event=>{
-    if(event.key==="Enter"){
-      event.preventDefault();
-      submitNameGate();
-    }else if(event.key==="Escape"){
-      event.preventDefault();
-      closeNameGate();
-    }
-  });
-  usernameRow?.querySelector(".usernameButton")?.addEventListener("click",event=>{
-    event.preventDefault();
-    submitNameGate();
-  });
+
 
   homeScreen.appendChild(layout);
 
-  window.__deepseekerMenu={
-    openNameGate,
-    closeNameGate
-  };
+  window.__deepseekerMenu={};
 }
 
 function updateHouseLoadingUI(progress=null,status=null){
@@ -3704,9 +3638,7 @@ document.querySelectorAll(".phoneSaveSlot").forEach(button=>{
 
 newGameButton.addEventListener("click",event=>{
   event.preventDefault();
-  if(window.__deepseekerMenu?.openNameGate){
-    window.__deepseekerMenu.openNameGate(()=>resetForNewGame(selectedSaveSlot));
-  }
+  resetForNewGame(selectedSaveSlot);
 });
 
 continueButton.addEventListener("click",()=>{
@@ -3715,16 +3647,12 @@ continueButton.addEventListener("click",()=>{
 
 createLobbyButton.addEventListener("click",()=>{
   const code=Math.random().toString(36).slice(2,8).toUpperCase();
-  if(window.__deepseekerMenu?.openNameGate){
-    window.__deepseekerMenu.openNameGate(()=>enterLobby(code,true));
-  }
+  enterLobby(code,true);
 });
 
 joinLobbyButton.addEventListener("click",()=>{
   const code=window.prompt("Enter the lobby code:");
-  if(code && window.__deepseekerMenu?.openNameGate){
-    window.__deepseekerMenu.openNameGate(()=>enterLobby(code,false));
-  }
+  if(code) enterLobby(code,false);
 });
 
 startLobbyButton.addEventListener("click",()=>{
