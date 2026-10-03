@@ -96,6 +96,75 @@ scene.add(ambient);
 const playerLight=new THREE.PointLight(0xb59b68,0,24,1.9);
 scene.add(playerLight);
 
+// Dedicated title-screen camera and lighting. The actual procedural Backrooms
+// remains visible behind the menu, so the title screen uses real geometry,
+// textures, fog and depth instead of a flat CSS illustration.
+const menuCamera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.08,180);
+const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x1d2117,0.46);
+const menuKeyLight=new THREE.PointLight(0xffe7a5,32,34,1.75);
+const menuFillLight=new THREE.PointLight(0xcbd6b4,8,28,1.9);
+scene.add(menuAmbient,menuKeyLight,menuFillLight);
+
+const MENU_WORLD_X=32;
+const MENU_WORLD_Z=30;
+const MENU_CAMERA_HEIGHT=2.28;
+const MENU_LOOK_HEIGHT=2.65;
+let menuSceneReady=false;
+let menuBackdropWasActive=false;
+
+function updateMenuScene(t){
+  if(gameStarted || !homeScreen || homeScreen.classList.contains("hidden")){
+    if(menuBackdropWasActive){
+      menuBackdropWasActive=false;
+      menuAmbient.intensity=0;
+      menuKeyLight.intensity=0;
+      menuFillLight.intensity=0;
+      scene.background.set(0x000100);
+    }
+    return false;
+  }
+
+  if(!menuBackdropWasActive){
+    menuBackdropWasActive=true;
+    menuAmbient.intensity=0.46;
+    menuKeyLight.intensity=32;
+    menuFillLight.intensity=8;
+    scene.background.set(0x080905);
+  }
+
+  // Keep the nearby Backrooms chunks streamed while the title screen is open.
+  world.update(MENU_WORLD_X,MENU_WORLD_Z);
+
+  const sway=Math.sin(t*0.12)*0.65;
+  const drift=Math.sin(t*0.08+1.1)*0.32;
+  const lookDrift=Math.sin(t*0.10+0.7)*0.7;
+
+  menuCamera.position.set(
+    MENU_WORLD_X+sway,
+    MENU_CAMERA_HEIGHT+drift,
+    MENU_WORLD_Z+9.5
+  );
+  menuCamera.lookAt(
+    MENU_WORLD_X+lookDrift,
+    MENU_LOOK_HEIGHT,
+    MENU_WORLD_Z-10
+  );
+
+  menuKeyLight.position.set(
+    MENU_WORLD_X+sway*0.5,
+    7.85,
+    MENU_WORLD_Z+4.5
+  );
+  menuFillLight.position.set(
+    MENU_WORLD_X-6.0,
+    4.2,
+    MENU_WORLD_Z-2.0
+  );
+
+  menuSceneReady=true;
+  return true;
+}
+
 const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
@@ -544,16 +613,16 @@ function installMainMenuRedesign(){
   z-index:1;
   background:
     linear-gradient(90deg,
-      rgba(1,3,2,.97) 0%,
-      rgba(1,3,2,.91) 17%,
-      rgba(1,3,2,.60) 33%,
-      rgba(1,3,2,.16) 50%,
-      transparent 69%),
+      rgba(1,2,1,.96) 0%,
+      rgba(1,2,1,.86) 17%,
+      rgba(1,2,1,.52) 31%,
+      rgba(1,2,1,.16) 48%,
+      transparent 70%),
     linear-gradient(180deg,
-      rgba(0,0,0,.68) 0%,
-      transparent 20%,
-      transparent 69%,
-      rgba(0,0,0,.78) 100%);
+      rgba(0,0,0,.60) 0%,
+      transparent 25%,
+      transparent 66%,
+      rgba(0,0,0,.84) 100%);
 }
 #menuBackdrop{
   position:absolute;
@@ -561,18 +630,15 @@ function installMainMenuRedesign(){
   overflow:hidden;
   pointer-events:none;
   z-index:0;
-  background:
-    radial-gradient(ellipse at 77% 42%,rgba(204,188,122,.15),transparent 19%),
-    radial-gradient(ellipse at 73% 68%,rgba(74,88,60,.12),transparent 26%),
-    linear-gradient(180deg,#121714 0%,#0a0e0c 48%,#030504 100%);
+  background:transparent;
 }
 #menuBackdrop::before{
   content:"";
   position:absolute;
   inset:0;
   background:
-    radial-gradient(ellipse at 77% 51%,transparent 0 18%,rgba(0,0,0,.18) 41%,rgba(0,0,0,.72) 100%),
-    linear-gradient(90deg,transparent 0 49%,rgba(206,196,154,.035) 49.1%,transparent 49.3% 72%,rgba(206,196,154,.025) 72.1%,transparent 72.3%);
+    radial-gradient(ellipse at 71% 42%,transparent 0 14%,rgba(0,0,0,.05) 33%,rgba(0,0,0,.62) 100%),
+    linear-gradient(90deg,rgba(0,0,0,.10),transparent 43%,rgba(0,0,0,.10));
 }
 #menuBackdrop::after{
   content:"";
@@ -581,190 +647,66 @@ function installMainMenuRedesign(){
   background:
     repeating-linear-gradient(180deg,
       transparent 0 5px,
-      rgba(255,255,255,.010) 6px,
-      transparent 7px),
-    radial-gradient(ellipse at 74% 44%,transparent 0 13%,rgba(0,0,0,.05) 28%,rgba(0,0,0,.66) 100%);
-  opacity:.56;
+      rgba(255,255,255,.008) 6px,
+      transparent 7px);
+  opacity:.42;
 }
 .menuBackdropGlow{
   position:absolute;
-  right:8vw;
-  top:15vh;
-  width:min(42vw,680px);
-  height:min(42vw,680px);
+  right:9vw;
+  top:10vh;
+  width:min(35vw,560px);
+  height:min(35vw,560px);
   border-radius:50%;
   background:radial-gradient(circle,
-    rgba(236,218,157,.19) 0,
-    rgba(236,218,157,.075) 18%,
-    rgba(236,218,157,.025) 38%,
+    rgba(245,225,160,.10) 0,
+    rgba(245,225,160,.025) 32%,
     transparent 70%);
-  filter:blur(13px);
-  animation:menuGlow 8s ease-in-out infinite alternate;
+  filter:blur(18px);
+  animation:menuGlow 9s ease-in-out infinite alternate;
+}
+.menuBackdropScan,
+.menuBackdropArchitecture,
+.menuBackdropTower,
+.menuBackdropPipe,
+.menuBackdropLight,
+.menuBackdropHaze{
+  opacity:.10;
+  pointer-events:none;
 }
 .menuBackdropScan{
   position:absolute;
-  top:0;
-  bottom:0;
-  left:-28vw;
-  width:20vw;
-  transform:skewX(-11deg);
-  background:linear-gradient(90deg,transparent,rgba(224,210,160,.045),transparent);
-  animation:menuSweep 13s ease-in-out infinite;
-  opacity:.55;
+  inset:0;
+  background:linear-gradient(90deg,transparent,rgba(223,209,160,.035),transparent);
+  width:22vw;
+  transform:translateX(-28vw) skewX(-10deg);
+  animation:menuSweep 15s ease-in-out infinite;
 }
 .menuBackdropArchitecture{
   position:absolute;
   inset:0;
-  opacity:.75;
-  background:
-    linear-gradient(90deg,
-      transparent 0 54%,
-      rgba(229,216,173,.045) 54.15%,
-      transparent 54.45% 72%,
-      rgba(229,216,173,.028) 72.15%,
-      transparent 72.45%),
-    linear-gradient(180deg,
-      transparent 0 22%,
-      rgba(229,216,173,.035) 22.15%,
-      transparent 22.4% 61%,
-      rgba(229,216,173,.025) 61.15%,
-      transparent 61.4%);
+  background:linear-gradient(90deg,transparent 62%,rgba(230,216,173,.035) 62.1%,transparent 62.4%);
 }
-.menuBackdropTower{
-  position:absolute;
-  right:6vw;
-  top:19vh;
-  width:min(43vw,700px);
-  height:63vh;
-  min-width:380px;
-  min-height:390px;
-  opacity:.60;
-  transform:perspective(1200px) rotateY(-11deg);
-  transform-origin:right center;
-  background:
-    linear-gradient(90deg,
-      rgba(7,10,8,.52) 0,
-      rgba(31,36,28,.20) 17%,
-      rgba(15,20,16,.08) 49%,
-      rgba(2,4,3,.54) 100%),
-    linear-gradient(180deg,
-      rgba(221,211,170,.035) 0 2%,
-      transparent 2% 18%,
-      rgba(221,211,170,.028) 18% 18.3%,
-      transparent 18.3% 100%);
-  border-left:1px solid rgba(228,216,173,.10);
-  border-right:1px solid rgba(228,216,173,.045);
-  box-shadow:
-    inset 0 0 90px rgba(0,0,0,.48),
-    0 0 100px rgba(222,205,150,.035);
-}
-.menuBackdropTower::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:
-    linear-gradient(90deg,
-      transparent 0 16%,
-      rgba(224,211,167,.04) 16.2%,
-      transparent 16.5% 50%,
-      rgba(224,211,167,.025) 50.2%,
-      transparent 50.5% 82%,
-      rgba(224,211,167,.035) 82.2%,
-      transparent 82.5%),
-    linear-gradient(180deg,
-      transparent 0 14%,
-      rgba(224,211,167,.035) 14.2%,
-      transparent 14.5% 74%,
-      rgba(224,211,167,.03) 74.2%,
-      transparent 74.5%);
-}
-.menuBackdropTower::after{
-  content:"";
-  position:absolute;
-  left:18%;
-  right:21%;
-  top:16%;
-  bottom:7%;
-  border:1px solid rgba(229,217,172,.055);
-  background:
-    linear-gradient(90deg,
-      rgba(0,0,0,.40),
-      rgba(231,218,169,.025) 50%,
-      rgba(0,0,0,.46)),
-    linear-gradient(180deg,
-      rgba(233,222,180,.025),
-      transparent 35% 64%,
-      rgba(0,0,0,.22));
-  box-shadow:inset 0 0 45px rgba(0,0,0,.34);
-}
-.menuBackdropPipe{
-  position:absolute;
-  right:4vw;
-  bottom:21vh;
-  width:min(34vw,560px);
-  height:2px;
-  background:linear-gradient(90deg,
-    transparent,
-    rgba(230,216,172,.10) 12%,
-    rgba(230,216,172,.48) 48%,
-    rgba(230,216,172,.12) 86%,
-    transparent);
-  box-shadow:0 0 22px rgba(228,210,155,.07);
-  transform:rotate(-4deg);
-  opacity:.72;
-}
+.menuBackdropTower,
+.menuBackdropPipe,
 .menuBackdropLight{
-  position:absolute;
-  right:20vw;
-  top:18vh;
-  width:min(31vw,500px);
-  height:4px;
-  background:linear-gradient(90deg,
-    transparent,
-    rgba(245,237,204,.18),
-    rgba(245,237,204,.88) 52%,
-    rgba(245,237,204,.16),
-    transparent);
-  box-shadow:
-    0 0 24px rgba(239,222,166,.18),
-    0 0 80px rgba(239,222,166,.07);
-  transform:rotate(-2deg);
-  animation:menuLightPulse 6.4s ease-in-out infinite;
-  opacity:.82;
-}
-.menuBackdropLight.secondary{
-  top:31vh;
-  right:30vw;
-  width:min(20vw,320px);
-  opacity:.25;
-  animation-delay:-2.7s;
+  display:none;
 }
 .menuBackdropHaze{
   position:absolute;
-  inset:-6%;
-  background:
-    radial-gradient(ellipse at 79% 42%,rgba(216,199,138,.065),transparent 20%),
-    linear-gradient(90deg,
-      transparent 27%,
-      rgba(214,205,173,.018) 58%,
-      transparent 80%);
-  filter:blur(24px);
-  animation:menuHaze 14s ease-in-out infinite alternate;
+  inset:0;
+  background:radial-gradient(ellipse at 72% 44%,rgba(219,200,139,.035),transparent 28%);
+  filter:blur(28px);
+  animation:menuHaze 16s ease-in-out infinite alternate;
 }
 @keyframes menuGlow{
-  from{transform:translate3d(-2%,2%,0) scale(.95);opacity:.58}
-  to{transform:translate3d(2%,-2%,0) scale(1.06);opacity:1}
-}
-@keyframes menuLightPulse{
-  0%,100%{opacity:.42;filter:brightness(.80)}
-  44%{opacity:.88;filter:brightness(1.10)}
-  50%{opacity:.58;filter:brightness(.68)}
-  56%{opacity:.84;filter:brightness(1.04)}
+  from{transform:translate3d(-1%,1%,0) scale(.96);opacity:.48}
+  to{transform:translate3d(2%,-2%,0) scale(1.07);opacity:.9}
 }
 @keyframes menuSweep{
-  0%{transform:translateX(-30vw) skewX(-11deg);opacity:0}
-  15%{opacity:.38}
-  48%,100%{transform:translateX(145vw) skewX(-11deg);opacity:0}
+  0%{transform:translateX(-30vw) skewX(-10deg);opacity:0}
+  18%{opacity:.35}
+  50%,100%{transform:translateX(145vw) skewX(-10deg);opacity:0}
 }
 @keyframes menuHaze{
   from{transform:translate3d(-1%,0,0) scale(1)}
@@ -794,70 +736,78 @@ function installMainMenuRedesign(){
   width:100%;
   height:100%;
 }
+.menuHomeLayout::before{
+  content:"";
+  position:absolute;
+  left:clamp(22px,3vw,48px);
+  top:clamp(205px,27vh,280px);
+  bottom:clamp(74px,8vh,104px);
+  width:1px;
+  background:linear-gradient(180deg,transparent,rgba(223,173,69,.25) 10%,rgba(223,173,69,.10) 78%,transparent);
+  pointer-events:none;
+}
 .menuLogo{
   position:absolute;
-  left:clamp(34px,4vw,64px);
+  left:clamp(38px,4vw,66px);
   top:clamp(30px,5vh,56px);
   color:#f4efdc;
-  text-shadow:0 4px 25px rgba(0,0,0,.94);
+  text-shadow:0 4px 26px rgba(0,0,0,.96);
 }
 .menuLogoMain{
   display:flex;
   flex-direction:column;
-  line-height:.88;
+  line-height:.84;
   letter-spacing:clamp(4px,.60vw,9px);
   font-weight:600;
 }
 .menuLogoMain span{
-  font-size:clamp(22px,2.45vw,39px);
-  color:#e9e3d0;
+  font-size:clamp(21px,2.35vw,38px);
+  color:#ebe5d3;
 }
 .menuLogoMain strong{
-  font-size:clamp(36px,4.45vw,68px);
+  font-size:clamp(36px,4.35vw,66px);
   font-weight:600;
   color:#d8b65d;
-  letter-spacing:clamp(5px,.74vw,11px);
+  letter-spacing:clamp(5px,.72vw,11px);
 }
 .menuLogoSub{
-  margin-top:13px;
+  margin-top:14px;
   padding-left:2px;
   font-size:8px;
-  letter-spacing:3.6px;
-  color:#8f8976;
+  letter-spacing:3.7px;
+  color:#8e8875;
 }
 .menuNav{
   position:absolute;
-  left:clamp(28px,4vw,58px);
-  top:clamp(220px,29vh,295px);
-  width:min(340px,29vw);
+  left:clamp(30px,4vw,60px);
+  top:clamp(222px,30vh,300px);
+  width:min(340px,28vw);
   display:flex;
   flex-direction:column;
 }
-.menuNavGroup{
-  position:relative;
-}
-.menuNavGroup + .menuNavGroup{margin-top:16px}
+.menuNavGroup{position:relative}
+.menuNavGroup + .menuNavGroup{margin-top:15px}
 .menuNavGroupLabel{
   display:flex;
   align-items:center;
   gap:10px;
-  margin:0 0 4px 22px;
+  margin:0 0 3px 20px;
   font-size:7px;
   letter-spacing:2.5px;
-  color:#6f6a5c;
+  color:#696456;
   text-shadow:0 2px 8px #000;
 }
 .menuNavGroupLabel::after{
   content:"";
   flex:1;
   height:1px;
-  background:linear-gradient(90deg,rgba(226,211,164,.085),transparent);
+  background:linear-gradient(90deg,rgba(226,211,164,.08),transparent);
 }
 .menuNavButton{
   position:relative;
   width:100%;
-  min-height:44px;
-  padding:0 18px 0 22px;
+  min-height:43px;
+  padding:0 18px 0 20px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -865,32 +815,32 @@ function installMainMenuRedesign(){
   border-left:2px solid transparent;
   border-radius:0;
   background:transparent;
-  color:#c7c1ae;
+  color:#c9c3b0;
   font:inherit;
   text-align:left;
-  font-size:clamp(12px,.93vw,15px);
-  letter-spacing:1.6px;
+  font-size:clamp(12px,.91vw,15px);
+  letter-spacing:1.65px;
   cursor:pointer;
   transition:background .15s,color .15s,border-color .15s,transform .15s;
-  text-shadow:0 2px 10px rgba(0,0,0,.95);
+  text-shadow:0 2px 10px rgba(0,0,0,.96);
 }
 .menuNavButton:hover{
-  background:linear-gradient(90deg,rgba(224,177,70,.085),transparent 82%);
-  color:#fff6dc;
+  background:linear-gradient(90deg,rgba(224,177,70,.09),transparent 86%);
+  color:#fff7df;
   transform:translateX(3px);
 }
 .menuNavButton.active,
 .menuNavButton:focus-visible{
-  background:linear-gradient(90deg,rgba(224,177,70,.16),rgba(224,177,70,.015) 74%,transparent);
+  background:linear-gradient(90deg,rgba(224,177,70,.17),rgba(224,177,70,.012) 74%,transparent);
   border-left-color:#dfad45;
-  color:#fff2cc;
+  color:#fff3cf;
   outline:none;
 }
 .menuNavButton:disabled{opacity:.38;cursor:not-allowed;transform:none!important}
 .menuNavArrow{
   font-size:19px;
   line-height:1;
-  color:#626052;
+  color:#5d5a4e;
   transition:transform .15s,color .15s;
 }
 .menuNavButton:hover .menuNavArrow{transform:translateX(4px);color:#ebbf68}
@@ -898,10 +848,10 @@ function installMainMenuRedesign(){
 
 .menuSlotBar{
   position:absolute;
-  left:clamp(28px,4vw,58px);
-  bottom:clamp(66px,7.5vh,98px);
-  width:min(520px,44vw);
-  color:#8f8977;
+  left:clamp(30px,4vw,60px);
+  bottom:clamp(68px,7.5vh,100px);
+  width:min(500px,43vw);
+  color:#8c8675;
   text-shadow:0 2px 8px #000;
 }
 .menuSlotHeader{
@@ -911,7 +861,7 @@ function installMainMenuRedesign(){
   margin-bottom:7px;
   padding:0 1px;
   font-size:7px;
-  letter-spacing:2.3px;
+  letter-spacing:2.2px;
 }
 .menuSlotHeader strong{color:#d2c8a5;font-weight:500}
 .menuHomeRedesign #saveSlots{
@@ -922,208 +872,78 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:82px;
-  padding:10px;
-  border:1px solid rgba(231,220,171,.095);
+  min-height:79px;
+  padding:9px 10px;
+  border:1px solid rgba(231,220,171,.09);
   border-radius:2px;
-  background:rgba(3,5,4,.18);
-  color:#b5af9b;
+  background:rgba(2,4,3,.14);
+  color:#b2ac99;
   display:flex;
   flex-direction:column;
   justify-content:center;
-  box-shadow:inset 0 1px rgba(255,255,255,.022);
+  box-shadow:inset 0 1px rgba(255,255,255,.018);
 }
-.menuHomeRedesign .saveSlotCard:hover{
-  background:rgba(223,173,69,.055);
-  border-color:rgba(231,220,171,.17);
-}
-.menuHomeRedesign .saveSlotCard.selected{
-  border-color:rgba(223,173,69,.66);
-  background:rgba(223,173,69,.085);
-  box-shadow:0 0 20px rgba(223,173,69,.04);
-}
-.menuHomeRedesign .saveSlotTitle{font-size:8px;letter-spacing:1.7px;color:#dfd6ba}
-.menuHomeRedesign .saveSlotMode{font-size:7px;color:#817c6e}
-.menuHomeRedesign .saveSlotDetail{
-  display:block;
-  margin-top:4px;
-  font-size:7px;
-  color:#6c685c;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.menuHomeRedesign .saveSlotActions{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:3px;
-  margin-top:6px;
-}
-.menuHomeRedesign .saveSlotActions button{
-  padding:5px 3px;
-  border:1px solid rgba(231,220,171,.075);
-  border-radius:2px;
-  background:rgba(255,255,255,.015);
-  color:#96907c;
-  font:inherit;
-  font-size:7px;
-  letter-spacing:1.1px;
-  cursor:pointer;
-}
-.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.075);color:#e8dcbe}
-.menuHomeRedesign .saveSlotActions button:disabled{opacity:.28;cursor:not-allowed}
-.menuSaveStatus{
-  margin-top:5px;
-  padding-left:1px;
-  font-size:7px;
-  letter-spacing:1.2px;
-  color:#666255;
-}
+.menuHomeRedesign .saveSlotCard:hover{background:rgba(223,173,69,.055);border-color:rgba(231,220,171,.16)}
+.menuHomeRedesign .saveSlotCard.selected{border-color:rgba(223,173,69,.66);background:rgba(223,173,69,.085);box-shadow:0 0 18px rgba(223,173,69,.035)}
+.menuHomeRedesign .saveSlotTitle{font-size:8px;letter-spacing:1.7px;color:#ddd4b9}
+.menuHomeRedesign .saveSlotMode{font-size:7px;color:#7e796d}
+.menuHomeRedesign .saveSlotDetail{display:block;margin-top:4px;font-size:7px;color:#676258;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menuHomeRedesign .saveSlotActions{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:6px}
+.menuHomeRedesign .saveSlotActions button{padding:5px 3px;border:1px solid rgba(231,220,171,.07);border-radius:2px;background:rgba(255,255,255,.014);color:#8e8877;font:inherit;font-size:7px;letter-spacing:1px;cursor:pointer}
+.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.075);color:#e7dabd}
+.menuHomeRedesign .saveSlotActions button:disabled{opacity:.27;cursor:not-allowed}
+.menuSaveStatus{margin-top:5px;padding-left:1px;font-size:7px;letter-spacing:1.2px;color:#625e54}
 
 .menuRightPanel{
   position:absolute;
-  top:clamp(118px,16vh,165px);
-  right:clamp(30px,4.5vw,70px);
-  width:min(275px,22vw);
-  padding:2px 0 4px 16px;
+  top:clamp(126px,18vh,178px);
+  right:clamp(34px,5vw,78px);
+  width:min(260px,20vw);
+  padding:0 0 0 15px;
   border:0;
-  border-left:1px solid rgba(223,173,69,.28);
+  border-left:1px solid rgba(223,173,69,.25);
   background:transparent;
-  color:#96907d;
+  color:#918b79;
   text-shadow:0 2px 8px #000;
-  opacity:.92;
+  opacity:.90;
 }
-.menuRightHeader{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:14px;
-  margin-bottom:15px;
-  font-size:7px;
-  letter-spacing:2.1px;
-  color:#8e8877;
-}
-.menuSignalState{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin-bottom:9px;
-  font-size:15px;
-  letter-spacing:2.4px;
-  color:#ddd1a7;
-}
-.menuSignalDot{
-  width:6px;
-  height:6px;
-  border-radius:50%;
-  background:#d3a43f;
-  box-shadow:0 0 10px rgba(223,173,69,.5);
-  animation:menuSignalPulse 2.2s ease-in-out infinite;
-}
-.menuRightLead{
-  margin:0 0 13px;
-  max-width:248px;
-  font-size:9px;
-  line-height:1.8;
-  color:#777267;
-}
-.menuRightRule{
-  height:1px;
-  background:rgba(226,211,164,.075);
-  margin:12px 0 14px;
-}
-.menuRightSectionLabel{
-  margin-bottom:6px;
-  font-size:7px;
-  letter-spacing:2.3px;
-  color:#a29a83;
-}
-.menuHomeRedesign .houseLoader{
-  width:100%;
-  margin:9px 0 0;
-  text-align:left;
-}
-.menuHomeRedesign .houseLoaderTop{color:#858071}
-.menuHomeRedesign .houseLoaderStatus{color:#666156;min-height:14px}
-.menuRightMeta{
-  display:grid;
-  gap:6px;
-  margin-top:11px;
-}
-.menuRightMetaRow{
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
-  font-size:7px;
-  letter-spacing:1.5px;
-}
-.menuRightMetaRow span:first-child{color:#57534a}
-.menuRightMetaRow span:last-child{color:#8b8472}
+.menuRightHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px;font-size:7px;letter-spacing:2px;color:#858070}
+.menuSignalState{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:15px;letter-spacing:2.4px;color:#ddd1a7}
+.menuSignalDot{width:6px;height:6px;border-radius:50%;background:#d3a43f;box-shadow:0 0 9px rgba(223,173,69,.45);animation:menuSignalPulse 2.2s ease-in-out infinite}
+.menuRightLead{margin:0 0 13px;max-width:240px;font-size:9px;line-height:1.8;color:#746f64}
+.menuRightRule{height:1px;background:rgba(226,211,164,.07);margin:12px 0 14px}
+.menuRightSectionLabel{margin-bottom:6px;font-size:7px;letter-spacing:2.2px;color:#9c9580}
+.menuHomeRedesign .houseLoader{width:100%;margin:9px 0 0;text-align:left}
+.menuHomeRedesign .houseLoaderTop{color:#817b6c}
+.menuHomeRedesign .houseLoaderStatus{color:#646055;min-height:14px}
+.menuRightMeta{display:grid;gap:6px;margin-top:11px}
+.menuRightMetaRow{display:flex;justify-content:space-between;gap:12px;font-size:7px;letter-spacing:1.4px}
+.menuRightMetaRow span:first-child{color:#514e46}
+.menuRightMetaRow span:last-child{color:#878071}
 
 .menuNameGate{
-  position:absolute;
-  inset:0;
-  z-index:20;
-  display:none;
-  place-items:center;
-  background:rgba(0,0,0,.52);
-  backdrop-filter:blur(6px);
+  position:absolute;inset:0;z-index:20;display:none;place-items:center;
+  background:rgba(0,0,0,.54);backdrop-filter:blur(7px);
 }
 .menuNameGate.open{display:grid}
 .menuNameGateCard{
-  width:min(430px,calc(100vw - 40px));
-  padding:24px;
-  border:1px solid rgba(226,211,164,.18);
-  border-radius:3px;
+  width:min(430px,calc(100vw - 40px));padding:24px;
+  border:1px solid rgba(226,211,164,.18);border-radius:3px;
   background:linear-gradient(145deg,rgba(8,11,9,.94),rgba(3,5,4,.97));
   box-shadow:0 28px 100px rgba(0,0,0,.62);
 }
-.menuNameGateTitle{
-  font-size:16px;
-  letter-spacing:3px;
-  color:#f0e7c8;
-  margin-bottom:8px;
-}
-.menuNameGateText{
-  margin:0 0 17px;
-  font-size:9px;
-  line-height:1.7;
-  letter-spacing:1.4px;
-  color:#8f8b79;
-}
-.menuNameGateActions{
-  display:flex;
-  gap:7px;
-  margin-top:9px;
-}
-.menuNameGateActions button{
-  flex:1;
-  min-height:38px;
-  border:1px solid rgba(231,220,171,.14);
-  border-radius:2px;
-  background:rgba(255,255,255,.04);
-  color:#cfc6a9;
-  font:inherit;
-  font-size:9px;
-  letter-spacing:1.5px;
-  cursor:pointer;
-}
-.menuNameGateActions button.primary{
-  border-color:rgba(223,173,69,.42);
-  background:rgba(223,173,69,.10);
-  color:#f0dfaf;
-}
+.menuNameGateTitle{font-size:16px;letter-spacing:3px;color:#f0e7c8;margin-bottom:8px}
+.menuNameGateText{margin:0 0 17px;font-size:9px;line-height:1.7;letter-spacing:1.4px;color:#8f8b79}
+.menuNameGateActions{display:flex;gap:7px;margin-top:9px}
+.menuNameGateActions button{flex:1;min-height:38px;border:1px solid rgba(231,220,171,.14);border-radius:2px;background:rgba(255,255,255,.04);color:#cfc6a9;font:inherit;font-size:9px;letter-spacing:1.5px;cursor:pointer}
+.menuNameGateActions button.primary{border-color:rgba(223,173,69,.42);background:rgba(223,173,69,.10);color:#f0dfaf}
 .menuNameGateActions button:hover{background:rgba(223,173,69,.10)}
 .menuNameGate .usernameRow{width:100%;margin:0}
-.menuNameGate .usernameInput{
-  background:rgba(1,3,2,.82);
-  border-color:rgba(231,220,171,.14);
-  border-radius:2px;
-}
+.menuNameGate .usernameInput{background:rgba(1,3,2,.82);border-color:rgba(231,220,171,.14);border-radius:2px}
 .menuFooter{
   position:absolute;
-  left:clamp(22px,3vw,52px);
-  right:clamp(22px,3vw,52px);
+  left:clamp(24px,3vw,50px);
+  right:clamp(24px,3vw,50px);
   bottom:clamp(18px,3vh,28px);
   display:flex;
   justify-content:space-between;
@@ -1131,15 +951,15 @@ function installMainMenuRedesign(){
   font-size:7px;
   line-height:1.6;
   letter-spacing:1.4px;
-  color:#5f5b52;
+  color:#5b574e;
   text-shadow:0 2px 8px #000;
 }
 .menuFooter span:last-child{text-align:right}
 
 @media(max-width:1000px){
   .menuNav{width:min(320px,38vw)}
-  .menuSlotBar{width:min(500px,50vw)}
-  .menuRightPanel{right:20px;width:min(270px,30vw)}
+  .menuSlotBar{width:min(480px,50vw)}
+  .menuRightPanel{right:20px;width:min(250px,30vw)}
 }
 @media(max-width:750px){
   .menuLogoMain span{font-size:23px}
@@ -1150,6 +970,7 @@ function installMainMenuRedesign(){
   .menuRightPanel{display:none}
   .menuFooter{left:20px;right:20px;bottom:17px}
   .menuFooter span:last-child{display:none}
+  .menuHomeLayout::before{left:18px;top:160px;bottom:60px}
   .menuLogo{left:20px;top:22px}
 }
 `;
@@ -3770,6 +3591,8 @@ function triggerEvent(){
 addEventListener("resize",()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
+  menuCamera.aspect=innerWidth/innerHeight;
+  menuCamera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
 
@@ -3877,7 +3700,17 @@ function animate(){
   }
 
   if(!houseMode){
-    world.update(player.pos.x,player.pos.z);
+    if(!gameStarted){
+      // Keep the title-screen camera centered on a known open section of
+      // chunk 0,0 while the game remains on the menu.
+      player.pos.set(MENU_WORLD_X,EYE,MENU_WORLD_Z);
+      player.vel.set(0,0,0);
+      player.jumpY=0;
+      player.jumpVelocity=0;
+      world.update(MENU_WORLD_X,MENU_WORLD_Z);
+    }else{
+      world.update(player.pos.x,player.pos.z);
+    }
   }
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
 
@@ -4071,7 +3904,13 @@ function animate(){
   batteryValue.textContent=Math.round(battery)+"%";
   batteryBar.style.opacity=flashlightOn?1:.45;
 
-  renderer.render(scene,camera);
+  const menuIsVisible=!gameStarted && !homeScreen.classList.contains("hidden");
+  const usingMenuCamera=menuIsVisible && updateMenuScene(t);
+
+  renderer.render(
+    scene,
+    usingMenuCamera ? menuCamera : camera
+  );
 }
 animate();
 
@@ -4089,6 +3928,7 @@ window.__deepseeker={
   player,
   world,
   camera,
+  menuCamera,
   renderer,
   seed:SEED,
   house:{model:()=>houseModel,spawn:()=>houseSpawn,active:()=>houseMode,toggle:()=>setHouseMode(!houseMode)}
