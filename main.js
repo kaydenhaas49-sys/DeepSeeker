@@ -396,18 +396,8 @@ function addCrackedFixtureModel(x,z,index){
   group.name="FluorescentCracked";
   group.position.set(x,8.97,z);
 
-  // Dark housing beneath the broken diffuser makes the gaps read as real breaks
-  // instead of painted lines floating over an intact rectangle.
-  const housing=new THREE.Mesh(
-    new THREE.BoxGeometry(3.5,.08,.95),
-    new THREE.MeshStandardMaterial({
-      color:0x171714,
-      roughness:.9
-    })
-  );
-  housing.position.y=-.055;
-  group.add(housing);
-
+  // Leave the gaps open. The ceiling grid above provides the dark contrast,
+  // while the damaged diffuser pieces remain the visible fixture geometry.
   const pieces=[
     {w:1.03,x:-1.16,y:.008,z:.012,rx:-.025,rz:-.018},
     {w:.92,x:-.12,y:-.018,z:-.018,rx:.012,rz:.030},
