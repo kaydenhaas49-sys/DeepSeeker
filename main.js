@@ -3919,22 +3919,91 @@ function finishSpiderModel(model,animations,sourceName){
     "die2"
   ];
 
-  const directClips=new Map();
+  const normalizeAnimationKey=(value)=>String(value||"")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g," ");
 
-  if(animations?.length>=documentedClipNames.length){
-    for(let i=0;i<documentedClipNames.length;i++){
-      directClips.set(documentedClipNames[i],animations[i]);
+  const animationAliases={
+    walk:["walk","walking"],
+    attack1:["attack 1","attack1","attack 01","attack01"],
+    attack2:["attack 2","attack2","attack 02","attack02"],
+    eat:["eat"],
+    defend:["defend","defence"],
+    hit1:["hit 1","hit1","hit 01","hit01"],
+    hit2:["hit 2","hit2","hit 02","hit02"],
+    crouch:["crouch"],
+    stand:["stand"],
+    idle1:["idle 1","idle1"],
+    idle2:["idle 2","idle2"],
+    jump:["jump"],
+    sidestep:["side step","sidestep"],
+    die1:["die 1","die1","death 1","death1"],
+    die2:["die 2","die2","death 2","death2"]
+  };
+
+  const rootBoneNames=new Set();
+  model.traverse(obj=>{
+    if(!obj.isSkinnedMesh || !obj.skeleton) return;
+    for(const bone of obj.skeleton.bones){
+      if(!bone.parent?.isBone){
+        rootBoneNames.add(String(bone.name||"").toLowerCase());
+      }
     }
-  }else if(animations?.length>1){
-    for(const clip of animations){
-      const name=normalizedAnimationName(clip);
-      if(name.includes("walk")) directClips.set("walk",clip);
-      else if(name.includes("attack 1") || name.includes("attack1")) directClips.set("attack1",clip);
-      else if(name.includes("attack 2") || name.includes("attack2")) directClips.set("attack2",clip);
-      else if(name.includes("idle 1") || name.includes("idle1")) directClips.set("idle1",clip);
-      else if(name.includes("idle 2") || name.includes("idle2")) directClips.set("idle2",clip);
-      else if(name.includes("die 1") || name.includes("die1")) directClips.set("die1",clip);
-      else if(name.includes("die 2") || name.includes("die2")) directClips.set("die2",clip);
+  });
+
+  const isRootPositionTrack=(track)=>{
+    if(!track?.name || !track.name.endsWith(".position")) return false;
+    const target=String(track.name).slice(0,-".position".length);
+    const nodeName=target
+      .split("|")
+      .pop()
+      .split(":")
+      .pop()
+      .toLowerCase();
+    return rootBoneNames.has(nodeName);
+  };
+
+  const makeStableSpiderClip=(clip)=>{
+    if(!clip) return null;
+    const stable=clip.clone();
+    stable.tracks=stable.tracks.filter(track=>!isRootPositionTrack(track));
+    stable.resetDuration();
+    return stable;
+  };
+
+  const directClips=new Map();
+  const claimedAnimations=new Set();
+
+  if(animations?.length>1){
+    // Prefer the animation's real FBX name. This avoids assuming the exporter
+    // kept the documented array order.
+    for(const documentedName of documentedClipNames){
+      const aliases=animationAliases[documentedName]||[documentedName];
+      const match=animations.find((clip,index)=>{
+        if(claimedAnimations.has(index)) return false;
+        const name=normalizeAnimationKey(clip.name);
+        return aliases.some(alias=>name.includes(normalizeAnimationKey(alias)));
+      });
+      if(match){
+        const index=animations.indexOf(match);
+        claimedAnimations.add(index);
+        directClips.set(documentedName,makeStableSpiderClip(match));
+      }
+    }
+
+    // If the exporter used generic names, fall back to documented array order
+    // only for animations that were not identified by name.
+    if(directClips.size<documentedClipNames.length && animations.length>=documentedClipNames.length){
+      for(let i=0;i<documentedClipNames.length;i++){
+        const documentedName=documentedClipNames[i];
+        if(directClips.has(documentedName)) continue;
+        const clip=animations.find((candidate,index)=>index===i && !claimedAnimations.has(index))
+          || animations.find((candidate,index)=>!claimedAnimations.has(index));
+        if(!clip) continue;
+        const index=animations.indexOf(clip);
+        claimedAnimations.add(index);
+        directClips.set(documentedName,makeStableSpiderClip(clip));
+      }
     }
   }
 
@@ -3951,7 +4020,7 @@ function finishSpiderModel(model,animations,sourceName){
         endFrame+1,
         sourceFPS
       );
-      directClips.set(name,clip);
+      directClips.set(name,makeStableSpiderClip(clip));
     }
   }
 
@@ -3968,6 +4037,11 @@ function finishSpiderModel(model,animations,sourceName){
       if(name.startsWith("die")) action.clampWhenFinished=true;
       spiderActions.set(name,action);
     }
+
+    console.log("[DeepSeeker] Spider animation map",{
+      selected:[...directClips.keys()],
+      rootBones:[...rootBoneNames]
+    });
 
     setSpiderAnimation(spiderWantedState);
   }else{
