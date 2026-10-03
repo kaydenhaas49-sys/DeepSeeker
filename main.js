@@ -102,6 +102,15 @@ scene.add(playerLight);
 // textures, fog and depth instead of a flat CSS illustration.
 const menuCamera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.05,160);
 
+const menuScene=new THREE.Scene();
+menuScene.background=new THREE.Color(0x4d4a34);
+menuScene.fog=new THREE.Fog(0x55513a,15,76);
+
+const menuSet=new THREE.Group();
+menuSet.name="RuinedBackroomsMenuSet";
+menuSet.visible=false;
+menuScene.add(menuSet);
+
 // Use the exact procedural textures from the playable Backrooms so the title screen
 // has the same wallpaper and drop-ceiling language as the actual game.
 const menuTextures=createTextures(Math.min(renderer.capabilities.getMaxAnisotropy(),4));
@@ -170,7 +179,7 @@ function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotation
     const wallSpan=Math.max(size.x,size.z);
     meshMaterial.map.repeat.set(
       Math.max(1,wallSpan/4),
-      Math.max(1,size.y/4)
+      1
     );
     meshMaterial.map.needsUpdate=true;
   }
