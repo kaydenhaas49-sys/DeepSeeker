@@ -805,7 +805,7 @@ function installMainMenuRedesign(){
 .menuHomeRedesign #saveSlots{
   width:100%;
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:1fr;
   gap:6px;
 }
 .menuHomeRedesign .saveSlotCard{
