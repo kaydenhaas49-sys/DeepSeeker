@@ -860,7 +860,7 @@ function installMainMenuRedesign(){
   background:
     linear-gradient(90deg,rgba(5,6,4,.86) 0%,rgba(8,9,6,.54) 24%,rgba(12,11,7,.12) 55%,rgba(5,5,4,.28) 100%),
     linear-gradient(180deg,rgba(58,46,17,.28),rgba(93,73,25,.12) 42%,rgba(5,5,4,.58) 100%),
-    url("https://images.unsplash.com/photo-1761251947081-c7477f5337ca?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wdW5kZXJmaW5lZA%3D%3D&ixlib=rb-4.1.0&q=88&w=2400")
+    url("https://images.unsplash.com/photo-1761251947081-c7477f5337ca?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=88&w=2400")
     center center / cover no-repeat;
   background-color:#302e21;
   background-blend-mode:multiply,color,normal;
