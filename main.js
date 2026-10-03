@@ -360,8 +360,8 @@ for(let i=0;i<menuLights.length;i++){
   menuSet.add(point);
 }
 
-const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x28281d,.75);
-const menuFill=new THREE.PointLight(0xd4c694,5.5,24,2);
+const menuAmbient=new THREE.HemisphereLight(0xc8ba86,0x28281d,.95);
+const menuFill=new THREE.PointLight(0xd4c694,7.5,26,2);
 menuFill.position.set(-4,4,-4);
 menuSet.add(menuAmbient,menuFill);
 
@@ -873,22 +873,21 @@ function installMainMenuRedesign(){
   z-index:1;
   background:
     linear-gradient(90deg,
-      rgba(1,2,1,.90) 0%,
-      rgba(1,2,1,.70) 15%,
-      rgba(1,2,1,.34) 30%,
-      rgba(1,2,1,.08) 46%,
-      transparent 68%),
+      rgba(1,2,1,.64) 0%,
+      rgba(1,2,1,.34) 18%,
+      rgba(1,2,1,.10) 38%,
+      transparent 58%),
     linear-gradient(180deg,
-      rgba(0,0,0,.44) 0%,
-      transparent 25%,
-      transparent 66%,
-      rgba(0,0,0,.62) 100%);
+      rgba(0,0,0,.18) 0%,
+      transparent 28%,
+      transparent 68%,
+      rgba(0,0,0,.38) 100%);
 }
 #menuBackdrop{
   position:absolute;
   inset:0;
   pointer-events:none;
-  z-index:0;
+  z-index:2;
   background:transparent;
 }
 #menuBackdrop::before{
@@ -910,7 +909,7 @@ function installMainMenuRedesign(){
 #homeScreen.menuHomeRedesign{
   position:absolute;
   inset:0;
-  z-index:3;
+  z-index:4;
   display:block;
   width:100vw;
   height:100vh;
