@@ -376,6 +376,13 @@ for(const [x,z,w,d,h,rot] of [
   addMenuBox("Partition",new THREE.Vector3(w,h,d),new THREE.Vector3(x,h/2,z),menuWallMaterial,rot);
 }
 
+// Mid-room architectural frame: a doorless opening that gives the camera a
+// strong near-to-far read and keeps the menu unmistakably inside the level.
+addMenuBox("MidRoomHeader",new THREE.Vector3(17.0,.72,.42),new THREE.Vector3(4.5,7.15,-17.5),menuRuinMaterial);
+addMenuBox("MidRoomLeft",new THREE.Vector3(.48,6.9,7.0),new THREE.Vector3(-4.0,3.45,-18.0),menuRuinMaterial);
+addMenuBox("MidRoomRight",new THREE.Vector3(.48,6.9,7.0),new THREE.Vector3(13.0,3.45,-18.0),menuRuinMaterial);
+addMenuBox("MidRoomDark",new THREE.Vector3(16.0,6.45,.16),new THREE.Vector3(4.5,3.2,-18.9),menuDarkMaterial);
+
 // The main visual anchor: a deep open bay that disappears into fog.
 addMenuBox("DeepBayFrameTop",new THREE.Vector3(24,1.05,.5),new THREE.Vector3(1.5,7.95,-64.5),menuRuinMaterial);
 addMenuBox("DeepBayLeft",new THREE.Vector3(.55,7.0,8.0),new THREE.Vector3(-10.5,3.5,-64),menuRuinMaterial);
@@ -441,6 +448,7 @@ for(const args of [
 
 // Fluorescent fixtures: each light is real geometry + a real point light.
 const menuLightFixtures3D=[
+  [-12,16,7.2,-.6],[-2,9,8.8,-.1],[9,16,6.8,.35],
   [-42,11,5.5,.2],[-24,4,10,.8],[-8,15,13,1.6],[10,5,8.5,2.5],[31,11,12,3.3],
   [-35,-10,8.5,4.1],[-14,-16,5.0,4.8],[8,-15,12.5,5.5],[34,-18,6.2,6.2],
   [-24,-31,9.5,7.0],[0,-34,14,7.8],[24,-35,5.8,8.4],[-8,-47,8.5,9.0],[18,-52,4.0,9.6]
@@ -463,10 +471,10 @@ for(const [x,z,power,phase] of menuLightFixtures3D){
 }
 
 // A few weak pools of practical light keep the 3D geometry readable.
-const menuAmbient=new THREE.HemisphereLight(0xd5c995,0x10110e,.42);
+const menuAmbient=new THREE.HemisphereLight(0xd5c995,0x10110e,.56);
 menuSet.add(menuAmbient);
 
-const menuFill=new THREE.PointLight(0xd5b96f,2.1,52,2);
+const menuFill=new THREE.PointLight(0xd5b96f,2.7,48,2);
 menuFill.position.set(-9,4,-6);
 menuSet.add(menuFill);
 
@@ -501,9 +509,9 @@ const menuDust=new THREE.Points(dustGeometry,dustMaterial);
 menuDust.name="MenuDust";
 menuSet.add(menuDust);
 
-const menuCameraStart=new THREE.Vector3(-19.5,2.75,27.5);
-const menuCameraTarget=new THREE.Vector3(1.5,3.05,-36);
-menuCamera.fov=72;
+const menuCameraStart=new THREE.Vector3(-13.5,2.72,18.5);
+const menuCameraTarget=new THREE.Vector3(5.5,3.02,-18.5);
+menuCamera.fov=76;
 menuCamera.near=.05;
 menuCamera.far=180;
 menuCamera.updateProjectionMatrix();
@@ -533,17 +541,17 @@ function updateMenuScene(t,dt){
     world.root.visible=false;
     if(menuBackdropElement) menuBackdropElement.style.display="none";
 
-    menuScene.background.set(0x252619);
-    menuScene.fog.color.set(0x3d3b2b);
-    menuScene.fog.near=11;
-    menuScene.fog.far=92;
+    menuScene.background.set(0x29291d);
+    menuScene.fog.color.set(0x45422f);
+    menuScene.fog.near=8;
+    menuScene.fog.far=78;
   }
 
   // Slow camera drift — enough motion to keep the menu alive without feeling
   // like a gameplay camera.
-  menuCamera.position.x=menuCameraStart.x+Math.sin(t*.030)*.48;
-  menuCamera.position.y=menuCameraStart.y+Math.sin(t*.061)*.045;
-  menuCamera.position.z=menuCameraStart.z+Math.cos(t*.026)*.38;
+  menuCamera.position.x=menuCameraStart.x+Math.sin(t*.030)*.34;
+  menuCamera.position.y=menuCameraStart.y+Math.sin(t*.061)*.035;
+  menuCamera.position.z=menuCameraStart.z+Math.cos(t*.026)*.28;
 
   menuCamera.lookAt(
     menuCameraTarget.x+Math.sin(t*.023)*.55,
