@@ -447,13 +447,52 @@ for(const args of [
 ]) addHangingCable(...args);
 
 // Fluorescent fixtures: each light is real geometry + a real point light.
+
+function addFixtureCracks(fixture,x,z,index,rotationY=0){
+  const crackedIndices=new Set([0,3,5,8,11,15]);
+  if(!crackedIndices.has(index)) return;
+
+  const crackMaterial=new THREE.LineBasicMaterial({
+    color:0x1a1a15,
+    transparent:true,
+    opacity:.82
+  });
+
+  const makeCrack=(points,offsetX=0,offsetZ=0)=>{
+    const geometry=new THREE.BufferGeometry().setFromPoints(
+      points.map(([px,pz])=>new THREE.Vector3(px+offsetX,0.058,pz+offsetZ))
+    );
+    const line=new THREE.Line(geometry,crackMaterial);
+    line.rotation.y=rotationY;
+    line.position.set(x,8.885,z);
+    line.name="FixtureCrack";
+    menuSet.add(line);
+  };
+
+  const variants=[
+    [[-1.35,-.22],[-.75,-.05],[-.36,-.20],[.05,-.02],[.48,-.18],[.98,-.03],[1.40,-.16]],
+    [[-.86,.24],[-.48,.05],[-.18,.20],[.25,.03],[.64,.14],[1.18,-.02]],
+    [[-.34,.08],[-.05,.28],[.24,.10],[.44,.31]]
+  ];
+
+  const chosen=variants[index%variants.length];
+  makeCrack(chosen);
+  if(index%2===0){
+    makeCrack(
+      [[-.05,-.02],[.13,-.30],[.31,-.15],[.50,-.34]],
+      -.15,
+      .06
+    );
+  }
+}
 const menuLightFixtures3D=[
   [-12,16,7.2,-.6],[-2,9,8.8,-.1],[9,16,6.8,.35],
   [-42,11,5.5,.2],[-24,4,10,.8],[-8,15,13,1.6],[10,5,8.5,2.5],[31,11,12,3.3],
   [-35,-10,8.5,4.1],[-14,-16,5.0,4.8],[8,-15,12.5,5.5],[34,-18,6.2,6.2],
   [-24,-31,9.5,7.0],[0,-34,14,7.8],[24,-35,5.8,8.4],[-8,-47,8.5,9.0],[18,-52,4.0,9.6]
 ];
-for(const [x,z,power,phase] of menuLightFixtures3D){
+for(let fixtureIndex=0;fixtureIndex<menuLightFixtures3D.length;fixtureIndex++){
+  const [x,z,power,phase]=menuLightFixtures3D[fixtureIndex];
   const fixture=addMenuBox(
     "Fluorescent",
     new THREE.Vector3(3.5,.10,.95),
@@ -468,6 +507,7 @@ for(const [x,z,power,phase] of menuLightFixtures3D){
   point.userData.basePower=power;
   point.userData.phase=phase;
   menuSet.add(point);
+  addFixtureCracks(fixture,x,z,fixtureIndex,0);
 }
 
 // A few weak pools of practical light keep the 3D geometry readable.
