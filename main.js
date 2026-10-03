@@ -3633,7 +3633,7 @@ function spawnSpiderAtPlayer(){
   return true;
 }
 
-async function extractFirstGlbFromZip(zipUrl){
+async function extractSpiderPack(zipUrl){
   const response=await fetch(zipUrl,{cache:"no-store"});
   if(!response.ok){
     throw new Error(`Spider pack request failed: ${response.status} ${response.statusText}`);
@@ -3655,13 +3655,15 @@ async function extractFirstGlbFromZip(zipUrl){
     throw new Error("Spider ZIP has no end-of-central-directory record.");
   }
 
+  const entryCount=view.getUint16(eocdOffset+10,true);
   const centralSize=view.getUint32(eocdOffset+12,true);
   const centralOffset=view.getUint32(eocdOffset+16,true);
   const decoder=new TextDecoder();
+  const entries=[];
   let offset=centralOffset;
 
-  while(offset<centralOffset+centralSize){
-    if(view.getUint32(offset,true)!==0x02014b50){
+  for(let i=0;i<entryCount;i++){
+    if(offset>=centralOffset+centralSize || view.getUint32(offset,true)!==0x02014b50){
       throw new Error("Spider ZIP central directory is invalid.");
     }
 
@@ -3675,193 +3677,312 @@ async function extractFirstGlbFromZip(zipUrl){
       new Uint8Array(buffer,offset+46,fileNameLength)
     );
 
-    if(fileName.toLowerCase().endsWith(".glb")){
-      if(view.getUint32(localHeaderOffset,true)!==0x04034b50){
-        throw new Error(`Spider GLB local header is invalid: ${fileName}`);
-      }
-
-      const localNameLength=view.getUint16(localHeaderOffset+26,true);
-      const localExtraLength=view.getUint16(localHeaderOffset+28,true);
-      const dataOffset=
-        localHeaderOffset+
-        30+
-        localNameLength+
-        localExtraLength;
-
-      const compressedData=new Uint8Array(
-        buffer,
-        dataOffset,
-        compressedSize
-      );
-
-      let glbBytes;
-      if(compression===0){
-        glbBytes=compressedData;
-      }else if(compression===8){
-        if(typeof DecompressionStream!=="function"){
-          throw new Error("This browser cannot decompress the Spider ZIP.");
-        }
-
-        const stream=new Blob([compressedData])
-          .stream()
-          .pipeThrough(new DecompressionStream("deflate-raw"));
-        glbBytes=new Uint8Array(await new Response(stream).arrayBuffer());
-      }else{
-        throw new Error(`Unsupported Spider ZIP compression method: ${compression}`);
-      }
-
-      return {
-        name:fileName,
-        url:URL.createObjectURL(
-          new Blob([glbBytes],{type:"model/gltf-binary"})
-        )
-      };
-    }
+    entries.push({
+      name:fileName,
+      lower:fileName.toLowerCase(),
+      compression,
+      compressedSize,
+      localHeaderOffset
+    });
 
     offset+=46+fileNameLength+extraLength+commentLength;
   }
 
-  throw new Error("Spider ZIP contains no GLB model.");
+  const modelCandidates=entries
+    .filter(entry=>entry.lower.endsWith(".fbx") || entry.lower.endsWith(".glb"))
+    .sort((a,b)=>{
+      const score=(entry)=>{
+        const modelScore=entry.lower.endsWith(".fbx") ? 100 : 50;
+        const spiderScore=entry.lower.includes("spider") ? 25 : 0;
+        return modelScore+spiderScore;
+      };
+      return score(b)-score(a) || b.compressedSize-a.compressedSize;
+    });
+
+  const modelEntry=modelCandidates[0];
+  if(!modelEntry){
+    throw new Error("Spider pack contains neither an FBX nor a GLB model.");
+  }
+
+  const imageEntries=entries.filter(entry=>
+    /.(png|jpe?g|webp|tga|bmp)$/i.test(entry.name)
+  );
+
+  const readEntry=async(entry)=>{
+    if(view.getUint32(entry.localHeaderOffset,true)!==0x04034b50){
+      throw new Error(`Spider ZIP local header is invalid: ${entry.name}`);
+    }
+
+    const localNameLength=view.getUint16(entry.localHeaderOffset+26,true);
+    const localExtraLength=view.getUint16(entry.localHeaderOffset+28,true);
+    const dataOffset=
+      entry.localHeaderOffset+
+      30+
+      localNameLength+
+      localExtraLength;
+
+    const compressedData=new Uint8Array(
+      buffer,
+      dataOffset,
+      entry.compressedSize
+    );
+
+    if(entry.compression===0){
+      return new Uint8Array(compressedData);
+    }
+
+    if(entry.compression===8){
+      if(typeof DecompressionStream!=="function"){
+        throw new Error("This browser cannot decompress the Spider ZIP.");
+      }
+
+      const stream=new Blob([compressedData])
+        .stream()
+        .pipeThrough(new DecompressionStream("deflate-raw"));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    throw new Error(
+      `Unsupported Spider ZIP compression method ${entry.compression}: ${entry.name}`
+    );
+  };
+
+  const mimeForName=(name)=>{
+    const ext=name.toLowerCase().split(".").pop();
+    return {
+      fbx:"application/octet-stream",
+      glb:"model/gltf-binary",
+      png:"image/png",
+      jpg:"image/jpeg",
+      jpeg:"image/jpeg",
+      webp:"image/webp",
+      tga:"image/x-tga",
+      bmp:"image/bmp"
+    }[ext] || "application/octet-stream";
+  };
+
+  const normalizeName=(value)=>{
+    let normalized=String(value||"").replace(/\\/g,"/").split("?")[0].split("#")[0];
+    try{
+      normalized=decodeURIComponent(normalized);
+    }catch(_error){}
+    return normalized.toLowerCase();
+  };
+
+  const basename=(value)=>{
+    const normalized=normalizeName(value);
+    return normalized.slice(normalized.lastIndexOf("/")+1);
+  };
+
+  const selectedEntries=[modelEntry,...imageEntries];
+  const resourceBlobs=new Map();
+
+  for(const entry of selectedEntries){
+    const bytes=await readEntry(entry);
+    const blob=new Blob([bytes],{type:mimeForName(entry.name)});
+    const fullName=normalizeName(entry.name);
+    const shortName=basename(entry.name);
+    resourceBlobs.set(fullName,blob);
+    if(!resourceBlobs.has(shortName)){
+      resourceBlobs.set(shortName,blob);
+    }
+  }
+
+  return {
+    modelType:modelEntry.lower.endsWith(".fbx") ? "fbx" : "glb",
+    modelName:basename(modelEntry.name),
+    sourceName:modelEntry.name,
+    resourceBlobs
+  };
+}
+
+function finishSpiderModel(model,animations,sourceName){
+  model.name="SpiderVisual";
+  model.visible=true;
+
+  let meshCount=0;
+  model.traverse(obj=>{
+    if(!obj.isMesh) return;
+    meshCount++;
+    obj.visible=true;
+    obj.frustumCulled=false;
+    obj.castShadow=true;
+    obj.receiveShadow=true;
+
+    const materials=Array.isArray(obj.material)?obj.material:[obj.material];
+    for(const material of materials){
+      if(!material) continue;
+      material.visible=true;
+      material.transparent=false;
+      material.opacity=1;
+      material.depthTest=true;
+      material.depthWrite=true;
+      material.side=THREE.DoubleSide;
+      material.needsUpdate=true;
+    }
+  });
+
+  if(meshCount===0){
+    throw new Error("Spider model contains no meshes.");
+  }
+
+  fitSpiderModel(model);
+
+  spiderModel=model;
+  spiderEntity.add(model);
+  spiderLoaded=true;
+
+  spiderMixer=null;
+  spiderActions.clear();
+  spiderAnimationState="";
+
+  const sourceClip=animations?.[0] || null;
+  if(sourceClip){
+    const sourceFPS=329/Math.max(sourceClip.duration,.001);
+    spiderMixer=new THREE.AnimationMixer(model);
+
+    for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
+      const clip=THREE.AnimationUtils.subclip(
+        sourceClip,
+        "spider_"+name,
+        startFrame,
+        endFrame+1,
+        sourceFPS
+      );
+      const action=spiderMixer.clipAction(clip);
+      action.setLoop(
+        name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
+        name.startsWith("die") ? 1 : Infinity
+      );
+      if(name.startsWith("die")) action.clampWhenFinished=true;
+      spiderActions.set(name,action);
+    }
+
+    setSpiderAnimation(spiderWantedState);
+  }else{
+    spiderWantedState="idle";
+  }
+
+  console.log(
+    "[DeepSeeker] Spider-Psionic asset loaded from ZIP",
+    {
+      source:sourceName,
+      format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
+      animations:animations?.map(animation=>animation.name)||[],
+      meshCount
+    }
+  );
+
+  spiderLoadStarted=false;
+
+  if(spiderSpawnPending && gameStarted && !houseMode){
+    spiderSpawnPending=false;
+    spawnSpiderAtPlayer();
+  }
+
+  eventText.textContent=sourceClip ? "SPIDER READY" : "SPIDER READY (STATIC)";
+  eventText.style.opacity="1";
+  setTimeout(()=>{
+    if(
+      eventText.textContent==="SPIDER READY" ||
+      eventText.textContent==="SPIDER READY (STATIC)"
+    ){
+      eventText.style.opacity="0";
+    }
+  },1800);
 }
 
 async function loadSpiderFromPack(){
   const packUrl="./assets/Spider-Psionic.zip";
+  let objectUrls=[];
 
-  try{
-    const extracted=await extractFirstGlbFromZip(packUrl);
-    const spiderUrl=extracted.url;
-
-    gltfLoader.load(
-      spiderUrl,
-    gltf=>{
-      const model=gltf.scene;
-      model.name="SpiderVisual";
-      model.visible=true;
-
-      let meshCount=0;
-      model.traverse(obj=>{
-        if(!obj.isMesh) return;
-        meshCount++;
-        obj.visible=true;
-        obj.frustumCulled=false;
-        obj.castShadow=true;
-        obj.receiveShadow=true;
-
-        const materials=Array.isArray(obj.material)?obj.material:[obj.material];
-        for(const material of materials){
-          if(!material) continue;
-          material.visible=true;
-          material.transparent=false;
-          material.opacity=1;
-          material.depthTest=true;
-          material.depthWrite=true;
-          material.side=THREE.DoubleSide;
-          material.needsUpdate=true;
-        }
-      });
-
-      if(meshCount===0){
-        throw new Error("Converted Spider GLB contains no meshes.");
-      }
-
-      fitSpiderModel(model);
-
-      spiderModel=model;
-      spiderEntity.add(model);
-      spiderLoaded=true;
-
-      spiderMixer=null;
-      spiderActions.clear();
-      spiderAnimationState="";
-
-      const sourceClip=gltf.animations?.[0] || null;
-
-      if(sourceClip){
-        const sourceFPS=329/Math.max(sourceClip.duration,.001);
-        spiderMixer=new THREE.AnimationMixer(model);
-
-        for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
-          const clip=THREE.AnimationUtils.subclip(
-            sourceClip,
-            "spider_"+name,
-            startFrame,
-            endFrame+1,
-            sourceFPS
-          );
-          const action=spiderMixer.clipAction(clip);
-          action.setLoop(
-            name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
-            name.startsWith("die") ? 1 : Infinity
-          );
-          if(name.startsWith("die")) action.clampWhenFinished=true;
-          spiderActions.set(name,action);
-        }
-
-        setSpiderAnimation(spiderWantedState);
-      }else{
-        spiderWantedState="idle";
-      }
-
-      console.log(
-        "[DeepSeeker] exact uploaded Spider-Psionic model loaded from ZIP",
-        {
-          source:extracted.name,
-          animations:gltf.animations?.map(animation=>animation.name)||[],
-          meshCount
-        }
-      );
-
-      URL.revokeObjectURL(spiderUrl);
-      spiderLoadStarted=false;
-
-      if(spiderSpawnPending && gameStarted && !houseMode){
-        spiderSpawnPending=false;
-        spawnSpiderAtPlayer();
-      }
-
-      eventText.textContent=sourceClip ? "SPIDER READY" : "SPIDER READY (STATIC)";
-      eventText.style.opacity="1";
-      setTimeout(()=>{
-        if(
-          eventText.textContent==="SPIDER READY" ||
-          eventText.textContent==="SPIDER READY (STATIC)"
-        ){
-          eventText.style.opacity="0";
-        }
-      },1800);
-    },
-    undefined,
-    error=>{
-      spiderLoaded=false;
-      spiderModel=null;
-      spiderMixer=null;
-      spiderActions.clear();
-      spiderAnimationState="";
-      spiderLoadStarted=false;
-      spiderSpawnPending=gameStarted && !houseMode;
-      URL.revokeObjectURL(spiderUrl);
-      console.error("[DeepSeeker] Spider-Psionic GLB failed to load from ZIP:",error);
-      // A missing entity is a gameplay asset problem, not a menu problem.
-      // Only surface the message after a run has actually started.
-      if(gameStarted){
-        eventText.textContent="SPIDER GLB FAILED TO LOAD";
-        eventText.style.opacity="1";
-      }
-    }
-    );
-  }catch(error){
+  const failSpiderLoad=(error,message)=>{
     spiderLoaded=false;
     spiderModel=null;
     spiderMixer=null;
     spiderActions.clear();
     spiderAnimationState="";
     spiderLoadStarted=false;
-    console.error("[DeepSeeker] Spider-Psionic ZIP extraction failed:",error);
+    spiderSpawnPending=gameStarted && !houseMode;
 
+    for(const url of objectUrls){
+      URL.revokeObjectURL(url);
+    }
+    objectUrls=[];
+
+    console.error("[DeepSeeker] Spider-Psionic pack load failed:",error);
     if(gameStarted){
-      eventText.textContent="SPIDER PACK FAILED TO LOAD";
+      eventText.textContent=message;
       eventText.style.opacity="1";
     }
+  };
+
+  try{
+    const extracted=await extractSpiderPack(packUrl);
+    const packManager=new THREE.LoadingManager();
+    const resourceUrls=new Map();
+
+    for(const [name,blob] of extracted.resourceBlobs){
+      const url=URL.createObjectURL(blob);
+      resourceUrls.set(name,url);
+      objectUrls.push(url);
+    }
+
+    const cleanupPackUrls=()=>{
+      for(const url of objectUrls){
+        URL.revokeObjectURL(url);
+      }
+      objectUrls=[];
+    };
+    packManager.onLoad=cleanupPackUrls;
+
+    packManager.setURLModifier((url)=>{
+      const normalized=String(url||"").replace(/\\/g,"/").split("?")[0].split("#")[0].toLowerCase();
+      const decoded=(()=>{
+        try{
+          return decodeURIComponent(normalized);
+        }catch(_error){
+          return normalized;
+        }
+      })();
+      const shortName=decoded.slice(decoded.lastIndexOf("/")+1);
+      return resourceUrls.get(decoded) || resourceUrls.get(shortName) || url;
+    });
+
+    packManager.onError=(url)=>{
+      console.warn("[DeepSeeker] Spider pack resource could not be resolved:",url);
+    };
+
+    const handleLoaded=(model,animations)=>{
+      try{
+        finishSpiderModel(model,animations,extracted.sourceName);
+      }catch(error){
+        cleanupPackUrls();
+        failSpiderLoad(error,"SPIDER MODEL FAILED TO LOAD");
+      }
+    };
+
+    if(extracted.modelType==="fbx"){
+      const loader=new FBXLoader(packManager);
+      loader.load(
+        extracted.modelName,
+        object=>handleLoaded(object,object.animations||[]),
+        undefined,
+        error=>failSpiderLoad(error,"SPIDER FBX FAILED TO LOAD")
+      );
+    }else{
+      const loader=new GLTFLoader(packManager);
+      loader.setDRACOLoader(dracoLoader);
+      loader.setMeshoptDecoder(MeshoptDecoder);
+      loader.load(
+        extracted.modelName,
+        gltf=>handleLoaded(gltf.scene,gltf.animations||[]),
+        undefined,
+        error=>failSpiderLoad(error,"SPIDER GLB FAILED TO LOAD")
+      );
+    }
+  }catch(error){
+    failSpiderLoad(error,"SPIDER PACK FAILED TO LOAD");
   }
 }
 

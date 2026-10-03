@@ -239,6 +239,11 @@ export class World {
       roughness: 0.96,
     });
 
+    // Every ceiling fixture gets a real PointLight. Only the nearest handful
+    // are enabled at once so the damaged lights can illuminate the room without
+    // recreating the severe multi-light performance hit.
+    this.fixtureLights = [];
+
     // Shared per-chunk geometry templates (never disposed per chunk).
     this.floorGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE);
     this.floorGeo.rotateX(-Math.PI / 2);
@@ -280,11 +285,45 @@ export class World {
         o.geometry.dispose();
       }
     });
+
+    this.fixtureLights = this.fixtureLights.filter(item => item.light.parent);
     this.chunks.delete(key);
   }
 
   // Called every frame with the player position.
+  updateFixtureLights(px,pz){
+    const maxActive=LOW_END_DEVICE ? 8 : 12;
+    const maxDistance=18;
+    const maxDistanceSq=maxDistance*maxDistance;
+    const candidates=[];
+
+    this.fixtureLights = this.fixtureLights.filter(item => item.light.parent);
+
+    for(const item of this.fixtureLights){
+      const dx=item.x-px;
+      const dz=item.z-pz;
+      const distanceSq=dx*dx+dz*dz;
+      item.light.visible=false;
+
+      if(distanceSq>maxDistanceSq) continue;
+
+      const priority=distanceSq*(item.cracked ? .78 : 1);
+      candidates.push({item,priority});
+    }
+
+    candidates.sort((a,b)=>a.priority-b.priority);
+
+    const now=performance.now()*.003;
+    for(let i=0;i<Math.min(maxActive,candidates.length);i++){
+      const item=candidates[i].item;
+      item.light.visible=true;
+      const flicker=.93+.07*Math.sin(now*item.flickerSpeed+item.phase);
+      item.light.intensity=item.baseIntensity*flicker;
+    }
+  }
+
   update(px, pz) {
+    this.updateFixtureLights(px,pz);
     const pcx = Math.floor(px / CHUNK_SIZE);
     const pcz = Math.floor(pz / CHUNK_SIZE);
 
@@ -443,8 +482,6 @@ export class World {
     const intactGeos=[];
     const dimGeos=[];
     const blackGeos=[];
-    const lightIndices=new Set([0,3]);
-
     const addBoxGeometry=(target,w,h,d,x,y,z,rx=0,ry=0,rz=0)=>{
       const geometry=new THREE.BoxGeometry(w,h,d);
       const rotation=new THREE.Euler(rx,ry,rz,"XYZ");
@@ -464,7 +501,7 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=1.25+rng()*.85;
+      const power=cracked ? 1.55+rng()*.55 : 1.95+rng()*.65;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
       const y=WALL_H-.055;
@@ -488,20 +525,27 @@ export class World {
         );
       }
 
-      // Only two actual point lights per chunk. The other fixtures stay emissive,
-      // which preserves the look without multiplying dynamic lighting cost.
-      if(lightIndices.has(index)){
-        const lightPower=cracked ? power*.24 : power;
-        const point=new THREE.PointLight(
-          0xffe6a8,
-          lightPower,
-          cracked ? 9 : 12,
-          2
-        );
-        point.position.set(x,y-.78,z);
-        point.name=cracked ? "CrackedFluorescentLight" : "FluorescentLight";
-        group.add(point);
-      }
+      // Cracked fixtures are real light sources, not just emissive meshes.
+      // Keep every fixture registered, then enable only the nearest few at runtime.
+      const point=new THREE.PointLight(
+        0xffe6a8,
+        power,
+        cracked ? 12 : 14,
+        2
+      );
+      point.position.set(x,y-.78,z);
+      point.visible=false;
+      point.name=cracked ? "CrackedFluorescentLight" : "FluorescentLight";
+      group.add(point);
+      this.fixtureLights.push({
+        light:point,
+        x,
+        z,
+        cracked,
+        baseIntensity:power,
+        phase,
+        flickerSpeed:cracked ? (8+rng()*5) : (4+rng()*3)
+      });
     }
 
     const mergeFixtureGeometries=(geometries,material,name)=>{
