@@ -865,12 +865,13 @@ function installMainMenuRedesign(){
 }
 .menuRightPanel{
   position:absolute;
-  right:clamp(24px,4vw,64px);
-  bottom:clamp(24px,5vh,56px);
-  width:min(360px,30vw);
+  left:clamp(20px,3vw,52px);
+  bottom:clamp(22px,4vh,48px);
+  width:min(390px,31vw);
   padding:15px 16px;
-  border-left:1px solid rgba(226,211,164,.22);
-  background:linear-gradient(90deg,rgba(5,7,6,.10),rgba(5,7,6,.42));
+  border-left:3px solid rgba(223,173,69,.34);
+  border-right:0;
+  background:linear-gradient(90deg,rgba(5,7,6,.44),rgba(5,7,6,.10));
   backdrop-filter:blur(5px);
   color:#9a9581;
   text-shadow:0 2px 8px #000;
@@ -985,7 +986,7 @@ function installMainMenuRedesign(){
 @media(max-width:900px){
   .menuNav{width:min(320px,45vw)}
   .menuSlotBar{width:min(440px,58vw)}
-  .menuRightPanel{width:min(320px,34vw);right:24px}
+  .menuRightPanel{width:min(360px,42vw);left:20px}
 }
 @media(max-width:650px){
   .menuNav{top:145px;width:min(320px,82vw)}
