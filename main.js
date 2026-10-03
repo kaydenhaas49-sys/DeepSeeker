@@ -1231,7 +1231,7 @@ function installMainMenuRedesign(){
 }
 .menuHomeRedesign .saveSlotCard{
   min-width:0;
-  min-height:92px;
+  min-height:118px;
   padding:13px 13px;
   border:1px solid rgba(231,220,171,.09);
   border-radius:4px;
