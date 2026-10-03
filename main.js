@@ -1338,7 +1338,9 @@ function installMainMenuRedesign(){
 `;
   document.head.appendChild(style);
 
-`
+  const backdrop=document.createElement("div");
+  backdrop.id="menuBackdrop";
+  backdrop.innerHTML=`
     <svg class="menuBGRuined" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs>
         <pattern id="cin-wall" width="64" height="46" patternUnits="userSpaceOnUse">
