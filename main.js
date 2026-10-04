@@ -76,6 +76,36 @@ const houseLoadPercentLobby=document.getElementById("houseLoadPercentLobby");
 const houseLoadStatusLobby=document.getElementById("houseLoadStatusLobby");
 let menuControlsButton=null;
 
+const bootScreen=document.getElementById("bootScreen");
+const bootProgressFill=document.getElementById("bootProgressFill");
+const bootProgressText=document.getElementById("bootProgressText");
+let bootFinished=false;
+let bootFinishQueued=false;
+
+function setBootProgress(percent,label){
+  const value=Math.max(0,Math.min(100,percent));
+  if(bootProgressFill) bootProgressFill.style.width=value+"%";
+  if(bootProgressText) bootProgressText.textContent=label||("INITIALIZING… "+Math.round(value)+"%");
+}
+
+function finishBootScreen(){
+  if(bootFinished || bootFinishQueued) return;
+  bootFinishQueued=true;
+  setBootProgress(100,"READY");
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      bootFinished=true;
+      container.style.visibility="visible";
+      if(bootScreen){
+        bootScreen.classList.add("done");
+        setTimeout(()=>bootScreen.remove(),260);
+      }
+    });
+  });
+}
+
+setBootProgress(8,"STARTING…");
+
 
 const gltfLoader=new GLTFLoader();
 const dracoLoader=new DRACOLoader();
@@ -85,6 +115,8 @@ gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setSize(innerWidth,innerHeight);
+container.style.visibility="hidden";
+setBootProgress(18,"STARTING RENDERER…");
 
 const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,1.25);
 const HOUSE_PIXEL_RATIO=0.70;
@@ -565,9 +597,9 @@ menuSet.add(menuDust);
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
-const MENU_SPIDER_X=6.0;
-const MENU_SPIDER_Y=7.95;
-const MENU_SPIDER_Z=-8.5;
+const MENU_SPIDER_X=4.8;
+const MENU_SPIDER_Y=7.85;
+const MENU_SPIDER_Z=3.5;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
@@ -671,8 +703,8 @@ function updateMenuScene(t,dt){
       ensureSpiderLoading();
     }
   }else{
-    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.19)*3.1;
-    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.13)*.95;
+    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.19)*2.4;
+    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.13)*1.25;
     menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
     menuSpider.rotation.z=Math.sin(t*.29)*.04;
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
@@ -3318,6 +3350,7 @@ function setHouseMode(enabled,options={}){
 }
 
 installMainMenuRedesign();
+setBootProgress(72,"BUILDING MENU…");
 
 const initialParams=new URLSearchParams(location.search);
 const querySaveSlot=initialParams.get("saveSlot");
@@ -5205,6 +5238,9 @@ function animate(){
         usingMenuCamera ? menuScene : scene,
         usingMenuCamera ? menuCamera : camera
       );
+      if(!bootFinished && !bootFinishQueued){
+        finishBootScreen();
+      }
     }catch(error){
       console.error("[DeepSeeker] Menu render error:",error);
 
@@ -5551,6 +5587,9 @@ function animate(){
   batteryBar.style.opacity=flashlightOn?1:.45;
 
   renderer.render(scene,camera);
+  if(!bootFinished && !bootFinishQueued){
+    finishBootScreen();
+  }
 }
 animate();
 

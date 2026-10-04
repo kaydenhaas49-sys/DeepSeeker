@@ -39,6 +39,29 @@ linear-gradient(180deg,rgba(5,7,6,.84),rgba(2,3,2,.92));
 color:#eee4b8;cursor:pointer;user-select:none;z-index:10;text-align:center;
 box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 #overlay.hidden{display:none}
+body{background:#020202}
+#app{visibility:hidden}
+#bootScreen{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  background:
+    radial-gradient(circle at 50% 42%,rgba(193,179,103,.08),transparent 28%),
+    linear-gradient(180deg,#050605 0%,#020202 100%);
+  color:#e9e2bd;
+  transition:opacity .24s ease,visibility .24s ease;
+}
+#bootScreen.done{opacity:0;visibility:hidden;pointer-events:none}
+.bootKicker{font-size:10px;letter-spacing:5px;color:#8c886f}
+.bootTitle{font-size:clamp(25px,4vw,46px);letter-spacing:7px;text-align:center;text-shadow:0 0 26px rgba(225,204,123,.12)}
+.bootTrack{width:min(360px,70vw);height:5px;border:1px solid rgba(229,218,170,.18);border-radius:99px;overflow:hidden;background:#ffffff08}
+#bootProgressFill{width:0%;height:100%;background:#d8c98a;transition:width .2s ease}
+#bootProgressText{min-height:12px;font-size:9px;letter-spacing:2.5px;color:#8d8a75}
 #overlay h1{margin:0;font-size:56px;letter-spacing:14px;font-weight:500;color:#f1e8bd;text-shadow:0 0 14px rgba(229,204,119,.18),0 0 42px rgba(214,190,90,.16)}
 #overlay .sub{margin:0;font-size:12px;letter-spacing:5px;color:#bdb38c;text-shadow:0 2px 12px #000}
 #overlay .prompt{margin:18px 0 0;font-size:14px;letter-spacing:4px;color:#e5d9a6;animation:pulse 1.6s ease-in-out infinite}
@@ -170,6 +193,12 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 </style>
 </head>
 <body>
+<div id="bootScreen" aria-live="polite">
+  <div class="bootKicker">DEEPSEEKER</div>
+  <div class="bootTitle">BACKROOMS: LOST SIGNAL</div>
+  <div class="bootTrack"><div id="bootProgressFill"></div></div>
+  <div id="bootProgressText">STARTING…</div>
+</div>
 <div id="app"></div>
 <div id="crosshair"></div>
 <div id="phone" aria-hidden="true">
@@ -354,6 +383,6 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
   }
 }
 </script>
-<script type="module" src="./main.js?v=20261003-spider36"></script>
+<script type="module" src="./main.js?v=20261003-spider38"></script>
 </body>
 </html>
