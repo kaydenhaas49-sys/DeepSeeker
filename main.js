@@ -76,75 +76,6 @@ const houseLoadPercentLobby=document.getElementById("houseLoadPercentLobby");
 const houseLoadStatusLobby=document.getElementById("houseLoadStatusLobby");
 let menuControlsButton=null;
 
-const bootScreen=document.getElementById("bootScreen");
-const bootProgressFill=document.getElementById("bootProgressFill");
-const bootProgressText=document.getElementById("bootProgressText");
-let bootFinished=false;
-let bootFinishQueued=false;
-let bootRenderReady=false;
-
-function setBootProgress(percent,label){
-  const value=Math.max(0,Math.min(100,percent));
-  if(bootProgressFill) bootProgressFill.style.width=value+"%";
-  if(bootProgressText) bootProgressText.textContent=label||("INITIALIZING… "+Math.round(value)+"%");
-}
-
-function getBootState(){
-  return {
-    house:houseLoaded && houseCollisionReady,
-    spider:spiderLoaded && Boolean(menuSpiderActual),
-    render:bootRenderReady
-  };
-}
-
-function updateBootReadiness(){
-  if(bootFinished || bootFinishQueued) return false;
-  const state=getBootState();
-
-  if(!state.house){
-    setBootProgress(
-      houseLoaded ? 70 : houseLoadFailed ? 0 : 45,
-      houseLoadFailed
-        ? "APARTMENT FAILED TO LOAD — REFRESH TO RETRY"
-        : houseLoaded
-          ? "BUILDING APARTMENT COLLISION…"
-          : "LOADING APARTMENT…"
-    );
-    return false;
-  }
-
-  if(!state.spider){
-    setBootProgress(82,spiderLoaded ? "FINALIZING SPIDER…" : "LOADING SPIDER…");
-    return false;
-  }
-
-  if(!state.render){
-    setBootProgress(96,"FINALIZING EVERYTHING…");
-    return false;
-  }
-
-  finishBootScreen();
-  return true;
-}
-
-function finishBootScreen(){
-  if(bootFinished || bootFinishQueued || !bootRenderReady) return;
-  bootFinishQueued=true;
-  setBootProgress(100,"READY");
-  requestAnimationFrame(()=>{
-    requestAnimationFrame(()=>{
-      bootFinished=true;
-      container.style.visibility="visible";
-      if(bootScreen){
-        bootScreen.classList.add("done");
-        setTimeout(()=>bootScreen.remove(),260);
-      }
-    });
-  });
-}
-
-setBootProgress(8,"STARTING…");
-
 
 const gltfLoader=new GLTFLoader();
 const dracoLoader=new DRACOLoader();
@@ -153,11 +84,7 @@ gltfLoader.setDRACOLoader(dracoLoader);
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
-renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.setSize(innerWidth,innerHeight);
-container.style.visibility="hidden";
-setBootProgress(18,"STARTING RENDERER…");
 
 const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,1.25);
 const HOUSE_PIXEL_RATIO=0.70;
@@ -293,7 +220,6 @@ function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotation
   mesh.name=name;
   mesh.position.copy(position);
   mesh.rotation.set(rotationX,rotationY,rotationZ);
-  mesh.receiveShadow=true;
   menuSet.add(mesh);
   return mesh;
 }
@@ -319,7 +245,6 @@ menuCeilingGeometry.rotateX(Math.PI/2); // face down, like the gameplay ceiling
 const menuCeilingMesh=new THREE.Mesh(menuCeilingGeometry,menuCeilingMaterial);
 menuCeilingMesh.name="MenuCeiling";
 menuCeilingMesh.position.set(0,9,-7);
-menuCeilingMesh.receiveShadow=true;
 menuSet.add(menuCeilingMesh);
 
 // A few panels are missing. Dark void cards sit over the continuous ceiling so
@@ -613,25 +538,6 @@ const menuFarLight=new THREE.PointLight(0xffd98e,.95,38,2);
 menuFarLight.position.set(4,3,-50);
 menuSet.add(menuFarLight);
 
-// Soft underside light dedicated to the menu spider so its shadow lands on the
-// nearby ceiling without changing gameplay lighting.
-const menuSpiderShadowLight=new THREE.SpotLight(
-  0xffdca0,
-  3.2,
-  42,
-  Math.PI/2.1,
-  .86,
-  1.5
-);
-menuSpiderShadowLight.position.set(-1.5,4.0,12.0);
-menuSpiderShadowLight.castShadow=true;
-menuSpiderShadowLight.shadow.mapSize.set(512,512);
-menuSpiderShadowLight.shadow.bias=-.0008;
-menuSpiderShadowLight.shadow.normalBias=.025;
-menuSpiderShadowLight.target=menuSpider;
-menuSet.add(menuSpiderShadowLight);
-menuSet.add(menuSpiderShadowLight.target);
-
 // Subtle dust motes are actual 3D points floating in the room.
 const dustPositions=[];
 const dustRng=mulberry32(SEED^0x5a17);
@@ -658,10 +564,10 @@ menuSet.add(menuDust);
 // The title screen uses a clone of the real Spider-Psionic rig loaded by the
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
-const MENU_SPIDER_SCALE=.08;
-const MENU_SPIDER_X=4.8;
-const MENU_SPIDER_Y=9.05;
-const MENU_SPIDER_Z=4.5;
+const MENU_SPIDER_SCALE=.06;
+const MENU_SPIDER_X=6.5;
+const MENU_SPIDER_Y=7.95;
+const MENU_SPIDER_Z=-14.5;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
@@ -684,33 +590,19 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
     node.frustumCulled=false;
-    node.castShadow=true;
+    node.castShadow=false;
     node.receiveShadow=false;
-
-    // Darken only the isolated menu clone while preserving the Spider-Psionic
-    // texture map itself. The gameplay spider keeps its original appearance.
-    const materials=Array.isArray(node.material)
-      ? node.material
-      : [node.material];
-
-    for(const material of materials){
-      if(!material?.color?.multiplyScalar) continue;
-      material.color.multiplyScalar(.28);
-      material.needsUpdate=true;
-    }
   });
-  // Menu-only ceiling anchor. Never derive this from the gameplay spider's
-  // fitted bounds, because that can move the menu clone toward the floor.
   menuSpider.add(menuSpiderActual);
-  menuSpiderActual.position.y=-.18;
-  menuSpiderActual.updateMatrixWorld(true);
-  menuSpider.position.y=MENU_SPIDER_Y;
+  menuSpider.updateMatrixWorld(true);
+  const bounds=new THREE.Box3().setFromObject(menuSpiderActual);
+  if(Number.isFinite(bounds.max.y)) menuSpider.position.y+=8.90-bounds.max.y;
   menuSpiderMixer=new THREE.AnimationMixer(menuSpiderActual);
   const menuClip=spiderAnimationClips.get("walk")||spiderAnimationClips.get("idle1")||spiderAnimationClips.get("idle2");
   if(menuClip){
     const action=menuSpiderMixer.clipAction(menuClip);
     action.setLoop(THREE.LoopRepeat,Infinity);
-    action.timeScale=.40;
+    action.timeScale=.42;
     action.play();
   }
   menuSpider.visible=true;
@@ -779,24 +671,10 @@ function updateMenuScene(t,dt){
       ensureSpiderLoading();
     }
   }else{
-    // Menu-only ceiling route. It starts directly inside the camera's view,
-    // then sweeps the broad visible roof instead of getting trapped in a corner.
-    // These values are independent from the gameplay spider.
-    const roofTime=t*.023;
-    const roofX=5+22*Math.sin(roofTime)+4*Math.sin(roofTime*.37);
-    const roofZ=-26+30*Math.sin(roofTime*.49+.6);
-
-    const lookTime=(t+.18)*.023;
-    const nextX=5+22*Math.sin(lookTime)+4*Math.sin(lookTime*.37);
-    const nextZ=-26+30*Math.sin(lookTime*.49+.6);
-
-    menuSpider.position.x=roofX;
-    menuSpider.position.z=roofZ;
-    // The ceiling clone is flipped 180° on X, which reverses its local forward axis.
-    // Add PI so the real walk cycle faces the direction it is moving.
-    menuSpider.rotation.y=Math.atan2(nextX-roofX,nextZ-roofZ)+Math.PI;
-    menuSpider.rotation.z=Math.sin(t*.18)*.018;
-
+    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.19)*1.15;
+    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.13)*.65;
+    menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
+    menuSpider.rotation.z=Math.sin(t*.29)*.025;
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
 
@@ -2188,18 +2066,16 @@ function updateHouseMemoryState(dt){
   }
 }
 
-function ensureHouseLoading(options={}){
+function ensureHouseLoading(){
   if(houseLoadStarted || houseLoaded) return;
-  if(houseLoadFailed) houseLoadFailed=false;
+
+  if(houseLoadFailed){
+    houseLoadFailed=false;
+  }
 
   houseLoadStarted=true;
   updateHouseLoadingUI(0,"HOUSE IS STARTING TO LOAD…");
   const start=()=>loadHouse();
-
-  if(options.immediate){
-    start();
-    return;
-  }
 
   if("requestIdleCallback" in window){
     window.requestIdleCallback(start,{timeout:3500});
@@ -3442,7 +3318,6 @@ function setHouseMode(enabled,options={}){
 }
 
 installMainMenuRedesign();
-setBootProgress(72,"BUILDING MENU…");
 
 const initialParams=new URLSearchParams(location.search);
 const querySaveSlot=initialParams.get("saveSlot");
@@ -4736,26 +4611,17 @@ async function loadSpiderFromPack(){
   }
 }
 
-function ensureSpiderLoading(options={}){
+function ensureSpiderLoading(){
   if(spiderLoadStarted || spiderLoaded) return;
   spiderLoadStarted=true;
 
   const start=()=>loadSpiderFromPack();
-  if(options.immediate){
-    start();
-    return;
-  }
-
   if("requestIdleCallback" in window){
     window.requestIdleCallback(start,{timeout:1800});
   }else{
     setTimeout(start,180);
   }
 }
-
-setBootProgress(74,"LOADING EVERYTHING…");
-ensureHouseLoading({immediate:true});
-ensureSpiderLoading({immediate:true});
 
 
 player.onStep=({intensity})=>audio.step(intensity);
@@ -5339,8 +5205,6 @@ function animate(){
         usingMenuCamera ? menuScene : scene,
         usingMenuCamera ? menuCamera : camera
       );
-      bootRenderReady=true;
-      updateBootReadiness();
     }catch(error){
       console.error("[DeepSeeker] Menu render error:",error);
 
@@ -5687,8 +5551,6 @@ function animate(){
   batteryBar.style.opacity=flashlightOn?1:.45;
 
   renderer.render(scene,camera);
-  bootRenderReady=true;
-  updateBootReadiness();
 }
 animate();
 
