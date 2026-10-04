@@ -9,6 +9,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { flashlightFlicker } from "./character.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
@@ -560,87 +561,47 @@ const menuDust=new THREE.Points(dustGeometry,dustMaterial);
 menuDust.name="MenuDust";
 menuSet.add(menuDust);
 
-// A dedicated ceiling-crawling spider silhouette lives only in the title-screen
-// scene. It is intentionally separate from the gameplay SpiderEntity so menu
-// rendering/loading can never affect the real enemy.
-function makeMenuSpiderSegment(a,b,r=.11){
-  const start=new THREE.Vector3(...a);
-  const end=new THREE.Vector3(...b);
-  const direction=end.clone().sub(start);
-  const mesh=new THREE.Mesh(
-    new THREE.CylinderGeometry(r,r*.82,direction.length(),7),
-    new THREE.MeshStandardMaterial({
-      color:0x090706,
-      roughness:1,
-      metalness:.02
-    })
-  );
-  mesh.position.copy(start).add(end).multiplyScalar(.5);
-  mesh.quaternion.setFromUnitVectors(
-    new THREE.Vector3(0,1,0),
-    direction.normalize()
-  );
-  return mesh;
-}
-
+// The title screen uses a clone of the real Spider-Psionic rig loaded by the
+// gameplay spider. This keeps the menu model authentic without sharing the
+// gameplay entity, transform, or animation mixer.
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
 menuSpider.position.set(7.0,7.95,-31.0);
 menuSpider.rotation.y=Math.PI*.18;
+menuSpider.visible=false;
 menuSet.add(menuSpider);
 
-const menuSpiderBodyMaterial=new THREE.MeshStandardMaterial({
-  color:0x080605,
-  roughness:1,
-  metalness:.02
-});
-const menuSpiderEyeMaterial=new THREE.MeshBasicMaterial({
-  color:0xb24b22
-});
+let menuSpiderActual=null;
+let menuSpiderMixer=null;
+let menuSpiderLoadRequested=false;
 
-const menuSpiderBody=new THREE.Mesh(
-  new THREE.SphereGeometry(1.35,16,10),
-  menuSpiderBodyMaterial
-);
-menuSpiderBody.scale.set(1.45,.54,1.05);
-menuSpiderBody.position.y=.15;
-menuSpider.add(menuSpiderBody);
-
-const menuSpiderHead=new THREE.Mesh(
-  new THREE.SphereGeometry(.62,14,10),
-  menuSpiderBodyMaterial
-);
-menuSpiderHead.scale.set(1.0,.72,1.12);
-menuSpiderHead.position.set(0,.02,1.18);
-menuSpider.add(menuSpiderHead);
-
-for(const side of [-1,1]){
-  for(let index=0;index<4;index++){
-    const spread=.72+index*.34;
-    const forward=.65-index*.18;
-    const droop=.16+index*.10;
-    const shoulder=[side*spread,.08,forward];
-    const knee=[side*(1.45+index*.28),-.18-droop*.45,forward-.18+index*.12];
-    const foot=[side*(2.05+index*.34),-.05-droop,forward-.65+index*.35];
-
-    const leg=new THREE.Group();
-    leg.name="MenuSpiderLeg";
-    leg.add(makeMenuSpiderSegment(shoulder,knee,.10));
-    leg.add(makeMenuSpiderSegment(knee,foot,.075));
-    leg.userData.phase=index*(Math.PI*.5)+(side<0?.2:0);
-    menuSpider.add(leg);
+function syncMenuSpiderFromGameplayModel(){
+  if(menuSpiderActual || !spiderModel) return;
+  menuSpiderActual=SkeletonUtils.clone(spiderModel);
+  menuSpiderActual.name="MenuSpiderActualModel";
+  menuSpiderActual.visible=true;
+  menuSpiderActual.scale.setScalar(.36);
+  menuSpiderActual.rotation.x=Math.PI;
+  menuSpiderActual.traverse(node=>{
+    if(!node.isMesh) return;
+    node.frustumCulled=false;
+    node.castShadow=false;
+    node.receiveShadow=false;
+  });
+  menuSpider.add(menuSpiderActual);
+  menuSpider.updateMatrixWorld(true);
+  const bounds=new THREE.Box3().setFromObject(menuSpiderActual);
+  if(Number.isFinite(bounds.max.y)) menuSpider.position.y+=8.90-bounds.max.y;
+  menuSpiderMixer=new THREE.AnimationMixer(menuSpiderActual);
+  const menuClip=spiderAnimationClips.get("walk")||spiderAnimationClips.get("idle1")||spiderAnimationClips.get("idle2");
+  if(menuClip){
+    const action=menuSpiderMixer.clipAction(menuClip);
+    action.setLoop(THREE.LoopRepeat,Infinity);
+    action.timeScale=.42;
+    action.play();
   }
+  menuSpider.visible=true;
 }
-
-for(const side of [-1,1]){
-  const eye=new THREE.Mesh(
-    new THREE.SphereGeometry(.075,8,8),
-    menuSpiderEyeMaterial
-  );
-  eye.position.set(side*.22,-.04,1.67);
-  menuSpider.add(eye);
-}
-
 
 const menuCameraStart=new THREE.Vector3(-13.5,2.72,18.5);
 const menuCameraTarget=new THREE.Vector3(5.5,3.02,-18.5);
@@ -698,20 +659,19 @@ function updateMenuScene(t,dt){
   menuDust.position.z=Math.cos(t*.029)*.55;
   menuSet.rotation.y=Math.sin(t*.008)*.004;
 
-  // Keep the menu spider unsettling but subtle: it slowly crawls across the
-  // distant ceiling instead of standing completely frozen.
-  menuSpider.position.x=7.0+Math.sin(t*.19)*1.8;
-  menuSpider.position.z=-31.0+Math.cos(t*.13)*1.1;
-  menuSpider.position.y=7.95+Math.sin(t*.41)*.035;
-  menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
-  menuSpider.rotation.z=Math.sin(t*.29)*.035;
-
-  menuSpider.traverse(node=>{
-    if(node.name!=="MenuSpiderLeg") return;
-    const phase=node.userData.phase||0;
-    node.rotation.z=Math.sin(t*1.65+phase)*.055;
-    node.rotation.x=Math.cos(t*1.35+phase)*.035;
-  });
+  // Load the real Spider-Psionic pack for the title screen; the menu gets an isolated clone.
+  if(!menuSpiderActual){
+    if(!menuSpiderLoadRequested){
+      menuSpiderLoadRequested=true;
+      ensureSpiderLoading();
+    }
+  }else{
+    menuSpider.position.x=7.0+Math.sin(t*.19)*1.8;
+    menuSpider.position.z=-31.0+Math.cos(t*.13)*1.1;
+    menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
+    menuSpider.rotation.z=Math.sin(t*.29)*.025;
+    if(menuSpiderMixer) menuSpiderMixer.update(dt);
+  }
 
   menuSet.traverse(node=>{
     if(node.userData?.basePower===undefined) return;
@@ -3389,6 +3349,7 @@ let spiderLoadStarted=false;
 let spiderModel=null;
 let spiderMixer=null;
 const spiderActions=new Map();
+const spiderAnimationClips=new Map();
 let spiderAnimationState="";
 let spiderWantedState="idle";
 let spiderBehaviorState="idle";
@@ -4271,6 +4232,7 @@ function finishSpiderModel(model,animations,sourceName){
 
   spiderMixer=null;
   spiderActions.clear();
+  spiderAnimationClips.clear();
   spiderAnimationState="";
 
   const normalizedAnimationName=(clip)=>String(clip?.name||"")
@@ -4443,6 +4405,11 @@ function finishSpiderModel(model,animations,sourceName){
     }
   }
 
+  spiderAnimationClips.clear();
+  for(const [name,clip] of directClips){
+    if(clip) spiderAnimationClips.set(name,clip);
+  }
+
   if(directClips.size){
     spiderMixer=new THREE.AnimationMixer(model);
 
@@ -4492,6 +4459,8 @@ function finishSpiderModel(model,animations,sourceName){
       meshCount
     }
   );
+
+  syncMenuSpiderFromGameplayModel();
 
   spiderLoadStarted=false;
 
