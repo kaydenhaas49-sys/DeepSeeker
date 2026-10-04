@@ -638,7 +638,7 @@ menuSet.add(menuDust);
 const MENU_SPIDER_SCALE=.06;
 const MENU_SPIDER_X=4.8;
 const MENU_SPIDER_Y=7.85;
-const MENU_SPIDER_Z=8.5;
+const MENU_SPIDER_Z=6.5;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
@@ -665,9 +665,10 @@ function syncMenuSpiderFromGameplayModel(){
     node.receiveShadow=false;
   });
   menuSpider.add(menuSpiderActual);
-  menuSpider.updateMatrixWorld(true);
+  menuSpiderActual.updateMatrixWorld(true);
   const bounds=new THREE.Box3().setFromObject(menuSpiderActual);
-  if(Number.isFinite(bounds.max.y)) menuSpider.position.y+=8.90-bounds.max.y;
+  if(Number.isFinite(bounds.max.y)) menuSpiderActual.position.y-=bounds.max.y;
+  menuSpider.position.y=8.90;
   menuSpiderMixer=new THREE.AnimationMixer(menuSpiderActual);
   const menuClip=spiderAnimationClips.get("walk")||spiderAnimationClips.get("idle1")||spiderAnimationClips.get("idle2");
   if(menuClip){
