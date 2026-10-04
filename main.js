@@ -3503,21 +3503,32 @@ let spiderTransitionToY=0;
 let spiderTransitionFromScale=1;
 let spiderTransitionToScale=1;
 let spiderTransitionKind="";
+let spiderPath=[];
+let spiderPathIndex=0;
+let spiderPathRepathTimer=0;
+let spiderPathTargetX=NaN;
+let spiderPathTargetZ=NaN;
 
 const SPIDER_STALK_TIME=2.8;
 const SPIDER_CEILING_MIN_TIME=5.0;
 const SPIDER_CEILING_MAX_TIME=9.0;
 const SPIDER_CHASE_MIN_TIME=3.5;
 const SPIDER_CHASE_MAX_TIME=6.5;
-const SPIDER_CEILING_SPEED=8.5;
+const SPIDER_CEILING_SPEED=4.5;
 const SPIDER_CEILING_Y=WALL_H-.10;
 const SPIDER_CEILING_SCALE=.72;
 const SPIDER_AUTO_LOOK_DURATION=1.0;
 const SPIDER_ATTACK_RANGE=2.4;
-const SPIDER_SPEED=3.2;
+const SPIDER_SPEED=2.05;
 const SPIDER_RADIUS=.85;
 const SPIDER_GROUND_OFFSET=.08;
 const SPIDER_TARGET_SPAN=6.2;
+
+const SPIDER_PATH_CELL_SIZE=1.35;
+const SPIDER_PATH_GRID_SIZE=31;
+const SPIDER_PATH_REPATH_TIME=.55;
+const SPIDER_PATH_WAYPOINT_REACH=.72;
+const SPIDER_PATH_TARGET_SHIFT=2.4;
 
 const SPIDER_ANIMATION_RANGES={
   idle1:[164,213],
@@ -3659,6 +3670,7 @@ function startSpiderCeilingMode(){
   spiderBehaviorState="ceiling";
   spiderBehaviorTime=0;
   spiderOnCeiling=false;
+  clearSpiderPath();
   spiderCeilingDuration=THREE.MathUtils.lerp(
     SPIDER_CEILING_MIN_TIME,
     SPIDER_CEILING_MAX_TIME,
@@ -3682,6 +3694,7 @@ function startSpiderChaseFromCeiling(){
   spiderBehaviorState="chase";
   spiderBehaviorTime=0;
   spiderOnCeiling=false;
+  clearSpiderPath();
   spiderChaseDuration=THREE.MathUtils.lerp(
     SPIDER_CHASE_MIN_TIME,
     SPIDER_CHASE_MAX_TIME,
@@ -3906,6 +3919,207 @@ function findSpiderSpawnPosition(){
   };
 }
 
+function clearSpiderPath(){
+  spiderPath.length=0;
+  spiderPathIndex=0;
+  spiderPathRepathTimer=0;
+  spiderPathTargetX=NaN;
+  spiderPathTargetZ=NaN;
+}
+
+function spiderPathSegmentClear(ax,az,bx,bz){
+  const dx=bx-ax;
+  const dz=bz-az;
+  const distance=Math.hypot(dx,dz);
+  const samples=Math.max(2,Math.ceil(distance/(SPIDER_PATH_CELL_SIZE*.45)));
+
+  for(let i=1;i<samples;i++){
+    const t=i/samples;
+    if(isSpiderBlocked(ax+dx*t,az+dz*t)) return false;
+  }
+  return true;
+}
+
+function buildSpiderPath(){
+  const startX=spiderEntity.position.x;
+  const startZ=spiderEntity.position.z;
+  const goalX=player.pos.x;
+  const goalZ=player.pos.z;
+  const size=SPIDER_PATH_GRID_SIZE;
+  const cellSize=SPIDER_PATH_CELL_SIZE;
+  const halfSpan=size*cellSize*.5;
+  const minX=(startX+goalX)*.5-halfSpan;
+  const minZ=(startZ+goalZ)*.5-halfSpan;
+  const total=size*size;
+  const indexOf=(col,row)=>row*size+col;
+
+  const toCell=(x,z)=>({
+    col:Math.max(0,Math.min(size-1,Math.floor((x-minX)/cellSize))),
+    row:Math.max(0,Math.min(size-1,Math.floor((z-minZ)/cellSize)))
+  });
+
+  const walkable=new Uint8Array(total);
+  for(let row=0;row<size;row++){
+    for(let col=0;col<size;col++){
+      const x=minX+(col+.5)*cellSize;
+      const z=minZ+(row+.5)*cellSize;
+      walkable[indexOf(col,row)]=isSpiderBlocked(x,z)?0:1;
+    }
+  }
+
+  const findOpenCell=(cell)=>{
+    if(walkable[indexOf(cell.col,cell.row)]) return cell;
+    for(let radius=1;radius<=5;radius++){
+      for(let row=cell.row-radius;row<=cell.row+radius;row++){
+        for(let col=cell.col-radius;col<=cell.col+radius;col++){
+          if(col<0||row<0||col>=size||row>=size) continue;
+          if(Math.max(Math.abs(col-cell.col),Math.abs(row-cell.row))!==radius) continue;
+          if(walkable[indexOf(col,row)]) return {col,row};
+        }
+      }
+    }
+    return null;
+  };
+
+  const actualStart=findOpenCell(toCell(startX,startZ));
+  const actualGoal=findOpenCell(toCell(goalX,goalZ));
+  if(!actualStart || !actualGoal){
+    clearSpiderPath();
+    return false;
+  }
+
+  const startIndex=indexOf(actualStart.col,actualStart.row);
+  const goalIndex=indexOf(actualGoal.col,actualGoal.row);
+  const cameFrom=new Int32Array(total);
+  cameFrom.fill(-1);
+  const gScore=new Float32Array(total);
+  const fScore=new Float32Array(total);
+  gScore.fill(Infinity);
+  fScore.fill(Infinity);
+
+  const heuristic=(index)=>{
+    const row=Math.floor(index/size);
+    const col=index-row*size;
+    return Math.hypot(actualGoal.col-col,actualGoal.row-row);
+  };
+
+  const open=[startIndex];
+  const closed=new Uint8Array(total);
+  gScore[startIndex]=0;
+  fScore[startIndex]=heuristic(startIndex);
+
+  const dirs=[
+    [-1,-1,1.41421356],[-1,0,1],[-1,1,1.41421356],
+    [0,-1,1],[0,1,1],
+    [1,-1,1.41421356],[1,0,1],[1,1,1.41421356]
+  ];
+
+  while(open.length){
+    let bestPos=0;
+    let current=open[0];
+    for(let i=1;i<open.length;i++){
+      if(fScore[open[i]]<fScore[current]){
+        current=open[i];
+        bestPos=i;
+      }
+    }
+    open.splice(bestPos,1);
+
+    if(current===goalIndex) break;
+    if(closed[current]) continue;
+    closed[current]=1;
+
+    const row=Math.floor(current/size);
+    const col=current-row*size;
+
+    for(const [dc,dr,cost] of dirs){
+      const nc=col+dc;
+      const nr=row+dr;
+      if(nc<0||nr<0||nc>=size||nr>=size) continue;
+
+      const next=indexOf(nc,nr);
+      if(closed[next] || !walkable[next]) continue;
+
+      if(dc!==0&&dr!==0){
+        if(
+          !walkable[indexOf(col+dc,row)] ||
+          !walkable[indexOf(col,row+dr)]
+        ) continue;
+      }
+
+      const tentative=gScore[current]+cost;
+      if(tentative>=gScore[next]) continue;
+
+      cameFrom[next]=current;
+      gScore[next]=tentative;
+      fScore[next]=tentative+heuristic(next);
+      if(!open.includes(next)) open.push(next);
+    }
+  }
+
+  if(startIndex!==goalIndex && cameFrom[goalIndex]===-1){
+    clearSpiderPath();
+    return false;
+  }
+
+  const cells=[];
+  let cursor=goalIndex;
+  cells.push(cursor);
+  while(cursor!==startIndex){
+    cursor=cameFrom[cursor];
+    if(cursor<0){
+      clearSpiderPath();
+      return false;
+    }
+    cells.push(cursor);
+  }
+  cells.reverse();
+
+  const raw=[];
+  for(let i=1;i<cells.length;i++){
+    const row=Math.floor(cells[i]/size);
+    const col=cells[i]-row*size;
+    raw.push(new THREE.Vector3(
+      minX+(col+.5)*cellSize,
+      spiderEntity.position.y,
+      minZ+(row+.5)*cellSize
+    ));
+  }
+
+  if(!raw.length){
+    raw.push(new THREE.Vector3(goalX,spiderEntity.position.y,goalZ));
+  }
+
+  const smooth=[];
+  let anchorX=startX;
+  let anchorZ=startZ;
+
+  for(let i=0;i<raw.length;){
+    let farthest=i;
+    for(let j=raw.length-1;j>i;j--){
+      if(spiderPathSegmentClear(anchorX,anchorZ,raw[j].x,raw[j].z)){
+        farthest=j;
+        break;
+      }
+    }
+
+    smooth.push(raw[farthest].clone());
+    anchorX=raw[farthest].x;
+    anchorZ=raw[farthest].z;
+    i=farthest+1;
+  }
+
+  smooth[smooth.length-1].x=goalX;
+  smooth[smooth.length-1].z=goalZ;
+
+  spiderPath=smooth;
+  spiderPathIndex=0;
+  spiderPathRepathTimer=SPIDER_PATH_REPATH_TIME;
+  spiderPathTargetX=goalX;
+  spiderPathTargetZ=goalZ;
+  return true;
+}
+
 function moveSpiderTowardPlayer(dt){
   const dx=player.pos.x-spiderEntity.position.x;
   const dz=player.pos.z-spiderEntity.position.z;
@@ -3915,37 +4129,64 @@ function moveSpiderTowardPlayer(dt){
     return distance;
   }
 
-  const inv=1/Math.max(distance,.001);
-  const desiredX=dx*inv;
-  const desiredZ=dz*inv;
-  const step=Math.min(SPIDER_SPEED*dt,Math.max(0,distance-SPIDER_ATTACK_RANGE));
+  spiderPathRepathTimer=Math.max(0,spiderPathRepathTimer-dt);
 
-  let bestX=0;
-  let bestZ=0;
-  let bestScore=-Infinity;
+  const targetShift=Number.isFinite(spiderPathTargetX)
+    ? Math.hypot(player.pos.x-spiderPathTargetX,player.pos.z-spiderPathTargetZ)
+    : Infinity;
 
-  const angles=[0,.28,-.28,.56,-.56,.9,-.9,1.25,-1.25,1.6,-1.6,2.0,-2.0,2.55,-2.55];
-  for(const angle of angles){
-    const cos=Math.cos(angle);
-    const sin=Math.sin(angle);
-    const dirX=desiredX*cos-desiredZ*sin;
-    const dirZ=desiredX*sin+desiredZ*cos;
-    const nextX=spiderEntity.position.x+dirX*step;
-    const nextZ=spiderEntity.position.z+dirZ*step;
-
-    if(isSpiderBlocked(nextX,nextZ)) continue;
-
-    const score=dirX*desiredX+dirZ*desiredZ;
-    if(score>bestScore){
-      bestScore=score;
-      bestX=dirX;
-      bestZ=dirZ;
-    }
+  if(
+    !spiderPath.length ||
+    spiderPathRepathTimer<=0 ||
+    targetShift>SPIDER_PATH_TARGET_SHIFT ||
+    spiderPathIndex>=spiderPath.length
+  ){
+    buildSpiderPath();
   }
 
-  if(bestScore>-Infinity){
-    spiderEntity.position.x+=bestX*step;
-    spiderEntity.position.z+=bestZ*step;
+  let waypoint=spiderPath[spiderPathIndex];
+  if(!waypoint){
+    const inv=1/Math.max(distance,.001);
+    waypoint=new THREE.Vector3(
+      spiderEntity.position.x+dx*inv,
+      spiderEntity.position.y,
+      spiderEntity.position.z+dz*inv
+    );
+  }
+
+  let waypointDx=waypoint.x-spiderEntity.position.x;
+  let waypointDz=waypoint.z-spiderEntity.position.z;
+  let waypointDistance=Math.hypot(waypointDx,waypointDz);
+
+  if(waypointDistance<SPIDER_PATH_WAYPOINT_REACH){
+    spiderPathIndex++;
+    waypoint=spiderPath[spiderPathIndex]||new THREE.Vector3(
+      player.pos.x,
+      spiderEntity.position.y,
+      player.pos.z
+    );
+    waypointDx=waypoint.x-spiderEntity.position.x;
+    waypointDz=waypoint.z-spiderEntity.position.z;
+    waypointDistance=Math.hypot(waypointDx,waypointDz);
+  }
+
+  if(waypointDistance>.001){
+    const inv=1/waypointDistance;
+    const step=Math.min(SPIDER_SPEED*dt,waypointDistance);
+    const nextX=spiderEntity.position.x+waypointDx*inv*step;
+    const nextZ=spiderEntity.position.z+waypointDz*inv*step;
+
+    if(!isSpiderBlocked(nextX,nextZ)){
+      spiderEntity.position.x=nextX;
+      spiderEntity.position.z=nextZ;
+    }else{
+      buildSpiderPath();
+    }
+
+    spiderEntity.rotation.y=Math.atan2(
+      waypoint.x-spiderEntity.position.x,
+      waypoint.z-spiderEntity.position.z
+    );
   }
 
   return distance;
@@ -5645,6 +5886,7 @@ function animate(){
     spiderAutoLookTimer=0;
     spiderAutoLookStarted=false;
     spiderOnCeiling=false;
+    clearSpiderPath();
     spiderTransitionTimer=0;
     spiderTransitionDuration=0;
     spiderEntity.rotation.x=0;
