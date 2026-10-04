@@ -3490,6 +3490,8 @@ let spiderJumpscareTimer=0;
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
 let spiderJumpscareScale=1;
+let spiderPounceStart=new THREE.Vector3();
+let spiderPounceTarget=new THREE.Vector3();
 let spiderAutoLookTimer=0;
 let spiderAutoLookStarted=false;
 let spiderOnCeiling=false;
@@ -3518,7 +3520,9 @@ const SPIDER_CEILING_SPEED=4.5;
 const SPIDER_CEILING_Y=WALL_H-.10;
 const SPIDER_CEILING_SCALE=.72;
 const SPIDER_AUTO_LOOK_DURATION=1.0;
-const SPIDER_ATTACK_RANGE=1.35;
+const SPIDER_ATTACK_RANGE=.65;
+const SPIDER_POUNCE_DURATION=.62;
+const SPIDER_POUNCE_HEIGHT=1.05;
 const SPIDER_SPEED=2.05;
 const SPIDER_RADIUS=.85;
 const SPIDER_GROUND_OFFSET=.08;
@@ -4195,32 +4199,37 @@ function moveSpiderTowardPlayer(dt){
 function startSpiderJumpscare(){
   spiderBehaviorState="jumpscare";
   spiderBehaviorTime=0;
-  spiderJumpscareTimer=1.20;
-  spiderJumpscareStartY=camera.position.y;
-  spiderJumpscareDirection.set(0,0,-1);
-  camera.getWorldDirection(spiderJumpscareDirection);
+  spiderJumpscareTimer=SPIDER_POUNCE_DURATION;
 
-  // Custom scare: the spider starts above the player, drops toward the camera,
-  // rapidly grows into frame, then gives the camera a short impact shake.
-  const offsetX=-spiderJumpscareDirection.x*2;
-  const offsetZ=-spiderJumpscareDirection.z*2;
+  spiderPounceStart.copy(spiderEntity.position);
+  spiderPounceStart.y=SPIDER_GROUND_OFFSET;
 
-  player.pos.x+=offsetX;
-  player.pos.z+=offsetZ;
-  player.jumpY=1;
-  player.jumpVelocity=0;
+  spiderJumpscareDirection.set(
+    player.pos.x-spiderEntity.position.x,
+    0,
+    player.pos.z-spiderEntity.position.z
+  );
 
-  camera.position.x+=offsetX;
-  camera.position.z+=offsetZ;
-  camera.position.y+=1;
+  if(spiderJumpscareDirection.lengthSq()<.0001){
+    spiderJumpscareDirection.set(
+      -Math.sin(player.yaw),
+      0,
+      -Math.cos(player.yaw)
+    );
+  }else{
+    spiderJumpscareDirection.normalize();
+  }
 
-  const scareStart=camera.position.clone()
-    .addScaledVector(spiderJumpscareDirection,2.75);
-  scareStart.y+=2.8;
+  // The spider only pounces once it is extremely close. It lands on the
+  // ground near the player, then immediately resumes the normal chase.
+  spiderPounceTarget.set(
+    player.pos.x-spiderJumpscareDirection.x*.42,
+    SPIDER_GROUND_OFFSET,
+    player.pos.z-spiderJumpscareDirection.z*.42
+  );
 
-  spiderEntity.position.copy(scareStart);
-  spiderJumpscareScale=.72;
-  spiderEntity.scale.setScalar(spiderJumpscareScale);
+  spiderJumpscareScale=1;
+  spiderEntity.scale.setScalar(1);
   spiderEntity.rotation.x=0;
   spiderEntity.rotation.y=Math.atan2(
     player.pos.x-spiderEntity.position.x,
@@ -4228,13 +4237,9 @@ function startSpiderJumpscare(){
   );
   spiderEntity.visible=true;
 
-  setSpiderAnimation("attack2");
-  player.keys.clear();
-  player.vel.set(0,0,0);
-  player.jumpVelocity=0;
-  pulse=1.35;
-
-  eventText.textContent="IT FOUND YOU";
+  setSpiderAnimation("jump");
+  pulse=.35;
+  eventText.textContent="RUN.";
   eventText.style.opacity="1";
 }
 
@@ -4289,7 +4294,21 @@ function resetPlayerAfterSpiderCatch(){
 }
 
 function finishSpiderJumpscare(){
-  resetPlayerAfterSpiderCatch();
+  spiderJumpscareTimer=0;
+  spiderJumpscareScale=1;
+  spiderBehaviorState="chase";
+  spiderBehaviorTime=0;
+  spiderOnCeiling=false;
+  clearSpiderPath();
+  spiderChaseDuration=THREE.MathUtils.lerp(
+    SPIDER_CHASE_MIN_TIME,
+    SPIDER_CHASE_MAX_TIME,
+    Math.random()
+  );
+  spiderEntity.position.y=SPIDER_GROUND_OFFSET;
+  spiderEntity.scale.setScalar(1);
+  spiderEntity.rotation.x=0;
+  setSpiderAnimation("chase");
 }
 
 function spawnSpiderAtPlayer(){
@@ -5778,46 +5797,29 @@ function animate(){
       spiderBehaviorTime+=dt;
 
       const jumpProgress=THREE.MathUtils.clamp(
-        1-spiderJumpscareTimer/1.20,
+        1-spiderJumpscareTimer/SPIDER_POUNCE_DURATION,
         0,
         1
       );
-      const easeOut=1-Math.pow(1-jumpProgress,3);
-      const impact=THREE.MathUtils.clamp(
-        (jumpProgress-.55)/.45,
-        0,
-        1
-      );
+      const horizontalProgress=jumpProgress*jumpProgress*(3-2*jumpProgress);
 
-      spiderEntity.position.copy(camera.position).addScaledVector(
-        spiderJumpscareDirection,
-        THREE.MathUtils.lerp(2.75,.72,easeOut)
+      spiderEntity.position.lerpVectors(
+        spiderPounceStart,
+        spiderPounceTarget,
+        horizontalProgress
       );
-      spiderEntity.position.y=THREE.MathUtils.lerp(
-        camera.position.y+2.8,
-        camera.position.y-.05,
-        easeOut
-      );
-      spiderEntity.scale.setScalar(
-        THREE.MathUtils.lerp(spiderJumpscareScale,1.58,easeOut)
-      );
+      spiderEntity.position.y=
+        SPIDER_GROUND_OFFSET+
+        Math.sin(jumpProgress*Math.PI)*SPIDER_POUNCE_HEIGHT;
 
+      spiderEntity.scale.setScalar(1);
       spiderEntity.rotation.y=Math.atan2(
         player.pos.x-spiderEntity.position.x,
         player.pos.z-spiderEntity.position.z
       );
-      spiderEntity.rotation.x=Math.sin(jumpProgress*Math.PI)*.16;
+      spiderEntity.rotation.x=Math.sin(jumpProgress*Math.PI)*.18;
 
-      camera.position.x+=Math.sin(spiderBehaviorTime*92)*.014*impact;
-      camera.position.y+=Math.cos(spiderBehaviorTime*84)*.011*impact;
-
-      setSpiderAnimation("attack2");
-      player.keys.clear();
-      player.vel.set(0,0,0);
-
-      const shake=jumpProgress*jumpProgress;
-      camera.position.x+=Math.sin(spiderBehaviorTime*76)*.008*shake;
-      camera.position.y+=Math.cos(spiderBehaviorTime*68)*.006*shake;
+      setSpiderAnimation("jump");
 
       if(spiderJumpscareTimer<=0){
         finishSpiderJumpscare();
