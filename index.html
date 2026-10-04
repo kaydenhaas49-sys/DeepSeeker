@@ -32,21 +32,42 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 .key{color:#e1d9af;font-weight:700}
 .action{color:#aaa}
 .closeHint{margin-top:20px;color:#736f58!important;font-size:11px!important;letter-spacing:1px}
-#overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:
-radial-gradient(circle at 50% 36%,rgba(199,182,106,.13),transparent 25%),
-radial-gradient(circle at 50% 100%,rgba(72,67,39,.16),transparent 52%),
-linear-gradient(180deg,rgba(5,7,6,.84),rgba(2,3,2,.92));
-color:#eee4b8;cursor:pointer;user-select:none;z-index:10;text-align:center;
-box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
+#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+background:radial-gradient(circle at 50% 38%,rgba(205,191,116,.10),transparent 21%),
+radial-gradient(circle at 50% 100%,rgba(80,74,43,.12),transparent 48%),
+linear-gradient(180deg,#050705 0%,#020302 100%);
+color:#ebe5c6;cursor:default;user-select:none;z-index:10;text-align:center;
+overflow:hidden;box-shadow:inset 0 0 180px #000}
+#overlay::before{content:"";position:absolute;inset:0;pointer-events:none;
+background:repeating-linear-gradient(180deg,rgba(255,255,255,.018) 0,rgba(255,255,255,.018) 1px,transparent 1px,transparent 5px);opacity:.38}
+#overlay::after{content:"";position:absolute;inset:0;pointer-events:none;
+background:radial-gradient(circle at center,transparent 42%,rgba(0,0,0,.72) 100%)}
 #overlay.hidden{display:none}
-#overlay h1{margin:0;font-size:56px;letter-spacing:14px;font-weight:500;color:#f1e8bd;text-shadow:0 0 14px rgba(229,204,119,.18),0 0 42px rgba(214,190,90,.16)}
-#overlay .sub{margin:0;font-size:12px;letter-spacing:5px;color:#bdb38c;text-shadow:0 2px 12px #000}
-#overlay .prompt{margin:18px 0 0;font-size:14px;letter-spacing:4px;color:#e5d9a6;animation:pulse 1.6s ease-in-out infinite}
-#initialLoadPanel{width:min(520px,78vw);margin-top:8px;padding:14px 16px;border:1px solid rgba(229,218,170,.16);border-radius:12px;background:rgba(8,10,8,.52);box-shadow:0 12px 35px rgba(0,0,0,.30)}
-#initialLoadTop{display:flex;justify-content:space-between;gap:16px;font-size:9px;letter-spacing:2.4px;color:#bcb391}
-#initialLoadTrack{height:7px;margin-top:9px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.08);border:1px solid rgba(229,218,170,.08)}
-#initialLoadFill{width:0%;height:100%;border-radius:99px;background:linear-gradient(90deg,#8d8154,#ded09a);box-shadow:0 0 16px rgba(216,201,138,.28);transition:width .12s linear}
-#initialLoadStatus{min-height:13px;margin-top:9px;font-size:8px;letter-spacing:1.5px;color:#817d6b;text-transform:uppercase}
+#loadingScreen{position:relative;z-index:1;width:min(860px,calc(100vw - 34px));min-height:min(680px,calc(100vh - 34px));padding:clamp(28px,5vw,62px);box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;
+border:1px solid rgba(225,214,163,.13);background:linear-gradient(180deg,rgba(17,19,15,.76),rgba(5,7,5,.89));
+box-shadow:0 32px 100px rgba(0,0,0,.58),inset 0 1px rgba(255,255,255,.035)}
+#loadingScreen::before{content:"";position:absolute;inset:0;pointer-events:none;
+background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent);transform:translateX(-100%);animation:bootSweep 4.5s linear infinite}
+#loadingScreen>*{position:relative;z-index:1}
+.loadCorner{position:absolute!important;font-size:8px;letter-spacing:2.5px;color:#6e6c5e;text-transform:uppercase}
+.loadCorner.tl{top:18px;left:20px}.loadCorner.tr{top:18px;right:20px}
+.loadCorner.bl{bottom:18px;left:20px}.loadCorner.br{bottom:18px;right:20px}
+.loadBrand{text-align:left;padding-top:20px}.loadBrandEyebrow{font-size:9px;letter-spacing:4px;color:#8e8b79;margin-bottom:15px}
+.loadBrand h1{margin:0;font-size:clamp(34px,7vw,72px);letter-spacing:clamp(7px,1.6vw,16px);font-weight:500;line-height:.94;color:#ece5bd;text-shadow:0 0 24px rgba(227,207,131,.10)}
+.loadBrandSub{margin-top:14px;font-size:10px;letter-spacing:4px;color:#9d987f}.loadBrandRule{width:100%;height:1px;margin-top:26px;background:linear-gradient(90deg,rgba(216,201,138,.52),rgba(216,201,138,.08),transparent)}
+#initialLoadPanel{width:min(680px,100%);margin:0 auto;padding:22px 0 18px;border-top:1px solid rgba(229,218,170,.09);border-bottom:1px solid rgba(229,218,170,.09)}
+#initialLoadTop{display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-size:9px;letter-spacing:2.6px;color:#aaa58d}
+#initialLoadPercent{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;color:#e5dcb6;letter-spacing:1px}
+#initialLoadTrack{position:relative;height:10px;margin-top:14px;overflow:hidden;background:#080a08;border:1px solid rgba(229,218,170,.10);box-shadow:inset 0 0 20px rgba(0,0,0,.5)}
+#initialLoadFill{width:0%;height:100%;background:linear-gradient(90deg,#7b704a,#b8aa73,#e0d39b);box-shadow:0 0 24px rgba(216,201,138,.22);transition:width .16s linear}
+#initialLoadTrack::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0 19px,rgba(255,255,255,.055) 19px 20px)}
+#initialLoadStatus{min-height:14px;margin-top:13px;font-size:9px;letter-spacing:2px;color:#817d6c;text-align:left;text-transform:uppercase}
+.loadTips{display:flex;justify-content:space-between;gap:20px;margin-top:15px;font-size:8px;letter-spacing:1.8px;color:#67665a;text-transform:uppercase}
+#overlay .prompt{margin:0;font-size:10px;letter-spacing:3px;color:#b8b198;text-transform:uppercase}
+.loadStatusPulse{display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:#cfc38f;box-shadow:0 0 10px rgba(216,201,138,.45);animation:loadDot 1.1s ease-in-out infinite}
+@keyframes bootSweep{to{transform:translateX(100%)}}@keyframes loadDot{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+@media(max-width:650px){#loadingScreen{min-height:calc(100vh - 22px);padding:30px 22px}.loadTips{flex-direction:column;gap:6px}.loadCorner{display:none}}
+
 #overlay .controls{font-size:11px;letter-spacing:2px;color:#a69e7c;line-height:1.9}
 #homeScreen,#lobbyScreen{width:min(620px,calc(100vw - 40px));display:flex;flex-direction:column;align-items:center;gap:12px;padding:28px 24px 24px;box-sizing:border-box;border:1px solid rgba(236,225,176,.12);border-radius:22px;background:linear-gradient(145deg,rgba(20,22,18,.72),rgba(7,9,7,.84));box-shadow:0 28px 100px rgba(0,0,0,.58),inset 0 1px rgba(255,255,255,.06),inset 0 -30px 70px rgba(0,0,0,.18);backdrop-filter:blur(10px)}
 #homeScreen.hidden,#lobbyScreen.hidden{display:none}
@@ -282,12 +303,21 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 
 <div id="overlay">
   <div id="loadingScreen">
-    <h1>BACKROOMS: LOST SIGNAL</h1>
-    <p class="sub">PROCEDURAL LIMINAL HORROR</p>
+    <span class="loadCorner tl">DS-01 // SECURE BOOT</span>
+    <span class="loadCorner tr">LOCAL BUILD // 2026</span>
+    <span class="loadCorner bl">NO SIGNAL DETECTED</span>
+    <span class="loadCorner br">DO NOT CLOSE THE WINDOW</span>
+    <div class="loadBrand">
+      <div class="loadBrandEyebrow">DEEPSEEKER // FIELD ENTRY SYSTEM</div>
+      <h1>BACKROOMS</h1>
+      <div class="loadBrandSub">LOST SIGNAL · WORLD INITIALIZATION</div>
+      <div class="loadBrandRule"></div>
+    </div>
     <div id="initialLoadPanel">
       <div id="initialLoadTop"><span>INITIALIZING WORLD</span><span id="initialLoadPercent">0%</span></div>
       <div id="initialLoadTrack"><div id="initialLoadFill"></div></div>
-      <div id="initialLoadStatus">LOADING APARTMENT ASSET…</div>
+      <div id="initialLoadStatus"><span class="loadStatusPulse"></span>LOADING APARTMENT ASSET…</div>
+      <div class="loadTips"><span>APARTMENT · SPIDER · SAVE DATA</span><span>MENU LOCKED UNTIL READY</span></div>
     </div>
     <p class="prompt" id="prompt">LOADING WORLD… 0%</p>
   </div>
@@ -364,6 +394,6 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
   }
 }
 </script>
-<script type="module" src="./main.js?v=20261003-spider38"></script>
+<script type="module" src="./main.js?v=20261003-spider39"></script>
 </body>
 </html>
