@@ -567,10 +567,10 @@ menuSet.add(menuDust);
 const MENU_SPIDER_SCALE=.06;
 const MENU_SPIDER_CEILING_Y=8.88;
 const MENU_SPIDER_PATH_CENTER_X=-3.0;
-const MENU_SPIDER_PATH_CENTER_Z=-6.0;
-const MENU_SPIDER_PATH_RADIUS_X=9.0;
-const MENU_SPIDER_PATH_RADIUS_Z=11.0;
-const MENU_SPIDER_PATH_SPEED=.05;
+const MENU_SPIDER_PATH_CENTER_Z=-3.0;
+const MENU_SPIDER_PATH_RADIUS_X=8.0;
+const MENU_SPIDER_PATH_RADIUS_Z=9.0;
+const MENU_SPIDER_PATH_SPEED=.035;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
@@ -599,6 +599,18 @@ function syncMenuSpiderFromGameplayModel(){
     node.frustumCulled=false;
     node.castShadow=false;
     node.receiveShadow=false;
+    node.renderOrder=50;
+
+    // The title-screen ceiling is opaque; keep the actual spider visibly
+    // attached to that ceiling without changing the gameplay spider.
+    if(node.material){
+      const materials=Array.isArray(node.material)?node.material:[node.material];
+      for(const material of materials){
+        material.depthTest=false;
+        material.depthWrite=false;
+        material.needsUpdate=true;
+      }
+    }
   });
   menuSpider.add(menuSpiderActual);
   menuSpider.updateMatrixWorld(true);
@@ -679,7 +691,7 @@ function updateMenuScene(t,dt){
   if(!menuSpiderActual){
     if(!menuSpiderLoadRequested){
       menuSpiderLoadRequested=true;
-      ensureSpiderLoading();
+      loadSpiderFromPack();
     }
   }else{
     // Large, slow elliptical crawl across the visible ceiling.
