@@ -757,7 +757,9 @@ function updateMenuScene(t,dt){
 
     menuSpider.position.x=roofX;
     menuSpider.position.z=roofZ;
-    menuSpider.rotation.y=Math.atan2(nextX-roofX,nextZ-roofZ);
+    // The ceiling clone is flipped 180° on X, which reverses its local forward axis.
+    // Add PI so the real walk cycle faces the direction it is moving.
+    menuSpider.rotation.y=Math.atan2(nextX-roofX,nextZ-roofZ)+Math.PI;
     menuSpider.rotation.z=Math.sin(t*.18)*.018;
 
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
