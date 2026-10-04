@@ -3335,7 +3335,7 @@ const SPIDER_ANIMATION_RANGES={
 const SPIDER_ANIMATION_ALIAS={
   idle:"idle1",
   stalk:"idle2",
-  chase:"defend",
+  chase:"hit2",
   attack:"attack1",
   hit:"hit1",
   death:"die1"
@@ -3503,27 +3503,39 @@ function rotatePlayerTowardSpider(dt){
 }
 
 function findSpiderSpawnPosition(){
-  const forwardX=-Math.sin(player.yaw);
-  const forwardZ=-Math.cos(player.yaw);
-  const rightX=Math.cos(player.yaw);
-  const rightZ=-Math.sin(player.yaw);
+  // Test spawns should surround the player instead of always appearing
+  // directly in front of the camera. Try several random points on a nearby
+  // ring, then fall back to evenly spaced directions if the area is blocked.
+  const randomCandidates=[];
+  for(let i=0;i<24;i++){
+    const angle=Math.random()*Math.PI*2;
+    const distance=THREE.MathUtils.lerp(10,18,Math.random());
+    randomCandidates.push([
+      player.pos.x+Math.cos(angle)*distance,
+      player.pos.z+Math.sin(angle)*distance
+    ]);
+  }
 
-  const candidates=[
-    [14,0],[16,0],[15,4],[15,-4],
-    [18,5],[18,-5],[20,3],[20,-3]
-  ];
-
-  for(const [distance,side] of candidates){
-    const x=player.pos.x+forwardX*distance+rightX*side;
-    const z=player.pos.z+forwardZ*distance+rightZ*side;
+  for(const [x,z] of randomCandidates){
     if(!isSpiderBlocked(x,z)){
       return {x,z};
     }
   }
 
+  for(let i=0;i<16;i++){
+    const angle=(i/16)*Math.PI*2;
+    const distance=i%2===0 ? 12 : 16;
+    const x=player.pos.x+Math.cos(angle)*distance;
+    const z=player.pos.z+Math.sin(angle)*distance;
+    if(!isSpiderBlocked(x,z)){
+      return {x,z};
+    }
+  }
+
+  const fallbackAngle=Math.random()*Math.PI*2;
   return {
-    x:player.pos.x+forwardX*12,
-    z:player.pos.z+forwardZ*12
+    x:player.pos.x+Math.cos(fallbackAngle)*11,
+    z:player.pos.z+Math.sin(fallbackAngle)*11
   };
 }
 
