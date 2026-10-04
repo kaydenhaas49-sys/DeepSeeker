@@ -580,7 +580,7 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpiderActual=SkeletonUtils.clone(spiderModel);
   menuSpiderActual.name="MenuSpiderActualModel";
   menuSpiderActual.visible=true;
-  menuSpiderActual.scale.setScalar(.36);
+  menuSpiderActual.scale.setScalar(.18);
   menuSpiderActual.rotation.x=Math.PI;
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
