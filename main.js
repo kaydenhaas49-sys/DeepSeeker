@@ -153,6 +153,8 @@ gltfLoader.setDRACOLoader(dracoLoader);
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.setSize(innerWidth,innerHeight);
 container.style.visibility="hidden";
 setBootProgress(18,"STARTING RENDERER…");
@@ -291,6 +293,7 @@ function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotation
   mesh.name=name;
   mesh.position.copy(position);
   mesh.rotation.set(rotationX,rotationY,rotationZ);
+  mesh.receiveShadow=true;
   menuSet.add(mesh);
   return mesh;
 }
@@ -316,6 +319,7 @@ menuCeilingGeometry.rotateX(Math.PI/2); // face down, like the gameplay ceiling
 const menuCeilingMesh=new THREE.Mesh(menuCeilingGeometry,menuCeilingMaterial);
 menuCeilingMesh.name="MenuCeiling";
 menuCeilingMesh.position.set(0,9,-7);
+menuCeilingMesh.receiveShadow=true;
 menuSet.add(menuCeilingMesh);
 
 // A few panels are missing. Dark void cards sit over the continuous ceiling so
@@ -609,6 +613,25 @@ const menuFarLight=new THREE.PointLight(0xffd98e,.95,38,2);
 menuFarLight.position.set(4,3,-50);
 menuSet.add(menuFarLight);
 
+// Soft underside light dedicated to the menu spider so its shadow lands on the
+// nearby ceiling without changing gameplay lighting.
+const menuSpiderShadowLight=new THREE.SpotLight(
+  0xffdca0,
+  3.2,
+  42,
+  Math.PI/2.1,
+  .86,
+  1.5
+);
+menuSpiderShadowLight.position.set(-1.5,4.0,12.0);
+menuSpiderShadowLight.castShadow=true;
+menuSpiderShadowLight.shadow.mapSize.set(512,512);
+menuSpiderShadowLight.shadow.bias=-.0008;
+menuSpiderShadowLight.shadow.normalBias=.025;
+menuSpiderShadowLight.target=menuSpider;
+menuSet.add(menuSpiderShadowLight);
+menuSet.add(menuSpiderShadowLight.target);
+
 // Subtle dust motes are actual 3D points floating in the room.
 const dustPositions=[];
 const dustRng=mulberry32(SEED^0x5a17);
@@ -661,7 +684,7 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
     node.frustumCulled=false;
-    node.castShadow=false;
+    node.castShadow=true;
     node.receiveShadow=false;
 
     // Darken only the isolated menu clone while preserving the Spider-Psionic
