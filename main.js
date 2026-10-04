@@ -4303,8 +4303,9 @@ function finishSpiderModel(model,animations,sourceName){
         });
       }
 
+      const spiderTint=source.color?.clone?.().multiplyScalar(.45) || new THREE.Color(0x3a2b26);
       const material=new THREE.MeshBasicMaterial({
-        color:source.color?.clone?.() || new THREE.Color(0xffffff),
+        color:spiderTint,
         map:source.map || null,
         alphaMap:source.alphaMap || null,
         transparent:Boolean(source.transparent),
