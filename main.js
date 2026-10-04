@@ -637,8 +637,8 @@ menuSet.add(menuDust);
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.08;
 const MENU_SPIDER_X=4.8;
-const MENU_SPIDER_Y=7.85;
-const MENU_SPIDER_Z=6.5;
+const MENU_SPIDER_Y=9.05;
+const MENU_SPIDER_Z=4.5;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
@@ -664,11 +664,12 @@ function syncMenuSpiderFromGameplayModel(){
     node.castShadow=false;
     node.receiveShadow=false;
   });
+  // Menu-only ceiling anchor. Never derive this from the gameplay spider's
+  // fitted bounds, because that can move the menu clone toward the floor.
   menuSpider.add(menuSpiderActual);
+  menuSpiderActual.position.y=-.18;
   menuSpiderActual.updateMatrixWorld(true);
-  const bounds=new THREE.Box3().setFromObject(menuSpiderActual);
-  if(Number.isFinite(bounds.max.y)) menuSpiderActual.position.y-=bounds.max.y;
-  menuSpider.position.y=8.90;
+  menuSpider.position.y=MENU_SPIDER_Y;
   menuSpiderMixer=new THREE.AnimationMixer(menuSpiderActual);
   const menuClip=spiderAnimationClips.get("walk")||spiderAnimationClips.get("idle1")||spiderAnimationClips.get("idle2");
   if(menuClip){
