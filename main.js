@@ -81,6 +81,7 @@ const bootProgressFill=document.getElementById("bootProgressFill");
 const bootProgressText=document.getElementById("bootProgressText");
 let bootFinished=false;
 let bootFinishQueued=false;
+let bootRenderReady=false;
 
 function setBootProgress(percent,label){
   const value=Math.max(0,Math.min(100,percent));
@@ -88,8 +89,46 @@ function setBootProgress(percent,label){
   if(bootProgressText) bootProgressText.textContent=label||("INITIALIZING… "+Math.round(value)+"%");
 }
 
+function getBootState(){
+  return {
+    house:houseLoaded && houseCollisionReady,
+    spider:spiderLoaded && Boolean(menuSpiderActual),
+    render:bootRenderReady
+  };
+}
+
+function updateBootReadiness(){
+  if(bootFinished || bootFinishQueued) return false;
+  const state=getBootState();
+
+  if(!state.house){
+    setBootProgress(
+      houseLoaded ? 70 : houseLoadFailed ? 0 : 45,
+      houseLoadFailed
+        ? "APARTMENT FAILED TO LOAD — REFRESH TO RETRY"
+        : houseLoaded
+          ? "BUILDING APARTMENT COLLISION…"
+          : "LOADING APARTMENT…"
+    );
+    return false;
+  }
+
+  if(!state.spider){
+    setBootProgress(82,spiderLoaded ? "FINALIZING SPIDER…" : "LOADING SPIDER…");
+    return false;
+  }
+
+  if(!state.render){
+    setBootProgress(96,"FINALIZING EVERYTHING…");
+    return false;
+  }
+
+  finishBootScreen();
+  return true;
+}
+
 function finishBootScreen(){
-  if(bootFinished || bootFinishQueued) return;
+  if(bootFinished || bootFinishQueued || !bootRenderReady) return;
   bootFinishQueued=true;
   setBootProgress(100,"READY");
   requestAnimationFrame(()=>{
@@ -599,7 +638,7 @@ menuSet.add(menuDust);
 const MENU_SPIDER_SCALE=.06;
 const MENU_SPIDER_X=4.8;
 const MENU_SPIDER_Y=7.85;
-const MENU_SPIDER_Z=3.5;
+const MENU_SPIDER_Z=8.5;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
@@ -2098,16 +2137,18 @@ function updateHouseMemoryState(dt){
   }
 }
 
-function ensureHouseLoading(){
+function ensureHouseLoading(options={}){
   if(houseLoadStarted || houseLoaded) return;
-
-  if(houseLoadFailed){
-    houseLoadFailed=false;
-  }
+  if(houseLoadFailed) houseLoadFailed=false;
 
   houseLoadStarted=true;
   updateHouseLoadingUI(0,"HOUSE IS STARTING TO LOAD…");
   const start=()=>loadHouse();
+
+  if(options.immediate){
+    start();
+    return;
+  }
 
   if("requestIdleCallback" in window){
     window.requestIdleCallback(start,{timeout:3500});
@@ -4644,17 +4685,26 @@ async function loadSpiderFromPack(){
   }
 }
 
-function ensureSpiderLoading(){
+function ensureSpiderLoading(options={}){
   if(spiderLoadStarted || spiderLoaded) return;
   spiderLoadStarted=true;
 
   const start=()=>loadSpiderFromPack();
+  if(options.immediate){
+    start();
+    return;
+  }
+
   if("requestIdleCallback" in window){
     window.requestIdleCallback(start,{timeout:1800});
   }else{
     setTimeout(start,180);
   }
 }
+
+setBootProgress(74,"LOADING EVERYTHING…");
+ensureHouseLoading({immediate:true});
+ensureSpiderLoading({immediate:true});
 
 
 player.onStep=({intensity})=>audio.step(intensity);
@@ -5238,9 +5288,8 @@ function animate(){
         usingMenuCamera ? menuScene : scene,
         usingMenuCamera ? menuCamera : camera
       );
-      if(!bootFinished && !bootFinishQueued){
-        finishBootScreen();
-      }
+      bootRenderReady=true;
+      updateBootReadiness();
     }catch(error){
       console.error("[DeepSeeker] Menu render error:",error);
 
@@ -5587,9 +5636,8 @@ function animate(){
   batteryBar.style.opacity=flashlightOn?1:.45;
 
   renderer.render(scene,camera);
-  if(!bootFinished && !bootFinishQueued){
-    finishBootScreen();
-  }
+  bootRenderReady=true;
+  updateBootReadiness();
 }
 animate();
 
