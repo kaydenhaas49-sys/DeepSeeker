@@ -3317,7 +3317,7 @@ const SPIDER_TARGET_SPAN=6.2;
 const SPIDER_ANIMATION_RANGES={
   idle1:[164,213],
   idle2:[214,249],
-  walk:[0,45],
+  walk:[3,44],
   attack1:[46,65],
   attack2:[66,85],
   eat:[86,99],
@@ -3335,7 +3335,7 @@ const SPIDER_ANIMATION_RANGES={
 const SPIDER_ANIMATION_ALIAS={
   idle:"idle1",
   stalk:"idle2",
-  chase:"hit2",
+  chase:"walk",
   attack:"attack1",
   hit:"hit1",
   death:"die1"
@@ -4105,7 +4105,22 @@ function finishSpiderModel(model,animations,sourceName){
       if(match){
         const index=animations.indexOf(match);
         claimedAnimations.add(index);
-        directClips.set(documentedName,makeStableSpiderClip(match,documentedName));
+
+        if(documentedName==="walk"){
+          // Test a slightly trimmed section of the walk clip instead of the
+          // exact 0–45 range that previously caused the rig to break.
+          const walkFPS=45/Math.max(match.duration,.001);
+          const walkClip=THREE.AnimationUtils.subclip(
+            match,
+            "spider_walk_test",
+            3,
+            45,
+            walkFPS
+          );
+          directClips.set(documentedName,makeStableSpiderClip(walkClip,"walk"));
+        }else{
+          directClips.set(documentedName,makeStableSpiderClip(match,documentedName));
+        }
       }
     }
 
