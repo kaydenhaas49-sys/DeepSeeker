@@ -231,7 +231,24 @@ function addMenuBox(name,size,position,material,rotationY=0,rotationX=0,rotation
 // No flat image is used here: the menu is a real Three.js room with depth,
 // geometry, materials, fog and animated fluorescent lighting.
 // ---------------------------------------------------------------------------
-addMenuBox("Floor",new THREE.Vector3(112,.22,118),new THREE.Vector3(0,-.11,-7),menuFloorMaterial);
+const menuFloorBox=addMenuBox(
+  "FloorCollisionVolume",
+  new THREE.Vector3(112,.22,118),
+  new THREE.Vector3(0,-.11,-7),
+  menuFloorMaterial
+);
+menuFloorBox.visible=false;
+
+const menuFloorSurfaceMaterial=menuFloorMaterial.clone();
+menuFloorSurfaceMaterial.side=THREE.DoubleSide;
+const menuFloorSurface=new THREE.Mesh(
+  new THREE.PlaneGeometry(112,118),
+  menuFloorSurfaceMaterial
+);
+menuFloorSurface.name="MenuFloorSurface";
+menuFloorSurface.rotation.x=-Math.PI/2;
+menuFloorSurface.position.set(0,.012,-7);
+menuSet.add(menuFloorSurface);
 
 addMenuBox("LeftWall",new THREE.Vector3(.34,9.4,118),new THREE.Vector3(-56,4.7,-7),menuWallMaterial);
 addMenuBox("RightWall",new THREE.Vector3(.34,9.4,118),new THREE.Vector3(56,4.7,-7),menuWallMaterial);
@@ -565,21 +582,21 @@ menuSet.add(menuDust);
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
-const MENU_SPIDER_CEILING_Y=8.88;
-const MENU_SPIDER_PATH_CENTER_X=-3.0;
-const MENU_SPIDER_PATH_CENTER_Z=-3.0;
-const MENU_SPIDER_PATH_RADIUS_X=8.0;
-const MENU_SPIDER_PATH_RADIUS_Z=9.0;
-const MENU_SPIDER_PATH_SPEED=.035;
+const MENU_SPIDER_CEILING_Y=8.98;
+const MENU_SPIDER_PATH_CENTER_X=3.0;
+const MENU_SPIDER_PATH_CENTER_Z=-18.0;
+const MENU_SPIDER_PATH_RADIUS_X=22.0;
+const MENU_SPIDER_PATH_RADIUS_Z=16.0;
+const MENU_SPIDER_PATH_SPEED=.072;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
 menuSpider.position.set(
   MENU_SPIDER_PATH_CENTER_X,
   MENU_SPIDER_CEILING_Y,
-  MENU_SPIDER_PATH_CENTER_Z+MENU_SPIDER_PATH_RADIUS_Z
+  MENU_SPIDER_PATH_CENTER_Z
 );
-menuSpider.rotation.y=Math.PI/2;
+menuSpider.rotation.y=0;
 menuSpider.visible=false;
 menuSet.add(menuSpider);
 
@@ -614,11 +631,6 @@ function syncMenuSpiderFromGameplayModel(){
   });
   menuSpider.add(menuSpiderActual);
   menuSpider.updateMatrixWorld(true);
-  const bounds=new THREE.Box3().setFromObject(menuSpiderActual);
-  if(Number.isFinite(bounds.max.y)){
-    // Keep the menu clone anchored to its own ceiling position.
-    menuSpiderActual.position.y-=bounds.max.y;
-  }
   menuSpider.position.y=MENU_SPIDER_CEILING_Y;
   menuSpiderMixer=new THREE.AnimationMixer(menuSpiderActual);
   const menuClip=spiderAnimationClips.get("walk")||spiderAnimationClips.get("idle1")||spiderAnimationClips.get("idle2");
@@ -694,25 +706,18 @@ function updateMenuScene(t,dt){
       loadSpiderFromPack();
     }
   }else{
-    // Large, slow elliptical crawl across the visible ceiling.
-    const phase=t*MENU_SPIDER_PATH_SPEED+Math.PI/2;
-    const sinPhase=Math.sin(phase);
-    const cosPhase=Math.cos(phase);
-    const velocityX=-sinPhase*MENU_SPIDER_PATH_RADIUS_X*MENU_SPIDER_PATH_SPEED;
-    const velocityZ=cosPhase*MENU_SPIDER_PATH_RADIUS_Z*MENU_SPIDER_PATH_SPEED;
+    const phase=t*MENU_SPIDER_PATH_SPEED;
+    const nextPhase=(t+dt)*MENU_SPIDER_PATH_SPEED;
+    const x=Math.sin(phase)*MENU_SPIDER_PATH_RADIUS_X;
+    const z=Math.cos(phase*.78)*MENU_SPIDER_PATH_RADIUS_Z;
+    const nx=Math.sin(nextPhase)*MENU_SPIDER_PATH_RADIUS_X;
+    const nz=Math.cos(nextPhase*.78)*MENU_SPIDER_PATH_RADIUS_Z;
 
-    menuSpider.position.x=
-      MENU_SPIDER_PATH_CENTER_X+
-      cosPhase*MENU_SPIDER_PATH_RADIUS_X;
+    menuSpider.position.x=MENU_SPIDER_PATH_CENTER_X+x;
     menuSpider.position.y=MENU_SPIDER_CEILING_Y;
-    menuSpider.position.z=
-      MENU_SPIDER_PATH_CENTER_Z+
-      sinPhase*MENU_SPIDER_PATH_RADIUS_Z;
-
-    // The model is upside-down on the ceiling, so invert its forward vector
-    // when deriving the heading. This keeps it from crawling backwards.
-    menuSpider.rotation.y=Math.atan2(-velocityX,-velocityZ);
-    menuSpider.rotation.z=Math.sin(t*.18)*.018;
+    menuSpider.position.z=MENU_SPIDER_PATH_CENTER_Z+z;
+    menuSpider.rotation.y=Math.atan2(nx-x,nz-z);
+    menuSpider.rotation.z=Math.sin(t*.35)*.015;
 
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
@@ -1019,7 +1024,7 @@ function readSelectedSaveSlot(){
 
 let selectedSaveSlot=readSelectedSaveSlot();
 hydrateSaveSlots();
-hydrateIndexedSaveSlots();
+const initialSaveHydrationPromise=hydrateIndexedSaveSlots();
 
 try{
   if(window.navigator?.storage?.persist){
@@ -1860,6 +1865,7 @@ function updateHouseLoadingUI(progress=null,status=null){
   const value=Number.isFinite(progress)
     ? Math.max(0,Math.min(100,Math.round(progress)))
     : (houseLoaded && houseCollisionReady ? 100 : houseLoaded ? 76 : 0);
+  window.__deepseekerHouseLoadProgress=value;
 
   const message=status || (
     houseLoadFailed
@@ -3367,14 +3373,93 @@ if(initialParams.get("save")==="1"){
   pendingSaveLoad=getSavedGame(selectedSaveSlot);
 }
 
-if(new URLSearchParams(location.search).get("lobby")==="1"){
-  showLobbyScreen();
-}else{
-  showHomeScreen();
+let initialLandingShown=false;
+let initialLoadingTimer=null;
+
+function updateInitialLoadingScreen(){
+  if(initialLandingShown) return;
+
+  const houseProgress=Number.isFinite(window.__deepseekerHouseLoadProgress)
+    ? window.__deepseekerHouseLoadProgress
+    : (houseCollisionReady ? 100 : houseLoaded ? 76 : houseLoadStarted ? 8 : 0);
+  const spiderProgress=spiderLoaded ? 100 : spiderLoadStarted ? 18 : 0;
+  const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
+  const total=Math.max(0,Math.min(100,Math.round(
+    houseProgress*.60 + spiderProgress*.35 + saveProgress*.05
+  )));
+
+  const fill=document.getElementById("initialLoadFill");
+  const percent=document.getElementById("initialLoadPercent");
+  const status=document.getElementById("initialLoadStatus");
+  if(fill) fill.style.width=total+"%";
+  if(percent) percent.textContent=total+"%";
+
+  if(status){
+    if(houseCollisionReady && spiderLoaded && window.__deepseekerSaveHydrationDone){
+      status.textContent="WORLD READY — STARTING MAIN MENU.";
+    }else if(!houseLoaded){
+      status.textContent="LOADING APARTMENT ASSET…";
+    }else if(!houseCollisionReady){
+      status.textContent="BUILDING APARTMENT COLLISION…";
+    }else if(!spiderLoaded){
+      status.textContent="LOADING SPIDER-Psionic…";
+    }else{
+      status.textContent="FINALIZING SAVE DATA…";
+    }
+  }
+
+  prompt.textContent="LOADING WORLD… "+total+"%";
 }
 
-// Apartment loading is now lazy: only start it for a new game or an
-// apartment-level Continue save.
+function finishInitialLoading(){
+  if(initialLandingShown) return;
+  if(!houseCollisionReady || !spiderLoaded || !window.__deepseekerSaveHydrationDone){
+    updateInitialLoadingScreen();
+    return;
+  }
+
+  initialLandingShown=true;
+  if(initialLoadingTimer!==null){
+    clearInterval(initialLoadingTimer);
+    initialLoadingTimer=null;
+  }
+
+  loadingScreen.style.display="none";
+  if(new URLSearchParams(location.search).get("lobby")==="1"){
+    showLobbyScreen();
+  }else{
+    showHomeScreen();
+  }
+}
+
+function beginInitialLoading(){
+  loadingScreen.style.display="flex";
+  homeScreen.classList.add("hidden");
+  lobbyScreen.classList.add("hidden");
+  window.__deepseekerSaveHydrationDone=false;
+
+  initialSaveHydrationPromise.finally(()=>{
+    window.__deepseekerSaveHydrationDone=true;
+  });
+
+  if(!houseLoaded && !houseLoadStarted){
+    houseLoadStarted=true;
+    loadHouse();
+  }
+  if(!spiderLoaded && !spiderLoadStarted){
+    spiderLoadStarted=true;
+    loadSpiderFromPack();
+  }
+
+  updateInitialLoadingScreen();
+  initialLoadingTimer=setInterval(()=>{
+    updateInitialLoadingScreen();
+    finishInitialLoading();
+  },80);
+}
+
+// The initial loading gate is started at the end of module initialization,
+ // after the gameplay, spider, and rendering state have all been created.
 
 player.hands.visible=true;
 
@@ -5591,6 +5676,7 @@ function animate(){
 
   renderer.render(scene,camera);
 }
+beginInitialLoading();
 animate();
 
 window.addEventListener("beforeunload",()=>{

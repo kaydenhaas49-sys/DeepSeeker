@@ -42,6 +42,11 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
 #overlay h1{margin:0;font-size:56px;letter-spacing:14px;font-weight:500;color:#f1e8bd;text-shadow:0 0 14px rgba(229,204,119,.18),0 0 42px rgba(214,190,90,.16)}
 #overlay .sub{margin:0;font-size:12px;letter-spacing:5px;color:#bdb38c;text-shadow:0 2px 12px #000}
 #overlay .prompt{margin:18px 0 0;font-size:14px;letter-spacing:4px;color:#e5d9a6;animation:pulse 1.6s ease-in-out infinite}
+#initialLoadPanel{width:min(520px,78vw);margin-top:8px;padding:14px 16px;border:1px solid rgba(229,218,170,.16);border-radius:12px;background:rgba(8,10,8,.52);box-shadow:0 12px 35px rgba(0,0,0,.30)}
+#initialLoadTop{display:flex;justify-content:space-between;gap:16px;font-size:9px;letter-spacing:2.4px;color:#bcb391}
+#initialLoadTrack{height:7px;margin-top:9px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.08);border:1px solid rgba(229,218,170,.08)}
+#initialLoadFill{width:0%;height:100%;border-radius:99px;background:linear-gradient(90deg,#8d8154,#ded09a);box-shadow:0 0 16px rgba(216,201,138,.28);transition:width .12s linear}
+#initialLoadStatus{min-height:13px;margin-top:9px;font-size:8px;letter-spacing:1.5px;color:#817d6b;text-transform:uppercase}
 #overlay .controls{font-size:11px;letter-spacing:2px;color:#a69e7c;line-height:1.9}
 #homeScreen,#lobbyScreen{width:min(620px,calc(100vw - 40px));display:flex;flex-direction:column;align-items:center;gap:12px;padding:28px 24px 24px;box-sizing:border-box;border:1px solid rgba(236,225,176,.12);border-radius:22px;background:linear-gradient(145deg,rgba(20,22,18,.72),rgba(7,9,7,.84));box-shadow:0 28px 100px rgba(0,0,0,.58),inset 0 1px rgba(255,255,255,.06),inset 0 -30px 70px rgba(0,0,0,.18);backdrop-filter:blur(10px)}
 #homeScreen.hidden,#lobbyScreen.hidden{display:none}
@@ -279,7 +284,12 @@ box-shadow:inset 0 0 140px rgba(0,0,0,.55)}
   <div id="loadingScreen">
     <h1>BACKROOMS: LOST SIGNAL</h1>
     <p class="sub">PROCEDURAL LIMINAL HORROR</p>
-    <p class="prompt" id="prompt">LOADING APARTMENT…</p>
+    <div id="initialLoadPanel">
+      <div id="initialLoadTop"><span>INITIALIZING WORLD</span><span id="initialLoadPercent">0%</span></div>
+      <div id="initialLoadTrack"><div id="initialLoadFill"></div></div>
+      <div id="initialLoadStatus">LOADING APARTMENT ASSET…</div>
+    </div>
+    <p class="prompt" id="prompt">LOADING WORLD… 0%</p>
   </div>
 
   <div id="homeScreen" class="hidden">
