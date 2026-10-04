@@ -565,9 +565,9 @@ menuSet.add(menuDust);
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
-const MENU_SPIDER_X=6.5;
+const MENU_SPIDER_X=6.0;
 const MENU_SPIDER_Y=7.95;
-const MENU_SPIDER_Z=-14.5;
+const MENU_SPIDER_Z=-8.5;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
@@ -671,10 +671,10 @@ function updateMenuScene(t,dt){
       ensureSpiderLoading();
     }
   }else{
-    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.19)*1.15;
-    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.13)*.65;
+    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.19)*3.1;
+    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.13)*.95;
     menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
-    menuSpider.rotation.z=Math.sin(t*.29)*.025;
+    menuSpider.rotation.z=Math.sin(t*.29)*.04;
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
 
