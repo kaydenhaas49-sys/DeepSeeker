@@ -564,9 +564,14 @@ menuSet.add(menuDust);
 // The title screen uses a clone of the real Spider-Psionic rig loaded by the
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
+const MENU_SPIDER_SCALE=.06;
+const MENU_SPIDER_X=6.5;
+const MENU_SPIDER_Y=7.95;
+const MENU_SPIDER_Z=-14.5;
+
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
-menuSpider.position.set(6.5,7.95,-14.5);
+menuSpider.position.set(MENU_SPIDER_X,MENU_SPIDER_Y,MENU_SPIDER_Z);
 menuSpider.rotation.y=Math.PI*.18;
 menuSpider.visible=false;
 menuSet.add(menuSpider);
@@ -580,7 +585,7 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpiderActual=SkeletonUtils.clone(spiderModel);
   menuSpiderActual.name="MenuSpiderActualModel";
   menuSpiderActual.visible=true;
-  menuSpiderActual.scale.setScalar(.06);
+  menuSpiderActual.scale.setScalar(MENU_SPIDER_SCALE);
   menuSpiderActual.rotation.x=Math.PI;
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
@@ -666,8 +671,8 @@ function updateMenuScene(t,dt){
       ensureSpiderLoading();
     }
   }else{
-    menuSpider.position.x=6.5+Math.sin(t*.19)*1.15;
-    menuSpider.position.z=-14.5+Math.cos(t*.13)*.65;
+    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.19)*1.15;
+    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.13)*.65;
     menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
     menuSpider.rotation.z=Math.sin(t*.29)*.025;
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
