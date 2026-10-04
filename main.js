@@ -565,14 +565,21 @@ menuSet.add(menuDust);
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
-const MENU_SPIDER_X=6.5;
-const MENU_SPIDER_Y=7.95;
-const MENU_SPIDER_Z=-14.5;
+const MENU_SPIDER_CEILING_Y=8.88;
+const MENU_SPIDER_PATH_CENTER_X=-3.0;
+const MENU_SPIDER_PATH_CENTER_Z=-6.0;
+const MENU_SPIDER_PATH_RADIUS_X=9.0;
+const MENU_SPIDER_PATH_RADIUS_Z=11.0;
+const MENU_SPIDER_PATH_SPEED=.05;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
-menuSpider.position.set(MENU_SPIDER_X,MENU_SPIDER_Y,MENU_SPIDER_Z);
-menuSpider.rotation.y=Math.PI*.18;
+menuSpider.position.set(
+  MENU_SPIDER_PATH_CENTER_X,
+  MENU_SPIDER_CEILING_Y,
+  MENU_SPIDER_PATH_CENTER_Z+MENU_SPIDER_PATH_RADIUS_Z
+);
+menuSpider.rotation.y=Math.PI/2;
 menuSpider.visible=false;
 menuSet.add(menuSpider);
 
@@ -596,7 +603,11 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpider.add(menuSpiderActual);
   menuSpider.updateMatrixWorld(true);
   const bounds=new THREE.Box3().setFromObject(menuSpiderActual);
-  if(Number.isFinite(bounds.max.y)) menuSpider.position.y+=8.90-bounds.max.y;
+  if(Number.isFinite(bounds.max.y)){
+    // Keep the menu clone anchored to its own ceiling position.
+    menuSpiderActual.position.y-=bounds.max.y;
+  }
+  menuSpider.position.y=MENU_SPIDER_CEILING_Y;
   menuSpiderMixer=new THREE.AnimationMixer(menuSpiderActual);
   const menuClip=spiderAnimationClips.get("walk")||spiderAnimationClips.get("idle1")||spiderAnimationClips.get("idle2");
   if(menuClip){
@@ -671,10 +682,26 @@ function updateMenuScene(t,dt){
       ensureSpiderLoading();
     }
   }else{
-    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.19)*1.15;
-    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.13)*.65;
-    menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
-    menuSpider.rotation.z=Math.sin(t*.29)*.025;
+    // Large, slow elliptical crawl across the visible ceiling.
+    const phase=t*MENU_SPIDER_PATH_SPEED+Math.PI/2;
+    const sinPhase=Math.sin(phase);
+    const cosPhase=Math.cos(phase);
+    const velocityX=-sinPhase*MENU_SPIDER_PATH_RADIUS_X*MENU_SPIDER_PATH_SPEED;
+    const velocityZ=cosPhase*MENU_SPIDER_PATH_RADIUS_Z*MENU_SPIDER_PATH_SPEED;
+
+    menuSpider.position.x=
+      MENU_SPIDER_PATH_CENTER_X+
+      cosPhase*MENU_SPIDER_PATH_RADIUS_X;
+    menuSpider.position.y=MENU_SPIDER_CEILING_Y;
+    menuSpider.position.z=
+      MENU_SPIDER_PATH_CENTER_Z+
+      sinPhase*MENU_SPIDER_PATH_RADIUS_Z;
+
+    // The model is upside-down on the ceiling, so invert its forward vector
+    // when deriving the heading. This keeps it from crawling backwards.
+    menuSpider.rotation.y=Math.atan2(-velocityX,-velocityZ);
+    menuSpider.rotation.z=Math.sin(t*.18)*.018;
+
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
 
