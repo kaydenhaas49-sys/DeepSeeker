@@ -3488,7 +3488,7 @@ function startSpiderCeilingMode(){
   spiderTransitionKind="up";
 
   spiderEntity.rotation.x=0;
-  setSpiderAnimation("stalk");
+  setSpiderAnimation("chase");
 }
 
 function startSpiderChaseFromCeiling(){
@@ -3876,24 +3876,33 @@ function spawnSpiderAtPlayer(){
 
 
   const spawn=findSpiderSpawnPosition();
-  spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
+
+  // Start the first appearance on the ceiling so the player notices the
+  // spider overhead before it ever drops into a chase.
+  spiderEntity.position.set(spawn.x,SPIDER_CEILING_Y,spawn.z);
+  spiderEntity.scale.setScalar(SPIDER_CEILING_SCALE);
+  spiderEntity.rotation.x=Math.PI;
+  chooseSpiderCeilingTarget();
   spiderEntity.rotation.y=Math.atan2(
-    player.pos.x-spawn.x,
-    player.pos.z-spawn.z
+    spiderCeilingTarget.x-spawn.x,
+    spiderCeilingTarget.z-spawn.z
   );
 
-  spiderBehaviorState="stalk";
+  spiderBehaviorState="ceiling";
   spiderBehaviorTime=0;
-  spiderAutoLookTimer=SPIDER_AUTO_LOOK_DURATION;
-  spiderAutoLookStarted=true;
+  spiderAutoLookTimer=0;
+  spiderAutoLookStarted=false;
   spiderAttackPlayed=false;
   spiderActive=true;
-  spiderOnCeiling=false;
-  spiderTransitionTimer=0;
-  spiderTransitionDuration=0;
-  spiderEntity.rotation.x=0;
+  spiderOnCeiling=true;
+  spiderCeilingDuration=THREE.MathUtils.lerp(
+    SPIDER_CEILING_MIN_TIME,
+    SPIDER_CEILING_MAX_TIME,
+    Math.random()
+  );
+  spiderTransitionTimer=spiderTransitionDuration=0;
   spiderEntity.visible=true;
-  setSpiderAnimation("stalk");
+  setSpiderAnimation("chase");
   return true;
 }
 
@@ -5392,7 +5401,7 @@ function animate(){
         }
       }else if(spiderBehaviorState==="ceiling"){
         const transitioning=updateSpiderTransition(dt);
-        setSpiderAnimation("stalk");
+        setSpiderAnimation("chase");
 
         if(!transitioning){
           moveSpiderOnCeiling(dt);
