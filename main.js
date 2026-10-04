@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, EYE, mulberry32 } from "./world.js";
+import { World, EYE, WALL_H, mulberry32 } from "./world.js";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
@@ -3305,8 +3305,26 @@ let spiderJumpscareDirection=new THREE.Vector3();
 let spiderJumpscareScale=1;
 let spiderAutoLookTimer=0;
 let spiderAutoLookStarted=false;
+let spiderOnCeiling=false;
+let spiderCeilingTarget=new THREE.Vector3();
+let spiderCeilingDuration=7;
+let spiderChaseDuration=5;
+let spiderTransitionTimer=0;
+let spiderTransitionDuration=0;
+let spiderTransitionFromY=0;
+let spiderTransitionToY=0;
+let spiderTransitionFromScale=1;
+let spiderTransitionToScale=1;
+let spiderTransitionKind="";
 
-const SPIDER_STALK_TIME=4.5;
+const SPIDER_STALK_TIME=2.8;
+const SPIDER_CEILING_MIN_TIME=5.0;
+const SPIDER_CEILING_MAX_TIME=9.0;
+const SPIDER_CHASE_MIN_TIME=3.5;
+const SPIDER_CHASE_MAX_TIME=6.5;
+const SPIDER_CEILING_SPEED=14.0;
+const SPIDER_CEILING_Y=WALL_H-.10;
+const SPIDER_CEILING_SCALE=.72;
 const SPIDER_AUTO_LOOK_DURATION=1.0;
 const SPIDER_ATTACK_RANGE=2.4;
 const SPIDER_SPEED=3.8;
@@ -3416,7 +3434,7 @@ function setSpiderAnimation(name){
 }
 
 function groundSpiderEntity(){
-  if(!spiderEntity.visible) return;
+  if(!spiderEntity.visible || spiderOnCeiling) return;
 
   const activeModel=spiderModel;
   if(!activeModel) return;
@@ -3429,6 +3447,168 @@ function groundSpiderEntity(){
   if(Math.abs(correction)>.0005){
     spiderEntity.position.y+=correction;
   }
+}
+
+function chooseSpiderCeilingTarget(){
+  for(let attempt=0;attempt<18;attempt++){
+    const angle=Math.random()*Math.PI*2;
+    const distance=THREE.MathUtils.lerp(12,32,Math.random());
+    const x=player.pos.x+Math.cos(angle)*distance;
+    const z=player.pos.z+Math.sin(angle)*distance;
+    if(!isSpiderBlocked(x,z)){
+      spiderCeilingTarget.set(x,SPIDER_CEILING_Y,z);
+      return;
+    }
+  }
+
+  spiderCeilingTarget.set(
+    player.pos.x+12,
+    SPIDER_CEILING_Y,
+    player.pos.z
+  );
+}
+
+function startSpiderCeilingMode(){
+  spiderBehaviorState="ceiling";
+  spiderBehaviorTime=0;
+  spiderOnCeiling=false;
+  spiderCeilingDuration=THREE.MathUtils.lerp(
+    SPIDER_CEILING_MIN_TIME,
+    SPIDER_CEILING_MAX_TIME,
+    Math.random()
+  );
+  chooseSpiderCeilingTarget();
+
+  spiderTransitionTimer=0;
+  spiderTransitionDuration=.65;
+  spiderTransitionFromY=spiderEntity.position.y;
+  spiderTransitionToY=SPIDER_CEILING_Y;
+  spiderTransitionFromScale=spiderEntity.scale.x || 1;
+  spiderTransitionToScale=SPIDER_CEILING_SCALE;
+  spiderTransitionKind="up";
+
+  spiderEntity.rotation.x=0;
+  setSpiderAnimation("stalk");
+}
+
+function startSpiderChaseFromCeiling(){
+  spiderBehaviorState="chase";
+  spiderBehaviorTime=0;
+  spiderOnCeiling=false;
+  spiderChaseDuration=THREE.MathUtils.lerp(
+    SPIDER_CHASE_MIN_TIME,
+    SPIDER_CHASE_MAX_TIME,
+    Math.random()
+  );
+
+  spiderTransitionTimer=0;
+  spiderTransitionDuration=.55;
+  spiderTransitionFromY=SPIDER_CEILING_Y;
+  spiderTransitionToY=SPIDER_GROUND_OFFSET;
+  spiderTransitionFromScale=SPIDER_CEILING_SCALE;
+  spiderTransitionToScale=1;
+  spiderTransitionKind="down";
+
+  setSpiderAnimation("chase");
+}
+
+function updateSpiderTransition(dt){
+  if(spiderTransitionTimer>=spiderTransitionDuration) return false;
+
+  spiderTransitionTimer=Math.min(
+    spiderTransitionDuration,
+    spiderTransitionTimer+dt
+  );
+
+  const p=THREE.MathUtils.clamp(
+    spiderTransitionTimer/Math.max(spiderTransitionDuration,.001),
+    0,
+    1
+  );
+  const eased=p*p*(3-2*p);
+
+  spiderEntity.position.y=THREE.MathUtils.lerp(
+    spiderTransitionFromY,
+    spiderTransitionToY,
+    eased
+  );
+  spiderEntity.scale.setScalar(
+    THREE.MathUtils.lerp(
+      spiderTransitionFromScale,
+      spiderTransitionToScale,
+      eased
+    )
+  );
+
+  if(spiderTransitionKind==="up"){
+    spiderEntity.rotation.x=THREE.MathUtils.lerp(0,Math.PI,eased);
+    spiderEntity.position.x=THREE.MathUtils.lerp(
+      spiderEntity.position.x,
+      spiderCeilingTarget.x,
+      eased*.35
+    );
+    spiderEntity.position.z=THREE.MathUtils.lerp(
+      spiderEntity.position.z,
+      spiderCeilingTarget.z,
+      eased*.35
+    );
+  }else if(spiderTransitionKind==="down"){
+    spiderEntity.rotation.x=THREE.MathUtils.lerp(Math.PI,0,eased);
+    spiderEntity.position.x=THREE.MathUtils.lerp(
+      spiderEntity.position.x,
+      player.pos.x,
+      eased*.20
+    );
+    spiderEntity.position.z=THREE.MathUtils.lerp(
+      spiderEntity.position.z,
+      player.pos.z,
+      eased*.20
+    );
+  }
+
+  if(spiderTransitionTimer>=spiderTransitionDuration){
+    if(spiderTransitionKind==="up"){
+      spiderOnCeiling=true;
+      spiderEntity.position.y=SPIDER_CEILING_Y;
+      spiderEntity.scale.setScalar(SPIDER_CEILING_SCALE);
+      spiderEntity.rotation.x=Math.PI;
+    }else if(spiderTransitionKind==="down"){
+      spiderOnCeiling=false;
+      spiderEntity.position.y=SPIDER_GROUND_OFFSET;
+      spiderEntity.scale.setScalar(1);
+      spiderEntity.rotation.x=0;
+    }
+  }
+
+  return true;
+}
+
+function moveSpiderOnCeiling(dt){
+  const dx=spiderCeilingTarget.x-spiderEntity.position.x;
+  const dz=spiderCeilingTarget.z-spiderEntity.position.z;
+  const distance=Math.hypot(dx,dz);
+
+  if(distance<2.0){
+    chooseSpiderCeilingTarget();
+    return;
+  }
+
+  const inv=1/Math.max(distance,.001);
+  const step=Math.min(SPIDER_CEILING_SPEED*dt,distance);
+  const nextX=spiderEntity.position.x+dx*inv*step;
+  const nextZ=spiderEntity.position.z+dz*inv*step;
+
+  if(!isSpiderBlocked(nextX,nextZ)){
+    spiderEntity.position.x=nextX;
+    spiderEntity.position.z=nextZ;
+  }else{
+    chooseSpiderCeilingTarget();
+  }
+
+  spiderEntity.rotation.y=Math.atan2(
+    spiderCeilingTarget.x-spiderEntity.position.x,
+    spiderCeilingTarget.z-spiderEntity.position.z
+  );
 }
 
 function isSpiderBlocked(x,z){
@@ -3587,14 +3767,13 @@ function moveSpiderTowardPlayer(dt){
 function startSpiderJumpscare(){
   spiderBehaviorState="jumpscare";
   spiderBehaviorTime=0;
-  spiderJumpscareTimer=1.05;
+  spiderJumpscareTimer=1.20;
   spiderJumpscareStartY=camera.position.y;
   spiderJumpscareDirection.set(0,0,-1);
   camera.getWorldDirection(spiderJumpscareDirection);
 
-  // Keep the spider in a simple, stable position directly in front of the
-  // camera. The old bounding-box recentering caused the model to jump/glitch
-  // whenever the animated pose changed.
+  // Custom scare: the spider starts above the player, drops toward the camera,
+  // rapidly grows into frame, then gives the camera a short impact shake.
   const offsetX=-spiderJumpscareDirection.x*2;
   const offsetZ=-spiderJumpscareDirection.z*2;
 
@@ -3607,33 +3786,27 @@ function startSpiderJumpscare(){
   camera.position.z+=offsetZ;
   camera.position.y+=1;
 
-  const scarePosition=camera.position.clone().add(
-    spiderJumpscareDirection.clone().multiplyScalar(1.15)
-  );
+  const scareStart=camera.position.clone()
+    .addScaledVector(spiderJumpscareDirection,2.75);
+  scareStart.y+=2.8;
 
-  spiderEntity.position.copy(scarePosition);
-  spiderEntity.position.y=camera.position.y-.05;
-  spiderJumpscareScale=1.16;
+  spiderEntity.position.copy(scareStart);
+  spiderJumpscareScale=.72;
   spiderEntity.scale.setScalar(spiderJumpscareScale);
-
-  // The Spider-Psionic model faces +Z, so the normal player-facing
-  // yaw points its face directly toward the camera at this position.
+  spiderEntity.rotation.x=0;
   spiderEntity.rotation.y=Math.atan2(
     player.pos.x-spiderEntity.position.x,
     player.pos.z-spiderEntity.position.z
   );
-
   spiderEntity.visible=true;
 
-  // Attack 2 is the dedicated attack animation; keep it fixed for the whole
-  // scare so the broken Walk clip never enters this state.
   setSpiderAnimation("attack2");
   player.keys.clear();
   player.vel.set(0,0,0);
   player.jumpVelocity=0;
-  pulse=1.25;
+  pulse=1.35;
 
-  eventText.textContent="CAUGHT";
+  eventText.textContent="IT FOUND YOU";
   eventText.style.opacity="1";
 }
 
@@ -3672,14 +3845,17 @@ function resetPlayerAfterSpiderCatch(){
 
   spiderJumpscareTimer=0;
   spiderJumpscareScale=1;
-  spiderBehaviorState="chase";
   spiderBehaviorTime=0;
   spiderAutoLookTimer=0;
   spiderAutoLookStarted=true;
+  spiderTransitionTimer=0;
+  spiderTransitionDuration=0;
+  spiderOnCeiling=false;
   spiderEntity.scale.setScalar(1);
   spiderEntity.position.y=SPIDER_GROUND_OFFSET;
-  setSpiderAnimation("chase");
+  spiderEntity.rotation.x=0;
   spiderEntity.visible=true;
+  startSpiderCeilingMode();
   pulse=1;
   eventText.style.opacity="1";
 }
@@ -3712,6 +3888,10 @@ function spawnSpiderAtPlayer(){
   spiderAutoLookStarted=true;
   spiderAttackPlayed=false;
   spiderActive=true;
+  spiderOnCeiling=false;
+  spiderTransitionTimer=0;
+  spiderTransitionDuration=0;
+  spiderEntity.rotation.x=0;
   spiderEntity.visible=true;
   setSpiderAnimation("stalk");
   return true;
@@ -5138,7 +5318,7 @@ function animate(){
     spiderMixer.update(dt);
   }
 
-  if(spiderJumpscareTimer<=0){
+  if(spiderJumpscareTimer<=0 && spiderTransitionTimer>=spiderTransitionDuration){
     groundSpiderEntity();
   }
 
@@ -5152,27 +5332,38 @@ function animate(){
       spiderBehaviorTime+=dt;
 
       const jumpProgress=THREE.MathUtils.clamp(
-        1-spiderJumpscareTimer/1.05,
+        1-spiderJumpscareTimer/1.20,
         0,
         1
       );
       const easeOut=1-Math.pow(1-jumpProgress,3);
+      const impact=THREE.MathUtils.clamp(
+        (jumpProgress-.55)/.45,
+        0,
+        1
+      );
 
       spiderEntity.position.copy(camera.position).addScaledVector(
         spiderJumpscareDirection,
-        THREE.MathUtils.lerp(1.15,.72,easeOut)
+        THREE.MathUtils.lerp(2.75,.72,easeOut)
       );
-      spiderEntity.position.y=camera.position.y-.05;
+      spiderEntity.position.y=THREE.MathUtils.lerp(
+        camera.position.y+2.8,
+        camera.position.y-.05,
+        easeOut
+      );
       spiderEntity.scale.setScalar(
         THREE.MathUtils.lerp(spiderJumpscareScale,1.58,easeOut)
       );
 
-      // Keep the Spider-Psionic model facing the camera for the
-      // whole attack. Do not add 180 degrees; that turns its back forward.
       spiderEntity.rotation.y=Math.atan2(
         player.pos.x-spiderEntity.position.x,
         player.pos.z-spiderEntity.position.z
       );
+      spiderEntity.rotation.x=Math.sin(jumpProgress*Math.PI)*.16;
+
+      camera.position.x+=Math.sin(spiderBehaviorTime*92)*.014*impact;
+      camera.position.y+=Math.cos(spiderBehaviorTime*84)*.011*impact;
 
       setSpiderAnimation("attack2");
       player.keys.clear();
@@ -5194,19 +5385,34 @@ function animate(){
       }
 
       if(spiderBehaviorState==="stalk"){
+        updateSpiderTransition(dt);
         setSpiderAnimation("stalk");
-        if(spiderBehaviorTime>=SPIDER_STALK_TIME){
-          spiderBehaviorState="chase";
-          spiderBehaviorTime=0;
-          setSpiderAnimation("chase");
+        if(spiderTransitionTimer>=spiderTransitionDuration && spiderBehaviorTime>=SPIDER_STALK_TIME){
+          startSpiderCeilingMode();
+        }
+      }else if(spiderBehaviorState==="ceiling"){
+        const transitioning=updateSpiderTransition(dt);
+        setSpiderAnimation("stalk");
+
+        if(!transitioning){
+          moveSpiderOnCeiling(dt);
+          if(spiderBehaviorTime>=spiderCeilingDuration){
+            startSpiderChaseFromCeiling();
+          }
         }
       }else if(spiderBehaviorState==="chase"){
+        const transitioning=updateSpiderTransition(dt);
         setSpiderAnimation("chase");
-        const distance=moveSpiderTowardPlayer(dt);
-        if(distance<=SPIDER_ATTACK_RANGE){
-          spiderAttackPlayed=false;
-          audio.scare();
-          startSpiderJumpscare();
+
+        if(!transitioning){
+          const distance=moveSpiderTowardPlayer(dt);
+          if(distance<=SPIDER_ATTACK_RANGE){
+            spiderAttackPlayed=false;
+            audio.scare();
+            startSpiderJumpscare();
+          }else if(spiderBehaviorTime>=spiderChaseDuration){
+            startSpiderCeilingMode();
+          }
         }
       }else if(spiderBehaviorState==="attack"){
         setSpiderAnimation("attack");
@@ -5215,16 +5421,16 @@ function animate(){
           pulse=1;
         }
         if(spiderBehaviorTime>=1.0){
-          spiderBehaviorState="chase";
-          spiderBehaviorTime=0;
-          setSpiderAnimation("chase");
+          startSpiderCeilingMode();
         }
       }
 
-      spiderEntity.rotation.y=Math.atan2(
-        player.pos.x-spiderEntity.position.x,
-        player.pos.z-spiderEntity.position.z
-      );
+      if(!spiderOnCeiling){
+        spiderEntity.rotation.y=Math.atan2(
+          player.pos.x-spiderEntity.position.x,
+          player.pos.z-spiderEntity.position.z
+        );
+      }
       spiderEntity.visible=true;
     }
   }else{
@@ -5233,6 +5439,10 @@ function animate(){
     spiderBehaviorTime=0;
     spiderAutoLookTimer=0;
     spiderAutoLookStarted=false;
+    spiderOnCeiling=false;
+    spiderTransitionTimer=0;
+    spiderTransitionDuration=0;
+    spiderEntity.rotation.x=0;
   }
   if(eventCooldown>0) eventCooldown-=dt;
   if(!houseMode && eventCooldown<=0 && t>nextEvent){
