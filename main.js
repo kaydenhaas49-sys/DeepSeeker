@@ -635,7 +635,7 @@ menuSet.add(menuDust);
 // The title screen uses a clone of the real Spider-Psionic rig loaded by the
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
-const MENU_SPIDER_SCALE=.06;
+const MENU_SPIDER_SCALE=.08;
 const MENU_SPIDER_X=4.8;
 const MENU_SPIDER_Y=7.85;
 const MENU_SPIDER_Z=6.5;
@@ -674,7 +674,7 @@ function syncMenuSpiderFromGameplayModel(){
   if(menuClip){
     const action=menuSpiderMixer.clipAction(menuClip);
     action.setLoop(THREE.LoopRepeat,Infinity);
-    action.timeScale=.52;
+    action.timeScale=.40;
     action.play();
   }
   menuSpider.visible=true;
@@ -743,16 +743,16 @@ function updateMenuScene(t,dt){
       ensureSpiderLoading();
     }
   }else{
-    // The menu spider independently sweeps almost the entire visible ceiling.
-    // It is deliberately slower than the gameplay spider and never uses gameplay
-    // movement constants.
-    const roofTime=t*.032;
-    const roofX=46*Math.sin(roofTime)+8*Math.sin(roofTime*.41);
-    const roofZ=-10+36*Math.sin(roofTime*.53+1.1);
+    // Menu-only ceiling route. It starts directly inside the camera's view,
+    // then sweeps the broad visible roof instead of getting trapped in a corner.
+    // These values are independent from the gameplay spider.
+    const roofTime=t*.023;
+    const roofX=5+22*Math.sin(roofTime)+4*Math.sin(roofTime*.37);
+    const roofZ=-26+30*Math.sin(roofTime*.49+.6);
 
-    const lookTime=(t+.12)*.032;
-    const nextX=46*Math.sin(lookTime)+8*Math.sin(lookTime*.41);
-    const nextZ=-10+36*Math.sin(lookTime*.53+1.1);
+    const lookTime=(t+.18)*.023;
+    const nextX=5+22*Math.sin(lookTime)+4*Math.sin(lookTime*.37);
+    const nextZ=-26+30*Math.sin(lookTime*.49+.6);
 
     menuSpider.position.x=roofX;
     menuSpider.position.z=roofZ;
