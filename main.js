@@ -663,6 +663,18 @@ function syncMenuSpiderFromGameplayModel(){
     node.frustumCulled=false;
     node.castShadow=false;
     node.receiveShadow=false;
+
+    // Darken only the isolated menu clone while preserving the Spider-Psionic
+    // texture map itself. The gameplay spider keeps its original appearance.
+    const materials=Array.isArray(node.material)
+      ? node.material
+      : [node.material];
+
+    for(const material of materials){
+      if(!material?.color?.multiplyScalar) continue;
+      material.color.multiplyScalar(.28);
+      material.needsUpdate=true;
+    }
   });
   // Menu-only ceiling anchor. Never derive this from the gameplay spider's
   // fitted bounds, because that can move the menu clone toward the floor.
