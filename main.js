@@ -716,7 +716,7 @@ function updateMenuScene(t,dt){
     menuSpider.position.x=MENU_SPIDER_PATH_CENTER_X+x;
     menuSpider.position.y=MENU_SPIDER_CEILING_Y;
     menuSpider.position.z=MENU_SPIDER_PATH_CENTER_Z+z;
-    menuSpider.rotation.y=Math.atan2(nx-x,nz-z);
+    menuSpider.rotation.y=Math.atan2(nx-x,nz-z)+Math.PI;
     menuSpider.rotation.z=Math.sin(t*.35)*.015;
 
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
