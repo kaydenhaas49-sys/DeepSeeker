@@ -566,7 +566,7 @@ menuSet.add(menuDust);
 // gameplay entity, transform, or animation mixer.
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
-menuSpider.position.set(7.0,7.95,-31.0);
+menuSpider.position.set(6.5,7.95,-14.5);
 menuSpider.rotation.y=Math.PI*.18;
 menuSpider.visible=false;
 menuSet.add(menuSpider);
@@ -666,8 +666,8 @@ function updateMenuScene(t,dt){
       ensureSpiderLoading();
     }
   }else{
-    menuSpider.position.x=7.0+Math.sin(t*.19)*1.8;
-    menuSpider.position.z=-31.0+Math.cos(t*.13)*1.1;
+    menuSpider.position.x=6.5+Math.sin(t*.19)*1.15;
+    menuSpider.position.z=-14.5+Math.cos(t*.13)*.65;
     menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
     menuSpider.rotation.z=Math.sin(t*.29)*.025;
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
