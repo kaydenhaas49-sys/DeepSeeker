@@ -673,7 +673,7 @@ function syncMenuSpiderFromGameplayModel(){
   if(menuClip){
     const action=menuSpiderMixer.clipAction(menuClip);
     action.setLoop(THREE.LoopRepeat,Infinity);
-    action.timeScale=.42;
+    action.timeScale=.82;
     action.play();
   }
   menuSpider.visible=true;
@@ -742,8 +742,8 @@ function updateMenuScene(t,dt){
       ensureSpiderLoading();
     }
   }else{
-    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.19)*2.4;
-    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.13)*1.25;
+    menuSpider.position.x=MENU_SPIDER_X+Math.sin(t*.52)*2.4;
+    menuSpider.position.z=MENU_SPIDER_Z+Math.cos(t*.36)*1.25;
     menuSpider.rotation.y=Math.PI*.18+Math.sin(t*.16)*.16;
     menuSpider.rotation.z=Math.sin(t*.29)*.04;
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
