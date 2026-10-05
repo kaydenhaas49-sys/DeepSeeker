@@ -4004,15 +4004,8 @@ function moveSpiderOnCeiling(dt){
 
   const inv=1/Math.max(distance,.001);
   const step=Math.min(SPIDER_CEILING_SPEED*dt,distance);
-  const nextX=spiderEntity.position.x+dx*inv*step;
-  const nextZ=spiderEntity.position.z+dz*inv*step;
-
-  if(!isSpiderBlocked(nextX,nextZ)){
-    spiderEntity.position.x=nextX;
-    spiderEntity.position.z=nextZ;
-  }else{
-    chooseSpiderCeilingTarget();
-  }
+  spiderEntity.position.x+=dx*inv*step;
+  spiderEntity.position.z+=dz*inv*step;
 
   spiderEntity.rotation.y=Math.atan2(
     spiderCeilingTarget.x-spiderEntity.position.x,
@@ -4021,14 +4014,40 @@ function moveSpiderOnCeiling(dt){
 }
 
 function isSpiderBlocked(x,z){
-  const walls=world.getNearbyWallBounds(x,z,SPIDER_RADIUS+.35);
+  const walls=world.getNearbyWallBounds(x,z,SPIDER_RADIUS+.22);
   for(const wall of walls){
     const nx=Math.max(wall.minX,Math.min(x,wall.maxX));
     const nz=Math.max(wall.minZ,Math.min(z,wall.maxZ));
     const dx=x-nx;
     const dz=z-nz;
-    if(dx*dx+dz*dz<SPIDER_RADIUS*SPIDER_RADIUS) return true;
+    if(dx*dx+dz*dz<=SPIDER_RADIUS*SPIDER_RADIUS) return true;
   }
+  return false;
+}
+
+function tryMoveSpiderGround(dx,dz){
+  const x=spiderEntity.position.x;
+  const z=spiderEntity.position.z;
+  const nextX=x+dx;
+  const nextZ=z+dz;
+
+  if(!isSpiderBlocked(nextX,nextZ)){
+    spiderEntity.position.x=nextX;
+    spiderEntity.position.z=nextZ;
+    return true;
+  }
+
+  // Slide along corners instead of freezing when the ideal path touches a wall.
+  if(!isSpiderBlocked(nextX,z)){
+    spiderEntity.position.x=nextX;
+    return true;
+  }
+
+  if(!isSpiderBlocked(x,nextZ)){
+    spiderEntity.position.z=nextZ;
+    return true;
+  }
+
   return false;
 }
 
@@ -4092,39 +4111,42 @@ function rotatePlayerTowardSpider(dt){
 }
 
 function findSpiderSpawnPosition(){
-  // Test spawns should surround the player instead of always appearing
-  // directly in front of the camera. Try several random points on a nearby
-  // ring, then fall back to evenly spaced directions if the area is blocked.
-  const randomCandidates=[];
-  for(let i=0;i<24;i++){
+  const hidden=[];
+  const visible=[];
+
+  for(let i=0;i<40;i++){
     const angle=Math.random()*Math.PI*2;
-    const distance=THREE.MathUtils.lerp(10,18,Math.random());
-    randomCandidates.push([
-      player.pos.x+Math.cos(angle)*distance,
-      player.pos.z+Math.sin(angle)*distance
-    ]);
-  }
-
-  for(const [x,z] of randomCandidates){
-    if(!isSpiderBlocked(x,z)){
-      return {x,z};
-    }
-  }
-
-  for(let i=0;i<16;i++){
-    const angle=(i/16)*Math.PI*2;
-    const distance=i%2===0 ? 12 : 16;
+    const distance=THREE.MathUtils.lerp(
+      SPIDER_MIN_SPAWN_DISTANCE,
+      SPIDER_MAX_SPAWN_DISTANCE,
+      Math.random()
+    );
     const x=player.pos.x+Math.cos(angle)*distance;
     const z=player.pos.z+Math.sin(angle)*distance;
-    if(!isSpiderBlocked(x,z)){
-      return {x,z};
-    }
+
+    if(isSpiderBlocked(x,z)) continue;
+
+    const hiddenFromPlayer=!spiderPathSegmentClear(
+      player.pos.x,
+      player.pos.z,
+      x,
+      z
+    );
+
+    (hiddenFromPlayer ? hidden : visible).push({x,z});
   }
 
-  const fallbackAngle=Math.random()*Math.PI*2;
+  if(hidden.length){
+    return hidden[Math.floor(Math.random()*hidden.length)];
+  }
+
+  if(visible.length){
+    return visible[Math.floor(Math.random()*visible.length)];
+  }
+
   return {
-    x:player.pos.x+Math.cos(fallbackAngle)*11,
-    z:player.pos.z+Math.sin(fallbackAngle)*11
+    x:player.pos.x+SPIDER_MIN_SPAWN_DISTANCE,
+    z:player.pos.z
   };
 }
 
@@ -4318,8 +4340,17 @@ function buildSpiderPath(){
     i=farthest+1;
   }
 
-  smooth[smooth.length-1].x=goalX;
-  smooth[smooth.length-1].z=goalZ;
+  const last=smooth[smooth.length-1];
+  if(last && spiderPathSegmentClear(last.x,last.z,goalX,goalZ)){
+    last.x=goalX;
+    last.z=goalZ;
+  }else if(!last || Math.hypot(last.x-goalX,last.z-goalZ)>.8){
+    smooth.push(new THREE.Vector3(
+      goalX,
+      spiderEntity.position.y,
+      goalZ
+    ));
+  }
 
   spiderPath=smooth;
   spiderPathIndex=0;
@@ -4382,13 +4413,11 @@ function moveSpiderTowardPlayer(dt){
   if(waypointDistance>.001){
     const inv=1/waypointDistance;
     const step=Math.min(SPIDER_SPEED*dt,waypointDistance);
-    const nextX=spiderEntity.position.x+waypointDx*inv*step;
-    const nextZ=spiderEntity.position.z+waypointDz*inv*step;
-
-    if(!isSpiderBlocked(nextX,nextZ)){
-      spiderEntity.position.x=nextX;
-      spiderEntity.position.z=nextZ;
-    }else{
+    if(!tryMoveSpiderGround(
+      waypointDx*inv*step,
+      waypointDz*inv*step
+    )){
+      spiderPathRepathTimer=0;
       buildSpiderPath();
     }
 
@@ -4396,6 +4425,25 @@ function moveSpiderTowardPlayer(dt){
       waypoint.x-spiderEntity.position.x,
       waypoint.z-spiderEntity.position.z
     );
+  }
+
+  const movedDistance=Math.hypot(
+    spiderEntity.position.x-(Number.isFinite(spiderLastMoveX) ? spiderLastMoveX : spiderEntity.position.x),
+    spiderEntity.position.z-(Number.isFinite(spiderLastMoveZ) ? spiderLastMoveZ : spiderEntity.position.z)
+  );
+
+  if(movedDistance<.003){
+    spiderStuckTime+=dt;
+  }else{
+    spiderStuckTime=0;
+  }
+
+  spiderLastMoveX=spiderEntity.position.x;
+  spiderLastMoveZ=spiderEntity.position.z;
+
+  if(spiderStuckTime>1.25){
+    spiderStuckTime=0;
+    startSpiderCeilingMode();
   }
 
   return distance;
