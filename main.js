@@ -3542,7 +3542,13 @@ function updateInitialLoadingScreen(){
   const houseProgress=Number.isFinite(window.__deepseekerHouseLoadProgress)
     ? window.__deepseekerHouseLoadProgress
     : (houseCollisionReady ? 100 : houseLoaded ? 76 : houseLoadStarted ? 8 : 0);
-  const spiderProgress=spiderLoaded ? 100 : spiderLoadStarted ? 18 : 0;
+  const spiderProgress=spiderLoaded
+    ? 100
+    : spiderLoadStarted
+      ? 18
+      : spiderStartupFailed
+        ? 100
+        : 0;
   const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
   const total=Math.max(0,Math.min(100,Math.round(
     houseProgress*.60 + spiderProgress*.35 + saveProgress*.05
@@ -3561,6 +3567,8 @@ function updateInitialLoadingScreen(){
       status.textContent="LOADING APARTMENT ASSET…";
     }else if(!houseCollisionReady){
       status.textContent="BUILDING APARTMENT COLLISION…";
+    }else if(!spiderLoaded && spiderStartupFailed){
+      status.textContent="SPIDER LOAD FAILED — MENU CAN CONTINUE; RETRYING IN BACKGROUND…";
     }else if(!spiderLoaded){
       status.textContent="LOADING SPIDER-Psionic…";
     }else{
@@ -3573,7 +3581,11 @@ function updateInitialLoadingScreen(){
 
 function finishInitialLoading(){
   if(initialLandingShown) return;
-  if(!houseCollisionReady || !spiderLoaded || !window.__deepseekerSaveHydrationDone){
+  if(
+    !houseCollisionReady ||
+    (!spiderLoaded && !spiderStartupFailed) ||
+    !window.__deepseekerSaveHydrationDone
+  ){
     updateInitialLoadingScreen();
     return;
   }
@@ -3635,6 +3647,8 @@ scene.add(spiderEntity);
 
 let spiderLoaded=false;
 let spiderLoadStarted=false;
+let spiderStartupFailed=false;
+let spiderRetryTimer=null;
 let spiderModel=null;
 let spiderMixer=null;
 const spiderActions=new Map();
@@ -4727,6 +4741,11 @@ function finishSpiderModel(model,animations,sourceName){
   spiderOriginalModel=model;
   spiderEntity.add(model);
   spiderLoaded=true;
+  spiderStartupFailed=false;
+  if(spiderRetryTimer!==null){
+    clearTimeout(spiderRetryTimer);
+    spiderRetryTimer=null;
+  }
 
   spiderMixer=null;
   spiderActions.clear();
@@ -4991,6 +5010,7 @@ async function loadSpiderFromPack(){
 
   const failSpiderLoad=(error,message)=>{
     spiderLoaded=false;
+    spiderStartupFailed=true;
     spiderModel=null;
     spiderMixer=null;
     spiderActions.clear();
@@ -5004,9 +5024,26 @@ async function loadSpiderFromPack(){
     objectUrls=[];
 
     console.error("[DeepSeeker] Spider-Psionic pack load failed:",error);
+
     if(gameStarted){
-      eventText.textContent=message;
+      eventText.textContent=message+" · RETRYING";
       eventText.style.opacity="1";
+      setTimeout(()=>{
+        if(eventText.textContent===(message+" · RETRYING")){
+          eventText.style.opacity="0";
+        }
+      },1800);
+    }
+
+    if(spiderRetryTimer===null){
+      spiderRetryTimer=setTimeout(()=>{
+        spiderRetryTimer=null;
+        if(!spiderLoaded && !spiderLoadStarted){
+          spiderStartupFailed=false;
+          spiderLoadStarted=true;
+          loadSpiderFromPack();
+        }
+      },4000);
     }
   };
 
