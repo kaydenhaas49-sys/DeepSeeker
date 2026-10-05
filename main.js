@@ -4233,7 +4233,7 @@ function moveSpiderTowardPlayer(dt){
 
   if(spiderStuckTime>1.25){
     spiderStuckTime=0;
-    startSpiderCeilingMode();
+    startSpiderGroundChase();
   }
 
   return distance;
@@ -4402,7 +4402,6 @@ function finishSpiderJumpscare(){
   spiderJumpscareScale=1;
   spiderBehaviorState="chase";
   spiderBehaviorTime=0;
-  spiderOnCeiling=false;
   spiderStuckTime=0;
   clearSpiderPath();
   spiderChaseDuration=THREE.MathUtils.lerp(
@@ -5941,7 +5940,7 @@ function animate(){
     spiderMixer.update(dt);
   }
 
-  if(spiderJumpscareTimer<=0 && spiderTransitionTimer>=spiderTransitionDuration){
+  if(spiderJumpscareTimer<=0){
     groundSpiderEntity();
   }
 
