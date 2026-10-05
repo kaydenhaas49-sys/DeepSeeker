@@ -596,7 +596,7 @@ const MENU_SPIDER_SCALE=.06;
 const MENU_DUCK_SCALE=.82;
 const MENU_SPIDER_CEILING_Y=8.98;
 // Put the duck on the foreground floor, centered in front of the title camera.
-const MENU_DUCK_MENU_X=-11.2;
+const MENU_DUCK_MENU_X=-8.4;
 const MENU_DUCK_MENU_Y=0;
 const MENU_DUCK_MENU_Z=8.5;
 const MENU_DUCK_SPIN_SPEED=1.35;
