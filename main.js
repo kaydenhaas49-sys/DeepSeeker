@@ -593,8 +593,12 @@ menuSet.add(menuDust);
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
-const MENU_DUCK_SCALE=.34;
+const MENU_DUCK_SCALE=.52;
 const MENU_SPIDER_CEILING_Y=8.98;
+const MENU_DUCK_MENU_X=5.5;
+const MENU_DUCK_MENU_Y=3.15;
+const MENU_DUCK_MENU_Z=-18.5;
+const MENU_DUCK_SPIN_SPEED=1.35;
 const MENU_SPIDER_PATH_CENTER_X=3.0;
 const MENU_SPIDER_PATH_CENTER_Z=-18.0;
 const MENU_SPIDER_PATH_RADIUS_X=22.0;
@@ -676,7 +680,8 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpiderActual.scale.setScalar(
     arachnophobiaMode ? MENU_DUCK_SCALE : MENU_SPIDER_SCALE
   );
-  menuSpiderActual.rotation.x=Math.PI;
+  menuSpiderActual.rotation.x=arachnophobiaMode ? 0 : Math.PI;
+  menuSpiderActual.rotation.y=arachnophobiaMode ? 0 : Math.PI;
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
     node.frustumCulled=false;
@@ -778,6 +783,20 @@ function updateMenuScene(t,dt){
       menuSpiderLoadRequested=true;
       loadSpiderFromPack();
     }
+  }else if(arachnophobiaMode){
+    // In arachnophobia mode the spider is replaced by a friendly duck mascot.
+    // Keep it in the visual center of the menu and continuously spin it in place.
+    menuSpider.position.set(
+      MENU_DUCK_MENU_X,
+      MENU_DUCK_MENU_Y,
+      MENU_DUCK_MENU_Z
+    );
+    menuSpider.rotation.set(
+      0,
+      t*MENU_DUCK_SPIN_SPEED,
+      0
+    );
+    menuSpider.rotation.z=0;
   }else{
     const phase=t*MENU_SPIDER_PATH_SPEED;
     const nextPhase=(t+dt)*MENU_SPIDER_PATH_SPEED;
