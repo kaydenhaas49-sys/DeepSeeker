@@ -321,6 +321,10 @@ export class Multiplayer {
       chatSequence: Number.isFinite(Number(state?.chatSequence)) ? Number(state.chatSequence) : 0,
       chatMessage: this.sanitizeMessage(state?.chatMessage || ""),
       chatSender: this.sanitizeName(state?.chatSender || ""),
+      worldEventSequence: Number.isFinite(Number(state?.worldEventSequence)) ? Number(state.worldEventSequence) : 0,
+      worldEventType: this.sanitizeMessage(state?.worldEventType || ""),
+      worldEventId: this.sanitizeMessage(state?.worldEventId || ""),
+      worldEventPayload: state?.worldEventPayload || "",
     };
   }
 
