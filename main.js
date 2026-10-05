@@ -27,6 +27,10 @@ const overlay=document.getElementById("overlay");
 const loadingScreen=document.getElementById("loadingScreen");
 const homeScreen=document.getElementById("homeScreen");
 const lobbyScreen=document.getElementById("lobbyScreen");
+const arachnophobiaWarning=document.getElementById("arachnophobiaWarning");
+const arachnophobiaModeButton=document.getElementById("arachnophobiaModeButton");
+const arachnophobiaModeStatus=document.getElementById("arachnophobiaModeStatus");
+const arachnophobiaContinueButton=document.getElementById("arachnophobiaContinueButton");
 const prompt=document.getElementById("prompt");
 const newGameButton=document.getElementById("newGameButton");
 const continueButton=document.getElementById("continueButton");
@@ -2516,6 +2520,44 @@ function toggleArachnophobia(){
   setTimeout(()=>{eventText.style.opacity="0";},1700);
 }
 
+function updateArachnophobiaWarningUI(){
+  if(!arachnophobiaModeButton) return;
+
+  arachnophobiaModeButton.textContent=arachnophobiaMode
+    ? "ARACHNOPHOBIA MODE: ON · RUBBER DUCK"
+    : "ARACHNOPHOBIA MODE: OFF · SPIDER";
+
+  if(arachnophobiaModeStatus){
+    arachnophobiaModeStatus.textContent=arachnophobiaMode
+      ? "SPIDER REPLACED WITH RUBBER DUCK"
+      : "SPIDER ENTITY ENABLED";
+  }
+}
+
+function showArachnophobiaWarning(){
+  if(!arachnophobiaWarning) return;
+
+  loadingScreen.style.display="none";
+  homeScreen.classList.add("hidden");
+  lobbyScreen.classList.add("hidden");
+  arachnophobiaWarning.classList.remove("hidden");
+  arachnophobiaWarning.setAttribute("aria-hidden","false");
+  updateArachnophobiaWarningUI();
+}
+
+function continueFromArachnophobiaWarning(){
+  if(!arachnophobiaWarning) return;
+
+  arachnophobiaWarning.classList.add("hidden");
+  arachnophobiaWarning.setAttribute("aria-hidden","true");
+
+  if(new URLSearchParams(location.search).get("lobby")==="1"){
+    showLobbyScreen();
+  }else{
+    showHomeScreen();
+  }
+}
+
 function installArachnophobiaControl(){
   const box=document.getElementById("controlsBox");
   if(!box || document.getElementById("deepseekerArachnophobiaToggle")) return;
@@ -2534,6 +2576,13 @@ function installArachnophobiaControl(){
 }
 
 installArachnophobiaControl();
+
+arachnophobiaModeButton?.addEventListener("click",()=>{
+  toggleArachnophobia();
+  updateArachnophobiaWarningUI();
+});
+
+arachnophobiaContinueButton?.addEventListener("click",continueFromArachnophobiaWarning);
 
 let multiplayerMapOpen=false;
 const multiplayerMap=document.createElement("div");
@@ -3598,12 +3647,7 @@ function finishInitialLoading(){
     initialLoadingTimer=null;
   }
 
-  loadingScreen.style.display="none";
-  if(new URLSearchParams(location.search).get("lobby")==="1"){
-    showLobbyScreen();
-  }else{
-    showHomeScreen();
-  }
+  showArachnophobiaWarning();
 }
 
 function beginInitialLoading(){
