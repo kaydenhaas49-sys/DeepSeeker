@@ -3524,6 +3524,8 @@ function setHouseMode(enabled,options={}){
 installMainMenuRedesign();
 installArachnophobiaControl();
 
+let arachnophobiaMode=getArachnophobiaMode();
+
 const initialParams=new URLSearchParams(location.search);
 const querySaveSlot=initialParams.get("saveSlot");
 if(querySaveSlot!==null){
@@ -3669,7 +3671,6 @@ let spiderPounceTarget=new THREE.Vector3();
 let spiderAutoLookTimer=0;
 let spiderAutoLookStarted=false;
 let spiderChaseDuration=5;
-let arachnophobiaMode=getArachnophobiaMode();
 let spiderOriginalModel=null;
 let funnyDuckModel=null;
 let spiderPath=[];
