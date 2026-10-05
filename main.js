@@ -47,6 +47,7 @@ const copyLobbyButton=document.getElementById("copyLobbyButton");
 const leaveLobbyButton=document.getElementById("leaveLobbyButton");
 const crosshair=document.getElementById("crosshair");
 const controls=document.getElementById("controlsPanel");
+const fitScreenButton=document.getElementById("fitScreenButton");
 const staminaBar=document.getElementById("staminaBar");
 const staminaValue=document.getElementById("staminaValue");
 const batteryBar=document.getElementById("batteryBar");
@@ -5716,6 +5717,10 @@ controls.addEventListener("click",e=>{
   if(e.target===controls) hideControls();
 });
 
+fitScreenButton?.addEventListener("click",()=>{
+  toggleFitScreen();
+});
+
 document.addEventListener("pointerlockchange",()=>{
   const locked=document.pointerLockElement===renderer.domElement;
 
@@ -5749,6 +5754,12 @@ document.addEventListener("pointerlockchange",()=>{
 });
 
 document.addEventListener("keydown",e=>{
+  if(e.code==="F11"){
+    e.preventDefault();
+    toggleFitScreen();
+    return;
+  }
+
   if(adminOverlay?.classList.contains("open")) return;
 
   if(securityCameras.active){
@@ -5836,14 +5847,55 @@ function triggerEvent(){
   },1800);
 }
 
-addEventListener("resize",()=>{
-  camera.aspect=innerWidth/innerHeight;
+function getDisplaySize(){
+  const viewport=window.visualViewport;
+  return {
+    width:Math.max(1,Math.round(viewport?.width||innerWidth)),
+    height:Math.max(1,Math.round(viewport?.height||innerHeight))
+  };
+}
+
+function fitGameToScreen(){
+  const {width,height}=getDisplaySize();
+
+  camera.aspect=width/height;
   camera.updateProjectionMatrix();
-  menuCamera.aspect=innerWidth/innerHeight;
+
+  menuCamera.aspect=width/height;
   menuCamera.updateProjectionMatrix();
+
   securityCameras.resize();
-  renderer.setSize(innerWidth,innerHeight);
-});
+  renderer.setSize(width,height,false);
+
+  // Keep CSS and WebGL aligned to the exact viewport currently available.
+  renderer.domElement.style.width="100%";
+  renderer.domElement.style.height="100%";
+
+  document.documentElement.style.setProperty("--deepseeker-vw",width+"px");
+  document.documentElement.style.setProperty("--deepseeker-vh",height+"px");
+}
+
+async function toggleFitScreen(){
+  try{
+    if(document.fullscreenElement){
+      await document.exitFullscreen();
+    }else{
+      await document.documentElement.requestFullscreen({navigationUI:"hide"});
+    }
+  }catch(error){
+    console.warn("[DeepSeeker] Fullscreen unavailable:",error);
+  }
+  fitGameToScreen();
+}
+
+addEventListener("resize",fitGameToScreen);
+
+if(window.visualViewport){
+  window.visualViewport.addEventListener("resize",fitGameToScreen);
+}
+
+document.addEventListener("fullscreenchange",fitGameToScreen);
+fitGameToScreen();
 
 const clock=new THREE.Clock();
 function animate(){
