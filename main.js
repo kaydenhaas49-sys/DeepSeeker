@@ -600,7 +600,6 @@ const MENU_DUCK_MENU_X=-11.2;
 const MENU_DUCK_MENU_Y=0;
 const MENU_DUCK_MENU_Z=8.5;
 const MENU_DUCK_SPIN_SPEED=1.35;
-const MENU_DUCK_EDGE_SAFE_MARGIN=.30;
 const MENU_SPIDER_PATH_CENTER_X=3.0;
 const MENU_SPIDER_PATH_CENTER_Z=-18.0;
 const MENU_SPIDER_PATH_RADIUS_X=22.0;
@@ -808,20 +807,11 @@ function updateMenuScene(t,dt){
     );
     menuSpider.rotation.z=0;
 
-    const duckMeshes=[];
+    // Keep the duck's individual meshes from being frustum-culled while
+    // a wing is crossing the edge of the menu camera's view.
     menuSpiderActual?.traverse(node=>{
-      if(node.isMesh) duckMeshes.push(node);
+      if(node.isMesh) node.frustumCulled=false;
     });
-
-    // Keep the whole duck render-safe. The extra margin prevents a wing that is
-    // only barely visible at the viewport edge from being treated inconsistently.
-    for(const mesh of duckMeshes){
-      mesh.frustumCulled=false;
-      if(mesh.geometry) mesh.geometry.computeBoundingSphere();
-      if(mesh.geometry?.boundingSphere){
-        mesh.geometry.boundingSphere.radius*=1+MENU_DUCK_EDGE_SAFE_MARGIN;
-      }
-    }
   }else{
     const phase=t*MENU_SPIDER_PATH_SPEED;
     const nextPhase=(t+dt)*MENU_SPIDER_PATH_SPEED;
