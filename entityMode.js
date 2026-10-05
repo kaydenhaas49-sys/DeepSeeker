@@ -20,11 +20,13 @@ export function setArachnophobiaMode(enabled){
 export function createFunnyDuckEntity(){
   const root=new THREE.Group();
   root.name="ArachnophobiaRubberDuck";
-  root.scale.setScalar(1.05);
+  root.scale.setScalar(1.10);
 
   const yellow=new THREE.MeshStandardMaterial({
-    color:0xf1cf37,
-    roughness:.7,
+    color:0xffd83d,
+    emissive:0x6f5600,
+    emissiveIntensity:.20,
+    roughness:.65,
     metalness:.02
   });
   const orange=new THREE.MeshStandardMaterial({
@@ -64,8 +66,8 @@ export function createFunnyDuckEntity(){
 
   for(const x of [-.63,.63]){
     const wing=new THREE.Mesh(new THREE.SphereGeometry(.34,14,10),yellow);
-    wing.scale.set(.55,1,.38);
-    wing.position.set(x*.82,.76,.03);
+    wing.scale.set(.68,1.08,.46);
+    wing.position.set(x*.88,.76,.03);
     wing.rotation.z=x<0 ? .32 : -.32;
     root.add(wing);
   }
