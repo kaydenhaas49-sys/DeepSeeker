@@ -801,14 +801,14 @@ function updateMenuScene(t,dt){
       MENU_DUCK_MENU_Y,
       MENU_DUCK_MENU_Z
     );
-    menuSpider.rotation.set(
-      0,
-      0,
-      t*MENU_DUCK_SPIN_SPEED
-    );
+    // Keep the biscuit's world position completely fixed. Only rotate the
+    // sprite itself around its own center so it does not bob or orbit vertically.
+    menuSpider.rotation.set(0,0,0);
 
     menuSpiderActual?.traverse(node=>{
-      if(node.isSprite) node.frustumCulled=false;
+      if(!node.isSprite) return;
+      node.frustumCulled=false;
+      node.rotation.z=t*MENU_DUCK_SPIN_SPEED;
     });
   }else{
     const phase=t*MENU_SPIDER_PATH_SPEED;
