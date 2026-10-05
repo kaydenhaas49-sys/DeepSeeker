@@ -4487,12 +4487,39 @@ function startSpiderJumpscare(){
   );
 
   if(isSpiderBlocked(spiderPounceTarget.x,spiderPounceTarget.z) || crossesWall){
-    const safe=findSafeSpiderGroundPointAroundPlayer(1.15,2.0);
-    spiderPounceTarget.set(
-      safe.x,
-      SPIDER_GROUND_OFFSET,
-      safe.z
-    );
+    let safe=null;
+    const baseAngle=Math.random()*Math.PI*2;
+
+    for(let i=0;i<24;i++){
+      const angle=baseAngle+(i/24)*Math.PI*2;
+      const distance=THREE.MathUtils.lerp(1.15,2.0,(i%6)/5);
+      const x=player.pos.x+Math.cos(angle)*distance;
+      const z=player.pos.z+Math.sin(angle)*distance;
+
+      if(
+        !isSpiderBlocked(x,z) &&
+        spiderPathSegmentClear(
+          spiderPounceStart.x,
+          spiderPounceStart.z,
+          x,
+          z
+        )
+      ){
+        safe={x,z};
+        break;
+      }
+    }
+
+    if(safe){
+      spiderPounceTarget.set(
+        safe.x,
+        SPIDER_GROUND_OFFSET,
+        safe.z
+      );
+    }else{
+      spiderPounceTarget.copy(spiderPounceStart);
+      spiderPounceTarget.y=SPIDER_GROUND_OFFSET;
+    }
   }
 
   spiderJumpscareScale=1;
