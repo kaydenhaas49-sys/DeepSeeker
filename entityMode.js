@@ -19,70 +19,29 @@ export function setArachnophobiaMode(enabled){
 
 export function createFunnyDuckEntity(){
   const root=new THREE.Group();
-  root.name="ArachnophobiaRubberDuck";
-  root.scale.setScalar(1.10);
+  root.name="ArachnophobiaBiscuit";
+  root.scale.setScalar(1.0);
 
-  const yellow=new THREE.MeshStandardMaterial({
-    color:0xffd83d,
-    emissive:0x6f5600,
-    emissiveIntensity:.20,
-    roughness:.65,
-    metalness:.02
+  // Transparent biscuit image used as the harmless arachnophobia replacement.
+  const texture=new THREE.TextureLoader().load("./assets/biscuit.svg");
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.needsUpdate=true;
+
+  const material=new THREE.SpriteMaterial({
+    map:texture,
+    transparent:true,
+    depthTest:true,
+    depthWrite:true,
+    sizeAttenuation:true
   });
-  const orange=new THREE.MeshStandardMaterial({
-    color:0xe58b25,
-    roughness:.72
-  });
-  const black=new THREE.MeshBasicMaterial({color:0x101010});
 
-  const body=new THREE.Mesh(
-    new THREE.SphereGeometry(.72,20,14),
-    yellow
-  );
-  body.scale.set(1,.86,1.2);
-  body.position.y=.72;
-  root.add(body);
+  const sprite=new THREE.Sprite(material);
+  sprite.name="BiscuitImage";
+  sprite.scale.set(2.75,2.33,1);
+  sprite.position.y=1.05;
+  root.add(sprite);
 
-  const head=new THREE.Mesh(
-    new THREE.SphereGeometry(.56,20,16),
-    yellow
-  );
-  head.position.set(0,1.42,.06);
-  root.add(head);
-
-  const beak=new THREE.Mesh(
-    new THREE.SphereGeometry(.22,16,10),
-    orange
-  );
-  beak.scale.set(1,.45,1.35);
-  beak.position.set(0,1.38,-.52);
-  root.add(beak);
-
-  for(const x of [-.19,.19]){
-    const eye=new THREE.Mesh(new THREE.SphereGeometry(.095,10,8),black);
-    eye.position.set(x,1.60,-.43);
-    root.add(eye);
-  }
-
-  for(const x of [-.63,.63]){
-    const wing=new THREE.Mesh(new THREE.SphereGeometry(.34,14,10),yellow);
-    wing.scale.set(.68,1.08,.46);
-    wing.position.set(x*.88,.76,.03);
-    wing.rotation.z=x<0 ? .32 : -.32;
-    root.add(wing);
-  }
-
-  for(const x of [-.28,.28]){
-    const foot=new THREE.Mesh(
-      new THREE.CapsuleGeometry(.10,.36,6,10),
-      orange
-    );
-    foot.rotation.z=Math.PI/2;
-    foot.position.set(x,.19,-.03);
-    root.add(foot);
-  }
-
-  root.userData.entityReplacement="rubber_duck";
-  root.userData.entityLabel="RUBBER DUCK";
+  root.userData.entityReplacement="biscuit";
+  root.userData.entityLabel="BISCUIT";
   return root;
 }
