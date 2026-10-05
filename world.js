@@ -245,6 +245,7 @@ export class World {
     this.fixtureLights = [];
     this.interactables = [];
     this.securityCameras = [];
+    this.atmosphereEffects = [];
 
     // Shared per-chunk geometry templates (never disposed per chunk).
     this.floorGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE);
@@ -291,6 +292,7 @@ export class World {
     this.fixtureLights = this.fixtureLights.filter(item => item.light.parent);
     this.interactables = this.interactables.filter(item => item?.parent);
     this.securityCameras = this.securityCameras.filter(item => item?.group?.parent);
+    this.atmosphereEffects = this.atmosphereEffects.filter(item => item?.group?.parent);
     this.chunks.delete(key);
   }
 
@@ -323,6 +325,36 @@ export class World {
       item.light.visible=true;
       const flicker=.93+.07*Math.sin(now*item.flickerSpeed+item.phase);
       item.light.intensity=item.baseIntensity*flicker;
+    }
+  }
+
+  updateAtmosphereEffects(dt, px, pz){
+    this.atmosphereEffects=this.atmosphereEffects.filter(item=>item?.group?.parent);
+    const maxDistance=42;
+    const maxDistanceSq=maxDistance*maxDistance;
+
+    for(const effect of this.atmosphereEffects){
+      const dx=effect.x-px;
+      const dz=effect.z-pz;
+      if(dx*dx+dz*dz>maxDistanceSq){
+        effect.group.visible=false;
+        continue;
+      }
+      effect.group.visible=true;
+
+      effect.time+=dt;
+      if(effect.type==="leak"){
+        for(let i=0;i<effect.drops.length;i++){
+          const drop=effect.drops[i];
+          drop.position.y-=drop.speed*dt;
+          if(drop.position.y<.08){
+            drop.position.y=drop.startY;
+          }
+        }
+      }else if(effect.type==="gust"){
+        effect.particles.rotation.y+=dt*.35;
+        effect.particles.position.x=Math.sin(effect.time*.75+effect.phase)*.18;
+      }
     }
   }
 
@@ -405,6 +437,88 @@ export class World {
 
   // -- mesh building ---------------------------------------------------------
 
+  buildAtmosphereEffects(group, data, cx, cz) {
+    const rng=mulberry32(hashSeed(cx,cz,this.seed)^0x7a4d21);
+    if(rng()>0.22) return;
+
+    const candidates=[];
+    for(let lx=2;lx<=CHUNK_CELLS-3;lx++){
+      for(let lz=2;lz<=CHUNK_CELLS-3;lz++){
+        const gx=cx*CHUNK_CELLS+lx;
+        const gz=cz*CHUNK_CELLS+lz;
+        if(!data.cells.has(cellKey(gx,gz))) candidates.push({lx,lz});
+      }
+    }
+    if(!candidates.length) return;
+
+    const chosen=candidates[Math.floor(rng()*candidates.length)];
+    const x=(cx*CHUNK_CELLS+chosen.lx+.5)*CELL;
+    const z=(cz*CHUNK_CELLS+chosen.lz+.5)*CELL;
+
+    if(rng()<.62){
+      const effectGroup=new THREE.Group();
+      effectGroup.name="CeilingLeak";
+      effectGroup.position.set(x,WALL_H-.25,z);
+
+      const pipeMat=new THREE.MeshStandardMaterial({color:0x5d5e57,roughness:.92});
+      const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.7,8),pipeMat);
+      pipe.position.y=.30;
+      effectGroup.add(pipe);
+
+      const dropMat=new THREE.MeshBasicMaterial({color:0xc4cfcb,transparent:true,opacity:.42});
+      const drops=[];
+      for(let i=0;i<5;i++){
+        const drop=new THREE.Mesh(new THREE.SphereGeometry(.035+.015*rng(),7,7),dropMat);
+        drop.position.set((rng()-.5)*.18,.55+rng()*.55,(rng()-.5)*.18);
+        drop.startY=drop.position.y;
+        drop.speed=.7+rng()*.9;
+        effectGroup.add(drop);
+        drops.push(drop);
+      }
+
+      group.add(effectGroup);
+      this.atmosphereEffects.push({
+        type:"leak",
+        group:effectGroup,
+        drops,
+        x,z,
+        time:0
+      });
+    }else{
+      const effectGroup=new THREE.Group();
+      effectGroup.name="VentilationGust";
+      effectGroup.position.set(x,WALL_H-1.2,z);
+
+      const particleMat=new THREE.PointsMaterial({
+        color:0xb8b7a4,
+        size:.045,
+        transparent:true,
+        opacity:.17,
+        depthWrite:false
+      });
+      const positions=new Float32Array(45*3);
+      for(let i=0;i<45;i++){
+        positions[i*3]=(rng()-.5)*2.8;
+        positions[i*3+1]=(rng()-.5)*1.1;
+        positions[i*3+2]=(rng()-.5)*2.8;
+      }
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
+      const particles=new THREE.Points(geometry,particleMat);
+      effectGroup.add(particles);
+      group.add(effectGroup);
+
+      this.atmosphereEffects.push({
+        type:"gust",
+        group:effectGroup,
+        particles,
+        x,z,
+        phase:rng()*Math.PI*2,
+        time:0
+      });
+    }
+  }
+
   buildComputerProps(group, data, cx, cz) {\n    const rng = mulberry32(hashSeed(cx, cz, this.seed) ^ 0x44a91d);\n    if (rng() > 0.28) return;\n\n    const candidates = [];\n    for (let lx = 2; lx <= CHUNK_CELLS - 3; lx++) {\n      for (let lz = 2; lz <= CHUNK_CELLS - 3; lz++) {\n        const gx = cx * CHUNK_CELLS + lx;\n        const gz = cz * CHUNK_CELLS + lz;\n        const open =\n          !data.cells.has(cellKey(gx, gz)) &&\n          !data.cells.has(cellKey(gx + 1, gz)) &&\n          !data.cells.has(cellKey(gx - 1, gz)) &&\n          !data.cells.has(cellKey(gx, gz + 1)) &&\n          !data.cells.has(cellKey(gx, gz - 1));\n        if (open) candidates.push({ lx, lz });\n      }\n    }\n    if (!candidates.length) return;\n\n    const chosen = candidates[Math.floor(rng() * candidates.length)];\n    const x = (cx * CHUNK_CELLS + chosen.lx + 0.5) * CELL;\n    const z = (cz * CHUNK_CELLS + chosen.lz + 0.5) * CELL;\n    const groupId = "FIELD_PC_" + cx + "_" + cz;\n    const security = rng() < 0.45;\n\n    const station = new THREE.Group();\n    station.name = groupId;\n    station.position.set(x, 0, z);\n    station.rotation.y = Math.floor(rng() * 4) * Math.PI / 2;\n\n    const wood = new THREE.MeshStandardMaterial({ color: 0x302b24, roughness: .88 });\n    const dark = new THREE.MeshStandardMaterial({ color: 0x111312, roughness: .45 });\n    const screen = new THREE.MeshStandardMaterial({\n      color: security ? 0x162617 : 0x142019,\n      emissive: security ? 0x447a48 : 0x223c2a,\n      emissiveIntensity: security ? 1.8 : 1.15,\n      roughness: .35\n    });\n\n    const desk = new THREE.Mesh(new THREE.BoxGeometry(2.3, .12, 1.0), wood);\n    desk.position.y = .82;\n    station.add(desk);\n\n    const monitor = new THREE.Mesh(new THREE.BoxGeometry(1.35, .78, .10), dark);\n    monitor.position.set(0, 1.42, -.18);\n    station.add(monitor);\n\n    const panel = new THREE.Mesh(new THREE.BoxGeometry(1.12, .56, .025), screen);\n    panel.position.set(0, 1.43, -.235);\n    station.add(panel);\n\n    const stem = new THREE.Mesh(new THREE.BoxGeometry(.12, .45, .12), dark);\n    stem.position.set(0, 1.02, -.18);\n    station.add(stem);\n\n    const keyboard = new THREE.Mesh(new THREE.BoxGeometry(.72, .035, .30), dark);\n    keyboard.position.set(0, .91, .22);\n    station.add(keyboard);\n\n    const glow = new THREE.PointLight(security ? 0x6fba75 : 0x6f9a76, security ? 1.8 : .7, 6, 2);\n    glow.position.set(0, 1.45, -.55);\n    station.add(glow);\n\n    station.userData.interactable = {\n      type: "computer",\n      id: groupId,\n      action: "USE COMPUTER",\n      prompt: security ? "ACCESS SECURITY TERMINAL" : "USE COMPUTER",\n      security\n    };\n\n    group.add(station);\n    this.interactables.push(station);\n\n    if (security) {\n      const cameraCount = 1 + (rng() < .35 ? 1 : 0);\n      for (let index = 0; index < cameraCount; index++) {\n        const angle = Math.floor(rng() * 8) * Math.PI / 4;\n        const radius = 10 + rng() * 12;\n        const cameraX = x + Math.cos(angle) * radius;\n        const cameraZ = z + Math.sin(angle) * radius;\n\n        const camGroup = new THREE.Group();\n        camGroup.name = "SECURITY_CAM_" + cx + "_" + cz + "_" + index;\n        camGroup.position.set(cameraX, WALL_H - 1.35, cameraZ);\n\n        const housingMaterial = new THREE.MeshStandardMaterial({ color: 0x111313, roughness: .75 });\n        const housing = new THREE.Mesh(new THREE.BoxGeometry(.42, .28, .55), housingMaterial);\n        housing.rotation.x = -.18;\n        camGroup.add(housing);\n\n        const lensMaterial = new THREE.MeshBasicMaterial({ color: 0x77b985 });\n        const lens = new THREE.Mesh(new THREE.SphereGeometry(.065, 8, 8), lensMaterial);\n        lens.position.set(0, -.02, -.30);\n        camGroup.add(lens);\n\n        group.add(camGroup);\n\n        const target = new THREE.Vector3(\n          cameraX + Math.cos(angle) * 14,\n          1.7,\n          cameraZ + Math.sin(angle) * 14\n        );\n\n        this.securityCameras.push({\n          id: camGroup.name,\n          name: "CAM " + String((Math.abs(cx * 17 + cz * 31 + index)) % 99 + 1).padStart(2, "0"),\n          group: camGroup,\n          position: new THREE.Vector3(cameraX, WALL_H - 1.35, cameraZ),\n          lookAt: target\n        });\n      }\n    }\n  }\n\n  getInteractables() {\n    this.interactables = this.interactables.filter(item => item?.parent);\n    return this.interactables;\n  }\n\n  getSecurityCameras() {\n    this.securityCameras = this.securityCameras.filter(item => item?.group?.parent);\n    return this.securityCameras;\n  }\n\n  buildChunkMeshes(data, cx, cz) {
     const group = new THREE.Group();
     const ox = cx * CHUNK_SIZE;
@@ -436,6 +550,7 @@ export class World {
 
     this.buildCeilingFixtures(group, cx, cz);
     this.buildComputerProps(group, data, cx, cz);
+    this.buildAtmosphereEffects(group, data, cx, cz);
 
     return group;
   }
