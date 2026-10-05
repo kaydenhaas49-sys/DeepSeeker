@@ -78,8 +78,8 @@ export class Player {
       ) {
         e.preventDefault();
       }
-      if(e.repeat && (e.code === "KeyC" || e.code === "Space")) return;
-      if(e.code === "KeyC" && this.locked){
+      if(e.repeat && (e.code === "ControlLeft" || e.code === "ControlRight" || e.code === "Space")) return;
+      if((e.code === "ControlLeft" || e.code === "ControlRight") && this.locked){
         if(!this.sliding && this.isRunning && Math.hypot(this.vel.x,this.vel.z)>3.0){
           this.sliding=true;
           this.slideTimer=.62;
