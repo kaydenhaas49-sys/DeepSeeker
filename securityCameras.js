@@ -1,11 +1,12 @@
 import * as THREE from "three";
 
 export class SecurityCameraSystem {
-  constructor({scene,renderer,player,getCameras}){
+  constructor({scene,renderer,player,getCameras,onClose}){
     this.scene=scene;
     this.renderer=renderer;
     this.player=player;
     this.getCameras=getCameras||(()=>[]);
+    this.onClose=onClose||(()=>{});
     this.active=false;
     this.index=0;
     this.camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.05,220);
@@ -50,6 +51,7 @@ export class SecurityCameraSystem {
   close(){
     this.active=false;
     if(this.root) this.root.style.display="none";
+    this.onClose();
   }
 
   cycle(direction){
