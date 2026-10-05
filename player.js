@@ -37,6 +37,14 @@ export class Player {
     this.jumpY = 0;
     this.jumpVelocity = 0;
     this.extraCollisionBoxes = [];
+    this.sliding = false;
+    this.slideTimer = 0;
+    this.slideDistance = 0;
+    this.landingKick = 0;
+    this.breathTimer = 0;
+    this.onBreath = null;
+    this.onLand = null;
+    this.onSlide = null;
     this.ignoreWorldCollision = false;
 
     this.characterModel = null;
@@ -71,8 +79,18 @@ export class Player {
         e.preventDefault();
       }
       if(e.repeat && (e.code === "KeyC" || e.code === "Space")) return;
-      if(e.code === "KeyC" && this.locked) this.crouched = !this.crouched;
-      if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched){
+      if(e.code === "KeyC" && this.locked){
+        if(!this.sliding && this.isRunning && Math.hypot(this.vel.x,this.vel.z)>3.0){
+          this.sliding=true;
+          this.slideTimer=.62;
+          this.crouched=true;
+          this.slideDistance=0;
+          if(this.onSlide) this.onSlide();
+        }else{
+          this.crouched = !this.crouched;
+        }
+      }
+      if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched && !this.sliding){
         this.jumpVelocity = JUMP_SPEED;
         this.stamina = Math.max(0, this.stamina - 8);
       }
@@ -204,8 +222,8 @@ export class Player {
       ? (k.has("KeyD") || k.has("ArrowRight") ? 1 : 0) -
           (k.has("KeyA") || k.has("ArrowLeft") ? 1 : 0)
       : 0;
-    const running = active && this.isRunning;
-    const speed = this.crouched ? CROUCH_SPEED : running ? RUN_SPEED : WALK_SPEED;
+    const running = active && this.isRunning && !this.sliding;
+    let speed = this.crouched ? CROUCH_SPEED : running ? RUN_SPEED : WALK_SPEED;
 
     const fx = -Math.sin(this.yaw);
     const fz = -Math.cos(this.yaw);
@@ -221,8 +239,19 @@ export class Player {
 
     // --- velocity smoothing (frame-rate independent) ---
     const kSm = 1 - Math.exp(-ACCEL * dt);
-    this.vel.x += (dx * speed - this.vel.x) * kSm;
-    this.vel.z += (dz * speed - this.vel.z) * kSm;
+    if(this.sliding){
+      this.slideTimer=Math.max(0,this.slideTimer-dt);
+      this.slideDistance+=Math.hypot(this.vel.x,this.vel.z)*dt;
+      const slideFriction=Math.exp(-2.15*dt);
+      this.vel.x*=slideFriction;
+      this.vel.z*=slideFriction;
+      if(this.slideTimer<=0 || Math.hypot(this.vel.x,this.vel.z)<1.0){
+        this.sliding=false;
+      }
+    }else{
+      this.vel.x += (dx * speed - this.vel.x) * kSm;
+      this.vel.z += (dz * speed - this.vel.z) * kSm;
+    }
 
     // --- move with candidate-position collision ---
     // Calculate the whole next position first. The player is only moved to a
@@ -255,6 +284,8 @@ export class Player {
 
     if(running && hSpeed > 0.5) {
       this.stamina = Math.max(0, this.stamina - 18 * dt);
+    } else if(this.sliding) {
+      this.stamina = Math.max(0, this.stamina - 5 * dt);
     } else {
       this.stamina = Math.min(100, this.stamina + (this.crouched ? 7 : 10) * dt);
     }
@@ -281,6 +312,14 @@ export class Player {
 
     // --- camera ---
     const targetEye = this.crouched ? 1.12 : EYE;
+    const wasAirborne = this.jumpY > 0.001;
+    this.breathTimer=Math.max(0,this.breathTimer-dt);
+    this.landingKick=Math.max(0,this.landingKick-dt*.75);
+
+    if(running && this.stamina<48 && this.breathTimer<=0){
+      this.breathTimer=this.stamina<18 ? .72 : 1.18;
+      if(this.onBreath) this.onBreath(Math.min(1,(48-this.stamina)/30));
+    }
 
     this.jumpVelocity -= JUMP_GRAVITY * dt;
     this.jumpY += this.jumpVelocity * dt;
@@ -296,11 +335,15 @@ export class Player {
     if(this.jumpY <= 0){
       this.jumpY = 0;
       this.jumpVelocity = 0;
+      if(wasAirborne){
+        this.landingKick=.08;
+        if(this.onLand) this.onLand(Math.min(1,Math.max(.25,hSpeed/RUN_SPEED)));
+      }
     }
 
     const currentEye = this.camera.position.y - this.bobOffset;
     const eye = currentEye + (targetEye - currentEye) * (1 - Math.exp(-12 * dt));
-    this.camera.position.set(this.pos.x, eye + this.bobOffset + this.jumpY, this.pos.z);
+    this.camera.position.set(this.pos.x, eye + this.bobOffset + this.jumpY - this.landingKick, this.pos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0);
 
     if(this.characterMixer) {
