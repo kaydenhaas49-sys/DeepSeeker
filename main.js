@@ -3658,7 +3658,6 @@ let spiderChaseDuration=5;
 let arachnophobiaMode=getArachnophobiaMode();
 let spiderOriginalModel=null;
 let funnyDuckModel=null;
-let spiderTransitionKind="";
 let spiderPath=[];
 let spiderPathIndex=0;
 let spiderPathRepathTimer=0;
