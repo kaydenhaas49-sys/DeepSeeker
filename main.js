@@ -2299,6 +2299,11 @@ function resetForNewGame(slot=selectedSaveSlot){
   player.keys.clear();
   player.jumpY=0;
   player.jumpVelocity=0;
+  player.crouched=false;
+  player.sliding=false;
+  player.slideTimer=0;
+  player.stamina=100;
+  player.landingKick=0;
   battery=100;
   flashlightOn=true;
   player.setFlashlightVisual(true);
@@ -5937,6 +5942,7 @@ function animate(){
       world.update(MENU_WORLD_X,MENU_WORLD_Z);
     }else{
       world.update(player.pos.x,player.pos.z);
+      world.updateAtmosphereEffects(dt,player.pos.x,player.pos.z);
     }
   }
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
