@@ -144,6 +144,22 @@ export class HorrorAudio {
     osc.stop(now+.14);
   }
 
+  quack(){
+    if(!this.ctx || this.muted) return;
+    const now=this.ctx.currentTime;
+    const osc=this.ctx.createOscillator();
+    const gain=this.ctx.createGain();
+    osc.type="square";
+    osc.frequency.setValueAtTime(440,now);
+    osc.frequency.exponentialRampToValueAtTime(170,now+.16);
+    gain.gain.setValueAtTime(.0001,now);
+    gain.gain.exponentialRampToValueAtTime(.10,now+.015);
+    gain.gain.exponentialRampToValueAtTime(.0001,now+.20);
+    osc.connect(gain).connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now+.22);
+  }
+
   scare(){
     if(!this.ctx||this.muted)return;
 
