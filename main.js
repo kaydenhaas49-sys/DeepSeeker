@@ -593,6 +593,7 @@ menuSet.add(menuDust);
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
+const MENU_DUCK_SCALE=.34;
 const MENU_SPIDER_CEILING_Y=8.98;
 const MENU_SPIDER_PATH_CENTER_X=3.0;
 const MENU_SPIDER_PATH_CENTER_Z=-18.0;
@@ -648,11 +649,12 @@ function applyArachnophobiaVisual(){
     spiderMixer=new THREE.AnimationMixer(spiderOriginalModel);
     for(const [name,clip] of spiderAnimationClips){
       const action=spiderMixer.clipAction(clip);
+      const oneShot=name.startsWith("die") || name.startsWith("attack");
       action.setLoop(
-        name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
-        name.startsWith("die") ? 1 : Infinity
+        oneShot ? THREE.LoopOnce : THREE.LoopRepeat,
+        oneShot ? 1 : Infinity
       );
-      if(name.startsWith("die")) action.clampWhenFinished=true;
+      if(oneShot) action.clampWhenFinished=true;
       spiderActions.set(name,action);
     }
     setSpiderAnimation(spiderWantedState);
@@ -671,7 +673,9 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpiderActual=SkeletonUtils.clone(spiderModel);
   menuSpiderActual.name="MenuSpiderActualModel";
   menuSpiderActual.visible=true;
-  menuSpiderActual.scale.setScalar(MENU_SPIDER_SCALE);
+  menuSpiderActual.scale.setScalar(
+    arachnophobiaMode ? MENU_DUCK_SCALE : MENU_SPIDER_SCALE
+  );
   menuSpiderActual.rotation.x=Math.PI;
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
@@ -4978,11 +4982,12 @@ function finishSpiderModel(model,animations,sourceName){
     for(const [name,clip] of directClips){
       if(!clip) continue;
       const action=spiderMixer.clipAction(clip);
+      const oneShot=name.startsWith("die") || name.startsWith("attack");
       action.setLoop(
-        name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
-        name.startsWith("die") ? 1 : Infinity
+        oneShot ? THREE.LoopOnce : THREE.LoopRepeat,
+        oneShot ? 1 : Infinity
       );
-      if(name.startsWith("die")) action.clampWhenFinished=true;
+      if(oneShot) action.clampWhenFinished=true;
       spiderActions.set(name,action);
     }
 
@@ -5682,6 +5687,15 @@ controls.addEventListener("click",e=>{
 
 document.addEventListener("pointerlockchange",()=>{
   const locked=document.pointerLockElement===renderer.domElement;
+
+  // CCTV intentionally releases pointer lock. Do not turn that intentional
+  // transition into the normal gameplay pause/loading overlay.
+  if(securityCameras.active){
+    overlay.classList.add("hidden");
+    crosshair.style.display="none";
+    return;
+  }
+
   if(!controlsOpen && !phoneOpen && !chatOpen){
     if(locked){
       overlay.classList.add("hidden");
@@ -6084,9 +6098,11 @@ function animate(){
 
         const distance=moveSpiderTowardPlayer(dt);
         if(distance<=SPIDER_ATTACK_RANGE){
+          spiderBehaviorState="attack";
+          spiderBehaviorTime=0;
           spiderAttackPlayed=false;
+          clearSpiderPath();
           audio.scare();
-          startSpiderJumpscare();
         }else if(spiderBehaviorTime>=spiderChaseDuration){
           spiderBehaviorTime=0;
           spiderChaseDuration=THREE.MathUtils.lerp(
@@ -6098,12 +6114,30 @@ function animate(){
         }
       }else if(spiderBehaviorState==="attack"){
         setSpiderAnimation("attack");
+
+        const attackAction=
+          spiderActions.get(SPIDER_ANIMATION_ALIAS.attack) ||
+          spiderActions.get("attack1") ||
+          spiderActions.get("attack2");
+
+        const attackDuration=Math.max(
+          .35,
+          Math.min(1.15,Number(attackAction?.getClip?.().duration)||.72)
+        );
+
         if(!spiderAttackPlayed){
           spiderAttackPlayed=true;
           pulse=1;
         }
-        if(spiderBehaviorTime>=1.0){
-          startSpiderGroundChase();
+
+        // Stay locked to the attack position while the one-shot animation plays.
+        spiderEntity.rotation.y=Math.atan2(
+          player.pos.x-spiderEntity.position.x,
+          player.pos.z-spiderEntity.position.z
+        );
+
+        if(spiderBehaviorTime>=attackDuration){
+          startSpiderJumpscare();
         }
       }
 
