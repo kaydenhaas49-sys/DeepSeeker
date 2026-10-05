@@ -1,0 +1,77 @@
+name: Temporary Pages smoke test
+
+on:
+  push:
+    branches:
+      - feature/foundations-immersion-multiplayer-20261004
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Run static server
+        run: |
+          python3 -m http.server 4173 > /tmp/deepseeker-server.log 2>&1 &
+      - name: Smoke test
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from "playwright";
+
+          const errors = [];
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage();
+
+          page.on("pageerror", error => {
+            errors.push("PAGEERROR: " + (error.stack || error.message));
+          });
+          page.on("console", message => {
+            if(message.type() === "error") {
+              errors.push("CONSOLE: " + message.text());
+            }
+          });
+          page.on("requestfailed", request => {
+            errors.push(
+              "REQUESTFAILED: " +
+              request.url() +
+              " · " +
+              (request.failure()?.errorText || "unknown")
+            );
+          });
+
+          await page.goto("http://127.0.0.1:4173/", {
+            waitUntil:"domcontentloaded",
+            timeout:60000
+          });
+
+          await page.waitForTimeout(30000);
+
+          console.log("TITLE:", await page.title());
+          console.log("PROMPT:", await page.locator("#prompt").textContent());
+
+          await page.screenshot({
+            path:"deepseeker-smoke.png",
+            fullPage:true
+          });
+
+          await browser.close();
+
+          if(errors.length){
+            console.error(errors.join("\n"));
+            process.exit(1);
+          }
+          NODE
+      - name: Upload smoke screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepseeker-smoke
+          path: deepseeker-smoke.png
