@@ -11,6 +11,11 @@ import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { flashlightFlicker } from "./character.js";
+import { InteractionSystem } from "./interaction.js";
+import { NavigationSystem } from "./navigation.js";
+import { ComputerSystem } from "./computer.js";
+import { SecurityCameraSystem } from "./securityCameras.js";
+import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode } from "./entityMode.js";
 
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
@@ -604,6 +609,58 @@ let menuSpiderActual=null;
 let menuSpiderMixer=null;
 let menuSpiderLoadRequested=false;
 
+function applyArachnophobiaVisual(){
+  if(!spiderOriginalModel) return;
+
+  if(spiderModel && spiderModel.parent===spiderEntity){
+    spiderEntity.remove(spiderModel);
+  }
+
+  spiderActions.clear();
+  spiderAnimationClips.clear();
+  spiderMixer=null;
+  spiderAnimationState="";
+
+  if(arachnophobiaMode){
+    if(!funnyDuckModel){
+      funnyDuckModel=createFunnyDuckEntity();
+    }
+    spiderModel=funnyDuckModel;
+    spiderEntity.add(funnyDuckModel);
+  }else{
+    spiderModel=spiderOriginalModel;
+    spiderEntity.add(spiderOriginalModel);
+  }
+
+  if(menuSpiderActual){
+    menuSpider.remove(menuSpiderActual);
+    menuSpiderActual=null;
+    menuSpiderMixer=null;
+  }
+
+  if(!arachnophobiaMode && spiderAnimationClips.size){
+    // Rebuild normal spider animation actions when switching back.
+    spiderMixer=new THREE.AnimationMixer(spiderOriginalModel);
+    for(const [name,clip] of spiderAnimationClips){
+      const action=spiderMixer.clipAction(clip);
+      action.setLoop(
+        name.startsWith("die") ? THREE.LoopOnce : THREE.LoopRepeat,
+        name.startsWith("die") ? 1 : Infinity
+      );
+      if(name.startsWith("die")) action.clampWhenFinished=true;
+      spiderActions.set(name,action);
+    }
+    setSpiderAnimation(spiderWantedState);
+  }
+
+  if(spiderModel){
+    spiderModel.visible=true;
+    spiderEntity.visible=spiderActive;
+  }
+
+  syncMenuSpiderFromGameplayModel();
+}
+
 function syncMenuSpiderFromGameplayModel(){
   if(menuSpiderActual || !spiderModel) return;
   menuSpiderActual=SkeletonUtils.clone(spiderModel);
@@ -762,6 +819,10 @@ scene.add(camera);
 
 const player=new Player(camera,renderer.domElement,world);
 const audio=new HorrorAudio();
+
+player.onBreath=(intensity=.65)=>audio.breath(intensity);
+player.onLand=(intensity=.7)=>audio.land(intensity);
+player.onSlide=()=>audio.slide(.8);
 
 player.hands.visible=true;
 
@@ -2311,6 +2372,17 @@ const multiplayer=new Multiplayer({
   onSharedFall:(startedAt)=>{
     startBackroomsFall(startedAt,false);
   },
+  onWorldEvent:(event)=>{
+    if(event?.type==="computer_opened"){
+      eventText.textContent="REMOTE TERMINAL ACTIVE · "+(event.id||"NODE");
+      eventText.style.opacity="1";
+      setTimeout(()=>{
+        if(eventText.textContent.startsWith("REMOTE TERMINAL ACTIVE")){
+          eventText.style.opacity="0";
+        }
+      },1600);
+    }
+  },
   onChat:({sender,message,self=false})=>{
     const row=document.createElement("div");
     row.className="chatMessage";
@@ -2373,6 +2445,82 @@ const multiplayer=new Multiplayer({
   }
 });
 
+const navigation=new NavigationSystem({
+  player,
+  getLevelName:()=>houseMode ? "APARTMENT" : "BACKROOMS"
+});
+
+const securityCameras=new SecurityCameraSystem({
+  scene,
+  renderer,
+  player,
+  getCameras:()=>world.getSecurityCameras(),
+  onClose:()=>{ if(gameStarted) player.lock(); }
+});
+
+const computerSystem=new ComputerSystem({
+  onOpenCameras:()=>{
+    computerSystem.close();
+    if(!securityCameras.open()){
+      eventText.textContent="NO SECURITY CAMERAS AVAILABLE";
+      eventText.style.opacity="1";
+      setTimeout(()=>{eventText.style.opacity="0";},1500);
+    }
+  },
+  onWorldEvent:(event)=>{
+    if(multiplayer?.socket){
+      multiplayer.broadcastWorldEvent(event.type,event.id,event);
+    }
+  },
+  onClose:()=>{ if(gameStarted) player.lock(); }
+});
+
+const interaction=new InteractionSystem({
+  camera,
+  domElement:renderer.domElement,
+  getCandidates:()=>world.getInteractables(),
+  onInteract:(target)=>{
+    if(!gameStarted || houseMode) return false;
+    if(target.type==="computer"){
+      computerSystem.open(target);
+      return true;
+    }
+    return false;
+  }
+});
+
+function toggleArachnophobia(){
+  arachnophobiaMode=setArachnophobiaMode(!arachnophobiaMode);
+  applyArachnophobiaVisual();
+  if(controlsOpen){
+    const button=document.getElementById("deepseekerArachnophobiaToggle");
+    if(button) button.textContent="ARACHNOPHOBIA MODE: "+(arachnophobiaMode?"ON · RUBBER DUCK":"OFF");
+  }
+  eventText.textContent=arachnophobiaMode
+    ? "ARACHNOPHOBIA MODE · RUBBER DUCK ENABLED"
+    : "ARACHNOPHOBIA MODE DISABLED";
+  eventText.style.opacity="1";
+  setTimeout(()=>{eventText.style.opacity="0";},1700);
+}
+
+function installArachnophobiaControl(){
+  const box=document.getElementById("controlsBox");
+  if(!box || document.getElementById("deepseekerArachnophobiaToggle")) return;
+  const button=document.createElement("button");
+  button.id="deepseekerArachnophobiaToggle";
+  button.type="button";
+  button.textContent="ARACHNOPHOBIA MODE: "+(arachnophobiaMode?"ON · RUBBER DUCK":"OFF");
+  button.style.cssText=[
+    "display:block","margin:14px auto 0","padding:9px 12px",
+    "border:1px solid rgba(229,218,170,.16)","border-radius:9px",
+    "background:#ffffff06","color:#bdb695","font:9px system-ui,sans-serif",
+    "letter-spacing:1.6px","cursor:pointer"
+  ].join(";");
+  button.addEventListener("click",toggleArachnophobia);
+  box.appendChild(button);
+}
+
+installArachnophobiaControl();
 
 let multiplayerMapOpen=false;
 const multiplayerMap=document.createElement("div");
@@ -3363,6 +3511,7 @@ function setHouseMode(enabled,options={}){
 }
 
 installMainMenuRedesign();
+installArachnophobiaControl();
 
 const initialParams=new URLSearchParams(location.search);
 const querySaveSlot=initialParams.get("saveSlot");
@@ -3504,6 +3653,9 @@ let spiderTransitionFromY=0;
 let spiderTransitionToY=0;
 let spiderTransitionFromScale=1;
 let spiderTransitionToScale=1;
+let arachnophobiaMode=getArachnophobiaMode();
+let spiderOriginalModel=null;
+let funnyDuckModel=null;
 let spiderTransitionKind="";
 let spiderPath=[];
 let spiderPathIndex=0;
@@ -4617,6 +4769,7 @@ function finishSpiderModel(model,animations,sourceName){
   fitSpiderModel(model);
 
   spiderModel=model;
+  spiderOriginalModel=model;
   spiderEntity.add(model);
   spiderLoaded=true;
 
@@ -4850,7 +5003,10 @@ function finishSpiderModel(model,animations,sourceName){
     }
   );
 
-  syncMenuSpiderFromGameplayModel();
+  // Swap the rendered entity after the real rig has been prepared. The
+  // original model stays cached so the accessibility setting can be changed
+  // without another network download.
+  applyArachnophobiaVisual();
 
   spiderLoadStarted=false;
 
@@ -4859,12 +5015,15 @@ function finishSpiderModel(model,animations,sourceName){
     spawnSpiderAtPlayer();
   }
 
-  eventText.textContent=spiderActions.size ? "SPIDER READY" : "SPIDER READY (STATIC)";
+  eventText.textContent=arachnophobiaMode
+    ? "ENTITY READY · DUCK MODE"
+    : (spiderActions.size ? "SPIDER READY" : "SPIDER READY (STATIC)");
   eventText.style.opacity="1";
   setTimeout(()=>{
     if(
       eventText.textContent==="SPIDER READY" ||
-      eventText.textContent==="SPIDER READY (STATIC)"
+      eventText.textContent==="SPIDER READY (STATIC)" ||
+      eventText.textContent==="ENTITY READY · DUCK MODE"
     ){
       eventText.style.opacity="0";
     }
@@ -5510,6 +5669,33 @@ document.addEventListener("pointerlockchange",()=>{
 document.addEventListener("keydown",e=>{
   if(adminOverlay?.classList.contains("open")) return;
 
+  if(securityCameras.active){
+    if(e.code==="Escape"){
+      e.preventDefault();
+      securityCameras.close();
+      return;
+    }
+    if(e.code==="ArrowLeft"){
+      e.preventDefault();
+      securityCameras.cycle(-1);
+      return;
+    }
+    if(e.code==="ArrowRight"){
+      e.preventDefault();
+      securityCameras.cycle(1);
+      return;
+    }
+    return;
+  }
+
+  if(computerSystem.openState){
+    if(e.code==="Escape"){
+      e.preventDefault();
+      computerSystem.close();
+    }
+    return;
+  }
+
   if(e.code==="Enter" && !e.repeat && gameStarted && !phoneOpen && !controlsOpen && !chatOpen){
     e.preventDefault();
     openChat();
@@ -5519,6 +5705,9 @@ document.addEventListener("keydown",e=>{
   if(chatOpen) return;
 
   if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen && !chatOpen){
+    if(interaction.interact()){
+      return;
+    }
     if(useHouseReturnTeleporter()){
       return;
     }
@@ -5570,6 +5759,7 @@ addEventListener("resize",()=>{
   camera.updateProjectionMatrix();
   menuCamera.aspect=innerWidth/innerHeight;
   menuCamera.updateProjectionMatrix();
+  securityCameras.resize();
   renderer.setSize(innerWidth,innerHeight);
 });
 
@@ -5583,6 +5773,14 @@ function animate(){
   // gameplay simulation so an unrelated gameplay error cannot black out the menu.
   if(hudRight) hudRight.style.display=gameStarted ? "block" : "none";
   const menuIsVisible=!gameStarted && !homeScreen.classList.contains("hidden");
+  navigation.root.style.display=(gameStarted && !securityCameras.active) ? "flex" : "none";
+
+  if(securityCameras.active){
+    securityCameras.update();
+    renderer.render(scene,securityCameras.camera);
+    return;
+  }
+
   if(menuIsVisible){
     try{
       const usingMenuCamera=updateMenuScene(t,dt);
@@ -5706,6 +5904,8 @@ function animate(){
   }
 
   multiplayer.update(dt);
+  interaction.update();
+  navigation.update(dt);
   if(multiplayerMapOpen) updateMultiplayerMap();
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
