@@ -1,7 +1,8 @@
 export class ComputerSystem {
-  constructor({onOpenCameras,onWorldEvent}){
+  constructor({onOpenCameras,onWorldEvent,onClose}){
     this.onOpenCameras=onOpenCameras||(()=>{});
     this.onWorldEvent=onWorldEvent||(()=>{});
+    this.onClose=onClose||(()=>{});
     this.overlay=null;
     this.output=null;
     this.current=null;
@@ -86,6 +87,7 @@ export class ComputerSystem {
   close(){
     if(this.overlay) this.overlay.style.display="none";
     this.current=null;
+    this.onClose();
   }
 
   get openState(){
