@@ -598,7 +598,7 @@ const MENU_SPIDER_CEILING_Y=8.98;
 // Put the duck on the foreground floor, centered in front of the title camera.
 const MENU_DUCK_MENU_X=-11.2;
 const MENU_DUCK_MENU_Y=0;
-const MENU_DUCK_MENU_Z=14.0;
+const MENU_DUCK_MENU_Z=8.5;
 const MENU_DUCK_SPIN_SPEED=1.35;
 const MENU_SPIDER_PATH_CENTER_X=3.0;
 const MENU_SPIDER_PATH_CENTER_Z=-18.0;
@@ -695,8 +695,15 @@ function syncMenuSpiderFromGameplayModel(){
     if(node.material){
       const materials=Array.isArray(node.material)?node.material:[node.material];
       for(const material of materials){
-        material.depthTest=false;
-        material.depthWrite=false;
+        if(arachnophobiaMode){
+          material.transparent=false;
+          material.opacity=1;
+          material.depthTest=true;
+          material.depthWrite=true;
+        }else{
+          material.depthTest=false;
+          material.depthWrite=false;
+        }
         material.needsUpdate=true;
       }
     }
