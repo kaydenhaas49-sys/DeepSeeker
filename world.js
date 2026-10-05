@@ -519,7 +519,133 @@ export class World {
     }
   }
 
-  buildComputerProps(group, data, cx, cz) {\n    const rng = mulberry32(hashSeed(cx, cz, this.seed) ^ 0x44a91d);\n    if (rng() > 0.28) return;\n\n    const candidates = [];\n    for (let lx = 2; lx <= CHUNK_CELLS - 3; lx++) {\n      for (let lz = 2; lz <= CHUNK_CELLS - 3; lz++) {\n        const gx = cx * CHUNK_CELLS + lx;\n        const gz = cz * CHUNK_CELLS + lz;\n        const open =\n          !data.cells.has(cellKey(gx, gz)) &&\n          !data.cells.has(cellKey(gx + 1, gz)) &&\n          !data.cells.has(cellKey(gx - 1, gz)) &&\n          !data.cells.has(cellKey(gx, gz + 1)) &&\n          !data.cells.has(cellKey(gx, gz - 1));\n        if (open) candidates.push({ lx, lz });\n      }\n    }\n    if (!candidates.length) return;\n\n    const chosen = candidates[Math.floor(rng() * candidates.length)];\n    const x = (cx * CHUNK_CELLS + chosen.lx + 0.5) * CELL;\n    const z = (cz * CHUNK_CELLS + chosen.lz + 0.5) * CELL;\n    const groupId = "FIELD_PC_" + cx + "_" + cz;\n    const security = rng() < 0.45;\n\n    const station = new THREE.Group();\n    station.name = groupId;\n    station.position.set(x, 0, z);\n    station.rotation.y = Math.floor(rng() * 4) * Math.PI / 2;\n\n    const wood = new THREE.MeshStandardMaterial({ color: 0x302b24, roughness: .88 });\n    const dark = new THREE.MeshStandardMaterial({ color: 0x111312, roughness: .45 });\n    const screen = new THREE.MeshStandardMaterial({\n      color: security ? 0x162617 : 0x142019,\n      emissive: security ? 0x447a48 : 0x223c2a,\n      emissiveIntensity: security ? 1.8 : 1.15,\n      roughness: .35\n    });\n\n    const desk = new THREE.Mesh(new THREE.BoxGeometry(2.3, .12, 1.0), wood);\n    desk.position.y = .82;\n    station.add(desk);\n\n    const monitor = new THREE.Mesh(new THREE.BoxGeometry(1.35, .78, .10), dark);\n    monitor.position.set(0, 1.42, -.18);\n    station.add(monitor);\n\n    const panel = new THREE.Mesh(new THREE.BoxGeometry(1.12, .56, .025), screen);\n    panel.position.set(0, 1.43, -.235);\n    station.add(panel);\n\n    const stem = new THREE.Mesh(new THREE.BoxGeometry(.12, .45, .12), dark);\n    stem.position.set(0, 1.02, -.18);\n    station.add(stem);\n\n    const keyboard = new THREE.Mesh(new THREE.BoxGeometry(.72, .035, .30), dark);\n    keyboard.position.set(0, .91, .22);\n    station.add(keyboard);\n\n    const glow = new THREE.PointLight(security ? 0x6fba75 : 0x6f9a76, security ? 1.8 : .7, 6, 2);\n    glow.position.set(0, 1.45, -.55);\n    station.add(glow);\n\n    station.userData.interactable = {\n      type: "computer",\n      id: groupId,\n      action: "USE COMPUTER",\n      prompt: security ? "ACCESS SECURITY TERMINAL" : "USE COMPUTER",\n      security\n    };\n\n    group.add(station);\n    this.interactables.push(station);\n\n    if (security) {\n      const cameraCount = 1 + (rng() < .35 ? 1 : 0);\n      for (let index = 0; index < cameraCount; index++) {\n        const angle = Math.floor(rng() * 8) * Math.PI / 4;\n        const radius = 10 + rng() * 12;\n        const cameraX = x + Math.cos(angle) * radius;\n        const cameraZ = z + Math.sin(angle) * radius;\n\n        const camGroup = new THREE.Group();\n        camGroup.name = "SECURITY_CAM_" + cx + "_" + cz + "_" + index;\n        camGroup.position.set(cameraX, WALL_H - 1.35, cameraZ);\n\n        const housingMaterial = new THREE.MeshStandardMaterial({ color: 0x111313, roughness: .75 });\n        const housing = new THREE.Mesh(new THREE.BoxGeometry(.42, .28, .55), housingMaterial);\n        housing.rotation.x = -.18;\n        camGroup.add(housing);\n\n        const lensMaterial = new THREE.MeshBasicMaterial({ color: 0x77b985 });\n        const lens = new THREE.Mesh(new THREE.SphereGeometry(.065, 8, 8), lensMaterial);\n        lens.position.set(0, -.02, -.30);\n        camGroup.add(lens);\n\n        group.add(camGroup);\n\n        const target = new THREE.Vector3(\n          cameraX + Math.cos(angle) * 14,\n          1.7,\n          cameraZ + Math.sin(angle) * 14\n        );\n\n        this.securityCameras.push({\n          id: camGroup.name,\n          name: "CAM " + String((Math.abs(cx * 17 + cz * 31 + index)) % 99 + 1).padStart(2, "0"),\n          group: camGroup,\n          position: new THREE.Vector3(cameraX, WALL_H - 1.35, cameraZ),\n          lookAt: target\n        });\n      }\n    }\n  }\n\n  getInteractables() {\n    this.interactables = this.interactables.filter(item => item?.parent);\n    return this.interactables;\n  }\n\n  getSecurityCameras() {\n    this.securityCameras = this.securityCameras.filter(item => item?.group?.parent);\n    return this.securityCameras;\n  }\n\n  buildChunkMeshes(data, cx, cz) {
+  buildComputerProps(group, data, cx, cz) {
+    const rng = mulberry32(hashSeed(cx, cz, this.seed) ^ 0x44a91d);
+    if (rng() > 0.28) return;
+
+    const candidates = [];
+    for (let lx = 2; lx <= CHUNK_CELLS - 3; lx++) {
+      for (let lz = 2; lz <= CHUNK_CELLS - 3; lz++) {
+        const gx = cx * CHUNK_CELLS + lx;
+        const gz = cz * CHUNK_CELLS + lz;
+        const open =
+          !data.cells.has(cellKey(gx, gz)) &&
+          !data.cells.has(cellKey(gx + 1, gz)) &&
+          !data.cells.has(cellKey(gx - 1, gz)) &&
+          !data.cells.has(cellKey(gx, gz + 1)) &&
+          !data.cells.has(cellKey(gx, gz - 1));
+        if (open) candidates.push({ lx, lz });
+      }
+    }
+    if (!candidates.length) return;
+
+    const chosen = candidates[Math.floor(rng() * candidates.length)];
+    const x = (cx * CHUNK_CELLS + chosen.lx + 0.5) * CELL;
+    const z = (cz * CHUNK_CELLS + chosen.lz + 0.5) * CELL;
+    const groupId = "FIELD_PC_" + cx + "_" + cz;
+    const security = rng() < 0.45;
+
+    const station = new THREE.Group();
+    station.name = groupId;
+    station.position.set(x, 0, z);
+    station.rotation.y = Math.floor(rng() * 4) * Math.PI / 2;
+
+    const wood = new THREE.MeshStandardMaterial({ color: 0x302b24, roughness: .88 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x111312, roughness: .45 });
+    const screen = new THREE.MeshStandardMaterial({
+      color: security ? 0x162617 : 0x142019,
+      emissive: security ? 0x447a48 : 0x223c2a,
+      emissiveIntensity: security ? 1.8 : 1.15,
+      roughness: .35
+    });
+
+    const desk = new THREE.Mesh(new THREE.BoxGeometry(2.3, .12, 1.0), wood);
+    desk.position.y = .82;
+    station.add(desk);
+
+    const monitor = new THREE.Mesh(new THREE.BoxGeometry(1.35, .78, .10), dark);
+    monitor.position.set(0, 1.42, -.18);
+    station.add(monitor);
+
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(1.12, .56, .025), screen);
+    panel.position.set(0, 1.43, -.235);
+    station.add(panel);
+
+    const stem = new THREE.Mesh(new THREE.BoxGeometry(.12, .45, .12), dark);
+    stem.position.set(0, 1.02, -.18);
+    station.add(stem);
+
+    const keyboard = new THREE.Mesh(new THREE.BoxGeometry(.72, .035, .30), dark);
+    keyboard.position.set(0, .91, .22);
+    station.add(keyboard);
+
+    const glow = new THREE.PointLight(security ? 0x6fba75 : 0x6f9a76, security ? 1.8 : .7, 6, 2);
+    glow.position.set(0, 1.45, -.55);
+    station.add(glow);
+
+    station.userData.interactable = {
+      type: "computer",
+      id: groupId,
+      action: "USE COMPUTER",
+      prompt: security ? "ACCESS SECURITY TERMINAL" : "USE COMPUTER",
+      security
+    };
+
+    group.add(station);
+    this.interactables.push(station);
+
+    if (security) {
+      const cameraCount = 1 + (rng() < .35 ? 1 : 0);
+      for (let index = 0; index < cameraCount; index++) {
+        const angle = Math.floor(rng() * 8) * Math.PI / 4;
+        const radius = 10 + rng() * 12;
+        const cameraX = x + Math.cos(angle) * radius;
+        const cameraZ = z + Math.sin(angle) * radius;
+
+        const camGroup = new THREE.Group();
+        camGroup.name = "SECURITY_CAM_" + cx + "_" + cz + "_" + index;
+        camGroup.position.set(cameraX, WALL_H - 1.35, cameraZ);
+
+        const housingMaterial = new THREE.MeshStandardMaterial({ color: 0x111313, roughness: .75 });
+        const housing = new THREE.Mesh(new THREE.BoxGeometry(.42, .28, .55), housingMaterial);
+        housing.rotation.x = -.18;
+        camGroup.add(housing);
+
+        const lensMaterial = new THREE.MeshBasicMaterial({ color: 0x77b985 });
+        const lens = new THREE.Mesh(new THREE.SphereGeometry(.065, 8, 8), lensMaterial);
+        lens.position.set(0, -.02, -.30);
+        camGroup.add(lens);
+
+        group.add(camGroup);
+
+        const target = new THREE.Vector3(
+          cameraX + Math.cos(angle) * 14,
+          1.7,
+          cameraZ + Math.sin(angle) * 14
+        );
+
+        this.securityCameras.push({
+          id: camGroup.name,
+          name: "CAM " + String((Math.abs(cx * 17 + cz * 31 + index)) % 99 + 1).padStart(2, "0"),
+          group: camGroup,
+          position: new THREE.Vector3(cameraX, WALL_H - 1.35, cameraZ),
+          lookAt: target
+        });
+      }
+    }
+  }
+
+  getInteractables() {
+    this.interactables = this.interactables.filter(item => item?.parent);
+    return this.interactables;
+  }
+
+  getSecurityCameras() {
+    this.securityCameras = this.securityCameras.filter(item => item?.group?.parent);
+    return this.securityCameras;
+  }
+
+  buildChunkMeshes(data, cx, cz) {
     const group = new THREE.Group();
     const ox = cx * CHUNK_SIZE;
     const oz = cz * CHUNK_SIZE;
