@@ -792,9 +792,9 @@ function updateMenuScene(t,dt){
       loadSpiderFromPack();
     }
   }else if(arachnophobiaMode){
-    // In arachnophobia mode the spider is replaced by a friendly duck mascot.
-    // Keep it on the foreground floor, centered in the shot, and continuously spin
-    // it without letting the wing meshes pop as they cross the screen edge.
+    // In arachnophobia mode the spider is replaced by a harmless biscuit image.
+    // Keep it on the foreground floor, centered in the shot, and spin the
+    // image in screen space so it never disappears edge-on.
     menuSpider.position.set(
       MENU_DUCK_MENU_X,
       MENU_DUCK_MENU_Y,
@@ -802,15 +802,12 @@ function updateMenuScene(t,dt){
     );
     menuSpider.rotation.set(
       0,
-      t*MENU_DUCK_SPIN_SPEED,
-      0
+      0,
+      t*MENU_DUCK_SPIN_SPEED
     );
-    menuSpider.rotation.z=0;
 
-    // Keep the duck's individual meshes from being frustum-culled while
-    // a wing is crossing the edge of the menu camera's view.
     menuSpiderActual?.traverse(node=>{
-      if(node.isMesh) node.frustumCulled=false;
+      if(node.isSprite) node.frustumCulled=false;
     });
   }else{
     const phase=t*MENU_SPIDER_PATH_SPEED;
