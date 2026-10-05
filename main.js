@@ -593,11 +593,12 @@ menuSet.add(menuDust);
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
-const MENU_DUCK_SCALE=.52;
+const MENU_DUCK_SCALE=.68;
 const MENU_SPIDER_CEILING_Y=8.98;
-const MENU_DUCK_MENU_X=5.5;
-const MENU_DUCK_MENU_Y=3.15;
-const MENU_DUCK_MENU_Z=-18.5;
+// Put the duck on the foreground floor, centered in front of the title camera.
+const MENU_DUCK_MENU_X=-11.2;
+const MENU_DUCK_MENU_Y=0;
+const MENU_DUCK_MENU_Z=14.0;
 const MENU_DUCK_SPIN_SPEED=1.35;
 const MENU_SPIDER_PATH_CENTER_X=3.0;
 const MENU_SPIDER_PATH_CENTER_Z=-18.0;
