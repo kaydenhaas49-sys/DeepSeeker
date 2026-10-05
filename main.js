@@ -4473,13 +4473,27 @@ function startSpiderJumpscare(){
     spiderJumpscareDirection.normalize();
   }
 
-  // The spider only pounces once it is extremely close. It lands on the
-  // ground near the player, then immediately resumes the normal chase.
   spiderPounceTarget.set(
-    player.pos.x-spiderJumpscareDirection.x*.42,
+    player.pos.x-spiderJumpscareDirection.x*.82,
     SPIDER_GROUND_OFFSET,
-    player.pos.z-spiderJumpscareDirection.z*.42
+    player.pos.z-spiderJumpscareDirection.z*.82
   );
+
+  const crossesWall=!spiderPathSegmentClear(
+    spiderPounceStart.x,
+    spiderPounceStart.z,
+    spiderPounceTarget.x,
+    spiderPounceTarget.z
+  );
+
+  if(isSpiderBlocked(spiderPounceTarget.x,spiderPounceTarget.z) || crossesWall){
+    const safe=findSafeSpiderGroundPointAroundPlayer(1.15,2.0);
+    spiderPounceTarget.set(
+      safe.x,
+      SPIDER_GROUND_OFFSET,
+      safe.z
+    );
+  }
 
   spiderJumpscareScale=1;
   spiderEntity.scale.setScalar(1);
@@ -4533,6 +4547,9 @@ function resetPlayerAfterSpiderCatch(){
   spiderJumpscareTimer=0;
   spiderJumpscareScale=1;
   spiderBehaviorTime=0;
+  spiderStuckTime=0;
+  spiderLastMoveX=NaN;
+  spiderLastMoveZ=NaN;
   spiderAutoLookTimer=0;
   spiderAutoLookStarted=true;
   spiderTransitionTimer=0;
@@ -4553,6 +4570,7 @@ function finishSpiderJumpscare(){
   spiderBehaviorState="chase";
   spiderBehaviorTime=0;
   spiderOnCeiling=false;
+  spiderStuckTime=0;
   clearSpiderPath();
   spiderChaseDuration=THREE.MathUtils.lerp(
     SPIDER_CHASE_MIN_TIME,
@@ -4562,6 +4580,10 @@ function finishSpiderJumpscare(){
   spiderEntity.position.y=SPIDER_GROUND_OFFSET;
   spiderEntity.scale.setScalar(1);
   spiderEntity.rotation.x=0;
+  spiderEntity.rotation.y=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
   setSpiderAnimation("chase");
 }
 
@@ -4595,6 +4617,9 @@ function spawnSpiderAtPlayer(){
   spiderAutoLookStarted=false;
   spiderAttackPlayed=false;
   spiderActive=true;
+  spiderStuckTime=0;
+  spiderLastMoveX=spawn.x;
+  spiderLastMoveZ=spawn.z;
   spiderOnCeiling=true;
   spiderCeilingDuration=THREE.MathUtils.lerp(
     SPIDER_CEILING_MIN_TIME,
@@ -6126,7 +6151,16 @@ function animate(){
       setSpiderAnimation("jump");
 
       if(spiderJumpscareTimer<=0){
-        finishSpiderJumpscare();
+        const catchDistance=Math.hypot(
+          player.pos.x-spiderEntity.position.x,
+          player.pos.z-spiderEntity.position.z
+        );
+
+        if(catchDistance<=1.35){
+          resetPlayerAfterSpiderCatch();
+        }else{
+          finishSpiderJumpscare();
+        }
       }
     }else{
       spiderBehaviorTime+=dt;
