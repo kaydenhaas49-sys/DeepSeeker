@@ -587,7 +587,7 @@ menuSet.add(menuDust);
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
-const MENU_SPIDER_CEILING_Y=8.98;
+const MENU_SPIDER_GROUND_Y=.08;
 const MENU_SPIDER_PATH_CENTER_X=3.0;
 const MENU_SPIDER_PATH_CENTER_Z=-18.0;
 const MENU_SPIDER_PATH_RADIUS_X=22.0;
@@ -598,7 +598,7 @@ const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
 menuSpider.position.set(
   MENU_SPIDER_PATH_CENTER_X,
-  MENU_SPIDER_CEILING_Y,
+  MENU_SPIDER_GROUND_Y,
   MENU_SPIDER_PATH_CENTER_Z
 );
 menuSpider.rotation.y=0;
@@ -666,7 +666,7 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpiderActual.name="MenuSpiderActualModel";
   menuSpiderActual.visible=true;
   menuSpiderActual.scale.setScalar(MENU_SPIDER_SCALE);
-  menuSpiderActual.rotation.x=Math.PI;
+  menuSpiderActual.rotation.x=0;
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
     node.frustumCulled=false;
@@ -674,8 +674,7 @@ function syncMenuSpiderFromGameplayModel(){
     node.receiveShadow=false;
     node.renderOrder=50;
 
-    // The title-screen ceiling is opaque; keep the actual spider visibly
-    // attached to that ceiling without changing the gameplay spider.
+    // The menu spider stays on the floor; it has no wall or ceiling behavior.
     if(node.material){
       const materials=Array.isArray(node.material)?node.material:[node.material];
       for(const material of materials){
@@ -687,7 +686,7 @@ function syncMenuSpiderFromGameplayModel(){
   });
   menuSpider.add(menuSpiderActual);
   menuSpider.updateMatrixWorld(true);
-  menuSpider.position.y=MENU_SPIDER_CEILING_Y;
+  menuSpider.position.y=MENU_SPIDER_GROUND_Y;
 
   if(arachnophobiaMode){
     menuSpiderMixer=null;
@@ -777,10 +776,10 @@ function updateMenuScene(t,dt){
     const nz=Math.cos(nextPhase*.78)*MENU_SPIDER_PATH_RADIUS_Z;
 
     menuSpider.position.x=MENU_SPIDER_PATH_CENTER_X+x;
-    menuSpider.position.y=MENU_SPIDER_CEILING_Y;
+    menuSpider.position.y=MENU_SPIDER_GROUND_Y;
     menuSpider.position.z=MENU_SPIDER_PATH_CENTER_Z+z;
     menuSpider.rotation.y=Math.atan2(nx-x,nz-z)+Math.PI;
-    menuSpider.rotation.z=Math.sin(t*.35)*.015;
+    menuSpider.rotation.z=0;
 
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
