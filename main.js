@@ -17,6 +17,8 @@ import { ComputerSystem } from "./computer.js";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode } from "./entityMode.js";
 
+let arachnophobiaMode=getArachnophobiaMode();
+
 const seedParam=new URLSearchParams(location.search).get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
 
@@ -3523,8 +3525,6 @@ function setHouseMode(enabled,options={}){
 
 installMainMenuRedesign();
 installArachnophobiaControl();
-
-let arachnophobiaMode=getArachnophobiaMode();
 
 const initialParams=new URLSearchParams(location.search);
 const querySaveSlot=initialParams.get("saveSlot");
