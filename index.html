@@ -69,6 +69,113 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 @media(max-width:650px){#loadingScreen{width:100%;height:100%;min-height:100%;padding:30px 22px}.loadTips{flex-direction:column;gap:6px}.loadCorner{display:none}}
 
 #overlay .controls{font-size:11px;letter-spacing:2px;color:#a69e7c;line-height:1.9}
+#arachnophobiaWarning{
+  position:absolute;
+  inset:0;
+  z-index:20;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:28px;
+  box-sizing:border-box;
+  background:
+    radial-gradient(circle at 50% 38%,rgba(121,103,54,.10),transparent 24%),
+    linear-gradient(180deg,rgba(2,3,2,.99),rgba(5,6,4,.98));
+  color:#ebe5c6;
+  text-align:center;
+  overflow:auto;
+}
+#arachnophobiaWarning.hidden{display:none}
+.arachWarningCard{
+  width:min(640px,calc(100vw - 44px));
+  padding:clamp(28px,5vw,54px);
+  box-sizing:border-box;
+  border:1px solid rgba(229,218,170,.14);
+  border-radius:8px;
+  background:linear-gradient(145deg,rgba(18,20,16,.94),rgba(6,8,6,.97));
+  box-shadow:0 30px 110px rgba(0,0,0,.72),inset 0 1px rgba(255,255,255,.035);
+}
+.arachWarningEyebrow{
+  font-size:9px;
+  letter-spacing:4px;
+  color:#8f8a74;
+  margin-bottom:14px;
+}
+.arachWarningTitle{
+  margin:0;
+  font-size:clamp(25px,5vw,44px);
+  letter-spacing:5px;
+  font-weight:500;
+  color:#eee6c5;
+  text-shadow:0 0 24px rgba(216,201,138,.08);
+}
+.arachWarningRule{
+  width:100%;
+  height:1px;
+  margin:22px 0 24px;
+  background:linear-gradient(90deg,transparent,rgba(216,201,138,.42),transparent);
+}
+.arachWarningText{
+  margin:0 auto;
+  max-width:520px;
+  font-size:12px;
+  line-height:1.8;
+  letter-spacing:.7px;
+  color:#aaa58f;
+}
+.arachWarningText strong{color:#ddd4b0;font-weight:500}
+.arachWarningMode{
+  margin-top:24px;
+  padding:14px;
+  border:1px solid rgba(229,218,170,.10);
+  border-radius:6px;
+  background:rgba(255,255,255,.025);
+}
+.arachWarningModeLabel{
+  font-size:8px;
+  letter-spacing:2.4px;
+  color:#777465;
+  margin-bottom:7px;
+}
+#arachnophobiaModeButton{
+  width:min(430px,100%);
+  padding:13px 16px;
+  border:1px solid rgba(216,201,138,.26);
+  border-radius:8px;
+  background:rgba(216,201,138,.06);
+  color:#e2d9b6;
+  font:inherit;
+  font-size:10px;
+  letter-spacing:2px;
+  cursor:pointer;
+  transition:background .15s,border-color .15s,transform .15s;
+}
+#arachnophobiaModeButton:hover{
+  background:rgba(216,201,138,.12);
+  border-color:rgba(216,201,138,.48);
+  transform:translateY(-1px);
+}
+#arachnophobiaModeStatus{
+  min-height:14px;
+  margin-top:9px;
+  font-size:8px;
+  letter-spacing:1.5px;
+  color:#817c68;
+}
+.arachWarningContinue{
+  width:min(430px,100%);
+  margin-top:12px;
+}
+.arachWarningFineprint{
+  margin:18px auto 0;
+  max-width:500px;
+  font-size:8px;
+  line-height:1.6;
+  letter-spacing:1.2px;
+  color:#5f5d51;
+  text-transform:uppercase;
+}
+
 #homeScreen,#lobbyScreen{width:min(620px,calc(100vw - 40px));display:flex;flex-direction:column;align-items:center;gap:12px;padding:28px 24px 24px;box-sizing:border-box;border:1px solid rgba(236,225,176,.12);border-radius:22px;background:linear-gradient(145deg,rgba(20,22,18,.72),rgba(7,9,7,.84));box-shadow:0 28px 100px rgba(0,0,0,.58),inset 0 1px rgba(255,255,255,.06),inset 0 -30px 70px rgba(0,0,0,.18);backdrop-filter:blur(10px)}
 #homeScreen.hidden,#lobbyScreen.hidden{display:none}
 #homeScreen::before,#lobbyScreen::before{content:"";width:72px;height:2px;background:linear-gradient(90deg,transparent,#d8c98a,transparent);opacity:.65;margin-bottom:4px}
@@ -321,6 +428,25 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
       <div class="loadTips"><span>APARTMENT · SPIDER · SAVE DATA</span><span>MENU LOCKED UNTIL READY</span></div>
     </div>
     <p class="prompt" id="prompt">LOADING WORLD… 0%</p>
+  </div>
+
+  <div id="arachnophobiaWarning" class="hidden" aria-hidden="true">
+    <div class="arachWarningCard">
+      <div class="arachWarningEyebrow">DEEPSEEKER // CONTENT WARNING</div>
+      <h2 class="arachWarningTitle">ARACHNOPHOBIA WARNING</h2>
+      <div class="arachWarningRule"></div>
+      <p class="arachWarningText">
+        <strong>This game contains a large spider-like creature, sudden appearances, and spider-themed horror.</strong>
+        You can replace the spider with a harmless rubber duck at any time using Arachnophobia Mode.
+      </p>
+      <div class="arachWarningMode">
+        <div class="arachWarningModeLabel">ENTITY REPLACEMENT</div>
+        <button id="arachnophobiaModeButton" type="button">ARACHNOPHOBIA MODE: OFF</button>
+        <div id="arachnophobiaModeStatus">SPIDER ENTITY ENABLED</div>
+      </div>
+      <button id="arachnophobiaContinueButton" class="menuButton arachWarningContinue" type="button">CONTINUE TO MAIN MENU</button>
+      <div class="arachWarningFineprint">Your selection is saved on this device and can be changed later.</div>
+    </div>
   </div>
 
   <div id="homeScreen" class="hidden">
