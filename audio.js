@@ -69,6 +69,61 @@ export class HorrorAudio {
     return this.muted;
   }
 
+  breath(intensity=.65){
+    if(!this.ctx || this.muted) return;
+    const now=this.ctx.currentTime;
+    const noise=this.ctx.createBufferSource();
+    const buffer=this.ctx.createBuffer(1,Math.floor(this.ctx.sampleRate*.32),this.ctx.sampleRate);
+    const data=buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*.28;
+    noise.buffer=buffer;
+
+    const filter=this.ctx.createBiquadFilter();
+    filter.type="lowpass";
+    filter.frequency.value=850;
+
+    const gain=this.ctx.createGain();
+    gain.gain.setValueAtTime(.0001,now);
+    gain.gain.exponentialRampToValueAtTime(.055*intensity,now+.07);
+    gain.gain.exponentialRampToValueAtTime(.0001,now+.30);
+
+    noise.connect(filter).connect(gain).connect(this.sfxGain);
+    noise.start(now);
+    noise.stop(now+.32);
+  }
+
+  land(intensity=.7){
+    if(!this.ctx || this.muted) return;
+    const now=this.ctx.currentTime;
+    const osc=this.ctx.createOscillator();
+    const gain=this.ctx.createGain();
+    osc.type="sine";
+    osc.frequency.setValueAtTime(86,now);
+    osc.frequency.exponentialRampToValueAtTime(42,now+.13);
+    gain.gain.setValueAtTime(.0001,now);
+    gain.gain.exponentialRampToValueAtTime(.07*intensity,now+.008);
+    gain.gain.exponentialRampToValueAtTime(.0001,now+.16);
+    osc.connect(gain).connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now+.18);
+  }
+
+  slide(intensity=.7){
+    if(!this.ctx || this.muted) return;
+    const now=this.ctx.currentTime;
+    const osc=this.ctx.createOscillator();
+    const gain=this.ctx.createGain();
+    osc.type="triangle";
+    osc.frequency.setValueAtTime(180,now);
+    osc.frequency.exponentialRampToValueAtTime(72,now+.24);
+    gain.gain.setValueAtTime(.0001,now);
+    gain.gain.exponentialRampToValueAtTime(.035*intensity,now+.02);
+    gain.gain.exponentialRampToValueAtTime(.0001,now+.28);
+    osc.connect(gain).connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now+.30);
+  }
+
   step(intensity=.7){
     if(!this.ctx)return;
 
