@@ -4397,7 +4397,8 @@ function startSpiderJumpscare(){
 
   setSpiderAnimation("jump");
   pulse=.35;
-  eventText.textContent="RUN.";
+  if(arachnophobiaMode) audio.quack();
+  eventText.textContent=arachnophobiaMode ? "QUACK." : "RUN.";
   eventText.style.opacity="1";
 }
 
@@ -4508,6 +4509,7 @@ function spawnSpiderAtPlayer(){
   spiderTransitionTimer=spiderTransitionDuration=0;
   spiderEntity.visible=true;
   setSpiderAnimation("chase");
+  if(arachnophobiaMode) audio.quack();
   return true;
 }
 
