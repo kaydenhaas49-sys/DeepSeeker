@@ -11,7 +11,7 @@ const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
 
 export class Multiplayer {
-  constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart, onSharedFall, onChat }) {
+  constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart, onSharedFall, onChat, onWorldEvent }) {
     this.scene = scene;
     this.player = player;
     this.getLevel = getLevel;
@@ -38,6 +38,9 @@ export class Multiplayer {
     this.fallSequence = 0;
     this.fallStartedAt = 0;
     this.lastSharedFallSequence = 0;
+    this.worldEventSequence = 0;
+    this.worldEvent = null;
+    this.lastRemoteWorldEventSequence = 0;
     this.chatSequence = 0;
     this.chatMessage = "";
     this.chatSender = "";
@@ -175,6 +178,23 @@ export class Multiplayer {
     }
   }
 
+  checkRemoteWorldEvent(state) {
+    const sequence = Number(state?.worldEventSequence);
+    if (!Number.isFinite(sequence) || sequence <= this.lastRemoteWorldEventSequence) return;
+    this.lastRemoteWorldEventSequence = sequence;
+
+    let payload = state?.worldEventPayload;
+    if (typeof payload === "string") {
+      try { payload = JSON.parse(payload); } catch { payload = {}; }
+    }
+    this.onWorldEvent({
+      type: this.sanitizeMessage(state?.worldEventType || ""),
+      id: this.sanitizeMessage(state?.worldEventId || ""),
+      payload: payload && typeof payload === "object" ? payload : {},
+      sequence
+    });
+  }
+
   checkSharedFall(state) {
     const normalized = this.normalizeState(state || {});
     const sequence = normalized.fallSequence;
@@ -202,6 +222,7 @@ export class Multiplayer {
           if (!player?.id || player.id === this.playerId) continue;
           this.addOrUpdatePlayer(player);
           this.checkSharedFall(player.state);
+          this.checkRemoteWorldEvent(player.state);
         }
         this.updateCount();
         break;
@@ -211,6 +232,7 @@ export class Multiplayer {
         if (data.player?.id && data.player.id !== this.playerId) {
           this.addOrUpdatePlayer(data.player);
           this.checkSharedFall(data.player.state);
+          this.checkRemoteWorldEvent(data.player.state);
           this.updateCount();
         }
         break;
@@ -242,6 +264,7 @@ export class Multiplayer {
         }
 
         this.checkSharedFall(nextState);
+        this.checkRemoteWorldEvent(nextState);
         break;
       }
 
@@ -492,6 +515,17 @@ export class Multiplayer {
     this.sendState(true);
   }
 
+  broadcastWorldEvent(type, id, payload = {}) {
+    this.worldEventSequence += 1;
+    this.worldEvent = {
+      type: this.sanitizeMessage(type),
+      id: this.sanitizeMessage(id),
+      payload: payload && typeof payload === "object" ? payload : {}
+    };
+    this.sendState(true);
+    return this.worldEventSequence;
+  }
+
   sendState(force = false) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
 
@@ -509,6 +543,10 @@ export class Multiplayer {
       chatSequence: this.chatSequence,
       chatMessage: this.chatMessage,
       chatSender: this.chatSender,
+      worldEventSequence: this.worldEventSequence,
+      worldEventType: this.worldEvent?.type || "",
+      worldEventId: this.worldEvent?.id || "",
+      worldEventPayload: this.worldEvent ? JSON.stringify(this.worldEvent.payload || {}) : "",
     };
 
     const changed =
@@ -523,7 +561,8 @@ export class Multiplayer {
       state.playerName !== this.lastSent.playerName ||
       state.fallSequence !== this.lastSent.fallSequence ||
       state.fallStartedAt !== this.lastSent.fallStartedAt ||
-      state.chatSequence !== this.lastSent.chatSequence;
+      state.chatSequence !== this.lastSent.chatSequence ||
+      state.worldEventSequence !== this.lastSent.worldEventSequence;
 
     const heartbeat = this.heartbeatTimer >= 1.0;
 
