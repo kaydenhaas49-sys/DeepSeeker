@@ -600,6 +600,7 @@ const MENU_DUCK_MENU_X=-11.2;
 const MENU_DUCK_MENU_Y=0;
 const MENU_DUCK_MENU_Z=8.5;
 const MENU_DUCK_SPIN_SPEED=1.35;
+const MENU_DUCK_EDGE_SAFE_MARGIN=.30;
 const MENU_SPIDER_PATH_CENTER_X=3.0;
 const MENU_SPIDER_PATH_CENTER_Z=-18.0;
 const MENU_SPIDER_PATH_RADIUS_X=22.0;
@@ -793,7 +794,8 @@ function updateMenuScene(t,dt){
     }
   }else if(arachnophobiaMode){
     // In arachnophobia mode the spider is replaced by a friendly duck mascot.
-    // Keep it in the visual center of the menu and continuously spin it in place.
+    // Keep it on the foreground floor, centered in the shot, and continuously spin
+    // it without letting the wing meshes pop as they cross the screen edge.
     menuSpider.position.set(
       MENU_DUCK_MENU_X,
       MENU_DUCK_MENU_Y,
@@ -805,6 +807,21 @@ function updateMenuScene(t,dt){
       0
     );
     menuSpider.rotation.z=0;
+
+    const duckMeshes=[];
+    menuSpiderActual?.traverse(node=>{
+      if(node.isMesh) duckMeshes.push(node);
+    });
+
+    // Keep the whole duck render-safe. The extra margin prevents a wing that is
+    // only barely visible at the viewport edge from being treated inconsistently.
+    for(const mesh of duckMeshes){
+      mesh.frustumCulled=false;
+      if(mesh.geometry) mesh.geometry.computeBoundingSphere();
+      if(mesh.geometry?.boundingSphere){
+        mesh.geometry.boundingSphere.radius*=1+MENU_DUCK_EDGE_SAFE_MARGIN;
+      }
+    }
   }else{
     const phase=t*MENU_SPIDER_PATH_SPEED;
     const nextPhase=(t+dt)*MENU_SPIDER_PATH_SPEED;
