@@ -3842,11 +3842,42 @@ function chooseSpiderCeilingTarget(){
   );
 }
 
+function findSafeSpiderGroundPointAroundPlayer(minDistance=4.5,maxDistance=7.5){
+  const candidates=[];
+  const baseAngle=Math.random()*Math.PI*2;
+
+  for(let i=0;i<24;i++){
+    const angle=baseAngle+(i/24)*Math.PI*2;
+    const distance=THREE.MathUtils.lerp(minDistance,maxDistance,(i%6)/5);
+    const x=player.pos.x+Math.cos(angle)*distance;
+    const z=player.pos.z+Math.sin(angle)*distance;
+
+    if(!isSpiderBlocked(x,z)){
+      candidates.push({x,z});
+    }
+  }
+
+  if(candidates.length){
+    candidates.sort((a,b)=>{
+      const aHidden=!spiderPathSegmentClear(player.pos.x,player.pos.z,a.x,a.z);
+      const bHidden=!spiderPathSegmentClear(player.pos.x,player.pos.z,b.x,b.z);
+      return Number(bHidden)-Number(aHidden);
+    });
+    return candidates[0];
+  }
+
+  return {
+    x:player.pos.x+Math.cos(baseAngle)*5.5,
+    z:player.pos.z+Math.sin(baseAngle)*5.5
+  };
+}
+
 function startSpiderCeilingMode(){
   spiderBehaviorState="ceiling";
   spiderBehaviorTime=0;
   spiderOnCeiling=false;
   clearSpiderPath();
+  spiderStuckTime=0;
   spiderCeilingDuration=THREE.MathUtils.lerp(
     SPIDER_CEILING_MIN_TIME,
     SPIDER_CEILING_MAX_TIME,
@@ -3855,9 +3886,13 @@ function startSpiderCeilingMode(){
   chooseSpiderCeilingTarget();
 
   spiderTransitionTimer=0;
-  spiderTransitionDuration=.65;
+  spiderTransitionDuration=.60;
   spiderTransitionFromY=spiderEntity.position.y;
   spiderTransitionToY=SPIDER_CEILING_Y;
+  spiderTransitionFromX=spiderEntity.position.x;
+  spiderTransitionFromZ=spiderEntity.position.z;
+  spiderTransitionToX=spiderEntity.position.x;
+  spiderTransitionToZ=spiderEntity.position.z;
   spiderTransitionFromScale=spiderEntity.scale.x || 1;
   spiderTransitionToScale=SPIDER_CEILING_SCALE;
   spiderTransitionKind="up";
@@ -3871,16 +3906,23 @@ function startSpiderChaseFromCeiling(){
   spiderBehaviorTime=0;
   spiderOnCeiling=false;
   clearSpiderPath();
+  spiderStuckTime=0;
   spiderChaseDuration=THREE.MathUtils.lerp(
     SPIDER_CHASE_MIN_TIME,
     SPIDER_CHASE_MAX_TIME,
     Math.random()
   );
 
+  const dropPoint=findSafeSpiderGroundPointAroundPlayer(4.0,6.5);
+
   spiderTransitionTimer=0;
-  spiderTransitionDuration=.55;
+  spiderTransitionDuration=.48;
   spiderTransitionFromY=SPIDER_CEILING_Y;
   spiderTransitionToY=SPIDER_GROUND_OFFSET;
+  spiderTransitionFromX=spiderEntity.position.x;
+  spiderTransitionFromZ=spiderEntity.position.z;
+  spiderTransitionToX=dropPoint.x;
+  spiderTransitionToZ=dropPoint.z;
   spiderTransitionFromScale=SPIDER_CEILING_SCALE;
   spiderTransitionToScale=1;
   spiderTransitionKind="down";
@@ -3918,29 +3960,20 @@ function updateSpiderTransition(dt){
 
   if(spiderTransitionKind==="up"){
     spiderEntity.rotation.x=THREE.MathUtils.lerp(0,Math.PI,eased);
-    spiderEntity.position.x=THREE.MathUtils.lerp(
-      spiderEntity.position.x,
-      spiderCeilingTarget.x,
-      eased*.35
-    );
-    spiderEntity.position.z=THREE.MathUtils.lerp(
-      spiderEntity.position.z,
-      spiderCeilingTarget.z,
-      eased*.35
-    );
   }else if(spiderTransitionKind==="down"){
     spiderEntity.rotation.x=THREE.MathUtils.lerp(Math.PI,0,eased);
-    spiderEntity.position.x=THREE.MathUtils.lerp(
-      spiderEntity.position.x,
-      player.pos.x,
-      eased*.20
-    );
-    spiderEntity.position.z=THREE.MathUtils.lerp(
-      spiderEntity.position.z,
-      player.pos.z,
-      eased*.20
-    );
   }
+
+  spiderEntity.position.x=THREE.MathUtils.lerp(
+    spiderTransitionFromX,
+    spiderTransitionToX,
+    eased
+  );
+  spiderEntity.position.z=THREE.MathUtils.lerp(
+    spiderTransitionFromZ,
+    spiderTransitionToZ,
+    eased
+  );
 
   if(spiderTransitionTimer>=spiderTransitionDuration){
     if(spiderTransitionKind==="up"){
