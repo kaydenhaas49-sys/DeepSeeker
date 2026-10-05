@@ -11,6 +11,9 @@ export class SecurityCameraSystem {
     this.index=0;
     this.camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.05,220);
     this.camera.rotation.order="YXZ";
+    this.camera.matrixAutoUpdate=true;
+    this._worldPosition=new THREE.Vector3();
+    this._worldTarget=new THREE.Vector3();
     this.root=null;
     this.label=null;
     this._buildOverlay();
@@ -65,9 +68,27 @@ export class SecurityCameraSystem {
     const cams=this._available();
     const cam=cams[this.index];
     if(!cam) return;
-    this.camera.position.copy(cam.position);
-    this.camera.lookAt(cam.lookAt);
+
+    // Camera positions live inside streamed chunk groups. Always resolve the
+    // actual world transform instead of assuming the group's local origin.
+    cam.group.updateWorldMatrix(true,true);
+    cam.group.getWorldPosition(this._worldPosition);
+    this.camera.position.copy(this._worldPosition);
+
+    // The generated target is stored in world space.
+    if(cam.lookAt){
+      this._worldTarget.copy(cam.lookAt);
+      this.camera.lookAt(this._worldTarget);
+    }else{
+      this._worldTarget.copy(this._worldPosition).add(
+        new THREE.Vector3(0,0,-10).applyQuaternion(cam.group.getWorldQuaternion(new THREE.Quaternion()))
+      );
+      this.camera.lookAt(this._worldTarget);
+    }
+
+    this.camera.updateProjectionMatrix();
     this.camera.updateMatrixWorld(true);
+
     if(this.label) this.label.textContent=(cam.name||("CAM "+String(this.index+1).padStart(2,"0")))+" · "+this.index+"/"+Math.max(0,cams.length-1);
   }
 
