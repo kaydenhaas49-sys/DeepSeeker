@@ -617,7 +617,6 @@ function applyArachnophobiaVisual(){
   }
 
   spiderActions.clear();
-  spiderAnimationClips.clear();
   spiderMixer=null;
   spiderAnimationState="";
 
@@ -689,6 +688,13 @@ function syncMenuSpiderFromGameplayModel(){
   menuSpider.add(menuSpiderActual);
   menuSpider.updateMatrixWorld(true);
   menuSpider.position.y=MENU_SPIDER_CEILING_Y;
+
+  if(arachnophobiaMode){
+    menuSpiderMixer=null;
+    menuSpider.visible=true;
+    return;
+  }
+
   menuSpiderMixer=new THREE.AnimationMixer(menuSpiderActual);
   const menuClip=spiderAnimationClips.get("walk")||spiderAnimationClips.get("idle1")||spiderAnimationClips.get("idle2");
   if(menuClip){
