@@ -648,11 +648,10 @@ function ensureTutorialOpenRoom(){
   floor.rotation.x=-Math.PI/2;
 
   const ceiling=addTutorialMesh(
-    new THREE.PlaneGeometry(max-min,max-min),
+    new THREE.BoxGeometry(max-min,.16,max-min),
     ceilingMaterial,
-    new THREE.Vector3((min+max)*.5,h,(min+max)*.5)
+    new THREE.Vector3((min+max)*.5,h+.08,(min+max)*.5)
   );
-  ceiling.rotation.x=Math.PI/2;
   ceiling.castShadow=true;
   ceiling.receiveShadow=true;
 
@@ -672,10 +671,9 @@ function ensureTutorialOpenRoom(){
     tutorialOpenRoomOccluders.push(mesh);
   }
 
-  // Two physical fixtures, with only the nearest one allowed to illuminate at
-  // once. The light switches on only when the player is actually facing it and
-  // there is a clear line of sight through the room.
-  const tutorialFixturePositions=[[20,22],[42,42]];
+  // Four permanent fluorescent fixtures, one near each corner of the tutorial.
+  // The tutorial is tiny enough that keeping all four on has negligible cost.
+  const tutorialFixturePositions=[[12,12],[52,12],[12,52],[52,52]];
   for(const [x,z] of tutorialFixturePositions){
     const fixtureMesh=addTutorialMesh(
       new THREE.BoxGeometry(4,.10,.95),
@@ -711,6 +709,10 @@ function ensureTutorialOpenRoom(){
   tutorialOpenRoomRoot.visible=true;
   tutorialOpenRoomActive=true;
   renderer.shadowMap.enabled=true;
+  flashlight.castShadow=true;
+  flashlight.shadow.mapSize.set(256,256);
+  flashlight.shadow.bias=-0.0004;
+  flashlight.shadow.normalBias=0.018;
   player.ignoreWorldCollision=true;
   player.extraCollisionBoxes=tutorialOpenRoomCollisionBoxes;
 }
@@ -736,6 +738,7 @@ function disableTutorialOpenRoom(){
 
   world.root.visible=true;
   renderer.shadowMap.enabled=ENABLE_SHADOWS;
+  flashlight.castShadow=ENABLE_SHADOWS;
   player.ignoreWorldCollision=false;
   player.extraCollisionBoxes=[];
 }
@@ -1512,6 +1515,8 @@ scene.add(camera);
 
 
 const player=new Player(camera,renderer.domElement,world);
+flashlightOn=false;
+player.setFlashlightVisual(false);
 const audio=new HorrorAudio();
 
 player.onBreath=(intensity=.65)=>audio.breath(intensity);
@@ -2918,6 +2923,8 @@ function ensureHouseLoading(){
 
 function startGame(save=null,saveSlot=selectedSaveSlot){
   setSelectedSaveSlot(saveSlot,false);
+  flashlightOn=false;
+  player.setFlashlightVisual(false);
   gameStarted=true;
   overlay.classList.add("hidden");
   audio.start();
