@@ -9,6 +9,13 @@ import {
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
+const MP_LOW_END =
+  (() => {
+    const q = new URLSearchParams(location.search).get("quality");
+    return q==="low" || q==="potato" ||
+      ((navigator.hardwareConcurrency||4)<=4 && (navigator.deviceMemory||4)<=4);
+  })();
+const REMOTE_RENDER_DISTANCE = MP_LOW_END ? 38 : 60;
 
 export class Multiplayer {
   constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart, onSharedFall, onChat, onWorldEvent }) {
@@ -441,6 +448,7 @@ export class Multiplayer {
         current: this.normalizeState(player.state || {}),
         nameplate:null,
         lastChatSequence:this.normalizeState(player.state || {}).chatSequence,
+        animationRefresh:0,
       };
 
       this.players.set(player.id, remote);
@@ -620,7 +628,7 @@ export class Multiplayer {
       const sameLevel = remote.current.level === (this.getLevel() ? "house" : "backrooms");
       const dx = remote.current.x - this.player.pos.x;
       const dz = remote.current.z - this.player.pos.z;
-      const nearby = dx * dx + dz * dz < 60 * 60;
+      const nearby = dx * dx + dz * dz < REMOTE_RENDER_DISTANCE * REMOTE_RENDER_DISTANCE;
       remote.group.visible = sameLevel && nearby;
 
       if(remote.nameplate){
@@ -630,11 +638,16 @@ export class Multiplayer {
           : 0;
       }
 
-      if(remote.mixer && remote.group.visible){
-        remote.mixer.update(dt);
+      remote.animationRefresh=(remote.animationRefresh||0)-dt;
+      if(remote.animationRefresh<=0){
+        remote.animationRefresh=MP_LOW_END?0.10:0.033;
       }
 
-      if(remote.remoteLight && remote.flashlight){
+      if(remote.mixer && remote.group.visible && remote.animationRefresh<=0){
+        remote.mixer.update(MP_LOW_END?Math.min(dt,.10):dt);
+      }
+
+      if(remote.remoteLight && remote.flashlight && (!MP_LOW_END || nearby)){
         remote.flashlight.getWorldPosition(remote.remoteLight.origin);
         updateRemoteFlashlight(
           remote.remoteLight,
