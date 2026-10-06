@@ -252,9 +252,15 @@ export class World {
       floor: LOW_END_DEVICE
         ? new THREE.MeshBasicMaterial({ map: tex.floor, color: 0x8f876f })
         : new THREE.MeshLambertMaterial({ map: tex.floor }),
+      // Keep the drop ceiling consistently warm/dim. The high-quality
+      // branch used a near-white base, which could blow out into a solid
+      // white roof even though the tile texture itself is correct.
+      // DoubleSide also prevents the ceiling from disappearing from the
+      // underside if the camera ever crosses the plane.
       ceiling: new THREE.MeshBasicMaterial({
         map: tex.ceiling,
-        color: LOW_END_DEVICE ? 0x77715d : 0xe2ddca
+        color: LOW_END_DEVICE ? 0x6f6953 : 0x817b63,
+        side: THREE.DoubleSide
       }),
     };
 
