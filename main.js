@@ -1157,6 +1157,7 @@ let houseCollisionRefreshTimer=0;
 let houseCollisionFocusX=NaN;
 let houseCollisionFocusZ=NaN;
 let gameStarted=false;
+let lastAutoSave=0;
 let houseIntroMessageShown=false;
 
 // First-room tutorial state. The apartment teaches movement, flashlight,
