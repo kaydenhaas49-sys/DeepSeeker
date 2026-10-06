@@ -80,7 +80,7 @@ export class Player {
         e.preventDefault();
       }
       if(e.repeat && (e.code === "ControlLeft" || e.code === "ControlRight" || e.code === "Space")) return;
-      if((e.code === "ControlLeft" || e.code === "ControlRight") && this.locked){
+      if((e.code === "ControlLeft" || e.code === "ControlRight") && this.movementActive){
         if(!this.sliding && this.isRunning && Math.hypot(this.vel.x,this.vel.z)>3.0){
           this.sliding=true;
           this.slideTimer=.62;
@@ -91,7 +91,7 @@ export class Player {
           this.crouched = !this.crouched;
         }
       }
-      if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched && !this.sliding){
+      if(e.code === "Space" && this.movementActive && this.jumpY <= 0.001 && !this.crouched && !this.sliding){
         this.jumpVelocity = JUMP_SPEED;
         this.stamina = Math.max(0, this.stamina - 8);
       }

@@ -243,6 +243,14 @@ scene.add(tutorialOpenRoomRoot);
 
 const tutorialOpenRoomCollisionBoxes=[];
 const tutorialHiddenWallMeshes=[];
+const tutorialOpenRoomLights=[];
+const tutorialOpenRoomOccluders=[];
+let tutorialOpenRoomLightLastUpdate=0;
+const tutorialOpenRoomLightOrigin=new THREE.Vector3();
+const tutorialOpenRoomLightDirection=new THREE.Vector3();
+const tutorialOpenRoomLightTarget=new THREE.Vector3();
+const tutorialOpenRoomLightTargetDirection=new THREE.Vector3();
+const tutorialOpenRoomLightRaycaster=new THREE.Raycaster();
 let tutorialOpenRoomActive=false;
 let tutorialMascotRoot=null;
 let tutorialMascotReady=false;
@@ -7424,7 +7432,8 @@ function animate(){
     !controlsOpen &&
     !chatOpen &&
     !securityCameras.active &&
-    overlay.classList.contains("hidden")
+    !adminOverlay.classList.contains("open") &&
+    !computerSystem.openState
   );
   player.update(dt);
   updateTutorialOpenRoomLights();
