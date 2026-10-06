@@ -254,7 +254,7 @@ export class World {
         : new THREE.MeshLambertMaterial({ map: tex.floor }),
       ceiling: new THREE.MeshBasicMaterial({
         map: tex.ceiling,
-        color: LOW_END_DEVICE ? 0xbab6a8 : 0xffffff
+        color: LOW_END_DEVICE ? 0x77715d : 0xe2ddca
       }),
     };
 
@@ -347,9 +347,7 @@ export class World {
 
   // Called every frame with the player position.
   updateFixtureLights(px,pz){
-    if(LOW_END_DEVICE) return;
-
-    const maxActive=6;
+    const maxActive=LOW_END_DEVICE ? 1 : 6;
     const maxDistance=18;
     const maxDistanceSq=maxDistance*maxDistance;
     const now=performance.now();
@@ -662,23 +660,23 @@ export class World {
         });
 
     const desk = new THREE.Mesh(new THREE.BoxGeometry(2.3, .12, 1.0), wood);
-    desk.position.y = .82;
+    desk.position.y = .06;
     station.add(desk);
 
     const monitor = new THREE.Mesh(new THREE.BoxGeometry(1.35, .78, .10), dark);
-    monitor.position.set(0, 1.42, -.18);
+    monitor.position.set(0, .66, -.18);
     station.add(monitor);
 
     const panel = new THREE.Mesh(new THREE.BoxGeometry(1.12, .56, .025), screen);
-    panel.position.set(0, 1.43, -.235);
+    panel.position.set(0, .67, -.235);
     station.add(panel);
 
     const stem = new THREE.Mesh(new THREE.BoxGeometry(.12, .45, .12), dark);
-    stem.position.set(0, 1.02, -.18);
+    stem.position.set(0, .26, -.18);
     station.add(stem);
 
     const keyboard = new THREE.Mesh(new THREE.BoxGeometry(.72, .035, .30), dark);
-    keyboard.position.set(0, .91, .22);
+    keyboard.position.set(0, .145, .22);
     station.add(keyboard);
 
     if(!LOW_END_DEVICE){
@@ -852,7 +850,6 @@ export class World {
 
     for(let index=0; index<fixturePositions.length; index++){
       const [localX,localZ]=fixturePositions[index];
-      if(LOW_END_DEVICE && index%2===1) continue;
 
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
