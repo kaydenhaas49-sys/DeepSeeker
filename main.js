@@ -1515,8 +1515,6 @@ scene.add(camera);
 
 
 const player=new Player(camera,renderer.domElement,world);
-flashlightOn=false;
-player.setFlashlightVisual(false);
 const audio=new HorrorAudio();
 
 player.onBreath=(intensity=.65)=>audio.breath(intensity);
@@ -6489,7 +6487,7 @@ function startBackroomsFall(sharedStartAt=Date.now(),broadcast=false){
   return true;
 }
 
-let flashlightOn=true;
+let flashlightOn=false;
 let battery=100;
 let controlsOpen=false;
 let pulse=0;
