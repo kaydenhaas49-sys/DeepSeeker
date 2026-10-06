@@ -1667,6 +1667,12 @@ function parseSave(raw){
     if(!parsed || typeof parsed!=="object") return null;
     if(!Number.isFinite(Number(parsed.x)) || !Number.isFinite(Number(parsed.z))) return null;
     if(parsed.level!=="apartment" && parsed.level!=="backrooms" && parsed.houseMode!==true && parsed.houseMode!==false) return null;
+    if(parsed.level==="apartment" || parsed.houseMode===true){
+      parsed.level="backrooms";
+      parsed.houseMode=false;
+      parsed.x=32;
+      parsed.z=32;
+    }
     return parsed;
   }catch{
     return null;
@@ -2599,7 +2605,7 @@ function installMainMenuRedesign(){
   terminal.innerHTML=`
     <div class="menuRightHeader"><span>FIELD TERMINAL</span><span>DS-01</span></div>
     <div class="menuSignalState"><span class="menuSignalDot"></span><span>SIGNAL: LOST</span></div>
-    <p class="menuRightLead">The apartment is only the entrance. Something is waiting in the halls beyond it.</p>
+    <p class="menuRightLead">The halls are only the beginning. Something is waiting deeper inside.</p>
     <div class="menuRightRule"></div>
     <div class="menuRightSectionLabel">ENTRY SYSTEM</div>
   `;
@@ -2616,7 +2622,7 @@ function installMainMenuRedesign(){
   meta.className="menuRightMeta";
   meta.innerHTML=`
     <div class="menuRightMetaRow"><span>WORLD</span><span>BACKROOMS</span></div>
-    <div class="menuRightMetaRow"><span>ENTRY</span><span>APARTMENT</span></div>
+    <div class="menuRightMetaRow"><span>ENTRY</span><span>LEVEL 0</span></div>
     <div class="menuRightMetaRow"><span>LINK</span><span>STANDBY</span></div>
   `;
   terminal.appendChild(meta);
@@ -2695,7 +2701,7 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
   const data={
     version:5,
     seed:SEED,
-    level:houseMode ? "apartment" : "backrooms",
+    level:"backrooms",
     savedAt:Date.now(),
     saveSlot:targetSlot,
     saveType:roomCode ? "MULTIPLAYER" : "SOLO",
@@ -2911,26 +2917,6 @@ function ensureHouseLoading(){
 
 function startGame(save=null,saveSlot=selectedSaveSlot){
   setSelectedSaveSlot(saveSlot,false);
-  // New games begin in the apartment. Continue only loads the apartment when
-  // the saved level says the player was actually there.
-  const needsApartment=Boolean(save && getSavedLevel(save)==="apartment");
-
-  if(needsApartment && (!houseLoaded || !houseCollisionReady)){
-    pendingHouseStart=true;
-    pendingSaveLoad=save;
-    pendingNewGameSlot=save ? null : normalizeSaveSlot(saveSlot);
-    ensureHouseLoading();
-
-    prompt.textContent=houseLoadFailed
-      ? "APARTMENT FAILED TO LOAD"
-      : "LOADING APARTMENT…";
-    eventText.textContent=houseLoadFailed
-      ? "APARTMENT FAILED TO LOAD"
-      : "APARTMENT STILL LOADING...";
-    eventText.style.opacity="1";
-    return false;
-  }
-
   gameStarted=true;
   overlay.classList.add("hidden");
   audio.start();
@@ -3072,7 +3058,7 @@ let chatHideTimer=0;
 const multiplayer=new Multiplayer({
   scene,
   player,
-  getLevel:()=>houseMode,
+  getLevel:()=>false,
   getFlashlightOn:()=>flashlightOn,
   onStatus:(message)=>{
     if(!message) return;
@@ -3351,7 +3337,7 @@ function updateMultiplayerMap(){
   const radius=width*.42;
   const range=55;
   const scale=radius/range;
-  const currentLevel=houseMode ? "house" : "backrooms";
+  const currentLevel="backrooms";
 
   ctx.clearRect(0,0,width,height);
   ctx.fillStyle="rgba(7,9,7,.94)";
@@ -3458,7 +3444,7 @@ function updateMultiplayerMap(){
   ctx.arc(centerX,centerY,radius,0,Math.PI*2);
   ctx.stroke();
 
-  multiplayerMapLevel.textContent=currentLevel==="house" ? "APARTMENT" : "BACKROOMS";
+  multiplayerMapLevel.textContent="BACKROOMS";
   if(!multiplayer.playerId) multiplayerMapLevel.textContent="CONNECTING";
 }
 
@@ -4409,9 +4395,6 @@ function prepareInitialStartupAssets(){
 function updateInitialLoadingScreen(){
   if(initialLandingShown) return;
 
-  const houseProgress=Number.isFinite(window.__deepseekerHouseLoadProgress)
-    ? window.__deepseekerHouseLoadProgress
-    : (houseCollisionReady ? 100 : houseLoaded ? 76 : houseLoadStarted ? 8 : 0);
   const spiderProgress=spiderLoaded
     ? 100
     : spiderLoadStarted
@@ -4424,12 +4407,11 @@ function updateInitialLoadingScreen(){
   const characterProgress=player.characterLoaded ? 100 : 0;
   const startupProgress=initialStartupPrepared ? 100 : 0;
   const total=Math.max(0,Math.min(100,Math.round(
-    houseProgress*.49 +
-    spiderProgress*.28 +
-    decoderProgress*.05 +
-    characterProgress*.08 +
-    startupProgress*.05 +
-    saveProgress*.05
+    spiderProgress*.54 +
+    decoderProgress*.06 +
+    characterProgress*.18 +
+    startupProgress*.08 +
+    saveProgress*.10
   )));
 
   const fill=document.getElementById("initialLoadFill");
@@ -4442,7 +4424,6 @@ function updateInitialLoadingScreen(){
     if(initialStartupError){
       status.textContent="STARTUP PREPARATION FAILED — RELOAD TO RETRY.";
     }else if(
-      houseCollisionReady &&
       spiderLoaded &&
       geometryDecoderReady &&
       player.characterLoaded &&
@@ -4450,10 +4431,6 @@ function updateInitialLoadingScreen(){
       window.__deepseekerSaveHydrationDone
     ){
       status.textContent="ALL GAME ASSETS READY — STARTING MAIN MENU.";
-    }else if(!houseLoaded){
-      status.textContent="LOADING APARTMENT ASSET…";
-    }else if(!houseCollisionReady){
-      status.textContent="BUILDING APARTMENT COLLISION…";
     }else if(!spiderLoaded && spiderStartupFailed){
       status.textContent="SPIDER LOAD FAILED — RETRYING…";
     }else if(!spiderLoaded){
@@ -4471,14 +4448,13 @@ function updateInitialLoadingScreen(){
     }
   }
 
-  prompt.textContent="LOADING WORLD… "+total+"%";
+  prompt.textContent="PREPARING WORLD… "+total+"%";
 }
 
 function finishInitialLoading(){
   if(initialLandingShown) return;
   if(
     initialStartupError ||
-    !houseCollisionReady ||
     !spiderLoaded ||
     !geometryDecoderReady ||
     !player.characterLoaded ||
@@ -4513,10 +4489,6 @@ function beginInitialLoading(){
   // loading screen. Nothing is intentionally deferred until after the menu.
   prepareInitialStartupAssets();
 
-  if(!houseLoaded && !houseLoadStarted){
-    houseLoadStarted=true;
-    loadHouse();
-  }
   if(!spiderLoaded && !spiderLoadStarted){
     spiderLoadStarted=true;
     loadSpiderFromPack();
@@ -7036,12 +7008,6 @@ applyStoryStage(0,false);
 
 overlay.addEventListener("click",(e)=>{
   if(e.target!==overlay) return;
-  if(!houseLoaded && !gameStarted){
-    prompt.textContent=houseLoadFailed
-      ? "APARTMENT FAILED TO LOAD"
-      : "START A GAME TO LOAD THE APARTMENT";
-    return;
-  }
   if(gameStarted){
     audio.start();
     player.lock();
@@ -7174,9 +7140,6 @@ document.addEventListener("keydown",e=>{
 
   if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen && !chatOpen){
     if(interaction.interact()){
-      return;
-    }
-    if(useHouseReturnTeleporter()){
       return;
     }
   }else if(e.code==="KeyF" && gameStarted && !phoneOpen && !controlsOpen) toggleFlashlight();

@@ -319,7 +319,7 @@ export class Multiplayer {
       z: Number.isFinite(z) ? z : 0,
       yaw: Number.isFinite(yaw) ? yaw : 0,
       pitch: Number.isFinite(Number(state?.pitch)) ? Number(state.pitch) : 0,
-      level: state?.level === "house" ? "house" : "backrooms",
+      level: "backrooms",
       crouched: Boolean(state?.crouched),
       flashlight: state?.flashlight !== false,
       playerName: this.sanitizeName(state?.playerName || ""),
@@ -546,7 +546,7 @@ export class Multiplayer {
       z: Number(this.player.pos.z.toFixed(3)),
       yaw: Number(this.player.yaw.toFixed(2)),
       pitch: Number(this.player.pitch.toFixed(2)),
-      level: this.getLevel() ? "house" : "backrooms",
+      level: "backrooms",
       crouched: Boolean(this.player.crouched),
       flashlight: Boolean(this.getFlashlightOn()),
       playerName: this.getPlayerName(),
@@ -625,7 +625,7 @@ export class Multiplayer {
       );
       remote.group.rotation.y = remote.current.yaw + Math.PI;
 
-      const sameLevel = remote.current.level === (this.getLevel() ? "house" : "backrooms");
+      const sameLevel = remote.current.level === "backrooms";
       const dx = remote.current.x - this.player.pos.x;
       const dz = remote.current.z - this.player.pos.z;
       const nearby = dx * dx + dz * dz < REMOTE_RENDER_DISTANCE * REMOTE_RENDER_DISTANCE;

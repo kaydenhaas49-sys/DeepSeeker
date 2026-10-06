@@ -1,16 +1,7 @@
 // levels.js — planned level architecture for Backrooms: Lost Signal.
-// The current playable build still runs APARTMENT + BACKROOMS. These definitions
-// keep future levels centralized so the level transition system can be added
-// without hardcoding names throughout main.js.
+// Playable levels are centralized here so future transitions do not require hardcoding names throughout main.js.
 
 export const LEVELS = [
-  {
-    id: "apartment",
-    name: "APARTMENT",
-    type: "imported",
-    description: "The normal world. The last place that feels familiar.",
-    depth: 0
-  },
   {
     id: "level-0",
     name: "LEVEL 0 · YELLOW",
@@ -54,7 +45,7 @@ export const LEVELS = [
 ];
 
 export function getLevelDefinition(id){
-  return LEVELS.find(level=>level.id===id) || LEVELS[1];
+  return LEVELS.find(level=>level.id===id) || LEVELS[0];
 }
 
 export function getNextLevelId(id){
