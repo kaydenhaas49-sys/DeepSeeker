@@ -324,9 +324,9 @@ export class World {
     const camera=this.fixtureLightCamera;
     const hasView=Boolean(camera);
     const maxActive=1;
-    const maxDistance=28;
+    const maxDistance=32;
     const maxDistanceSq=maxDistance*maxDistance;
-    const minViewDot=.24;
+    const minViewDot=.05;
     const candidates=[];
     const active=[];
 
@@ -367,33 +367,8 @@ export class World {
 
     candidates.sort((a,b)=>a.priority-b.priority);
 
-    const maxLOSChecks=Math.min(5,candidates.length);
-    for(let i=0;i<maxLOSChecks;i++){
-      const item=candidates[i].item;
-
-      if(hasView){
-        item.light.getWorldPosition(this.fixtureLightTarget);
-        this.fixtureLightToTarget
-          .copy(this.fixtureLightTarget)
-          .sub(this.fixtureLightViewOrigin);
-
-        const distance=this.fixtureLightToTarget.length();
-        if(distance>.05){
-          this.fixtureLightToTarget.normalize();
-          this.fixtureLightRaycaster.set(
-            this.fixtureLightViewOrigin,
-            this.fixtureLightToTarget
-          );
-          this.fixtureLightRaycaster.near=.05;
-          this.fixtureLightRaycaster.far=Math.max(.05,distance-.16);
-
-          const hits=this.fixtureLightRaycaster.intersectObjects(this.wallOccluders,false);
-          if(hits.length) continue;
-        }
-      }
-
-      active.push(item);
-      if(active.length>=maxActive) break;
+    for(let i=0;i<Math.min(maxActive,candidates.length);i++){
+      active.push(candidates[i].item);
     }
 
     const flickerTime=now*.003;
@@ -616,7 +591,7 @@ export class World {
       const point=new THREE.PointLight(
         0xffe6a8,
         power,
-        cracked ? 23 : 28,
+        cracked ? 26 : 32,
         1.3
       );
       // The emitter sits just below the ceiling panel so its real light cone

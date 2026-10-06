@@ -731,31 +731,12 @@ function updateTutorialOpenRoomLights(){
       item.mesh.material.emissiveIntensity=.34;
     }
 
-    item.light.getWorldPosition(tutorialOpenRoomLightTarget);
     const dx=item.x-player.pos.x;
     const dz=item.z-player.pos.z;
     const distanceSq=dx*dx+dz*dz;
-    if(distanceSq>30*30) continue;
+    if(distanceSq>36*36) continue;
 
-    tutorialOpenRoomLightTargetDirection
-      .copy(tutorialOpenRoomLightTarget)
-      .sub(tutorialOpenRoomLightOrigin)
-      .normalize();
-
-    const viewDot=tutorialOpenRoomLightDirection.dot(tutorialOpenRoomLightTargetDirection);
-    if(viewDot<.24) continue;
-
-    const distance=Math.sqrt(distanceSq);
-    tutorialOpenRoomLightRaycaster.set(
-      tutorialOpenRoomLightOrigin,
-      tutorialOpenRoomLightTargetDirection
-    );
-    tutorialOpenRoomLightRaycaster.near=.05;
-    tutorialOpenRoomLightRaycaster.far=Math.max(.05,distance-.22);
-
-    if(tutorialOpenRoomLightRaycaster.intersectObjects(tutorialOpenRoomOccluders,false).length) continue;
-
-    candidates.push({item,priority:distanceSq-viewDot*60});
+    candidates.push({item,priority:distanceSq});
   }
 
   candidates.sort((a,b)=>a.priority-b.priority);
@@ -5020,7 +5001,7 @@ function startHouseTutorialSpiderChase(){
   spiderEntity.visible=true;
   spiderRevealLight.visible=true;
   spiderRevealLight.intensity=4.2;
-  setSpiderAnimation("runby");
+  setSpiderAnimation("chase");
   pulse=.8;
 
   if(arachnophobiaMode){
@@ -5165,8 +5146,7 @@ function updateHouseTutorialSpider(dt){
   spiderEntity.visible=true;
   spiderRevealLight.visible=true;
   spiderRevealLight.intensity=4.2;
-  setSpiderAnimation("runby");
-  groundSpiderEntity();
+  setSpiderAnimation("chase");
 
   if(houseTutorialSpiderStuckTime>.65){
     finishHouseTutorialSpiderChase();
@@ -7530,8 +7510,23 @@ function animate(){
   // Keep beam range and aim stable. Wall-hit occlusion was changing the
   // spotlight target dozens of times per second and could make surfaces snap
   // or flicker as the center ray crossed a wall edge.
-  flashlight.distance=FLASHLIGHT_BASE_DISTANCE;
-  flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
+  let activeFlashlightDistance=FLASHLIGHT_BASE_DISTANCE;
+  if(tutorialOpenRoomActive){
+    camera.getWorldPosition(tutorialOpenRoomLightOrigin);
+    camera.getWorldDirection(tutorialOpenRoomLightDirection);
+    if(tutorialOpenRoomLightDirection.y>.001){
+      const ceilingDistance=(WALL_H-.06-tutorialOpenRoomLightOrigin.y) /
+        tutorialOpenRoomLightDirection.y;
+      if(Number.isFinite(ceilingDistance) && ceilingDistance>0.25){
+        activeFlashlightDistance=Math.min(
+          activeFlashlightDistance,
+          ceilingDistance
+        );
+      }
+    }
+  }
+  flashlight.distance=activeFlashlightDistance;
+  flashlight.target.position.set(0,0,-activeFlashlightDistance);
   if(
     spiderMixer &&
     (
