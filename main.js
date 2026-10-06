@@ -1465,50 +1465,7 @@ camera.add(flashlight);
 camera.add(flashlight.target);
 scene.add(camera);
 
-const flashlightRaycaster=new THREE.Raycaster();
-const flashlightRayOrigin=new THREE.Vector3();
-const flashlightRayDirection=new THREE.Vector3();
-let flashlightOcclusionTimer=0;
 
-function updateFlashlightOcclusion(dt){
-  if(tutorialOpenRoomActive){
-    flashlightOcclusionTimer=0;
-    flashlight.distance=FLASHLIGHT_BASE_DISTANCE;
-    flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
-    return;
-  }
-
-  flashlightOcclusionTimer-=dt;
-  if(flashlightOcclusionTimer>0) return;
-
-  flashlightOcclusionTimer=LOW_END_PERFORMANCE?.10:.045;
-
-  flashlightRayOrigin.setFromMatrixPosition(camera.matrixWorld);
-  camera.getWorldDirection(flashlightRayDirection);
-
-  flashlightRaycaster.set(flashlightRayOrigin,flashlightRayDirection);
-  flashlightRaycaster.near=.08;
-  flashlightRaycaster.far=FLASHLIGHT_BASE_DISTANCE;
-
-  const root=houseMode
-    ? houseRoot
-    : tutorialOpenRoomActive
-      ? tutorialOpenRoomRoot
-      : world.root;
-  const hits=flashlightRaycaster.intersectObject(root,true);
-
-  let distance=FLASHLIGHT_BASE_DISTANCE;
-  for(const hit of hits){
-    if(!hit.object?.visible) continue;
-    if(hit.distance>.1){
-      distance=Math.max(.7,hit.distance+.08);
-      break;
-    }
-  }
-
-  flashlight.distance=distance;
-  flashlight.target.position.set(0,0,-distance);
-}
 
 const player=new Player(camera,renderer.domElement,world);
 const audio=new HorrorAudio();
@@ -7474,12 +7431,11 @@ function animate(){
     ? (LOW_END_PERFORMANCE ? 1.15 : 1.65)
     : 0;
   flashlightFill.visible=flashlight.visible;
-  if(flashlight.visible){
-    updateFlashlightOcclusion(dt);
-  }else{
-    flashlight.distance=FLASHLIGHT_BASE_DISTANCE;
-    flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
-  }
+  // Keep beam range and aim stable. Wall-hit occlusion was changing the
+  // spotlight target dozens of times per second and could make surfaces snap
+  // or flicker as the center ray crossed a wall edge.
+  flashlight.distance=FLASHLIGHT_BASE_DISTANCE;
+  flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
   if(
     spiderMixer &&
     (
