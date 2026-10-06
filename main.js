@@ -810,22 +810,20 @@ function updateMenuScene(t,dt){
     menuBackdropWasActive=true;
     world.root.visible=false;
 
-    if(LOW_END_PERFORMANCE){
-      menuSet.visible=false;
-      menuScene.background.set(0x0a0b08);
-      menuScene.fog.near=20;
-      menuScene.fog.far=45;
-      if(menuBackdropElement) menuBackdropElement.style.display="none";
-      return true;
-    }
-
     menuSet.visible=true;
     if(menuBackdropElement) menuBackdropElement.style.display="none";
 
-    menuScene.background.set(0x29291d);
-    menuScene.fog.color.set(0x45422f);
-    menuScene.fog.near=8;
-    menuScene.fog.far=78;
+    if(LOW_END_PERFORMANCE){
+      menuScene.background.set(0x15150f);
+      menuScene.fog.color.set(0x3c3a2a);
+      menuScene.fog.near=12;
+      menuScene.fog.far=50;
+    }else{
+      menuScene.background.set(0x29291d);
+      menuScene.fog.color.set(0x45422f);
+      menuScene.fog.near=8;
+      menuScene.fog.far=78;
+    }
   }
 
   // Slow camera drift — enough motion to keep the menu alive without feeling
@@ -868,7 +866,7 @@ function updateMenuScene(t,dt){
     menuSpiderActual?.traverse(node=>{
       if(!node.isSprite) return;
       node.frustumCulled=false;
-      node.rotation.z=t*MENU_DUCK_SPIN_SPEED;
+      node.rotation.z=t*MENU_DUCK_SPIN_SPEED*4.5;
     });
   }else{
     const phase=t*MENU_SPIDER_PATH_SPEED;
