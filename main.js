@@ -236,7 +236,8 @@ let tutorialMascotMouth=null;
 let tutorialMascotSpeechStage=-1;
 let tutorialMascotSpeechTimer=0;
 const tutorialMascotPosition=new THREE.Vector3();
-const tutorialMascotCameraOffset=new THREE.Vector3(.78,-.48,-1.45);
+const tutorialMascotRight=new THREE.Vector3();
+const tutorialMascotForward=new THREE.Vector3();
 const tutorialMascotAimLocal=new THREE.Vector3(-.55,.08,-1).normalize();
 const tutorialMascotAimQuaternion=new THREE.Quaternion();
 tutorialMascotAimQuaternion.setFromUnitVectors(
@@ -395,12 +396,32 @@ function updateTutorialMascot(dt){
   }
 
   tutorialMascotRoot.visible=true;
-  tutorialMascotPosition.copy(tutorialMascotCameraOffset);
-  camera.localToWorld(tutorialMascotPosition);
-  tutorialMascotRoot.position.copy(tutorialMascotPosition);
-  tutorialMascotRoot.quaternion.copy(camera.quaternion).multiply(tutorialMascotAimQuaternion);
 
-  const bob=Math.sin(tutorialMascotTime*3.2)*.035;
+  camera.getWorldDirection(tutorialMascotForward);
+  tutorialMascotForward.y=0;
+  tutorialMascotForward.normalize();
+  tutorialMascotRight.set(
+    tutorialMascotForward.z,
+    0,
+    -tutorialMascotForward.x
+  );
+
+  // Keep the mascot physically in the room instead of parented to the
+  // camera, so it reads as a floating companion rather than an arm prop.
+  tutorialMascotPosition.copy(player.pos)
+    .addScaledVector(tutorialMascotForward,1.9)
+    .addScaledVector(tutorialMascotRight,1.15);
+  tutorialMascotPosition.y=Math.max(1.9,player.pos.y-.05);
+
+  tutorialMascotRoot.position.copy(tutorialMascotPosition);
+  tutorialMascotRoot.lookAt(
+    camera.position.x,
+    camera.position.y-.22,
+    camera.position.z
+  );
+  tutorialMascotRoot.rotateY(Math.PI);
+
+  const bob=Math.sin(tutorialMascotTime*3.2)*.08;
   tutorialMascotRoot.position.y+=bob;
 
   const talkActive=
