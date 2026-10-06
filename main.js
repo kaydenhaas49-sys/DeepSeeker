@@ -808,8 +808,18 @@ function updateMenuScene(t,dt){
 
   if(!menuBackdropWasActive){
     menuBackdropWasActive=true;
-    menuSet.visible=true;
     world.root.visible=false;
+
+    if(LOW_END_PERFORMANCE){
+      menuSet.visible=false;
+      menuScene.background.set(0x0a0b08);
+      menuScene.fog.near=20;
+      menuScene.fog.far=45;
+      if(menuBackdropElement) menuBackdropElement.style.display="none";
+      return true;
+    }
+
+    menuSet.visible=true;
     if(menuBackdropElement) menuBackdropElement.style.display="none";
 
     menuScene.background.set(0x29291d);
