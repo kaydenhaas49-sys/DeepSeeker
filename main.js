@@ -653,6 +653,8 @@ function ensureTutorialOpenRoom(){
     new THREE.Vector3((min+max)*.5,h,(min+max)*.5)
   );
   ceiling.rotation.x=Math.PI/2;
+  ceiling.castShadow=true;
+  ceiling.receiveShadow=true;
 
   const walls=[
     {size:[max-min,h,t],position:[(min+max)*.5,h*.5,min]},
@@ -682,10 +684,10 @@ function ensureTutorialOpenRoom(){
     );
     fixtureMesh.material.emissiveIntensity=.34;
 
-    const light=new THREE.PointLight(0xffe6a8,6.5,24,1.4);
+    const light=new THREE.PointLight(0xffe6a8,11.5,30,1.35);
     light.position.set(x,h-.75,z);
     light.castShadow=false;
-    light.visible=false;
+    light.visible=true;
     light.name="TutorialFluorescentLight";
     tutorialOpenRoomRoot.add(light);
     tutorialOpenRoomLights.push({
@@ -694,7 +696,7 @@ function ensureTutorialOpenRoom(){
       x,
       z,
       phase:Math.random()*Math.PI*2,
-      baseIntensity:6.5
+      baseIntensity:11.5
     });
   }
 
@@ -708,6 +710,7 @@ function ensureTutorialOpenRoom(){
 
   tutorialOpenRoomRoot.visible=true;
   tutorialOpenRoomActive=true;
+  renderer.shadowMap.enabled=true;
   player.ignoreWorldCollision=true;
   player.extraCollisionBoxes=tutorialOpenRoomCollisionBoxes;
 }
@@ -715,38 +718,12 @@ function ensureTutorialOpenRoom(){
 function updateTutorialOpenRoomLights(){
   if(!tutorialOpenRoomActive || !tutorialOpenRoomLights.length) return;
 
-  const now=performance.now();
-  if(now-tutorialOpenRoomLightLastUpdate<100) return;
-  tutorialOpenRoomLightLastUpdate=now;
-
-  camera.getWorldPosition(tutorialOpenRoomLightOrigin);
-  camera.getWorldDirection(tutorialOpenRoomLightDirection);
-  tutorialOpenRoomLightDirection.normalize();
-
-  const candidates=[];
   for(const item of tutorialOpenRoomLights){
-    item.light.visible=false;
-    item.light.intensity=0;
+    item.light.visible=true;
+    item.light.intensity=item.baseIntensity;
     if(item.mesh?.material?.emissiveIntensity!==undefined){
-      item.mesh.material.emissiveIntensity=.34;
+      item.mesh.material.emissiveIntensity=2.1;
     }
-
-    const dx=item.x-player.pos.x;
-    const dz=item.z-player.pos.z;
-    const distanceSq=dx*dx+dz*dz;
-    if(distanceSq>36*36) continue;
-
-    candidates.push({item,priority:distanceSq});
-  }
-
-  candidates.sort((a,b)=>a.priority-b.priority);
-  const active=candidates[0]?.item;
-  if(!active) return;
-
-  active.light.visible=true;
-  active.light.intensity=active.baseIntensity*(.96+.04*Math.sin(now*.004+active.phase));
-  if(active.mesh?.material?.emissiveIntensity!==undefined){
-    active.mesh.material.emissiveIntensity=1.55;
   }
 }
 
@@ -758,6 +735,7 @@ function disableTutorialOpenRoom(){
   tutorialOpenRoomActive=false;
 
   world.root.visible=true;
+  renderer.shadowMap.enabled=ENABLE_SHADOWS;
   player.ignoreWorldCollision=false;
   player.extraCollisionBoxes=[];
 }
@@ -1523,6 +1501,9 @@ camera.add(flashlightFill);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
+flashlight.shadow.mapSize.set(256,256);
+flashlight.shadow.bias=-0.0004;
+flashlight.shadow.normalBias=0.018;
 flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
 camera.add(flashlight);
 camera.add(flashlight.target);
