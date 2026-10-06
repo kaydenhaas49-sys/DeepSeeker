@@ -2247,7 +2247,10 @@ function updateHouseLoadingUI(progress=null,status=null){
   }
 
   const save=getSavedGame(selectedSaveSlot);
-  if(newGameButton) newGameButton.disabled=false;
+  if(newGameButton){
+    newGameButton.disabled=false;
+    newGameButton.removeAttribute("disabled");
+  }
   if(continueButton) continueButton.disabled=!save;
 
   if(startLobbyButton && !new URLSearchParams(location.search).has("lobby")){
@@ -2567,10 +2570,10 @@ function continueGame(slot=selectedSaveSlot){
   startGame(save,slot);
 }
 
-function resetForNewGame(slot=selectedSaveSlot){
+function resetForNewGame(slot=selectedSaveSlot,{skipConfirm=false}={}){
   const targetSlot=normalizeSaveSlot(slot);
 
-  if(getSavedGame(targetSlot) && !window.confirm("SLOT "+targetSlot+" ALREADY HAS A SAVE. STARTING NEW GAME WILL OVERWRITE IT. CONTINUE?")){
+  if(!skipConfirm && getSavedGame(targetSlot) && !window.confirm("SLOT "+targetSlot+" ALREADY HAS A SAVE. STARTING NEW GAME WILL OVERWRITE IT. CONTINUE?")){
     eventText.textContent="NEW GAME CANCELLED · SLOT "+targetSlot;
     eventText.style.opacity="1";
     return;
@@ -6332,7 +6335,8 @@ document.querySelectorAll(".phoneSaveSlot").forEach(button=>{
 
 newGameButton.addEventListener("click",event=>{
   event.preventDefault();
-  resetForNewGame(selectedSaveSlot);
+  event.stopPropagation();
+  resetForNewGame(selectedSaveSlot,{skipConfirm:true});
 });
 
 continueButton.addEventListener("click",()=>{
