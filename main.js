@@ -140,6 +140,9 @@ let housePixelRatio=HOUSE_PIXEL_RATIO;
 let perfElapsed=0;
 let perfFrames=0;
 let perfCooldown=0;
+let uiRefreshElapsed=0;
+let storyRefreshElapsed=0;
+let debugPerfElapsed=0;
 renderer.setPixelRatio(currentPixelRatio);
 renderer.toneMapping=LOW_END_PERFORMANCE
   ? THREE.NoToneMapping
@@ -6069,6 +6072,9 @@ function animate(){
   perfElapsed+=dt;
   perfFrames++;
   perfCooldown=Math.max(0,perfCooldown-dt);
+  uiRefreshElapsed+=dt;
+  storyRefreshElapsed+=dt;
+  debugPerfElapsed+=dt;
 
   if(perfElapsed>=0.5){
     const fps=perfFrames/perfElapsed;
@@ -6170,7 +6176,12 @@ function animate(){
   if(multiplayerMapOpen) updateMultiplayerMap();
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
-    if(!houseMode) updateStoryProgress();
+    if(!houseMode && storyRefreshElapsed>=(
+    LOW_END_PERFORMANCE?.08:.02
+  )){
+    storyRefreshElapsed=0;
+    updateStoryProgress();
+  }
 
   if(gameStarted){
     if(t-lastAutoSave>20){
@@ -6384,12 +6395,28 @@ function animate(){
     ambient.intensity=0;
   }
 
-  const stamina=player.stamina;
-  staminaBar.style.width=stamina+"%";
-  staminaValue.textContent=Math.round(stamina);
-  batteryBar.style.width=battery+"%";
-  batteryValue.textContent=Math.round(battery)+"%";
-  batteryBar.style.opacity=flashlightOn?1:.45;
+  if(uiRefreshElapsed>=(
+    LOW_END_PERFORMANCE?.075:.033
+  )){
+    uiRefreshElapsed=0;
+    const stamina=player.stamina;
+    staminaBar.style.width=stamina+"%";
+    staminaValue.textContent=Math.round(stamina);
+    batteryBar.style.width=battery+"%";
+    batteryValue.textContent=Math.round(battery)+"%";
+    batteryBar.style.opacity=flashlightOn?1:.45;
+  }
+
+  if(urlParams.get("perf")==="1" && debugPerfElapsed>=.5){
+    debugPerfElapsed=0;
+    console.debug("[DeepSeeker PERF]",{
+      fps:Math.round(perfFrames/Math.max(perfElapsed,.001)),
+      calls:renderer.info.render.calls,
+      triangles:renderer.info.render.triangles,
+      pixelRatio:houseMode?housePixelRatio:currentPixelRatio,
+      lowEnd:LOW_END_PERFORMANCE
+    });
+  }
 
   renderer.render(scene,camera);
 }
