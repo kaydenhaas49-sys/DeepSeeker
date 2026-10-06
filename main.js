@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, mulberry32 } from "./world.js";
+import { World, EYE, WALL_H, WALL_T, mulberry32 } from "./world.js";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js";
 import { HorrorAudio } from "./audio.js";
