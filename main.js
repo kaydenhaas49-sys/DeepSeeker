@@ -113,6 +113,27 @@ const houseLoadPercentLobby=document.getElementById("houseLoadPercentLobby");
 const houseLoadStatusLobby=document.getElementById("houseLoadStatusLobby");
 let menuControlsButton=null;
 
+document.addEventListener("click",(event)=>{
+  const target=event.target?.closest?.("#newGameButton");
+  if(!target) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+
+  if(gameStarted) return;
+
+  try{
+    resetForNewGame(selectedSaveSlot,{skipConfirm:true});
+  }catch(error){
+    console.error("[DeepSeeker] NEW GAME click failed:",error);
+    const message=String(error?.message||error||"Unknown error");
+    if(eventText){
+      eventText.textContent="NEW GAME ERROR · "+message.slice(0,140);
+      eventText.style.opacity="1";
+    }
+  }
+},true);
+
 
 const gltfLoader=new GLTFLoader();
 const dracoLoader=new DRACOLoader();
@@ -6333,11 +6354,7 @@ document.querySelectorAll(".phoneSaveSlot").forEach(button=>{
   });
 });
 
-newGameButton.addEventListener("click",event=>{
-  event.preventDefault();
-  event.stopPropagation();
-  resetForNewGame(selectedSaveSlot,{skipConfirm:true});
-});
+// NEW GAME uses the document-level capture handler above so the menu can safely rebuild its DOM.
 
 continueButton.addEventListener("click",()=>{
   continueGame(selectedSaveSlot);
