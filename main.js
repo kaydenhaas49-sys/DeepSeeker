@@ -176,48 +176,111 @@ const tutorialOpenRoomCollisionBoxes=[];
 const tutorialHiddenWallMeshes=[];
 let tutorialOpenRoomActive=false;
 
-function ensureTutorialOpenRoom(){
-  if(tutorialOpenRoomActive) return;
+function clearTutorialOpenRoomGeometry(){
+  while(tutorialOpenRoomRoot.children.length){
+    const child=tutorialOpenRoomRoot.children.pop();
+    if(!child) continue;
 
-  world.root.visible=true;
-  world.update(32,32);
-
-  const chunk=world.chunks.get("0,0");
-  if(chunk?.group){
-    chunk.group.traverse(obj=>{
-      if(obj.isMesh && obj.material===world.materials.wall){
-        obj.visible=false;
-        tutorialHiddenWallMeshes.push(obj);
+    child.traverse(obj=>{
+      if(obj.userData?.tutorialOwnedMaterial && obj.material){
+        const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
+        for(const material of materials) material.dispose();
+      }
+      if(obj.userData?.tutorialOwnedGeometry && obj.geometry){
+        obj.geometry.dispose();
       }
     });
   }
+  tutorialOpenRoomRoot.visible=false;
+}
+
+function ensureTutorialOpenRoom(){
+  if(tutorialOpenRoomActive) return;
+
+  // Seed the real procedural world in the background, but keep it completely
+  // out of the tutorial render path. The tutorial must never depend on a chunk
+  // mesh, chunk light, or world-material lighting state to be visible.
+  world.update(32,32);
+  world.root.visible=false;
 
   tutorialOpenRoomCollisionBoxes.length=0;
-  while(tutorialOpenRoomRoot.children.length){
-    tutorialOpenRoomRoot.remove(tutorialOpenRoomRoot.children[0]);
-  }
+  clearTutorialOpenRoomGeometry();
 
   const min=4;
   const max=60;
   const h=WALL_H;
   const t=WALL_T;
 
-  const wallMaterial=world.materials.wall;
+  const wallMaterial=new THREE.MeshBasicMaterial({
+    map:world.materials.wall.map,
+    color:0xb6a13f
+  });
+  const floorMaterial=new THREE.MeshBasicMaterial({
+    map:world.materials.floor.map,
+    color:0x8f876f,
+    side:THREE.DoubleSide
+  });
+  const ceilingMaterial=new THREE.MeshBasicMaterial({
+    map:world.materials.ceiling.map,
+    color:0x3a382e,
+    side:THREE.DoubleSide
+  });
+  const fixtureMaterial=new THREE.MeshBasicMaterial({
+    color:0xffedbd
+  });
+
+  const addTutorialMesh=(geometry,material,position)=>{
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.position.copy(position);
+    mesh.frustumCulled=false;
+    mesh.userData.tutorialOwnedGeometry=true;
+    mesh.userData.tutorialOwnedMaterial=true;
+    tutorialOpenRoomRoot.add(mesh);
+    return mesh;
+  };
+
+  const floor=addTutorialMesh(
+    new THREE.PlaneGeometry(max-min,max-min),
+    floorMaterial,
+    new THREE.Vector3((min+max)*.5,0,(min+max)*.5)
+  );
+  floor.rotation.x=-Math.PI/2;
+
+  const ceiling=addTutorialMesh(
+    new THREE.PlaneGeometry(max-min,max-min),
+    ceilingMaterial,
+    new THREE.Vector3((min+max)*.5,h,(min+max)*.5)
+  );
+  ceiling.rotation.x=Math.PI/2;
+
   const walls=[
-    {size:[56,h,t],position:[32,h*.5,min]},
-    {size:[56,h,t],position:[32,h*.5,max]},
-    {size:[t,h,56],position:[min,h*.5,32]},
-    {size:[t,h,56],position:[max,h*.5,32]}
+    {size:[max-min,h,t],position:[(min+max)*.5,h*.5,min]},
+    {size:[max-min,h,t],position:[(min+max)*.5,h*.5,max]},
+    {size:[t,h,max-min],position:[min,h*.5,(min+max)*.5]},
+    {size:[t,h,max-min],position:[max,h*.5,(min+max)*.5]}
   ];
 
   for(const wall of walls){
-    const mesh=new THREE.Mesh(
+    addTutorialMesh(
       new THREE.BoxGeometry(...wall.size),
-      wallMaterial
+      wallMaterial,
+      new THREE.Vector3(...wall.position)
     );
-    mesh.position.set(...wall.position);
-    mesh.frustumCulled=false;
-    tutorialOpenRoomRoot.add(mesh);
+  }
+
+  // Three simple fluorescent fixtures keep the room readable even when the
+  // normal Backrooms lights are outside their active selection radius.
+  for(const [x,z] of [[18,18],[42,18],[30,42]]){
+    addTutorialMesh(
+      new THREE.BoxGeometry(4,.10,.95),
+      fixtureMaterial,
+      new THREE.Vector3(x,h-.055,z)
+    );
+    const light=new THREE.PointLight(0xffe6a8,8,24,1.8);
+    light.position.set(x,h-.8,z);
+    light.userData.tutorialOwnedMaterial=false;
+    light.userData.tutorialOwnedGeometry=false;
+    tutorialOpenRoomRoot.add(light);
   }
 
   const half=t*.5;
@@ -235,24 +298,20 @@ function ensureTutorialOpenRoom(){
 }
 
 function disableTutorialOpenRoom(){
-  if(!tutorialOpenRoomActive && tutorialHiddenWallMeshes.length===0) return;
+  if(!tutorialOpenRoomActive && tutorialOpenRoomRoot.children.length===0) return;
 
-  for(const mesh of tutorialHiddenWallMeshes){
-    if(mesh) mesh.visible=true;
-  }
-  tutorialHiddenWallMeshes.length=0;
-
-  tutorialOpenRoomRoot.visible=false;
+  clearTutorialOpenRoomGeometry();
   tutorialOpenRoomCollisionBoxes.length=0;
   tutorialOpenRoomActive=false;
 
+  world.root.visible=true;
   player.ignoreWorldCollision=false;
   player.extraCollisionBoxes=[];
 }
 
-const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,0);
+const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,0.16);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0x8f815d,0);
+const ambient=new THREE.AmbientLight(0x8f815d,0.035);
 scene.add(ambient);
 
 
@@ -6777,7 +6836,7 @@ function animate(){
     if(houseDoorCollisionDirty || houseCollisionRefreshTimer<=0 || movedEnough){
       updateHouseDoorCollisions();
     }
-  }else{
+  }else if(!tutorialOpenRoomActive){
     player.extraCollisionBoxes=[];
   }
 
