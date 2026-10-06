@@ -1,7 +1,7 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
-import { createHazmatCharacter } from "./character.js";
+import { createHazmatCharacter, createFirstPersonArms } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -154,6 +154,13 @@ export class Player {
       this.characterModel = character.model;
       this.characterMixer = character.mixer;
       this.characterFlashlight = character.flashlight;
+
+      const firstPersonArms=createFirstPersonArms(character.model);
+      firstPersonArms.position.set(0,-1.05,-.68);
+      firstPersonArms.scale.setScalar(1.04);
+      firstPersonArms.rotation.x=THREE.MathUtils.degToRad(1.5);
+      this.hands.add(firstPersonArms);
+      this.hands.visible=true;
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
@@ -373,6 +380,12 @@ export class Player {
       );
       this.worldAvatar.rotation.y=this.yaw + Math.PI;
       this.worldAvatar.visible=false;
+    }
+
+    // Keep the first-person arm rig camera-local and always available while
+    // the player is in normal gameplay.
+    if(this.hands){
+      this.hands.visible=true;
     }
   }
 

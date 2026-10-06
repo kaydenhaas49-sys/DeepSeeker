@@ -362,6 +362,176 @@ function pickIdleAnimation(clips){
   return ranked[0]?.score>=500 ? ranked[0].clip : null;
 }
 
+
+function isArmBoneName(name){
+  const n=normalizeBoneName(name);
+  return /shoulder|clavicle|upperarm|lowerarm|forearm|elbow|wrist|hand|arm/.test(n);
+}
+
+function meshNameLooksLikeArm(mesh){
+  const n=normalizeBoneName(mesh.name);
+  return /shoulder|sleeve|upperarm|lowerarm|forearm|elbow|wrist|hand|glove|cuff|arm/.test(n);
+}
+
+function attributeComponent(attribute,index,component){
+  if(component===0) return attribute.getX(index);
+  if(component===1) return attribute.getY(index);
+  if(component===2) return attribute.getZ(index);
+  return attribute.getW(index);
+}
+
+function vertexArmWeight(skinnedMesh,vertexIndex,armBoneIndices){
+  const geometry=skinnedMesh.geometry;
+  const skinIndex=geometry.getAttribute("skinIndex");
+  const skinWeight=geometry.getAttribute("skinWeight");
+  if(!skinIndex || !skinWeight) return 0;
+
+  let total=0;
+  for(let i=0;i<4;i++){
+    const boneIndex=attributeComponent(skinIndex,vertexIndex,i);
+    const weight=attributeComponent(skinWeight,vertexIndex,i);
+    if(armBoneIndices.has(boneIndex)) total+=weight;
+  }
+  return total;
+}
+
+function extractArmGeometry(source){
+  const geometry=source.geometry;
+  const position=geometry.getAttribute("position");
+  if(!position || !geometry.getAttribute("skinIndex") || !geometry.getAttribute("skinWeight")) return null;
+
+  const armBoneIndices=new Set();
+  source.skeleton?.bones.forEach((bone,index)=>{
+    if(isArmBoneName(bone.name)) armBoneIndices.add(index);
+  });
+  if(!armBoneIndices.size) return null;
+
+  const sourceIndex=geometry.index;
+  const triangleCount=sourceIndex
+    ? Math.floor(sourceIndex.count/3)
+    : Math.floor(position.count/3);
+  const keptVertices=[];
+
+  for(let tri=0;tri<triangleCount;tri++){
+    const vertices=[
+      sourceIndex ? sourceIndex.getX(tri*3) : tri*3,
+      sourceIndex ? sourceIndex.getX(tri*3+1) : tri*3+1,
+      sourceIndex ? sourceIndex.getX(tri*3+2) : tri*3+2
+    ];
+    const weights=vertices.map(index=>vertexArmWeight(source,index,armBoneIndices));
+    const average=(weights[0]+weights[1]+weights[2])/3;
+    const strongVertices=weights.filter(weight=>weight>=.18).length;
+
+    if(average>=.22 && strongVertices>=2){
+      keptVertices.push(...vertices);
+    }
+  }
+
+  if(!keptVertices.length) return null;
+
+  const result=new THREE.BufferGeometry();
+  for(const [name,attribute] of Object.entries(geometry.attributes)){
+    const values=[];
+    for(const sourceVertex of keptVertices){
+      for(let component=0;component<attribute.itemSize;component++){
+        values.push(attributeComponent(attribute,sourceVertex,component));
+      }
+    }
+
+    result.setAttribute(
+      name,
+      new THREE.BufferAttribute(
+        new attribute.array.constructor(values),
+        attribute.itemSize,
+        attribute.normalized
+      )
+    );
+  }
+
+  result.computeBoundingBox();
+  result.computeBoundingSphere();
+  return result;
+}
+
+function applyFirstPersonArmPose(root){
+  root.updateMatrixWorld(true);
+
+  const leftUpper=findBoneByNameParts(root,[
+    "mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"
+  ]);
+  const rightUpper=findBoneByNameParts(root,[
+    "mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"
+  ]);
+  const leftForearm=findBoneByNameParts(root,[
+    "mixamorigleftforearm","leftforearm","leftlowerarm","leftelbow","forearml"
+  ]) || getBoneChild(leftUpper);
+  const rightForearm=findBoneByNameParts(root,[
+    "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
+  ]) || getBoneChild(rightUpper);
+
+  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(-.20,-.74,-.64).normalize());
+  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(.20,-.74,-.64).normalize());
+
+  root.updateMatrixWorld(true);
+
+  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(-.12,-.48,-.86).normalize());
+  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(.12,-.48,-.86).normalize());
+
+  root.updateMatrixWorld(true);
+}
+
+export function createFirstPersonArms(model){
+  const root=cloneSkeleton(model);
+  root.name="FirstPersonActualArms";
+  root.visible=true;
+
+  const sourceMeshes=[];
+  root.traverse(obj=>{
+    if(obj.isMesh) sourceMeshes.push(obj);
+  });
+
+  for(const source of sourceMeshes){
+    source.visible=false;
+
+    if(source.isSkinnedMesh){
+      const armGeometry=extractArmGeometry(source);
+      if(armGeometry){
+        const armMesh=new THREE.SkinnedMesh(
+          armGeometry,
+          Array.isArray(source.material)
+            ? source.material.map(material=>material.clone())
+            : source.material?.clone?.() || source.material
+        );
+
+        armMesh.position.copy(source.position);
+        armMesh.quaternion.copy(source.quaternion);
+        armMesh.scale.copy(source.scale);
+        armMesh.renderOrder=1000;
+        armMesh.frustumCulled=false;
+        armMesh.bind(source.skeleton,source.bindMatrix);
+        armMesh.bindMatrixInverse.copy(source.bindMatrixInverse);
+        source.parent.add(armMesh);
+      }
+    }else if(meshNameLooksLikeArm(source)){
+      source.visible=true;
+      source.renderOrder=1000;
+      source.frustumCulled=false;
+    }
+  }
+
+  applyFirstPersonArmPose(root);
+
+  root.traverse(obj=>{
+    if(!obj.isMesh) return;
+    obj.frustumCulled=false;
+    obj.renderOrder=1000;
+    obj.castShadow=false;
+    obj.receiveShadow=false;
+  });
+
+  return root;
+}
+
 export function createRemoteFlashlight(scene){
   const target=new THREE.Object3D();
   const light=new THREE.SpotLight(0xf0dfad,27,60,Math.PI/5.5,.88,1.5);
