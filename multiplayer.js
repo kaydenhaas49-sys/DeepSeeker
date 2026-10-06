@@ -638,13 +638,13 @@ export class Multiplayer {
           : 0;
       }
 
-      remote.animationRefresh=(remote.animationRefresh||0)-dt;
-      if(remote.animationRefresh<=0){
-        remote.animationRefresh=MP_LOW_END?0.10:0.033;
-      }
-
-      if(remote.mixer && remote.group.visible && remote.animationRefresh<=0){
-        remote.mixer.update(MP_LOW_END?Math.min(dt,.10):dt);
+      remote.animationRefresh=(remote.animationRefresh||0)+dt;
+      if(remote.mixer && remote.group.visible){
+        const interval=MP_LOW_END?.10:.033;
+        if(remote.animationRefresh>=interval){
+          remote.mixer.update(remote.animationRefresh);
+          remote.animationRefresh=0;
+        }
       }
 
       if(remote.remoteLight && remote.flashlight && (!MP_LOW_END || nearby)){
