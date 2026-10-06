@@ -136,6 +136,7 @@ export class Player {
     this.characterMixer = null;
     this.characterFlashlight = null;
     this.characterLoaded = false;
+    this.characterLoadFailed = false;
 
     this.worldAvatar = new THREE.Group();
     this.worldAvatar.name = "LocalHazmatAvatar";
@@ -144,7 +145,7 @@ export class Player {
     const worldRoot = this.camera.parent || this.camera;
     worldRoot.add(this.worldAvatar);
 
-    this.loadCharacterModel();
+    this.characterReadyPromise=this.loadCharacterModel();
   }
 
   async loadCharacterModel() {
@@ -179,6 +180,7 @@ export class Player {
 
       this.hands.add(firstPersonArms);
       this.hands.visible=true;
+      this.hands.renderOrder=1999;
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
@@ -198,10 +200,14 @@ export class Player {
 
       this.worldAvatar.add(character.model);
       this.characterLoaded = true;
+      this.characterLoadFailed = false;
 
       console.log("[DeepSeeker] local hazmat avatar ready");
+      return true;
     }catch(error){
+      this.characterLoadFailed = true;
       console.error("[DeepSeeker] local hazmat avatar failed:",error);
+      return false;
     }
   }
 

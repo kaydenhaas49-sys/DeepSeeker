@@ -97,7 +97,7 @@ tutorialGuide.style.cssText=[
   "box-shadow:0 16px 50px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.045)",
   "backdrop-filter:blur(7px)",
   "color:#eee7c9",
-  "z-index:8",
+  "z-index:18",
   "pointer-events:none",
   "opacity:0",
   "transition:opacity .22s ease,transform .22s ease"
@@ -2949,6 +2949,7 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
     player.jumpY=0;
     player.jumpVelocity=0;
     player.keys.clear();
+    setHouseTutorialStage(1);
     showHouseIntroPhoneMessage();
   }
 
@@ -4420,11 +4421,13 @@ function updateInitialLoadingScreen(){
         : 0;
   const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
   const decoderProgress=geometryDecoderReady ? 100 : 0;
+  const characterProgress=player.characterLoaded ? 100 : 0;
   const startupProgress=initialStartupPrepared ? 100 : 0;
   const total=Math.max(0,Math.min(100,Math.round(
-    houseProgress*.54 +
-    spiderProgress*.30 +
-    decoderProgress*.06 +
+    houseProgress*.49 +
+    spiderProgress*.28 +
+    decoderProgress*.05 +
+    characterProgress*.08 +
     startupProgress*.05 +
     saveProgress*.05
   )));
@@ -4442,6 +4445,7 @@ function updateInitialLoadingScreen(){
       houseCollisionReady &&
       spiderLoaded &&
       geometryDecoderReady &&
+      player.characterLoaded &&
       initialStartupPrepared &&
       window.__deepseekerSaveHydrationDone
     ){
@@ -4456,6 +4460,10 @@ function updateInitialLoadingScreen(){
       status.textContent="LOADING SPIDER-Psionic…";
     }else if(!geometryDecoderReady){
       status.textContent="INITIALIZING GEOMETRY DECODERS…";
+    }else if(!player.characterLoaded && player.characterLoadFailed){
+      status.textContent="PLAYER MODEL FAILED TO LOAD — RELOAD TO RETRY.";
+    }else if(!player.characterLoaded){
+      status.textContent="LOADING PLAYER MODEL + ARMS…";
     }else if(!initialStartupPrepared){
       status.textContent="PREPARING FIRST-ROOM ASSETS…";
     }else{
@@ -4473,6 +4481,8 @@ function finishInitialLoading(){
     !houseCollisionReady ||
     !spiderLoaded ||
     !geometryDecoderReady ||
+    !player.characterLoaded ||
+    player.characterLoadFailed ||
     !initialStartupPrepared ||
     !window.__deepseekerSaveHydrationDone
   ){

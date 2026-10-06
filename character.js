@@ -469,13 +469,13 @@ function applyFirstPersonArmPose(root){
     "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
   ]) || getBoneChild(rightUpper);
 
-  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(-.16,-.06,-.986).normalize());
-  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(.16,-.06,-.986).normalize());
+  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(-.16,-.06,.986).normalize());
+  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(.16,-.06,.986).normalize());
 
   root.updateMatrixWorld(true);
 
-  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(-.10,-.03,-.995).normalize());
-  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(.10,-.03,-.995).normalize());
+  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(-.10,-.03,.995).normalize());
+  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(.10,-.03,.995).normalize());
 
   root.updateMatrixWorld(true);
 }
@@ -498,6 +498,10 @@ export function createFirstPersonArms(model){
     "mixamorigrighthand","righthand","handr","wristr"
   ]);
 
+  // Match the orientation used by the world-space character and bring
+  // the real hands into the lower-middle of the first-person frame.
+  root.rotation.y=Math.PI;
+
   if(leftHand && rightHand){
     const leftWorld=leftHand.getWorldPosition(new THREE.Vector3());
     const rightWorld=rightHand.getWorldPosition(new THREE.Vector3());
@@ -505,11 +509,11 @@ export function createFirstPersonArms(model){
 
     root.position.set(
       -handCenter.x,
-      -.24-handCenter.y,
-      -.82-handCenter.z+.48
+      -.30-handCenter.y,
+      -.90-handCenter.z
     );
   }else{
-    root.position.set(0,-.55,-.34);
+    root.position.set(0,-.55,-1.05);
   }
 
   root.updateMatrixWorld(true);
