@@ -4465,28 +4465,52 @@ function setHouseTutorialStage(stage){
   if(stage===1){
     houseTutorialStartX=player.pos.x;
     houseTutorialStartZ=player.pos.z;
-    objective.textContent="Move around the room. W A S D to move.";
-    showHouseTutorialMessage("W A S D · MOVE",1400);
+    objective.textContent="MOVE AROUND THE ROOM · W A S D";
+    showHouseTutorialMessage("W A S D · MOVE",1500);
   }else if(stage===2){
-    objective.textContent="Try your flashlight. Press F to toggle it.";
-    showHouseTutorialMessage("F · FLASHLIGHT",1400);
+    objective.textContent="JUMP OVER THE FLOOR MARK · SPACE";
+    showHouseTutorialMessage("SPACE · JUMP",1500);
   }else if(stage===3){
-    objective.textContent="There is something in this room. Walk toward it.";
+    objective.textContent="CROUCH DOWN AND STAY LOW · CTRL";
+    showHouseTutorialMessage("CTRL · CROUCH",1500);
+  }else if(stage===4){
+    houseTutorialStartX=player.pos.x;
+    houseTutorialStartZ=player.pos.z;
+    objective.textContent="SPRINT ACROSS THE ROOM · HOLD SHIFT";
+    showHouseTutorialMessage("SHIFT · SPRINT",1500);
+  }else if(stage===5){
+    flashlightOn=false;
+    player.setFlashlightVisual(false);
+    flashlight.visible=false;
+    flashlight.intensity=0;
+    objective.textContent="TURN THE FLASHLIGHT ON · F";
+    showHouseTutorialMessage("F · FLASHLIGHT",1500);
+  }else if(stage===6){
+    objective.textContent="OPEN THE DEEPSEEKER PHONE · P";
+    showHouseTutorialMessage("P · OPEN PHONE",1500);
+  }else if(stage===7){
+    objective.textContent="READ M'S MESSAGE, THEN CLOSE THE PHONE · P";
+    showHouseTutorialMessage("CHECK THE DEEPSEEKER.",1700);
+  }else if(stage===8){
+    objective.textContent="MOVE TOWARD THE FIGURE AT THE END OF THE ROOM.";
     if(!houseTutorialSpiderPrepared){
       prepareHouseTutorialSpider();
     }
-    showHouseTutorialMessage("SOMETHING IS SITTING THERE.",1700);
-  }else if(stage===4){
-    objective.textContent="RUN. Hold SHIFT to sprint.";
+    showHouseTutorialMessage(
+      arachnophobiaMode ? "THERE IS A DUCK AHEAD." : "SOMETHING IS WAITING AHEAD.",
+      1900
+    );
+  }else if(stage===9){
+    objective.textContent="RUN. HOLD SHIFT AND GET AWAY FROM IT.";
     showHouseTutorialMessage(
       arachnophobiaMode ? "THE DUCK IS CHASING YOU." : "IT MOVED. RUN.",
-      1500
+      1600
     );
-  }else if(stage===5){
-    objective.textContent="Tutorial complete. Follow the signal deeper.";
+  }else if(stage===10){
+    objective.textContent="TUTORIAL COMPLETE · FOLLOW THE SIGNAL DEEPER.";
     showHouseTutorialMessage(
       arachnophobiaMode ? "YOU LOST THE DUCK." : "IT STOPPED.",
-      1400
+      1600
     );
     disableTutorialOpenRoom();
   }
@@ -4510,14 +4534,14 @@ function startHouseTutorialSpiderChase(){
     audio.scare();
   }
 
-  setHouseTutorialStage(4);
+  setHouseTutorialStage(9);
 }
 
 function finishHouseTutorialSpiderChase(){
   hideHouseTutorialSpider();
 
-  if(!houseMode && houseTutorialStage===4){
-    setHouseTutorialStage(5);
+  if(!houseMode && houseTutorialStage===9){
+    setHouseTutorialStage(10);
   }
 }
 
@@ -4545,7 +4569,33 @@ function updateHouseTutorialSpider(dt){
     return;
   }
 
-  if(houseTutorialStage<3){
+  if(houseTutorialStage===2){
+    if(player.jumpY>.25 || player.jumpVelocity>1.2){
+      setHouseTutorialStage(3);
+    }
+    return;
+  }
+
+  if(houseTutorialStage===3){
+    if(player.crouched){
+      setHouseTutorialStage(4);
+    }
+    return;
+  }
+
+  if(houseTutorialStage===4){
+    const sprintDistance=Math.hypot(
+      player.pos.x-houseTutorialStartX,
+      player.pos.z-houseTutorialStartZ
+    );
+    const sprinting=player.isRunning && Math.hypot(player.vel.x,player.vel.z)>2.0;
+    if(sprinting && sprintDistance>=4.0){
+      setHouseTutorialStage(5);
+    }
+    return;
+  }
+
+  if(houseTutorialStage<8){
     return;
   }
 
@@ -6205,8 +6255,8 @@ function toggleFlashlight(){
   flashlightOn=!flashlightOn;
   player.setFlashlightVisual(flashlightOn);
 
-  if(!houseMode && gameStarted && houseTutorialStage===2){
-    setHouseTutorialStage(3);
+  if(!houseMode && gameStarted && houseTutorialStage===5 && flashlightOn){
+    setHouseTutorialStage(6);
   }
 }
 function refreshPhoneContent(){
@@ -6340,12 +6390,20 @@ function togglePhone(){
     if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
     crosshair.style.display="none";
     refreshPhoneContent();
+
+    if(!houseMode && gameStarted && houseTutorialStage===6){
+      setHouseTutorialStage(7);
+    }
   }else{
     adminOverlay.classList.remove("open");
     adminOverlay.setAttribute("aria-hidden","true");
 
-    if(!houseMode && gameStarted && houseTutorialStage===0){
-      setHouseTutorialStage(1);
+    if(!houseMode && gameStarted){
+      if(houseTutorialStage===0){
+        setHouseTutorialStage(1);
+      }else if(houseTutorialStage===7){
+        setHouseTutorialStage(8);
+      }
     }
 
     if(!controlsOpen) player.lock();
