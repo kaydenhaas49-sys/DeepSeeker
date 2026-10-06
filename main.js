@@ -908,10 +908,11 @@ function updateMenuScene(t,dt){
 }
 
 
+const FLASHLIGHT_BASE_DISTANCE=LOW_END_PERFORMANCE?72:100;
 const flashlight=new THREE.SpotLight(
   0xf0dfad,
   LOW_END_PERFORMANCE?58:72,
-  LOW_END_PERFORMANCE?72:100,
+  FLASHLIGHT_BASE_DISTANCE,
   LOW_END_PERFORMANCE?Math.PI/4.0:Math.PI/4.2,
   LOW_END_PERFORMANCE?.82:.78,
   1.1
@@ -919,10 +920,44 @@ const flashlight=new THREE.SpotLight(
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
-flashlight.target.position.set(0,0,-60);
+flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
 camera.add(flashlight);
 camera.add(flashlight.target);
 scene.add(camera);
+
+const flashlightRaycaster=new THREE.Raycaster();
+const flashlightRayOrigin=new THREE.Vector3();
+const flashlightRayDirection=new THREE.Vector3();
+let flashlightOcclusionTimer=0;
+
+function updateFlashlightOcclusion(dt){
+  flashlightOcclusionTimer-=dt;
+  if(flashlightOcclusionTimer>0) return;
+
+  flashlightOcclusionTimer=LOW_END_PERFORMANCE?.10:.045;
+
+  flashlightRayOrigin.setFromMatrixPosition(camera.matrixWorld);
+  camera.getWorldDirection(flashlightRayDirection);
+
+  flashlightRaycaster.set(flashlightRayOrigin,flashlightRayDirection);
+  flashlightRaycaster.near=.08;
+  flashlightRaycaster.far=FLASHLIGHT_BASE_DISTANCE;
+
+  const root=houseMode ? houseRoot : world.root;
+  const hits=flashlightRaycaster.intersectObject(root,true);
+
+  let distance=FLASHLIGHT_BASE_DISTANCE;
+  for(const hit of hits){
+    if(!hit.object?.visible) continue;
+    if(hit.distance>.1){
+      distance=Math.max(.7,hit.distance+.08);
+      break;
+    }
+  }
+
+  flashlight.distance=distance;
+  flashlight.target.position.set(0,0,-distance);
+}
 
 const player=new Player(camera,renderer.domElement,world);
 const audio=new HorrorAudio();
@@ -3879,6 +3914,7 @@ let spiderAutoLookStarted=false;
 let spiderChaseDuration=5;
 let spiderOriginalModel=null;
 let funnyDuckModel=null;
+let spiderVisibleToPlayer=true;
 let spiderPath=[];
 let spiderPathIndex=0;
 let spiderPathRepathTimer=0;
@@ -5423,6 +5459,106 @@ const adminProjectiles=[];
 const ADMIN_PASSWORD="DEEPSEEKER";
 let storyStage=0;
 let maxStoryDistance=0;
+let gameEnded=false;
+let endingOverlay=null;
+const ENDING_MARKUP="<div class=\"endingGlitch\"></div><div class=\"endingCenter\"><div class=\"endingKicker\">DEEPSEEKER // LOST SIGNAL</div><div class=\"endingTitle\" id=\"endingTitle\">THE BOTTOM</div><div class=\"endingLine\" id=\"endingLine\">YOU FOUND IT.</div><button id=\"endingReturn\" type=\"button\">RETURN TO TITLE</button></div>";
+const ENDING_DISTANCE=660;
+
+function beginGameEnding(){
+  if(gameEnded || !gameStarted) return;
+
+  gameEnded=true;
+  player.keys.clear();
+  player.vel.set(0,0,0);
+
+  spiderActive=false;
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+
+  flashlightOn=false;
+  flashlight.visible=false;
+  player.setFlashlightVisual(false);
+
+  if(document.pointerLockElement===renderer.domElement){
+    document.exitPointerLock();
+  }
+
+  controlsOpen=false;
+  phoneOpen=false;
+  deepseekerAppOpen=false;
+  chatOpen=false;
+  controls.classList.add("hidden");
+  phone.classList.remove("open","app-open");
+  phone.setAttribute("aria-hidden","true");
+  crosshair.style.display="none";
+
+  if(!endingOverlay){
+    endingOverlay=document.createElement("div");
+    endingOverlay.id="deepseekerEnding";
+    endingOverlay.innerHTML=ENDING_MARKUP;
+    endingOverlay.style.cssText=[
+      "position:fixed",
+      "inset:0",
+      "z-index:10000",
+      "display:grid",
+      "place-items:center",
+      "background:#000",
+      "color:#e7dfbb",
+      "opacity:0",
+      "transition:opacity 1.2s ease",
+      "font-family:ui-monospace,SFMono-Regular,Menlo,monospace",
+      "user-select:none",
+      "overflow:hidden"
+    ].join(";");
+
+    const style=document.createElement("style");
+    style.textContent=
+      "#deepseekerEnding .endingGlitch{position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(255,255,255,.018) 0 1px,transparent 1px 5px),radial-gradient(circle at 50% 50%,rgba(214,198,132,.055),transparent 34%);mix-blend-mode:screen;pointer-events:none;}"+
+      "#deepseekerEnding .endingCenter{position:relative;width:min(760px,86vw);text-align:center;padding:32px;}"+
+      "#deepseekerEnding .endingKicker{font-size:10px;letter-spacing:4px;color:#77715e;margin-bottom:28px;}"+
+      "#deepseekerEnding .endingTitle{font-size:clamp(34px,7vw,82px);letter-spacing:clamp(8px,1.8vw,18px);color:#e8dfb8;font-weight:400;text-shadow:0 0 28px rgba(216,201,138,.08);}"+
+      "#deepseekerEnding .endingLine{min-height:28px;margin-top:20px;font-size:12px;letter-spacing:3px;line-height:1.7;color:#aaa487;}"+
+      "#deepseekerEnding #endingReturn{margin-top:42px;padding:13px 22px;border:1px solid rgba(229,218,170,.24);border-radius:10px;background:rgba(255,255,255,.04);color:#d9d1af;font:inherit;font-size:9px;letter-spacing:2.5px;cursor:pointer;opacity:0;transition:opacity .5s,background .2s,border-color .2s;}"+
+      "#deepseekerEnding #endingReturn:hover{background:rgba(216,201,138,.10);border-color:rgba(216,201,138,.55);}";
+
+    document.head.appendChild(style);
+    document.body.appendChild(endingOverlay);
+
+    endingOverlay.querySelector("#endingReturn").addEventListener("click",()=>{
+      location.href=location.pathname;
+    });
+  }
+
+  const title=endingOverlay.querySelector("#endingTitle");
+  const line=endingOverlay.querySelector("#endingLine");
+  const button=endingOverlay.querySelector("#endingReturn");
+
+  title.textContent="THE BOTTOM";
+  line.textContent="YOU FOUND IT.";
+  button.style.opacity="0";
+  endingOverlay.style.opacity="1";
+
+  audio.scare();
+
+  setTimeout(()=>{
+    if(!gameEnded) return;
+    title.textContent="NO FLOOR. NO EXIT.";
+    line.textContent="THE SIGNAL WAS NEVER BELOW YOU.";
+  },1800);
+
+  setTimeout(()=>{
+    if(!gameEnded) return;
+    title.textContent="DEEPSEEKER";
+    line.textContent="YOU WERE FOLLOWING YOUR OWN SIGNAL.";
+  },4000);
+
+  setTimeout(()=>{
+    if(!gameEnded) return;
+    title.textContent="SIGNAL TERMINATED";
+    line.textContent="LOST SIGNAL // CONNECTION CLOSED";
+    button.style.opacity="1";
+  },6500);
+}
 
 const STORY = [
   {
@@ -5479,7 +5615,7 @@ const STORY = [
     depth: 5,
     title: "M — FINAL ENTRY",
     text: "We found the bottom. You are not following my trail. I'm following yours.",
-    objective: "Find the bottom."
+    objective: "Find the bottom. Find the source of the signal."
   }
 ];
 
@@ -5521,6 +5657,14 @@ function updateStoryProgress(){
   }
   if(nextStage!==storyStage){
     applyStoryStage(nextStage,true);
+  }
+
+  if(
+    !gameEnded &&
+    storyStage===STORY.length-1 &&
+    maxStoryDistance>=ENDING_DISTANCE
+  ){
+    beginGameEnding();
   }
 }
 
@@ -5863,7 +6007,7 @@ document.addEventListener("pointerlockchange",()=>{
       overlay.classList.add("hidden");
     }else if(gameStarted){
       if(multiplayerMapOpen) toggleMultiplayerMap(false);
-      loadingScreen.style.display="flex";
+      loadingScreen.style.display="none";
       homeScreen.classList.add("hidden");
       lobbyScreen.classList.add("hidden");
       prompt.textContent="CLICK TO RESUME";
@@ -5879,6 +6023,31 @@ document.addEventListener("pointerlockchange",()=>{
   }
 });
 
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){
+    player.keys.clear();
+    return;
+  }
+
+  fitGameToScreen();
+
+  if(
+    gameStarted &&
+    !gameEnded &&
+    !controlsOpen &&
+    !phoneOpen &&
+    !chatOpen &&
+    document.pointerLockElement!==renderer.domElement
+  ){
+    loadingScreen.style.display="none";
+    homeScreen.classList.add("hidden");
+    lobbyScreen.classList.add("hidden");
+    prompt.textContent="CLICK TO RESUME";
+    overlay.classList.remove("hidden");
+    crosshair.style.display="none";
+  }
+});
+
 document.addEventListener("keydown",e=>{
   if(e.code==="F11"){
     e.preventDefault();
@@ -5887,6 +6056,7 @@ document.addEventListener("keydown",e=>{
   }
 
   if(adminOverlay?.classList.contains("open")) return;
+  if(gameEnded) return;
 
   if(securityCameras.active){
     if(e.code==="Escape"){
@@ -6257,6 +6427,12 @@ function animate(){
 
   flashlight.intensity=flashlightOn ? flashlightStrength : 0;
   flashlight.visible=flashlightOn && battery>0;
+  if(flashlight.visible){
+    updateFlashlightOcclusion(dt);
+  }else{
+    flashlight.distance=FLASHLIGHT_BASE_DISTANCE;
+    flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
+  }
   if(!houseMode && spiderMixer && spiderActive){
     spiderMixer.update(dt);
   }
@@ -6265,7 +6441,7 @@ function animate(){
     groundSpiderEntity();
   }
 
-  spiderRevealLight.intensity=(!houseMode && spiderActive)
+  spiderRevealLight.intensity=(!houseMode && spiderActive && spiderVisibleToPlayer)
     ? (spiderJumpscareTimer>0 ? 5.0 : 2.8)
     : 0;
 
@@ -6371,10 +6547,19 @@ function animate(){
         player.pos.x-spiderEntity.position.x,
         player.pos.z-spiderEntity.position.z
       );
+
+      // The spider already has a world-space sight test; use it as the final
+      // render gate so the model and its reveal light cannot show through walls.
+      spiderVisibleToPlayer =
+        spiderJumpscareTimer>0 || playerHasLineOfSightToSpider();
+      if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
+      spiderRevealLight.visible=spiderVisibleToPlayer;
       spiderEntity.visible=true;
     }
   }else{
     spiderEntity.visible=false;
+    spiderRevealLight.visible=false;
+    spiderVisibleToPlayer=false;
     spiderBehaviorState="idle";
     spiderBehaviorTime=0;
     spiderAutoLookTimer=0;
