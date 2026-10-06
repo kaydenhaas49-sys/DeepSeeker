@@ -1440,19 +1440,19 @@ function updateMenuScene(t,dt){
 }
 
 
-const FLASHLIGHT_BASE_DISTANCE=LOW_END_PERFORMANCE?72:100;
+const FLASHLIGHT_BASE_DISTANCE=LOW_END_PERFORMANCE?60:75;
 const flashlight=new THREE.SpotLight(
   0xf0dfad,
-  LOW_END_PERFORMANCE?58:72,
+  LOW_END_PERFORMANCE?28:32,
   FLASHLIGHT_BASE_DISTANCE,
-  LOW_END_PERFORMANCE?Math.PI/3.0:Math.PI/3.15,
-  LOW_END_PERFORMANCE?.84:.80,
-  1.05
+  LOW_END_PERFORMANCE?Math.PI/3.1:Math.PI/3.2,
+  LOW_END_PERFORMANCE?.92:.90,
+  1.35
 );
 const flashlightFill=new THREE.PointLight(
   0xf0dfad,
-  1.65,
-  10,
+  .30,
+  7,
   2
 );
 flashlightFill.castShadow=false;
@@ -7398,7 +7398,7 @@ function animate(){
   const lowBattery=Math.pow(THREE.MathUtils.clamp((35-battery)/35,0,1),1.15);
   const lowBatteryWave=Math.sin(t*(9+lowBattery*28)+battery*.19);
   const lowBatteryDrop=lowBattery>0 && lowBatteryWave>.35 ? THREE.MathUtils.lerp(1,.20,lowBattery) : 1;
-  let flashlightStrength=68.0*flicker*lowBatteryDrop;
+  let flashlightStrength=32.0*flicker*lowBatteryDrop;
 
   if(flashlightOn && !houseMode && spiderActive){
     const spiderDistance=Math.hypot(
@@ -7414,14 +7414,14 @@ function animate(){
     );
     const dimmedStrength=THREE.MathUtils.lerp(
       flashlightStrength,
-      7.0*flicker,
+      5.0*flicker,
       proximity*proximity
     );
 
     flashlightStrength=dimmedStrength;
 
     if(spiderJumpscareTimer>0){
-      flashlightStrength=10.0*flicker;
+      flashlightStrength=6.0*flicker;
     }
   }
 

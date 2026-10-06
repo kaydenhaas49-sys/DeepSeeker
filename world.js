@@ -235,13 +235,13 @@ export class World {
     this.fixtureMaterial = new THREE.MeshStandardMaterial({
       color: 0xfff4ca,
       emissive: 0xffe2a0,
-      emissiveIntensity: 4.00,
+      emissiveIntensity: 2.30,
       roughness: 0.28,
     });
     this.fixtureDimMaterial = new THREE.MeshStandardMaterial({
       color: 0xfff4ca,
       emissive: 0xffe2a0,
-      emissiveIntensity: 3.00,
+      emissiveIntensity: 1.55,
       roughness: 0.30,
     });
     this.fixtureBlackMaterial = new THREE.MeshStandardMaterial({
@@ -511,10 +511,10 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=cracked ? 7.2+rng()*2.0 : 9.5+rng()*2.5;
+      const power=cracked ? 12.0+rng()*2.0 : 18.0+rng()*3.0;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
-      const y=WALL_H-.055;
+      const y=WALL_H-.035;
 
       if(cracked){
         const pieces=crackedPattern[index%crackedPattern.length];
@@ -540,10 +540,13 @@ export class World {
       const point=new THREE.PointLight(
         0xffe6a8,
         power,
-        cracked ? 23 : 27,
-        1.8
+        cracked ? 32 : 38,
+        1.2
       );
-      point.position.set(x,y-.78,z);
+      // The emitter sits just below the ceiling panel so its real light cone
+      // washes across the surrounding walls and floor.
+      point.position.set(x,y-.20,z);
+      point.castShadow=false;
       point.visible=false;
       point.name=cracked ? "CrackedFluorescentLight" : "FluorescentLight";
       group.add(point);
