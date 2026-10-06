@@ -938,6 +938,9 @@ let houseCollisionReady=false;
 let houseCollisionBuildStarted=false;
 let houseUnloadTimer=0;
 const houseCollisionBoxes=[];
+const houseRenderMeshes=[];
+const houseLowMaterialCache=new Map();
+let houseRenderCullAt=0;
 const houseFloorRaycaster=new THREE.Raycaster();
 const houseViewRaycaster=new THREE.Raycaster();
 let houseDoorCollisionDirty=true;
@@ -2212,6 +2215,7 @@ function disposeHouseResources(){
 
   houseRoot.remove(houseModel);
 
+  const disposedMaterials=new Set();
   houseModel.traverse(obj=>{
     if(!obj.isMesh) return;
 
@@ -2224,10 +2228,17 @@ function disposeHouseResources(){
       : [obj.material];
 
     for(const material of materials){
-      if(!material) continue;
+      if(!material || disposedMaterials.has(material)) continue;
+      disposedMaterials.add(material);
       material.dispose();
     }
   });
+
+  for(const material of houseLowMaterialCache.values()){
+    if(!disposedMaterials.has(material)) material.dispose();
+  }
+  houseLowMaterialCache.clear();
+  houseRenderMeshes.length=0;
 
   houseModel=null;
   houseCollisionBoxes.length=0;
@@ -3041,11 +3052,44 @@ function freezeStaticHouseTransforms(root){
 }
 
 function prepareHouseRenderCulling(root){
+  houseRenderMeshes.length=0;
+
   root.traverse((obj)=>{
     if(!obj.isMesh) return;
+
     obj.visible=!obj.userData.houseRemovedDoor;
     obj.frustumCulled=true;
+
+    if(LOW_END_PERFORMANCE){
+      const box=new THREE.Box3().setFromObject(obj);
+      const sphere=box.getBoundingSphere(new THREE.Sphere());
+      obj.userData.houseCullCenter=sphere.center.clone();
+      obj.userData.houseCullRadius=Math.max(.5,sphere.radius);
+      houseRenderMeshes.push(obj);
+    }
   });
+}
+
+function updateHouseRenderCulling(){
+  if(!LOW_END_PERFORMANCE || !houseMode || !houseRenderMeshes.length) return;
+
+  const maxDistance=38;
+  const px=player.pos.x;
+  const pz=player.pos.z;
+
+  for(const mesh of houseRenderMeshes){
+    if(mesh.userData.houseRemovedDoor){
+      mesh.visible=false;
+      continue;
+    }
+
+    const center=mesh.userData.houseCullCenter;
+    const radius=mesh.userData.houseCullRadius||.5;
+    const dx=px-center.x;
+    const dz=pz-center.z;
+    const limit=maxDistance+radius;
+    mesh.visible=(dx*dx+dz*dz)<=limit*limit;
+  }
 }
 
 function updateHouseDoorCollisions(){
@@ -3478,10 +3522,35 @@ function loadHouse(){
           ? obj.material
           : [obj.material];
 
-        for(const material of materials){
-          if(!material) continue;
-          material.side=THREE.FrontSide;
-          material.toneMapped=true;
+        if(LOW_END_PERFORMANCE){
+          const simplified=materials.map(source=>{
+            if(!source) return source;
+
+            const cacheKey=source.uuid;
+            const cached=houseLowMaterialCache.get(cacheKey);
+            if(cached) return cached;
+
+            const material=new THREE.MeshLambertMaterial({
+              map:source.map||null,
+              color:source.color?.clone?.()||0xffffff,
+              alphaMap:source.alphaMap||null,
+              transparent:Boolean(source.transparent),
+              opacity:Number.isFinite(source.opacity)?source.opacity:1,
+              vertexColors:Boolean(source.vertexColors),
+              side:THREE.FrontSide,
+              fog:true
+            });
+            houseLowMaterialCache.set(cacheKey,material);
+            return material;
+          });
+
+          obj.material=Array.isArray(obj.material) ? simplified : simplified[0];
+        }else{
+          for(const material of materials){
+            if(!material) continue;
+            material.side=THREE.FrontSide;
+            material.toneMapped=true;
+          }
         }
       });
 
@@ -6062,6 +6131,14 @@ function animate(){
 
   if(houseMode){
     updateHouseDoors(dt);
+
+    if(LOW_END_PERFORMANCE){
+      houseRenderCullAt-=dt;
+      if(houseRenderCullAt<=0){
+        houseRenderCullAt=.12;
+        updateHouseRenderCulling();
+      }
+    }
 
     houseCollisionRefreshTimer-=dt;
     const movedEnough=
