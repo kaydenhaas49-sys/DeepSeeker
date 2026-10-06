@@ -215,9 +215,9 @@ export class World {
 
     const tex = createTextures(anisotropy);
     this.materials = {
-      wall: new THREE.MeshStandardMaterial({ map: tex.wall, roughness: 0.92 }),
-      floor: new THREE.MeshStandardMaterial({ map: tex.floor, roughness: 1.0 }),
-      ceiling: new THREE.MeshStandardMaterial({ map: tex.ceiling, roughness: 0.95 }),
+      wall: new THREE.MeshLambertMaterial({ map: tex.wall }),
+      floor: new THREE.MeshLambertMaterial({ map: tex.floor }),
+      ceiling: new THREE.MeshLambertMaterial({ map: tex.ceiling }),
     };
 
     // Shared fluorescent materials. Fixture meshes are per-chunk so they are
@@ -243,6 +243,10 @@ export class World {
     // are enabled at once so the damaged lights can illuminate the room without
     // recreating the severe multi-light performance hit.
     this.fixtureLights = [];
+    this.activeFixtureLights = [];
+    this.fixtureLightRefreshAt = 0;
+    this.fixtureLightSelectionX = Infinity;
+    this.fixtureLightSelectionZ = Infinity;
     this.interactables = [];
     this.securityCameras = [];
     this.atmosphereEffects = [];
@@ -277,6 +281,7 @@ export class World {
 
     this.root.add(group);
     this.chunks.set(cellKey(cx, cz), { data, group, wallBounds });
+    this.fixtureLightRefreshAt = 0;
   }
 
   disposeChunk(key) {
@@ -289,6 +294,8 @@ export class World {
       }
     });
 
+    this.activeFixtureLights = this.activeFixtureLights.filter(item => item.light.parent);
+    for(const item of this.activeFixtureLights) item.light.visible=false;
     this.fixtureLights = this.fixtureLights.filter(item => item.light.parent);
     this.interactables = this.interactables.filter(item => item?.parent);
     this.securityCameras = this.securityCameras.filter(item => item?.group?.parent);
@@ -298,32 +305,55 @@ export class World {
 
   // Called every frame with the player position.
   updateFixtureLights(px,pz){
-    const maxActive=LOW_END_DEVICE ? 8 : 12;
+    const maxActive=LOW_END_DEVICE ? 4 : 6;
     const maxDistance=18;
     const maxDistanceSq=maxDistance*maxDistance;
-    const candidates=[];
+    const now=performance.now();
 
-    this.fixtureLights = this.fixtureLights.filter(item => item.light.parent);
+    const movedEnough=
+      !Number.isFinite(this.fixtureLightSelectionX) ||
+      !Number.isFinite(this.fixtureLightSelectionZ) ||
+      Math.abs(px-this.fixtureLightSelectionX)>1.5 ||
+      Math.abs(pz-this.fixtureLightSelectionZ)>1.5;
 
-    for(const item of this.fixtureLights){
-      const dx=item.x-px;
-      const dz=item.z-pz;
-      const distanceSq=dx*dx+dz*dz;
-      item.light.visible=false;
+    if(now>=this.fixtureLightRefreshAt || movedEnough){
+      const candidates=[];
 
-      if(distanceSq>maxDistanceSq) continue;
+      for(const item of this.activeFixtureLights){
+        item.light.visible=false;
+      }
 
-      const priority=distanceSq*(item.cracked ? .78 : 1);
-      candidates.push({item,priority});
+      for(const item of this.fixtureLights){
+        const dx=item.x-px;
+        const dz=item.z-pz;
+        const distanceSq=dx*dx+dz*dz;
+
+        if(distanceSq>maxDistanceSq) continue;
+
+        const priority=distanceSq*(item.cracked ? .78 : 1);
+        candidates.push({item,priority});
+      }
+
+      candidates.sort((a,b)=>a.priority-b.priority);
+
+      this.activeFixtureLights=candidates
+        .slice(0,maxActive)
+        .map(entry=>entry.item);
+
+      for(const item of this.activeFixtureLights){
+        item.light.visible=true;
+      }
+
+      this.fixtureLightSelectionX=px;
+      this.fixtureLightSelectionZ=pz;
+      this.fixtureLightRefreshAt=now+120;
     }
 
-    candidates.sort((a,b)=>a.priority-b.priority);
-
-    const now=performance.now()*.003;
-    for(let i=0;i<Math.min(maxActive,candidates.length);i++){
-      const item=candidates[i].item;
-      item.light.visible=true;
-      const flicker=.93+.07*Math.sin(now*item.flickerSpeed+item.phase);
+    const flickerTime=now*.003;
+    for(const item of this.activeFixtureLights){
+      const flicker=.93+.07*Math.sin(
+        flickerTime*item.flickerSpeed+item.phase
+      );
       item.light.intensity=item.baseIntensity*flicker;
     }
   }
