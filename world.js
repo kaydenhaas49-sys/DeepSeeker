@@ -587,7 +587,7 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=cracked ? 1.4+rng()*.45 : 2.5+rng()*.7;
+      const power=cracked ? 2.0+rng()*.55 : 3.8+rng()*1.0;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
       const y=WALL_H-.035;
@@ -616,7 +616,7 @@ export class World {
       const point=new THREE.PointLight(
         0xffe6a8,
         power,
-        cracked ? 12 : 15,
+        cracked ? 15 : 19,
         1.3
       );
       // The emitter sits just below the ceiling panel so its real light cone
