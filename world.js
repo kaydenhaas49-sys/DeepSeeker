@@ -259,7 +259,7 @@ export class World {
       // underside if the camera ever crosses the plane.
       ceiling: new THREE.MeshBasicMaterial({
         map: tex.ceiling,
-        color: LOW_END_DEVICE ? 0x6f6953 : 0x817b63,
+        color: LOW_END_DEVICE ? 0xa59f82 : 0xb5af98,
         side: THREE.DoubleSide
       }),
     };
