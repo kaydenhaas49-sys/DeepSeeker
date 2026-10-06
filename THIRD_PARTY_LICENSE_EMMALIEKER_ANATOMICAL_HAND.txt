@@ -1,0 +1,6 @@
+DeepSeeker uses the "Anatomically Accurate Rigged & Animated Hand Model" by Emma L. D. Lieker.
+Source: https://github.com/emmalieker/anatomical-hand-model
+License: CC BY-NC 4.0.
+Attribution: 3D Rigged Hand Model © 2026 Emma L. D. Lieker.
+The source permits personal and academic use; commercial use requires separate permission.
+The model is loaded from the author's pinned GitHub GLB export at runtime.

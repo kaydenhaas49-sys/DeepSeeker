@@ -1,0 +1,12 @@
+Third-party asset: “Rigged hand” by Elena FF
+Source: https://sketchfab.com/3d-models/hand-rigged-eae97cc2a742413cb5338ab942b12c1e
+Asset mirror used from: https://github.com/blechdom/morphazoid
+License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+License: https://creativecommons.org/licenses/by-sa/4.0/
+
+Usage in DeepSeeker:
+- The original hand mesh, textures, and rig are used as the visible first-person hands.
+- The model is mirrored for the opposite hand and resized/repositioned for the camera view.
+- These changes do not remove the original attribution or license.
+
+Author: Elena FF (elenaferfor)

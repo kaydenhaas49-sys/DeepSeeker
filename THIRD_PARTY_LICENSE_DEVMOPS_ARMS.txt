@@ -1,0 +1,4 @@
+DeepSeeker uses the "Low Poly Arms (Rigged)" asset by DevMops.
+Source: https://opengameart.org/content/low-poly-arms-rigged
+License: CC0 1.0 Universal (public domain dedication).
+The model is loaded from the author's publicly available FBX asset at runtime.
