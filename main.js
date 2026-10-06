@@ -167,6 +167,89 @@ const camera=new THREE.PerspectiveCamera(
 );
 const world=new World(scene,SEED,Math.min(renderer.capabilities.getMaxAnisotropy(),4));
 
+const tutorialOpenRoomRoot=new THREE.Group();
+tutorialOpenRoomRoot.name="DeepSeekerTutorialOpenRoom";
+tutorialOpenRoomRoot.visible=false;
+scene.add(tutorialOpenRoomRoot);
+
+const tutorialOpenRoomCollisionBoxes=[];
+const tutorialHiddenWallMeshes=[];
+let tutorialOpenRoomActive=false;
+
+function ensureTutorialOpenRoom(){
+  if(tutorialOpenRoomActive) return;
+
+  world.root.visible=true;
+  world.update(32,32);
+
+  const chunk=world.chunks.get("0,0");
+  if(chunk?.group){
+    chunk.group.traverse(obj=>{
+      if(obj.isMesh && obj.material===world.materials.wall){
+        obj.visible=false;
+        tutorialHiddenWallMeshes.push(obj);
+      }
+    });
+  }
+
+  tutorialOpenRoomCollisionBoxes.length=0;
+  while(tutorialOpenRoomRoot.children.length){
+    tutorialOpenRoomRoot.remove(tutorialOpenRoomRoot.children[0]);
+  }
+
+  const min=4;
+  const max=60;
+  const h=WALL_H;
+  const t=WALL_T;
+
+  const wallMaterial=world.materials.wall;
+  const walls=[
+    {size:[56,h,t],position:[32,h*.5,min]},
+    {size:[56,h,t],position:[32,h*.5,max]},
+    {size:[t,h,56],position:[min,h*.5,32]},
+    {size:[t,h,56],position:[max,h*.5,32]}
+  ];
+
+  for(const wall of walls){
+    const mesh=new THREE.Mesh(
+      new THREE.BoxGeometry(...wall.size),
+      wallMaterial
+    );
+    mesh.position.set(...wall.position);
+    mesh.frustumCulled=false;
+    tutorialOpenRoomRoot.add(mesh);
+  }
+
+  const half=t*.5;
+  tutorialOpenRoomCollisionBoxes.push(
+    {minX:min,maxX:max,minZ:min-half,maxZ:min+half},
+    {minX:min,maxX:max,minZ:max-half,maxZ:max+half},
+    {minX:min-half,maxX:min+half,minZ:min,maxZ:max},
+    {minX:max-half,maxX:max+half,minZ:min,maxZ:max}
+  );
+
+  tutorialOpenRoomRoot.visible=true;
+  tutorialOpenRoomActive=true;
+  player.ignoreWorldCollision=true;
+  player.extraCollisionBoxes=tutorialOpenRoomCollisionBoxes;
+}
+
+function disableTutorialOpenRoom(){
+  if(!tutorialOpenRoomActive && tutorialHiddenWallMeshes.length===0) return;
+
+  for(const mesh of tutorialHiddenWallMeshes){
+    if(mesh) mesh.visible=true;
+  }
+  tutorialHiddenWallMeshes.length=0;
+
+  tutorialOpenRoomRoot.visible=false;
+  tutorialOpenRoomCollisionBoxes.length=0;
+  tutorialOpenRoomActive=false;
+
+  player.ignoreWorldCollision=false;
+  player.extraCollisionBoxes=[];
+}
+
 const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,0);
 scene.add(hemi);
 const ambient=new THREE.AmbientLight(0x8f815d,0);
@@ -2358,7 +2441,7 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   setSelectedSaveSlot(saveSlot,false);
   // New games begin in the apartment. Continue only loads the apartment when
   // the saved level says the player was actually there.
-  const needsApartment=!save || getSavedLevel(save)==="apartment";
+  const needsApartment=Boolean(save && getSavedLevel(save)==="apartment");
 
   if(needsApartment && (!houseLoaded || !houseCollisionReady)){
     pendingHouseStart=true;
@@ -2387,7 +2470,14 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   if(save){
     applySavedGame(save);
   }else{
-    setHouseMode(true,{announceFall:false});
+    houseMode=false;
+    ensureTutorialOpenRoom();
+    player.pos.set(32,EYE,32);
+    player.vel.set(0,0,0);
+    player.jumpY=0;
+    player.jumpVelocity=0;
+    player.keys.clear();
+    showHouseIntroPhoneMessage();
   }
 
   player.lock();
@@ -2469,14 +2559,12 @@ function resetForNewGame(slot=selectedSaveSlot){
   maxStoryDistance=0;
 
   // Reset the level state without relying on the previous run's state.
-  if(houseMode){
-    setHouseMode(false,{announceFall:false});
-  }else{
-    world.root.visible=true;
-    houseRoot.visible=false;
-    player.ignoreWorldCollision=false;
-    player.extraCollisionBoxes=[];
-  }
+  houseMode=false;
+  disableTutorialOpenRoom();
+  world.root.visible=true;
+  houseRoot.visible=false;
+  player.ignoreWorldCollision=false;
+  player.extraCollisionBoxes=[];
 
   applyStoryStage(0,false);
   eventText.textContent=`STARTING NEW GAME · SLOT ${targetSlot}`;
@@ -4159,9 +4247,9 @@ function playerHasLineOfSightToSpider(){
 }
 
 function isHouseTutorialSpiderBlocked(x,z){
-  for(const box of houseCollisionBoxes){
-    const nx=THREE.MathUtils.clamp(x,box.minX,box.maxX);
-    const nz=THREE.MathUtils.clamp(z,box.minZ,box.maxZ);
+  for(const box of tutorialOpenRoomCollisionBoxes){
+    const nx=Math.max(box.minX,Math.min(x,box.maxX));
+    const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
     const dx=x-nx;
     const dz=z-nz;
     if(dx*dx+dz*dz<=SPIDER_RADIUS*SPIDER_RADIUS) return true;
@@ -4172,7 +4260,6 @@ function isHouseTutorialSpiderBlocked(x,z){
 function houseTutorialSpiderSegmentClear(ax,az,bx,bz){
   const distance=Math.hypot(bx-ax,bz-az);
   const samples=Math.max(8,Math.ceil(distance/.55));
-
   for(let i=1;i<samples;i++){
     const t=i/samples;
     const x=THREE.MathUtils.lerp(ax,bx,t);
@@ -4183,25 +4270,8 @@ function houseTutorialSpiderSegmentClear(ax,az,bx,bz){
 }
 
 function houseTutorialSpiderCanBeSeen(){
-  if(!houseModel || !houseTutorialSpiderPrepared) return false;
-
-  const origin=camera.getWorldPosition(new THREE.Vector3());
-  const target=new THREE.Vector3(
-    spiderEntity.position.x,
-    spiderEntity.position.y+.78,
-    spiderEntity.position.z
-  );
-
-  const direction=target.sub(origin);
-  const length=direction.length();
-  if(length<.2) return true;
-
-  direction.normalize();
-  houseViewRaycaster.set(origin,direction);
-  houseViewRaycaster.far=Math.max(0,length-.12);
-
-  const hits=houseViewRaycaster.intersectObject(houseModel,true);
-  return hits.length===0;
+  if(!houseTutorialSpiderPrepared) return false;
+  return playerHasLineOfSightToSpider();
 }
 
 function hideHouseTutorialSpider(){
@@ -4233,40 +4303,31 @@ function showHouseTutorialMessage(message,duration=1500){
 }
 
 function prepareHouseTutorialSpider(){
-  if(!spiderLoaded || !houseReturnPortal.userData.active) return false;
+  if(!spiderLoaded || houseMode || !tutorialOpenRoomActive) return false;
 
-  const anchor=houseReturnPortal.position;
+  const forwardX=-Math.sin(player.yaw);
+  const forwardZ=-Math.cos(player.yaw);
   const candidates=[];
 
-  for(let i=0;i<18;i++){
-    const angle=(i/18)*Math.PI*2 + Math.PI/18;
-    const distance=5.0 + (i%3)*.75;
+  for(let i=0;i<10;i++){
+    const angle=Math.atan2(forwardX,forwardZ)+(i-4.5)*.26;
+    const distance=10.0+(i%3)*1.5;
     candidates.push({
-      x:anchor.x+Math.cos(angle)*distance,
-      z:anchor.z+Math.sin(angle)*distance
+      x:player.pos.x+Math.sin(angle)*distance,
+      z:player.pos.z+Math.cos(angle)*distance
     });
   }
 
-  const choose=(requireSight)=>{
-    for(const candidate of candidates){
-      if(isHouseTutorialSpiderBlocked(candidate.x,candidate.z)) continue;
+  let chosen=null;
+  for(const candidate of candidates){
+    if(isHouseTutorialSpiderBlocked(candidate.x,candidate.z)) continue;
+    if(!houseTutorialSpiderSegmentClear(
+      player.pos.x,player.pos.z,candidate.x,candidate.z
+    )) continue;
+    chosen=candidate;
+    break;
+  }
 
-      const fromPlayer=Math.hypot(
-        candidate.x-player.pos.x,
-        candidate.z-player.pos.z
-      );
-
-      if(fromPlayer<4.5 || fromPlayer>14) continue;
-      if(requireSight && !houseTutorialSpiderSegmentClear(
-        player.pos.x,player.pos.z,candidate.x,candidate.z
-      )) continue;
-
-      return candidate;
-    }
-    return null;
-  };
-
-  const chosen=choose(true) || choose(false);
   if(!chosen) return false;
 
   houseTutorialSpiderPosition.set(
@@ -4285,7 +4346,7 @@ function prepareHouseTutorialSpider(){
   spiderEntity.visible=true;
   spiderVisibleToPlayer=true;
   spiderRevealLight.visible=true;
-  spiderRevealLight.intensity=1.35;
+  spiderRevealLight.intensity=1.1;
   setSpiderAnimation("idle");
 
   houseTutorialSpiderPrepared=true;
@@ -4296,7 +4357,7 @@ function prepareHouseTutorialSpider(){
 }
 
 function setHouseTutorialStage(stage){
-  if(!houseMode) return;
+  if(!gameStarted || houseMode) return;
 
   houseTutorialStage=stage;
 
@@ -4309,11 +4370,11 @@ function setHouseTutorialStage(stage){
     objective.textContent="Try your flashlight. Press F to toggle it.";
     showHouseTutorialMessage("F · FLASHLIGHT",1400);
   }else if(stage===3){
-    objective.textContent="Find the magazine on the couch. Press E to interact.";
+    objective.textContent="There is something in this room. Walk toward it.";
     if(!houseTutorialSpiderPrepared){
       prepareHouseTutorialSpider();
     }
-    showHouseTutorialMessage("SOMETHING IS STANDING NEARBY.",1700);
+    showHouseTutorialMessage("SOMETHING IS SITTING THERE.",1700);
   }else if(stage===4){
     objective.textContent="RUN. Hold SHIFT to sprint.";
     showHouseTutorialMessage(
@@ -4321,11 +4382,12 @@ function setHouseTutorialStage(stage){
       1500
     );
   }else if(stage===5){
-    objective.textContent="Find the magazine. Press E to enter the Backrooms.";
+    objective.textContent="Tutorial complete. Follow the signal deeper.";
     showHouseTutorialMessage(
       arachnophobiaMode ? "YOU LOST THE DUCK." : "IT STOPPED.",
       1400
     );
+    disableTutorialOpenRoom();
   }
 }
 
@@ -4353,21 +4415,36 @@ function startHouseTutorialSpiderChase(){
 function finishHouseTutorialSpiderChase(){
   hideHouseTutorialSpider();
 
-  if(houseMode && houseTutorialStage===4){
+  if(!houseMode && houseTutorialStage===4){
     setHouseTutorialStage(5);
   }
 }
 
 function updateHouseTutorialSpider(dt){
   if(
-    !houseMode ||
+    houseMode ||
     !gameStarted ||
-    houseTutorialStage<3 ||
+    !tutorialOpenRoomActive ||
     !spiderLoaded
   ){
     if(houseTutorialSpiderState!=="hidden"){
       hideHouseTutorialSpider();
     }
+    return;
+  }
+
+  if(houseTutorialStage===1){
+    const movedDistance=Math.hypot(
+      player.pos.x-houseTutorialStartX,
+      player.pos.z-houseTutorialStartZ
+    );
+    if(movedDistance>=4.0){
+      setHouseTutorialStage(2);
+    }
+    return;
+  }
+
+  if(houseTutorialStage<3){
     return;
   }
 
@@ -4386,16 +4463,13 @@ function updateHouseTutorialSpider(dt){
 
   if(houseTutorialSpiderState==="static"){
     spiderEntity.visible=true;
-    spiderRevealLight.intensity=1.35;
+    spiderRevealLight.intensity=1.1;
     spiderRevealLight.visible=houseTutorialSpiderCanBeSeen();
-    spiderEntity.rotation.y=Math.atan2(
-      dxToPlayer,
-      dzToPlayer
-    );
+    spiderEntity.rotation.y=Math.atan2(dxToPlayer,dzToPlayer);
     setSpiderAnimation("idle");
     groundSpiderEntity();
 
-    if(distanceToPlayer<=4.8){
+    if(distanceToPlayer<=5.2){
       startHouseTutorialSpiderChase();
     }
     return;
@@ -4403,39 +4477,37 @@ function updateHouseTutorialSpider(dt){
 
   if(houseTutorialSpiderState!=="chase") return;
 
-  if(distanceToPlayer<=1.15 || houseTutorialSpiderTime>=3.2){
+  if(distanceToPlayer<=1.15 || houseTutorialSpiderTime>=3.25){
     finishHouseTutorialSpiderChase();
     return;
   }
 
-  const step=Math.min(5.4*dt,Math.max(0,distanceToPlayer-.95));
-  if(step>0){
-    const inv=1/Math.max(distanceToPlayer,.001);
-    const moveX=dxToPlayer*inv*step;
-    const moveZ=dzToPlayer*inv*step;
+  const step=Math.min(5.5*dt,Math.max(0,distanceToPlayer-.95));
+  const inv=1/Math.max(distanceToPlayer,.001);
+  const moveX=dxToPlayer*inv*step;
+  const moveZ=dzToPlayer*inv*step;
 
-    if(!isHouseTutorialSpiderBlocked(
-      spiderEntity.position.x+moveX,
-      spiderEntity.position.z+moveZ
-    )){
-      spiderEntity.position.x+=moveX;
-      spiderEntity.position.z+=moveZ;
-      houseTutorialSpiderStuckTime=0;
-    }else if(!isHouseTutorialSpiderBlocked(
-      spiderEntity.position.x+moveX,
-      spiderEntity.position.z
-    )){
-      spiderEntity.position.x+=moveX;
-      houseTutorialSpiderStuckTime=0;
-    }else if(!isHouseTutorialSpiderBlocked(
-      spiderEntity.position.x,
-      spiderEntity.position.z+moveZ
-    )){
-      spiderEntity.position.z+=moveZ;
-      houseTutorialSpiderStuckTime=0;
-    }else{
-      houseTutorialSpiderStuckTime+=dt;
-    }
+  if(!isHouseTutorialSpiderBlocked(
+    spiderEntity.position.x+moveX,
+    spiderEntity.position.z+moveZ
+  )){
+    spiderEntity.position.x+=moveX;
+    spiderEntity.position.z+=moveZ;
+    houseTutorialSpiderStuckTime=0;
+  }else if(!isHouseTutorialSpiderBlocked(
+    spiderEntity.position.x+moveX,
+    spiderEntity.position.z
+  )){
+    spiderEntity.position.x+=moveX;
+    houseTutorialSpiderStuckTime=0;
+  }else if(!isHouseTutorialSpiderBlocked(
+    spiderEntity.position.x,
+    spiderEntity.position.z+moveZ
+  )){
+    spiderEntity.position.z+=moveZ;
+    houseTutorialSpiderStuckTime=0;
+  }else{
+    houseTutorialSpiderStuckTime+=dt;
   }
 
   spiderEntity.rotation.x=0;
@@ -4443,8 +4515,8 @@ function updateHouseTutorialSpider(dt){
     player.pos.x-spiderEntity.position.x,
     player.pos.z-spiderEntity.position.z
   );
-  spiderEntity.visible=houseTutorialSpiderCanBeSeen();
-  spiderRevealLight.visible=spiderEntity.visible;
+  spiderEntity.visible=true;
+  spiderRevealLight.visible=true;
   spiderRevealLight.intensity=4.2;
   setSpiderAnimation("runby");
   groundSpiderEntity();
@@ -6032,7 +6104,7 @@ function toggleFlashlight(){
   flashlightOn=!flashlightOn;
   player.setFlashlightVisual(flashlightOn);
 
-  if(houseMode && houseTutorialStage===2){
+  if(!houseMode && gameStarted && houseTutorialStage===2){
     setHouseTutorialStage(3);
   }
 }
@@ -6058,14 +6130,14 @@ function showHouseIntroPhoneMessage(){
   phoneAppName.textContent="MESSAGE FROM M";
   phoneDepth.textContent="!";
   phoneDepthLabel.textContent="NEW MESSAGE";
-  phoneCardTitle.textContent="LOOK FOR THE MAGAZINE";
-  phoneCardText.textContent="It's on the couch. When you find it, press E to interact with it.";
+  phoneCardTitle.textContent="KEEP MOVING";
+  phoneCardText.textContent="You're in the Backrooms. Move around the room first. When this message closes, try your flashlight.";
 
   renderStoryLog();
   phoneStory.insertAdjacentHTML("afterbegin",`
     <div class="storyEntry">
-      <div class="storyMeta">M · HOUSE MESSAGE</div>
-      <div class="storyText">Look for the magazine. It's on the couch. When you find it, press E to interact with it.</div>
+      <div class="storyMeta">M · ENTRY TUTORIAL</div>
+      <div class="storyText">You're in the Backrooms. Move around the room first. When this message closes, try your flashlight.</div>
     </div>
   `);
 }
@@ -6171,7 +6243,7 @@ function togglePhone(){
     adminOverlay.classList.remove("open");
     adminOverlay.setAttribute("aria-hidden","true");
 
-    if(houseMode && houseTutorialStage===0){
+    if(!houseMode && gameStarted && houseTutorialStage===0){
       setHouseTutorialStage(1);
     }
 
