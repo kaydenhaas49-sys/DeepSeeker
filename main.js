@@ -98,8 +98,8 @@ gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setSize(innerWidth,innerHeight);
 
-const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,1.25);
-const HOUSE_PIXEL_RATIO=0.70;
+const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,1.0);
+const HOUSE_PIXEL_RATIO=0.66;
 const MIN_HOUSE_PIXEL_RATIO=0.52;
 let currentPixelRatio=BASE_PIXEL_RATIO;
 let housePixelRatio=HOUSE_PIXEL_RATIO;
@@ -117,15 +117,13 @@ scene.background=new THREE.Color(0x000100);
 scene.fog=new THREE.Fog(0x030302,14,62);
 
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
-const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
+const world=new World(scene,SEED,Math.min(renderer.capabilities.getMaxAnisotropy(),4));
 
 const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,0);
 scene.add(hemi);
 const ambient=new THREE.AmbientLight(0x8f815d,0);
 scene.add(ambient);
 
-const playerLight=new THREE.PointLight(0xb59b68,0,24,1.9);
-scene.add(playerLight);
 
 // Dedicated title-screen camera and lighting. The actual procedural Backrooms
 // remains visible behind the menu, so the title screen uses real geometry,
@@ -524,6 +522,8 @@ function addCrackedFixtureModel(x,z,index){
   return group;
 }
 
+const menuFlickerNodes=[];
+const menuActiveLightIndices=new Set([6,14,22,30]);
 for(let fixtureIndex=0;fixtureIndex<menuLightFixtures3D.length;fixtureIndex++){
   const [x,z,power,phase]=menuLightFixtures3D[fixtureIndex];
   const cracked=[0,1,2,4,5,7,8,9,10,12,13,14,15,16,17,18,20,21,22,24,25,26,27,29,30].includes(fixtureIndex);
@@ -547,7 +547,9 @@ for(let fixtureIndex=0;fixtureIndex<menuLightFixtures3D.length;fixtureIndex++){
   point.userData.basePower=lightPower;
   point.userData.phase=phase;
   point.userData.cracked=cracked;
+  point.visible=menuActiveLightIndices.has(fixtureIndex);
   menuSet.add(point);
+  menuFlickerNodes.push(fixture,point);
   addFixtureCracks(fixture,x,z,fixtureIndex,0);
 }
 
@@ -827,18 +829,12 @@ function updateMenuScene(t,dt){
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
 
-  menuSet.traverse(node=>{
-    if(node.userData?.basePower===undefined) return;
-
+  for(const node of menuFlickerNodes){
     const phase=node.userData.phase||0;
     const base=node.userData.basePower;
     const wave=Math.sin(t*1.55+phase)*.055;
-
-    // Cracked fixtures run much dimmer even before their ballast flickers.
     const cracked=node.userData.cracked===true;
     const crackedDim=cracked ? .52 : 1;
-
-    // Occasional hard ballast dropout, staggered per fixture.
     const dropout=Math.sin(t*3.65+phase*3.3)>.996 ? -.82 : 0;
 
     if(node.isLight){
@@ -850,7 +846,7 @@ function updateMenuScene(t,dt){
           (1+Math.sin(t*1.55+phase)*.045+dropout*.55)
       );
     }
-  });
+  }
 
   return true;
 }
@@ -6038,7 +6034,7 @@ function animate(){
   }
 
   multiplayer.update(dt);
-  interaction.update();
+  interaction.update(dt);
   navigation.update(dt);
   if(multiplayerMapOpen) updateMultiplayerMap();
 
@@ -6110,10 +6106,7 @@ function animate(){
   }
 
   flashlight.intensity=flashlightOn ? flashlightStrength : 0;
-  if(!houseMode){
-    playerLight.position.set(player.pos.x,EYE+.35,player.pos.z);
-  }
-
+  flashlight.visible=flashlightOn && battery>0;
   if(!houseMode && spiderMixer && spiderActive){
     spiderMixer.update(dt);
   }
