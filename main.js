@@ -1100,6 +1100,13 @@ const flashlightRayDirection=new THREE.Vector3();
 let flashlightOcclusionTimer=0;
 
 function updateFlashlightOcclusion(dt){
+  if(tutorialOpenRoomActive){
+    flashlightOcclusionTimer=0;
+    flashlight.distance=FLASHLIGHT_BASE_DISTANCE;
+    flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
+    return;
+  }
+
   flashlightOcclusionTimer-=dt;
   if(flashlightOcclusionTimer>0) return;
 
