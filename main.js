@@ -19,8 +19,33 @@ import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode } fro
 
 let arachnophobiaMode=getArachnophobiaMode();
 
-const seedParam=new URLSearchParams(location.search).get("seed");
+const urlParams=new URLSearchParams(location.search);
+const seedParam=urlParams.get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
+const QUALITY_PARAM=urlParams.get("quality");
+
+function detectLowEndHardware(){
+  const cores=navigator.hardwareConcurrency||4;
+  const memory=navigator.deviceMemory||4;
+  let gpu="";
+  try{
+    const canvas=document.createElement("canvas");
+    const gl=canvas.getContext("webgl2")||canvas.getContext("webgl");
+    const ext=gl?.getExtension("WEBGL_debug_renderer_info");
+    gpu=ext
+      ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||"")
+      : String(gl?.getParameter(gl.RENDERER)||"");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  }catch{}
+
+  const weakGpu=/swiftshader|llvmpipe|software rasterizer|intel(?:r)?\s+(?:hd|uhd|iris)|mesa.*intel|microsoft basic render/i.test(gpu);
+  const weakCpu=cores<=4 && memory<=4;
+  const forcedLow=QUALITY_PARAM==="low"||QUALITY_PARAM==="potato";
+  return forcedLow || weakGpu || weakCpu;
+}
+
+const LOW_END_PERFORMANCE=QUALITY_PARAM!=="high" && detectLowEndHardware();
+if(LOW_END_PERFORMANCE) document.documentElement.classList.add("deepseeker-low");
 
 const container=document.getElementById("app");
 const overlay=document.getElementById("overlay");
@@ -95,28 +120,48 @@ dracoLoader.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.165.0/examples/
 gltfLoader.setDRACOLoader(dracoLoader);
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
-const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
-renderer.setSize(innerWidth,innerHeight);
+const renderer=new THREE.WebGLRenderer({
+  antialias:!LOW_END_PERFORMANCE,
+  powerPreference:"high-performance",
+  precision:LOW_END_PERFORMANCE?"mediump":"highp",
+  alpha:false,
+  stencil:false
+});
+renderer.setSize(innerWidth,innerHeight,false);
 
-const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,1.0);
-const HOUSE_PIXEL_RATIO=0.66;
-const MIN_HOUSE_PIXEL_RATIO=0.52;
+const BASE_PIXEL_RATIO=LOW_END_PERFORMANCE
+  ? Math.min(devicePixelRatio,.55)
+  : Math.min(devicePixelRatio,1.0);
+const HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE?.50:.66;
+const MIN_HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE?.34:.52;
+const PERFORMANCE_TARGET_FPS=LOW_END_PERFORMANCE?100:60;
 let currentPixelRatio=BASE_PIXEL_RATIO;
 let housePixelRatio=HOUSE_PIXEL_RATIO;
 let perfElapsed=0;
 let perfFrames=0;
 let perfCooldown=0;
 renderer.setPixelRatio(currentPixelRatio);
-renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMapping=LOW_END_PERFORMANCE
+  ? THREE.NoToneMapping
+  : THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.08;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x000100);
-scene.fog=new THREE.Fog(0x030302,14,62);
+scene.fog=new THREE.Fog(
+  0x030302,
+  LOW_END_PERFORMANCE?12:14,
+  LOW_END_PERFORMANCE?46:62
+);
 
-const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.08,300);
+const camera=new THREE.PerspectiveCamera(
+  70,
+  innerWidth/innerHeight,
+  .08,
+  LOW_END_PERFORMANCE?100:300
+);
 const world=new World(scene,SEED,Math.min(renderer.capabilities.getMaxAnisotropy(),4));
 
 const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,0);
@@ -852,7 +897,14 @@ function updateMenuScene(t,dt){
 }
 
 
-const flashlight=new THREE.SpotLight(0xf0dfad,72,100,Math.PI/4.2,.78,1.1);
+const flashlight=new THREE.SpotLight(
+  0xf0dfad,
+  LOW_END_PERFORMANCE?58:72,
+  LOW_END_PERFORMANCE?72:100,
+  LOW_END_PERFORMANCE?Math.PI/4.0:Math.PI/4.2,
+  LOW_END_PERFORMANCE?.82:.78,
+  1.1
+);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
@@ -3561,7 +3613,6 @@ function setHouseMode(enabled,options={}){
     spiderSpawnPending=false;
     renderer.setPixelRatio(housePixelRatio);
     flashlight.castShadow=false;
-    playerLight.intensity=0;
 
     player.pos.copy(houseSpawn);
     player.vel.set(0,0,0);
@@ -3576,7 +3627,6 @@ function setHouseMode(enabled,options={}){
   }else{
     renderer.setPixelRatio(currentPixelRatio);
     flashlight.castShadow=ENABLE_SHADOWS;
-    playerLight.intensity=0;
 
     spiderSpawnPending=true;
     ensureSpiderLoading();
@@ -5959,11 +6009,15 @@ function animate(){
     if(perfCooldown<=0){
       const baseRatio=houseMode ? housePixelRatio : currentPixelRatio;
       let nextRatio=baseRatio;
+      const minRatio=houseMode
+        ? MIN_HOUSE_PIXEL_RATIO
+        : LOW_END_PERFORMANCE?.34:.42;
+      const maxRatio=houseMode ? HOUSE_PIXEL_RATIO : BASE_PIXEL_RATIO;
 
-      if(fps<42){
-        nextRatio=Math.max(houseMode ? MIN_HOUSE_PIXEL_RATIO : 0.8,baseRatio-0.08);
-      }else if(fps>58){
-        nextRatio=Math.min(houseMode ? HOUSE_PIXEL_RATIO : BASE_PIXEL_RATIO,baseRatio+0.08);
+      if(fps<PERFORMANCE_TARGET_FPS-8){
+        nextRatio=Math.max(minRatio,baseRatio-(LOW_END_PERFORMANCE?.06:.08));
+      }else if(fps>PERFORMANCE_TARGET_FPS+12){
+        nextRatio=Math.min(maxRatio,baseRatio+(LOW_END_PERFORMANCE?.035:.08));
       }
 
       if(Math.abs(nextRatio-baseRatio)>=0.05){
