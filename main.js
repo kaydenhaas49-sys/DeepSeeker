@@ -560,6 +560,9 @@ function updateTutorialMascot(dt){
 }
 
 function clearTutorialOpenRoomGeometry(){
+  tutorialOpenRoomLights.length=0;
+  tutorialOpenRoomOccluders.length=0;
+  tutorialOpenRoomLightLastUpdate=0;
   while(tutorialOpenRoomRoot.children.length){
     const child=tutorialOpenRoomRoot.children.pop();
     if(!child) continue;
@@ -651,26 +654,40 @@ function ensureTutorialOpenRoom(){
   ];
 
   for(const wall of walls){
-    addTutorialMesh(
+    const mesh=addTutorialMesh(
       new THREE.BoxGeometry(...wall.size),
       wallMaterial,
       new THREE.Vector3(...wall.position)
     );
+    tutorialOpenRoomOccluders.push(mesh);
   }
 
-  // Three simple fluorescent fixtures keep the room readable even when the
-  // normal Backrooms lights are outside their active selection radius.
-  for(const [x,z] of [[18,18],[42,18],[30,42]]){
-    addTutorialMesh(
+  // Two physical fixtures, with only the nearest one allowed to illuminate at
+  // once. The light switches on only when the player is actually facing it and
+  // there is a clear line of sight through the room.
+  const tutorialFixturePositions=[[20,22],[42,42]];
+  for(const [x,z] of tutorialFixturePositions){
+    const fixtureMesh=addTutorialMesh(
       new THREE.BoxGeometry(4,.10,.95),
-      fixtureMaterial,
+      fixtureMaterial.clone(),
       new THREE.Vector3(x,h-.055,z)
     );
-    const light=new THREE.PointLight(0xffe6a8,8,24,1.8);
-    light.position.set(x,h-.8,z);
-    light.userData.tutorialOwnedMaterial=false;
-    light.userData.tutorialOwnedGeometry=false;
+    fixtureMesh.material.emissiveIntensity=.18;
+
+    const light=new THREE.PointLight(0xffe6a8,2.35,14,1.5);
+    light.position.set(x,h-.75,z);
+    light.castShadow=false;
+    light.visible=false;
+    light.name="TutorialFluorescentLight";
     tutorialOpenRoomRoot.add(light);
+    tutorialOpenRoomLights.push({
+      light,
+      mesh:fixtureMesh,
+      x,
+      z,
+      phase:Math.random()*Math.PI*2,
+      baseIntensity:2.35
+    });
   }
 
   const half=t*.5;
@@ -685,6 +702,67 @@ function ensureTutorialOpenRoom(){
   tutorialOpenRoomActive=true;
   player.ignoreWorldCollision=true;
   player.extraCollisionBoxes=tutorialOpenRoomCollisionBoxes;
+}
+
+function updateTutorialOpenRoomLights(){
+  if(!tutorialOpenRoomActive || !tutorialOpenRoomLights.length) return;
+
+  const now=performance.now();
+  if(now-tutorialOpenRoomLightLastUpdate<100) return;
+  tutorialOpenRoomLightLastUpdate=now;
+
+  camera.getWorldPosition(tutorialOpenRoomLightOrigin);
+  camera.getWorldDirection(tutorialOpenRoomLightDirection);
+  tutorialOpenRoomLightDirection.normalize();
+
+  const candidates=[];
+  for(const item of tutorialOpenRoomLights){
+    item.light.visible=false;
+    item.light.intensity=0;
+    if(item.mesh?.material?.emissiveIntensity!==undefined){
+      item.mesh.material.emissiveIntensity=.18;
+    }
+
+    item.light.getWorldPosition(tutorialOpenRoomLightTarget);
+    const dx=item.x-player.pos.x;
+    const dz=item.z-player.pos.z;
+    const distanceSq=dx*dx+dz*dz;
+    if(distanceSq>22*22) continue;
+
+    tutorialOpenRoomLightTargetDirection
+      .copy(tutorialOpenRoomLightTarget)
+      .sub(tutorialOpenRoomLightOrigin)
+      .normalize();
+
+    const viewDot=tutorialOpenRoomLightDirection.dot(tutorialOpenRoomLightTargetDirection);
+    if(viewDot<.52) continue;
+
+    const distance=Math.sqrt(distanceSq);
+    tutorialOpenRoomLightDirection.subVectors(
+      tutorialOpenRoomLightTarget,
+      tutorialOpenRoomLightOrigin
+    ).normalize();
+    tutorialOpenRoomLightRaycaster.set(
+      tutorialOpenRoomLightOrigin,
+      tutorialOpenRoomLightDirection
+    );
+    tutorialOpenRoomLightRaycaster.near=.05;
+    tutorialOpenRoomLightRaycaster.far=Math.max(.05,distance-.22);
+
+    if(tutorialOpenRoomLightRaycaster.intersectObjects(tutorialOpenRoomOccluders,false).length) continue;
+
+    candidates.push({item,priority:distanceSq-viewDot*60});
+  }
+
+  candidates.sort((a,b)=>a.priority-b.priority);
+  const active=candidates[0]?.item;
+  if(!active) return;
+
+  active.light.visible=true;
+  active.light.intensity=active.baseIntensity*(.96+.04*Math.sin(now*.004+active.phase));
+  if(active.mesh?.material?.emissiveIntensity!==undefined){
+    active.mesh.material.emissiveIntensity=.85;
+  }
 }
 
 function disableTutorialOpenRoom(){
@@ -7339,7 +7417,17 @@ function animate(){
     player.extraCollisionBoxes=[];
   }
 
+  player.inputEnabled=(
+    gameStarted &&
+    !gameEnded &&
+    !phoneOpen &&
+    !controlsOpen &&
+    !chatOpen &&
+    !securityCameras.active &&
+    overlay.classList.contains("hidden")
+  );
   player.update(dt);
+  updateTutorialOpenRoomLights();
   updateAdminFly(dt);
   updateAdminProjectiles(dt);
   updateTutorialMascot(dt);

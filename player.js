@@ -26,6 +26,7 @@ export class Player {
     this.vel = new THREE.Vector3();
     this.keys = new Set();
     this.locked = false;
+    this.inputEnabled = false;
     this.bobPhase = 0;
     this.bobOffset = 0;
     this.fov = 70;
@@ -252,14 +253,20 @@ export class Player {
     return this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
   }
 
+  get movementActive() {
+    return this.locked || this.inputEnabled;
+  }
+
   get isRunning() {
-    return this.locked && !this.crouched && this.wantsToRun && this.stamina > 1;
+    return this.movementActive && !this.crouched && this.wantsToRun && this.stamina > 1;
   }
 
   update(dt) {
-    // --- input direction (relative to yaw); ignored while unlocked ---
+    // Keyboard movement can continue when pointer lock is unavailable, but
+    // main.js disables input while menus, phones, controls, or other overlays
+    // are active.
     const k = this.keys;
-    const active = this.locked;
+    const active = this.movementActive;
     const f = active
       ? (k.has("KeyW") || k.has("ArrowUp") ? 1 : 0) -
           (k.has("KeyS") || k.has("ArrowDown") ? 1 : 0)

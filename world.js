@@ -298,6 +298,7 @@ export class World {
     const entry = this.chunks.get(key);
     if (!entry) return;
     this.root.remove(entry.group);
+    this.wallOccluders=this.wallOccluders.filter(mesh=>mesh.parent);
     entry.group.traverse((o) => {
       if (o.isMesh && o.geometry !== this.floorGeo && o.geometry !== this.ceilGeo) {
         o.geometry.dispose();
@@ -322,14 +323,15 @@ export class World {
 
     const camera=this.fixtureLightCamera;
     const hasView=Boolean(camera);
-    const maxActive=LOW_END_DEVICE ? 1 : 2;
-    const maxDistance=18;
+    const maxActive=1;
+    const maxDistance=16;
     const maxDistanceSq=maxDistance*maxDistance;
-    const minViewDot=.48;
+    const minViewDot=.52;
     const candidates=[];
     const active=[];
 
     this.fixtureLights=this.fixtureLights.filter(item=>item.light.parent);
+    this.wallOccluders=this.wallOccluders.filter(mesh=>mesh.parent);
 
     if(hasView){
       camera.getWorldPosition(this.fixtureLightViewOrigin);
@@ -585,7 +587,7 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=cracked ? 2.0+rng()*.65 : 3.8+rng()*1.0;
+      const power=cracked ? 1.4+rng()*.45 : 2.5+rng()*.7;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
       const y=WALL_H-.035;
@@ -614,7 +616,7 @@ export class World {
       const point=new THREE.PointLight(
         0xffe6a8,
         power,
-        cracked ? 15 : 18,
+        cracked ? 12 : 15,
         1.3
       );
       // The emitter sits just below the ceiling panel so its real light cone
