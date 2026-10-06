@@ -252,6 +252,7 @@ export class World {
     // Ceiling fixtures use a tiny real-light budget. They only activate when
     // the player's camera is actually looking toward them.
     this.fixtureLights = [];
+    this.wallOccluders = [];
     this.fixtureLightLastUpdate = 0;
     this.fixtureLightCamera = null;
     this.fixtureLightRaycaster = new THREE.Raycaster();
@@ -321,10 +322,10 @@ export class World {
 
     const camera=this.fixtureLightCamera;
     const hasView=Boolean(camera);
-    const maxActive=LOW_END_DEVICE ? 2 : 3;
-    const maxDistance=20;
+    const maxActive=LOW_END_DEVICE ? 1 : 2;
+    const maxDistance=18;
     const maxDistanceSq=maxDistance*maxDistance;
-    const minViewDot=.18;
+    const minViewDot=.48;
     const candidates=[];
     const active=[];
 
@@ -384,7 +385,7 @@ export class World {
           this.fixtureLightRaycaster.near=.05;
           this.fixtureLightRaycaster.far=Math.max(.05,distance-.16);
 
-          const hits=this.fixtureLightRaycaster.intersectObject(this.root,true);
+          const hits=this.fixtureLightRaycaster.intersectObjects(this.wallOccluders,false);
           if(hits.length) continue;
         }
       }
@@ -497,6 +498,7 @@ export class World {
     ceiling.position.set(ox + mid, WALL_H, oz + mid);
     group.add(ceiling);
 
+    let wallMesh=null;
     if (data.walls.length > 0) {
       const geos = data.walls.map((w) => {
         const g = wallGeometry(w.len, w.horiz);
@@ -509,7 +511,11 @@ export class World {
       });
       const merged = mergeGeometries(geos, false);
       for (const g of geos) g.dispose();
-      group.add(new THREE.Mesh(merged, this.materials.wall));
+      wallMesh=new THREE.Mesh(merged, this.materials.wall);
+      wallMesh.name="BackroomsWallOccluder";
+      wallMesh.userData.fixtureLightOccluder=true;
+      group.add(wallMesh);
+      this.wallOccluders.push(wallMesh);
     }
 
     this.buildCeilingFixtures(group, cx, cz);
@@ -519,10 +525,8 @@ export class World {
 
   buildCeilingFixtures(group, cx, cz) {
     const fixturePositions = [
-      [16,16],
-      [48,16],
-      [16,48],
-      [48,48],
+      [18,18],
+      [48,46],
     ];
     const rng = mulberry32(hashSeed(cx, cz, this.seed) ^ 0x6f31a9);
 
@@ -581,7 +585,7 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=cracked ? 4.5+rng()*1.5 : 7.0+rng()*2.0;
+      const power=cracked ? 2.0+rng()*.65 : 3.8+rng()*1.0;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
       const y=WALL_H-.035;
@@ -610,7 +614,7 @@ export class World {
       const point=new THREE.PointLight(
         0xffe6a8,
         power,
-        cracked ? 20 : 24,
+        cracked ? 15 : 18,
         1.3
       );
       // The emitter sits just below the ceiling panel so its real light cone

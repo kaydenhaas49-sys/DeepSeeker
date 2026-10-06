@@ -1440,10 +1440,10 @@ function updateMenuScene(t,dt){
 }
 
 
-const FLASHLIGHT_BASE_DISTANCE=LOW_END_PERFORMANCE?60:75;
+const FLASHLIGHT_BASE_DISTANCE=LOW_END_PERFORMANCE?46:58;
 const flashlight=new THREE.SpotLight(
   0xf0dfad,
-  LOW_END_PERFORMANCE?28:32,
+  LOW_END_PERFORMANCE?17:20,
   FLASHLIGHT_BASE_DISTANCE,
   LOW_END_PERFORMANCE?Math.PI/3.1:Math.PI/3.2,
   LOW_END_PERFORMANCE?.92:.90,
@@ -1451,8 +1451,8 @@ const flashlight=new THREE.SpotLight(
 );
 const flashlightFill=new THREE.PointLight(
   0xf0dfad,
-  .30,
-  7,
+  .08,
+  5,
   2
 );
 flashlightFill.castShadow=false;
@@ -7398,7 +7398,7 @@ function animate(){
   const lowBattery=Math.pow(THREE.MathUtils.clamp((35-battery)/35,0,1),1.15);
   const lowBatteryWave=Math.sin(t*(9+lowBattery*28)+battery*.19);
   const lowBatteryDrop=lowBattery>0 && lowBatteryWave>.35 ? THREE.MathUtils.lerp(1,.20,lowBattery) : 1;
-  let flashlightStrength=32.0*flicker*lowBatteryDrop;
+  let flashlightStrength=20.0*flicker*lowBatteryDrop;
 
   if(flashlightOn && !houseMode && spiderActive){
     const spiderDistance=Math.hypot(
@@ -7428,7 +7428,7 @@ function animate(){
   flashlight.intensity=flashlightOn ? flashlightStrength : 0;
   flashlight.visible=flashlightOn && battery>0;
   flashlightFill.intensity=flashlight.visible
-    ? (LOW_END_PERFORMANCE ? 1.15 : 1.65)
+    ? (LOW_END_PERFORMANCE ? .32 : .48)
     : 0;
   flashlightFill.visible=flashlight.visible;
   // Keep beam range and aim stable. Wall-hit occlusion was changing the
