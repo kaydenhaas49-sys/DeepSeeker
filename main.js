@@ -233,6 +233,9 @@ let tutorialMascotRoot=null;
 let tutorialMascotReady=false;
 let tutorialMascotTime=0;
 let tutorialMascotMouth=null;
+let tutorialMascotFlashlight=null;
+let tutorialMascotFlashlightLens=null;
+let tutorialMascotBlasterBeam=null;
 let tutorialMascotSpeechStage=-1;
 let tutorialMascotSpeechTimer=0;
 const tutorialMascotPosition=new THREE.Vector3();
@@ -336,6 +339,86 @@ function createTutorialMascot(){
   tutorialMascotMouth.userData.tutorialOwnedMaterial=true;
   tutorialMascotRoot.add(tutorialMascotMouth);
 
+  // The handheld prop no longer lives on the first-person arm. Give the
+  // talking blaster its own compact head-mounted flashlight instead.
+  tutorialMascotFlashlight=new THREE.Group();
+  tutorialMascotFlashlight.name="BlasterHeadFlashlight";
+  tutorialMascotFlashlight.position.set(1.06,.02,0);
+  tutorialMascotFlashlight.rotation.y=-Math.PI/2;
+
+  const flashlightBodyMaterial=new THREE.MeshStandardMaterial({
+    color:0x171917,
+    roughness:.58,
+    metalness:.35
+  });
+  const flashlightRingMaterial=new THREE.MeshStandardMaterial({
+    color:0x6a695d,
+    roughness:.35,
+    metalness:.72
+  });
+  const flashlightLensMaterial=new THREE.MeshStandardMaterial({
+    color:0xf4e8be,
+    emissive:0xd8bd72,
+    emissiveIntensity:2.8,
+    roughness:.24,
+    metalness:.03
+  });
+
+  const flashlightBody=new THREE.Mesh(
+    new THREE.CylinderGeometry(.047,.058,.34,10),
+    flashlightBodyMaterial
+  );
+  flashlightBody.rotation.x=Math.PI/2;
+  flashlightBody.userData.tutorialOwnedGeometry=true;
+  flashlightBody.userData.tutorialOwnedMaterial=true;
+
+  const flashlightHead=new THREE.Mesh(
+    new THREE.CylinderGeometry(.075,.055,.10,10),
+    flashlightBodyMaterial
+  );
+  flashlightHead.rotation.x=Math.PI/2;
+  flashlightHead.position.z=-.205;
+  flashlightHead.userData.tutorialOwnedGeometry=true;
+  flashlightHead.userData.tutorialOwnedMaterial=false;
+
+  const flashlightRing=new THREE.Mesh(
+    new THREE.TorusGeometry(.076,.010,6,14),
+    flashlightRingMaterial
+  );
+  flashlightRing.rotation.x=Math.PI/2;
+  flashlightRing.position.z=-.258;
+  flashlightRing.userData.tutorialOwnedGeometry=true;
+  flashlightRing.userData.tutorialOwnedMaterial=true;
+
+  tutorialMascotFlashlightLens=new THREE.Mesh(
+    new THREE.CylinderGeometry(.057,.057,.018,12),
+    flashlightLensMaterial
+  );
+  tutorialMascotFlashlightLens.name="BlasterFlashlightLens";
+  tutorialMascotFlashlightLens.rotation.x=Math.PI/2;
+  tutorialMascotFlashlightLens.position.z=-.27;
+  tutorialMascotFlashlightLens.userData.tutorialOwnedGeometry=true;
+  tutorialMascotFlashlightLens.userData.tutorialOwnedMaterial=true;
+
+  tutorialMascotFlashlight.add(
+    flashlightBody,
+    flashlightHead,
+    flashlightRing,
+    tutorialMascotFlashlightLens
+  );
+  tutorialMascotRoot.add(tutorialMascotFlashlight);
+
+  const blasterBeam=new THREE.SpotLight(0xf0dfad,14,18,Math.PI/5,.72,1.1);
+  blasterBeam.name="BlasterHeadBeam";
+  blasterBeam.position.set(1.02,.02,0);
+  blasterBeam.rotation.y=-Math.PI/2;
+  const blasterBeamTarget=new THREE.Object3D();
+  blasterBeamTarget.position.set(1.02,.02,1.8);
+  tutorialMascotRoot.add(blasterBeamTarget);
+  blasterBeam.target=blasterBeamTarget;
+  tutorialMascotRoot.add(blasterBeam);
+  tutorialMascotBlasterBeam=blasterBeam;
+
   const light=new THREE.PointLight(0xd9c56c,1.5,7,1.8);
   light.position.set(.15,.12,.1);
   tutorialMascotRoot.add(light);
@@ -376,6 +459,24 @@ function speakTutorialMascot(stage){
 
 function updateTutorialMascot(dt){
   if(!tutorialMascotRoot || !tutorialMascotReady) return;
+
+  // Keep the old first-person arm flashlight completely hidden. The only
+  // visible physical flashlight is mounted on the blaster head now.
+  if(player.characterFlashlight){
+    player.characterFlashlight.visible=false;
+  }
+
+  const blasterLightOn=flashlightOn && houseTutorialStage>=5;
+  if(tutorialMascotFlashlight){
+    tutorialMascotFlashlight.visible=true;
+  }
+  if(tutorialMascotFlashlightLens?.material){
+    tutorialMascotFlashlightLens.material.emissiveIntensity=blasterLightOn ? 2.8 : .08;
+    tutorialMascotFlashlightLens.material.color.set(blasterLightOn ? 0xf4e8be : 0x514f44);
+  }
+  if(tutorialMascotBlasterBeam){
+    tutorialMascotBlasterBeam.intensity=blasterLightOn ? 14 : 0;
+  }
 
   tutorialMascotTime+=dt;
   tutorialMascotSpeechTimer=Math.max(0,tutorialMascotSpeechTimer-dt);
