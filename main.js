@@ -229,6 +229,112 @@ scene.add(tutorialOpenRoomRoot);
 const tutorialOpenRoomCollisionBoxes=[];
 const tutorialHiddenWallMeshes=[];
 let tutorialOpenRoomActive=false;
+let tutorialMascotRoot=null;
+let tutorialMascotReady=false;
+let tutorialMascotTime=0;
+
+function createTutorialMascot(){
+  if(tutorialMascotReady) return;
+
+  tutorialMascotRoot=new THREE.Group();
+  tutorialMascotRoot.name="TutorialBadgeAI";
+  tutorialMascotRoot.visible=false;
+  tutorialOpenRoomRoot.add(tutorialMascotRoot);
+
+  const body=new THREE.Mesh(
+    new THREE.CapsuleGeometry(.62,.52,6,12),
+    new THREE.MeshStandardMaterial({
+      color:0xe7c34f,
+      roughness:.42,
+      metalness:.08,
+      emissive:0x5b4309,
+      emissiveIntensity:.28
+    })
+  );
+  body.rotation.z=Math.PI/2;
+  body.scale.z=.72;
+  body.userData.tutorialOwnedGeometry=true;
+  body.userData.tutorialOwnedMaterial=true;
+  tutorialMascotRoot.add(body);
+
+  const visor=new THREE.Mesh(
+    new THREE.BoxGeometry(.14,.34,.58),
+    new THREE.MeshStandardMaterial({
+      color:0x121511,
+      roughness:.2,
+      metalness:.28,
+      emissive:0x66806f,
+      emissiveIntensity:.9
+    })
+  );
+  visor.position.set(.58,.05,0);
+  visor.rotation.z=Math.PI/2;
+  visor.userData.tutorialOwnedGeometry=true;
+  visor.userData.tutorialOwnedMaterial=true;
+  tutorialMascotRoot.add(visor);
+
+  const eyeMaterial=new THREE.MeshBasicMaterial({color:0xe5f7df});
+  for(const z of [-.14,.14]){
+    const eye=new THREE.Mesh(
+      new THREE.SphereGeometry(.055,10,8),
+      eyeMaterial
+    );
+    eye.position.set(.67,.11,z);
+    eye.userData.tutorialOwnedGeometry=true;
+    eye.userData.tutorialOwnedMaterial=false;
+    tutorialMascotRoot.add(eye);
+  }
+
+  const ring=new THREE.Mesh(
+    new THREE.TorusGeometry(.70,.035,8,24),
+    new THREE.MeshStandardMaterial({
+      color:0x55451a,
+      roughness:.5,
+      metalness:.15,
+      emissive:0x2a2108,
+      emissiveIntensity:.18
+    })
+  );
+  ring.rotation.y=Math.PI/2;
+  ring.userData.tutorialOwnedGeometry=true;
+  ring.userData.tutorialOwnedMaterial=true;
+  tutorialMascotRoot.add(ring);
+
+  const light=new THREE.PointLight(0xd9c56c,1.8,8,1.8);
+  light.position.set(.4,.05,0);
+  tutorialMascotRoot.add(light);
+
+  tutorialMascotReady=true;
+}
+
+function updateTutorialMascot(dt){
+  if(!tutorialMascotRoot || !tutorialMascotReady) return;
+
+  tutorialMascotTime+=dt;
+  const shouldShow=
+    gameStarted &&
+    !houseMode &&
+    tutorialOpenRoomActive &&
+    houseTutorialStage>=6 &&
+    houseTutorialStage<=7;
+
+  if(!shouldShow){
+    tutorialMascotRoot.visible=false;
+    return;
+  }
+
+  tutorialMascotRoot.visible=true;
+  tutorialMascotRoot.position.set(
+    32,
+    5.25+Math.sin(tutorialMascotTime*1.7)*.18,
+    15
+  );
+  tutorialMascotRoot.rotation.y=Math.sin(tutorialMascotTime*.7)*.22;
+  tutorialMascotRoot.rotation.z=Math.sin(tutorialMascotTime*1.3)*.04;
+
+  const scale=.82+Math.sin(tutorialMascotTime*3.1)*.06;
+  tutorialMascotRoot.scale.setScalar(scale);
+}
 
 function clearTutorialOpenRoomGeometry(){
   while(tutorialOpenRoomRoot.children.length){
@@ -259,6 +365,7 @@ function ensureTutorialOpenRoom(){
 
   tutorialOpenRoomCollisionBoxes.length=0;
   clearTutorialOpenRoomGeometry();
+  createTutorialMascot();
 
   const min=4;
   const max=60;
@@ -4554,6 +4661,8 @@ function setHouseTutorialStage(stage){
   }else if(stage===6){
     objective.textContent="OPEN THE DEEPSEEKER PHONE · P";
     showHouseTutorialMessage("P · OPEN PHONE",1500);
+    eventText.textContent="BADGE AI ONLINE";
+    eventText.style.opacity="1";
   }else if(stage===7){
     objective.textContent="READ M'S MESSAGE, THEN CLOSE THE PHONE · P";
     showHouseTutorialMessage("CHECK THE DEEPSEEKER.",1700);
@@ -7007,6 +7116,7 @@ function animate(){
   player.update(dt);
   updateAdminFly(dt);
   updateAdminProjectiles(dt);
+  updateTutorialMascot(dt);
 
   if(backroomsFallTimer>0 && gameStarted && houseMode){
     camera.position.y+=fallCameraOffset;
