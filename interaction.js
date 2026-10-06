@@ -9,6 +9,7 @@ export class InteractionSystem {
     this.raycaster=new THREE.Raycaster();
     this.raycaster.far=3.2;
     this.active=null;
+    this.elapsed=0;
     this.prompt=null;
     this._ensurePrompt();
   }
@@ -42,11 +43,15 @@ export class InteractionSystem {
     return null;
   }
 
-  update(){
+  update(dt=.016){
     if(!this.camera || document.pointerLockElement!==this.dom){
       this.setActive(null);
       return;
     }
+
+    this.elapsed+=dt;
+    if(this.elapsed<.05) return;
+    this.elapsed=0;
 
     const candidates=this.getCandidates().filter(Boolean);
     if(!candidates.length){
