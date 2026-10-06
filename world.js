@@ -235,13 +235,13 @@ export class World {
     this.fixtureMaterial = new THREE.MeshStandardMaterial({
       color: 0xfff4ca,
       emissive: 0xffe2a0,
-      emissiveIntensity: 2.30,
+      emissiveIntensity: 0.55,
       roughness: 0.28,
     });
     this.fixtureDimMaterial = new THREE.MeshStandardMaterial({
       color: 0xfff4ca,
       emissive: 0xffe2a0,
-      emissiveIntensity: 1.55,
+      emissiveIntensity: 0.34,
       roughness: 0.30,
     });
     this.fixtureBlackMaterial = new THREE.MeshStandardMaterial({
@@ -249,10 +249,17 @@ export class World {
       roughness: 0.96,
     });
 
-    // Every ceiling fixture gets a real PointLight. Only the nearest handful
-    // are enabled at once so the damaged lights can illuminate the room without
-    // recreating the severe multi-light performance hit.
+    // Ceiling fixtures use a tiny real-light budget. They only activate when
+    // the player's camera is actually looking toward them.
     this.fixtureLights = [];
+    this.fixtureLightLastUpdate = 0;
+    this.fixtureLightCamera = null;
+    this.fixtureLightRaycaster = new THREE.Raycaster();
+    this.fixtureLightViewOrigin = new THREE.Vector3();
+    this.fixtureLightDirection = new THREE.Vector3();
+    this.fixtureLightTargetDirection = new THREE.Vector3();
+    this.fixtureLightToTarget = new THREE.Vector3();
+    this.fixtureLightTarget = new THREE.Vector3();
 
     // Shared per-chunk geometry templates (never disposed per chunk).
     this.floorGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE);
@@ -302,36 +309,101 @@ export class World {
 
   // Called every frame with the player position.
   updateFixtureLights(px,pz){
-    const maxActive=LOW_END_DEVICE ? 8 : 12;
-    const maxDistance=18;
-    const maxDistanceSq=maxDistance*maxDistance;
-    const candidates=[];
+    const now=performance.now();
+    const interval=LOW_END_DEVICE ? 140 : 100;
 
-    this.fixtureLights = this.fixtureLights.filter(item => item.light.parent);
+    if(now-this.fixtureLightLastUpdate<interval) return;
+    this.fixtureLightLastUpdate=now;
+
+    if(!this.fixtureLightCamera || !this.fixtureLightCamera.parent){
+      this.fixtureLightCamera=this.scene.getObjectByProperty("isCamera",true);
+    }
+
+    const camera=this.fixtureLightCamera;
+    const hasView=Boolean(camera);
+    const maxActive=LOW_END_DEVICE ? 2 : 3;
+    const maxDistance=20;
+    const maxDistanceSq=maxDistance*maxDistance;
+    const minViewDot=.18;
+    const candidates=[];
+    const active=[];
+
+    this.fixtureLights=this.fixtureLights.filter(item=>item.light.parent);
+
+    if(hasView){
+      camera.getWorldPosition(this.fixtureLightViewOrigin);
+      camera.getWorldDirection(this.fixtureLightDirection);
+      this.fixtureLightDirection.normalize();
+    }
 
     for(const item of this.fixtureLights){
+      item.light.visible=false;
+
       const dx=item.x-px;
       const dz=item.z-pz;
       const distanceSq=dx*dx+dz*dz;
-      item.light.visible=false;
-
       if(distanceSq>maxDistanceSq) continue;
 
-      const priority=distanceSq*(item.cracked ? .78 : 1);
+      let priority=distanceSq*(item.cracked ? .78 : 1);
+
+      if(hasView){
+        item.light.getWorldPosition(this.fixtureLightTarget);
+        this.fixtureLightTargetDirection
+          .copy(this.fixtureLightTarget)
+          .sub(this.fixtureLightViewOrigin)
+          .normalize();
+
+        const viewDot=this.fixtureLightDirection.dot(this.fixtureLightTargetDirection);
+        if(viewDot<minViewDot) continue;
+
+        priority-=viewDot*5;
+      }
+
       candidates.push({item,priority});
     }
 
     candidates.sort((a,b)=>a.priority-b.priority);
 
-    const now=performance.now()*.003;
-    for(let i=0;i<Math.min(maxActive,candidates.length);i++){
+    const maxLOSChecks=Math.min(5,candidates.length);
+    for(let i=0;i<maxLOSChecks;i++){
       const item=candidates[i].item;
+
+      if(hasView){
+        item.light.getWorldPosition(this.fixtureLightTarget);
+        this.fixtureLightToTarget
+          .copy(this.fixtureLightTarget)
+          .sub(this.fixtureLightViewOrigin);
+
+        const distance=this.fixtureLightToTarget.length();
+        if(distance>.05){
+          this.fixtureLightToTarget.normalize();
+          this.fixtureLightRaycaster.set(
+            this.fixtureLightViewOrigin,
+            this.fixtureLightToTarget
+          );
+          this.fixtureLightRaycaster.near=.05;
+          this.fixtureLightRaycaster.far=Math.max(.05,distance-.16);
+
+          const hits=this.fixtureLightRaycaster.intersectObject(this.root,true);
+          if(hits.length) continue;
+        }
+      }
+
+      active.push(item);
+      if(active.length>=maxActive) break;
+    }
+
+    const flickerTime=now*.003;
+    for(const item of active){
       item.light.visible=true;
-      const flicker=.93+.07*Math.sin(now*item.flickerSpeed+item.phase);
+
+      const flicker=item.cracked
+        ? .88+.10*Math.sin(flickerTime*item.flickerSpeed+item.phase)
+        : .95+.035*Math.sin(flickerTime*item.flickerSpeed+item.phase);
+
       item.light.intensity=item.baseIntensity*flicker;
     }
   }
-
   update(px, pz) {
     this.updateFixtureLights(px,pz);
     const pcx = Math.floor(px / CHUNK_SIZE);
@@ -447,12 +519,10 @@ export class World {
 
   buildCeilingFixtures(group, cx, cz) {
     const fixturePositions = [
-      [12,12],
-      [32,12],
-      [52,12],
-      [12,40],
-      [32,40],
-      [52,40],
+      [16,16],
+      [48,16],
+      [16,48],
+      [48,48],
     ];
     const rng = mulberry32(hashSeed(cx, cz, this.seed) ^ 0x6f31a9);
 
@@ -511,7 +581,7 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=cracked ? 12.0+rng()*2.0 : 18.0+rng()*3.0;
+      const power=cracked ? 4.5+rng()*1.5 : 7.0+rng()*2.0;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
       const y=WALL_H-.035;
@@ -540,8 +610,8 @@ export class World {
       const point=new THREE.PointLight(
         0xffe6a8,
         power,
-        cracked ? 32 : 38,
-        1.2
+        cracked ? 20 : 24,
+        1.3
       );
       // The emitter sits just below the ceiling panel so its real light cone
       // washes across the surrounding walls and floor.
