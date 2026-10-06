@@ -520,6 +520,31 @@ export function createFirstPersonArms(model){
   }
 
   applyFirstPersonArmPose(root);
+  root.updateMatrixWorld(true);
+
+  const leftHand=findBoneByNameParts(root,[
+    "mixamoriglefthand","lefthand","handl","wristl"
+  ]);
+  const rightHand=findBoneByNameParts(root,[
+    "mixamorigrighthand","righthand","handr","wristr"
+  ]);
+
+  // Place the real hands into the lower-middle of the camera view. This is
+  // derived from their actual skeleton positions, so model changes do not
+  // silently push them below the screen again.
+  if(leftHand && rightHand){
+    const leftWorld=leftHand.getWorldPosition(new THREE.Vector3());
+    const rightWorld=rightHand.getWorldPosition(new THREE.Vector3());
+    const handCenter=leftWorld.add(rightWorld).multiplyScalar(.5);
+
+    root.position.x-=handCenter.x;
+    root.position.y+=(-.22-handCenter.y);
+    root.position.z+=(-.92-handCenter.z);
+    root.updateMatrixWorld(true);
+  }else{
+    // Fallback only when the rig has no discoverable hand bones.
+    root.position.set(0,-.55,-.92);
+  }
 
   root.traverse(obj=>{
     if(!obj.isMesh) return;

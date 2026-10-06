@@ -7650,7 +7650,7 @@ function animate(){
 
   // The normal spider system is Backrooms-only. The apartment gets one
   // deliberately scripted teaching encounter on top of it.
-  if(houseMode){
+  if(houseMode || tutorialOpenRoomActive){
     updateHouseTutorialSpider(dt);
   }
 
