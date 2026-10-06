@@ -80,6 +80,39 @@ const batteryValue=document.getElementById("batteryValue");
 const eventText=document.getElementById("event");
 const objective=document.getElementById("objective");
 const hudRight=document.getElementById("hudRight");
+
+const tutorialGuide=document.createElement("div");
+tutorialGuide.id="tutorialGuide";
+tutorialGuide.style.cssText=[
+  "position:fixed",
+  "left:50%",
+  "bottom:7%",
+  "transform:translateX(-50%) translateY(10px)",
+  "width:min(520px,calc(100vw - 36px))",
+  "box-sizing:border-box",
+  "padding:16px 18px 14px",
+  "border:1px solid rgba(226,214,166,.24)",
+  "border-radius:9px",
+  "background:linear-gradient(180deg,rgba(10,12,9,.92),rgba(4,6,4,.96))",
+  "box-shadow:0 16px 50px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.045)",
+  "backdrop-filter:blur(7px)",
+  "color:#eee7c9",
+  "z-index:8",
+  "pointer-events:none",
+  "opacity:0",
+  "transition:opacity .22s ease,transform .22s ease"
+].join(";");
+tutorialGuide.innerHTML=
+  '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">'+
+    '<span id="tutorialGuideLabel" style="font-size:8px;letter-spacing:3px;color:#989174">FIELD TUTORIAL</span>'+
+    '<span id="tutorialGuideStep" style="font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.5px;color:#7f7c69">01/09</span>'+
+  '</div>'+
+  '<div id="tutorialGuideAction" style="font-size:15px;letter-spacing:1.4px;color:#eee8cb"></div>'+
+  '<div id="tutorialGuideHint" style="margin-top:6px;font-size:10px;line-height:1.45;letter-spacing:.8px;color:#9f9a84"></div>';
+document.body.appendChild(tutorialGuide);
+const tutorialGuideStep=document.getElementById("tutorialGuideStep");
+const tutorialGuideAction=document.getElementById("tutorialGuideAction");
+const tutorialGuideHint=document.getElementById("tutorialGuideHint");
 const vignette=document.getElementById("vignette");
 const phone=document.getElementById("phone");
 const phoneAppName=document.getElementById("phoneAppName");
@@ -4391,6 +4424,7 @@ function resetHouseTutorial(){
   houseTutorialStartX=player.pos.x;
   houseTutorialStartZ=player.pos.z;
   hideHouseTutorialSpider();
+  updateTutorialGuide();
 }
 
 function showHouseTutorialMessage(message,duration=1500){
@@ -4457,10 +4491,42 @@ function prepareHouseTutorialSpider(){
   return true;
 }
 
+function updateTutorialGuide(){
+  if(!tutorialGuide || !gameStarted || houseMode || houseTutorialStage<=0 || houseTutorialStage>=10){
+    tutorialGuide.style.opacity="0";
+    tutorialGuide.style.transform="translateX(-50%) translateY(10px)";
+    return;
+  }
+
+  const lessons={
+    1:["MOVE","W A S D","Walk around the room until the lesson completes."],
+    2:["JUMP","SPACE","Jump once. You do not need to jump high."],
+    3:["CROUCH","CTRL","Hold CTRL until you crouch."],
+    4:["SPRINT","SHIFT","Hold SHIFT and sprint across the room."],
+    5:["FLASHLIGHT","F","Your flashlight is off. Turn it on."],
+    6:["PHONE","P","Open the DeepSeeker phone."],
+    7:["MESSAGE","P","Read M's message, then close the phone."],
+    8:["APPROACH","W A S D","Move toward the figure ahead. Do not freeze."],
+    9:["RUN","SHIFT","Hold SHIFT and get away from it."]
+  };
+  const lesson=lessons[houseTutorialStage];
+  if(!lesson){
+    tutorialGuide.style.opacity="0";
+    return;
+  }
+
+  tutorialGuideStep.textContent=String(houseTutorialStage).padStart(2,"0")+"/09";
+  tutorialGuideAction.textContent=lesson[0]+" · "+lesson[1];
+  tutorialGuideHint.textContent=lesson[2];
+  tutorialGuide.style.opacity="1";
+  tutorialGuide.style.transform="translateX(-50%) translateY(0)";
+}
+
 function setHouseTutorialStage(stage){
   if(!gameStarted || houseMode) return;
 
   houseTutorialStage=stage;
+  updateTutorialGuide();
 
   if(stage===1){
     houseTutorialStartX=player.pos.x;
@@ -4512,6 +4578,7 @@ function setHouseTutorialStage(stage){
       arachnophobiaMode ? "YOU LOST THE DUCK." : "IT STOPPED.",
       1600
     );
+    updateTutorialGuide();
     disableTutorialOpenRoom();
   }
 }
