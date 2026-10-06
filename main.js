@@ -1112,7 +1112,11 @@ function updateFlashlightOcclusion(dt){
   flashlightRaycaster.near=.08;
   flashlightRaycaster.far=FLASHLIGHT_BASE_DISTANCE;
 
-  const root=houseMode ? houseRoot : world.root;
+  const root=houseMode
+    ? houseRoot
+    : tutorialOpenRoomActive
+      ? tutorialOpenRoomRoot
+      : world.root;
   const hits=flashlightRaycaster.intersectObject(root,true);
 
   let distance=FLASHLIGHT_BASE_DISTANCE;
