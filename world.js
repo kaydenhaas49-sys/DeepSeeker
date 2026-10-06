@@ -39,6 +39,38 @@ export function mulberry32(a) {
 const cellKey = (x, z) => x + "," + z;
 
 // ---------------------------------------------------------------------------
+// Performance profile
+// ---------------------------------------------------------------------------
+
+const QUALITY_PARAM=new URLSearchParams(location.search).get("quality");
+
+function detectLowEndHardware(){
+  const cores=navigator.hardwareConcurrency||4;
+  const memory=navigator.deviceMemory||4;
+  let gpu="";
+  try{
+    const canvas=document.createElement("canvas");
+    const gl=canvas.getContext("webgl2")||canvas.getContext("webgl");
+    const ext=gl?.getExtension("WEBGL_debug_renderer_info");
+    gpu=ext
+      ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||"")
+      : String(gl?.getParameter(gl.RENDERER)||"");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  }catch{}
+  return /swiftshader|llvmpipe|software rasterizer|intel(?:r)?\s+(?:hd|uhd|iris)|mesa.*intel|microsoft basic render/i.test(gpu)
+    || (cores<=4 && memory<=4);
+}
+
+const LOW_END_DEVICE=
+  QUALITY_PARAM==="low" ||
+  QUALITY_PARAM==="potato" ||
+  (QUALITY_PARAM!=="high" && detectLowEndHardware());
+
+const R_GENERATE=LOW_END_DEVICE ? 1 : 2;
+const R_DISPOSE=LOW_END_DEVICE ? 1 : 3;
+const CHUNK_RENDER_DISTANCE=LOW_END_DEVICE ? 74 : Infinity;
+
+// ---------------------------------------------------------------------------
 // Chunk layout generation
 // ---------------------------------------------------------------------------
 // A chunk's layout is a set of axis-aligned wall segments on the grid.
@@ -80,7 +112,9 @@ export function generateChunk(cx, cz, seed) {
 
   // 1) Large architectural partitions — fewer, longer walls create
   // believable rooms and long Backrooms sightlines instead of a noisy maze.
-  const nSeg = 32 + Math.floor(rng() * 11); // 32–42 wall attempts
+  const nSeg = LOW_END_DEVICE
+    ? 22 + Math.floor(rng() * 7)
+    : 32 + Math.floor(rng() * 11); // weak: 22–28, normal: 32–42 wall attempts
   for (let i = 0; i < nSeg; i++) {
     const horiz = rng() < 0.5;
     const len = 3 + Math.floor(rng() * 6); // 3–8 cells
@@ -106,7 +140,9 @@ export function generateChunk(cx, cz, seed) {
 
   // Extra short partitions: these break up the big empty expanses and make
   // each chunk feel much more like a dense Backrooms floor plan.
-  const nShort = 12 + Math.floor(rng() * 8); // 12–19 extra attempts
+  const nShort = LOW_END_DEVICE
+    ? 6 + Math.floor(rng() * 5)
+    : 12 + Math.floor(rng() * 8); // weak: 6–10, normal: 12–19 extra attempts
   for (let i = 0; i < nShort; i++) {
     const horiz = rng() < 0.5;
     const len = 2 + Math.floor(rng() * 4); // 2–5 cells
@@ -164,11 +200,6 @@ export function generateChunk(cx, cz, seed) {
 // Chunk meshes + chunk manager
 // ---------------------------------------------------------------------------
 
-const QUALITY_PARAM=new URLSearchParams(location.search).get("quality");
-// Lightweight world streaming is the default. ?quality=high opts into the heavier path.
-const LOW_END_DEVICE=QUALITY_PARAM!=="high";
-const R_GENERATE = LOW_END_DEVICE ? 1 : 2;
-const R_DISPOSE = LOW_END_DEVICE ? 1 : 3;
 // BoxGeometry face order: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z (4 verts each).
 // Scale the U coordinate of a face so the wallpaper repeats every CELL meters.
 function scaleFaceU(geo, face, s) {
@@ -213,30 +244,40 @@ export class World {
     this.wallQueryScratch = [];
     scene.add(this.root);
 
-    const tex = createTextures(anisotropy);
+    const tex = createTextures(
+      LOW_END_DEVICE ? 1 : Math.min(anisotropy,4)
+    );
     this.materials = {
       wall: new THREE.MeshLambertMaterial({ map: tex.wall }),
-      floor: new THREE.MeshLambertMaterial({ map: tex.floor }),
-      ceiling: new THREE.MeshLambertMaterial({ map: tex.ceiling }),
+      floor: LOW_END_DEVICE
+        ? new THREE.MeshBasicMaterial({ map: tex.floor, color: 0x8f876f })
+        : new THREE.MeshLambertMaterial({ map: tex.floor }),
+      ceiling: new THREE.MeshBasicMaterial({
+        map: tex.ceiling,
+        color: LOW_END_DEVICE ? 0xbab6a8 : 0xffffff
+      }),
     };
 
     // Shared fluorescent materials. Fixture meshes are per-chunk so they are
     // disposed with the chunk, while these materials are reused everywhere.
-    this.fixtureMaterial = new THREE.MeshStandardMaterial({
-      color: 0xfff4ca,
-      emissive: 0xffe2a0,
-      emissiveIntensity: 4.00,
-      roughness: 0.28,
-    });
-    this.fixtureDimMaterial = new THREE.MeshStandardMaterial({
-      color: 0xfff4ca,
-      emissive: 0xffe2a0,
-      emissiveIntensity: 3.00,
-      roughness: 0.30,
-    });
-    this.fixtureBlackMaterial = new THREE.MeshStandardMaterial({
+    this.fixtureMaterial = LOW_END_DEVICE
+      ? new THREE.MeshBasicMaterial({color:0xffedbd})
+      : new THREE.MeshStandardMaterial({
+          color: 0xfff4ca,
+          emissive: 0xffe2a0,
+          emissiveIntensity: 4.00,
+          roughness: 0.28,
+        });
+    this.fixtureDimMaterial = LOW_END_DEVICE
+      ? new THREE.MeshBasicMaterial({color:0x8f896f})
+      : new THREE.MeshStandardMaterial({
+          color: 0xfff4ca,
+          emissive: 0xffe2a0,
+          emissiveIntensity: 3.00,
+          roughness: 0.30,
+        });
+    this.fixtureBlackMaterial = new THREE.MeshBasicMaterial({
       color: 0x10100e,
-      roughness: 0.96,
     });
 
     // Every ceiling fixture gets a real PointLight. Only the nearest handful
@@ -247,6 +288,7 @@ export class World {
     this.fixtureLightRefreshAt = 0;
     this.fixtureLightSelectionX = Infinity;
     this.fixtureLightSelectionZ = Infinity;
+    this.renderCullRefreshAt = 0;
     this.interactables = [];
     this.securityCameras = [];
     this.atmosphereEffects = [];
@@ -305,7 +347,9 @@ export class World {
 
   // Called every frame with the player position.
   updateFixtureLights(px,pz){
-    const maxActive=LOW_END_DEVICE ? 4 : 6;
+    if(LOW_END_DEVICE) return;
+
+    const maxActive=6;
     const maxDistance=18;
     const maxDistanceSq=maxDistance*maxDistance;
     const now=performance.now();
@@ -319,17 +363,17 @@ export class World {
     if(now>=this.fixtureLightRefreshAt || movedEnough){
       const candidates=[];
 
-      for(const item of this.activeFixtureLights){
+      for(const item of this.activeFixtureLights||[]){
         item.light.visible=false;
       }
+
+      this.fixtureLights=this.fixtureLights.filter(item=>item.light.parent);
 
       for(const item of this.fixtureLights){
         const dx=item.x-px;
         const dz=item.z-pz;
         const distanceSq=dx*dx+dz*dz;
-
         if(distanceSq>maxDistanceSq) continue;
-
         const priority=distanceSq*(item.cracked ? .78 : 1);
         candidates.push({item,priority});
       }
@@ -359,6 +403,7 @@ export class World {
   }
 
   updateAtmosphereEffects(dt, px, pz){
+    if(LOW_END_DEVICE) return;
     this.atmosphereEffects=this.atmosphereEffects.filter(item=>item?.group?.parent);
     const maxDistance=42;
     const maxDistanceSq=maxDistance*maxDistance;
@@ -390,6 +435,26 @@ export class World {
 
   update(px, pz) {
     this.updateFixtureLights(px,pz);
+
+    if(LOW_END_DEVICE){
+      const now=performance.now();
+      if(now>=this.renderCullRefreshAt){
+        this.renderCullRefreshAt=now+120;
+        const maxDistSq=CHUNK_RENDER_DISTANCE*CHUNK_RENDER_DISTANCE;
+        for(const entry of this.chunks.values()){
+          const minX=entry.data.cx*CHUNK_SIZE;
+          const maxX=minX+CHUNK_SIZE;
+          const minZ=entry.data.cz*CHUNK_SIZE;
+          const maxZ=minZ+CHUNK_SIZE;
+          const nx=Math.max(minX,Math.min(px,maxX));
+          const nz=Math.max(minZ,Math.min(pz,maxZ));
+          const dx=px-nx;
+          const dz=pz-nz;
+          entry.group.visible=(dx*dx+dz*dz)<=maxDistSq;
+        }
+      }
+    }
+
     const pcx = Math.floor(px / CHUNK_SIZE);
     const pcz = Math.floor(pz / CHUNK_SIZE);
 
@@ -468,6 +533,7 @@ export class World {
   // -- mesh building ---------------------------------------------------------
 
   buildAtmosphereEffects(group, data, cx, cz) {
+    if(LOW_END_DEVICE) return;
     const rng=mulberry32(hashSeed(cx,cz,this.seed)^0x7a4d21);
     if(rng()>0.22) return;
 
@@ -551,7 +617,7 @@ export class World {
 
   buildComputerProps(group, data, cx, cz) {
     const rng = mulberry32(hashSeed(cx, cz, this.seed) ^ 0x44a91d);
-    if (rng() > 0.28) return;
+    if (rng() > (LOW_END_DEVICE ? 0.10 : 0.28)) return;
 
     const candidates = [];
     for (let lx = 2; lx <= CHUNK_CELLS - 3; lx++) {
@@ -580,14 +646,20 @@ export class World {
     station.position.set(x, 0, z);
     station.rotation.y = Math.floor(rng() * 4) * Math.PI / 2;
 
-    const wood = new THREE.MeshStandardMaterial({ color: 0x302b24, roughness: .88 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x111312, roughness: .45 });
-    const screen = new THREE.MeshStandardMaterial({
-      color: security ? 0x162617 : 0x142019,
-      emissive: security ? 0x447a48 : 0x223c2a,
-      emissiveIntensity: security ? 1.8 : 1.15,
-      roughness: .35
-    });
+    const wood = LOW_END_DEVICE
+      ? new THREE.MeshBasicMaterial({color:0x302b24})
+      : new THREE.MeshStandardMaterial({color:0x302b24,roughness:.88});
+    const dark = LOW_END_DEVICE
+      ? new THREE.MeshBasicMaterial({color:0x111312})
+      : new THREE.MeshStandardMaterial({color:0x111312,roughness:.45});
+    const screen = LOW_END_DEVICE
+      ? new THREE.MeshBasicMaterial({color:security?0x3e7047:0x31503b})
+      : new THREE.MeshStandardMaterial({
+          color: security ? 0x162617 : 0x142019,
+          emissive: security ? 0x447a48 : 0x223c2a,
+          emissiveIntensity: security ? 1.8 : 1.15,
+          roughness: .35
+        });
 
     const desk = new THREE.Mesh(new THREE.BoxGeometry(2.3, .12, 1.0), wood);
     desk.position.y = .82;
@@ -609,9 +681,16 @@ export class World {
     keyboard.position.set(0, .91, .22);
     station.add(keyboard);
 
-    const glow = new THREE.PointLight(security ? 0x6fba75 : 0x6f9a76, security ? 1.8 : .7, 6, 2);
-    glow.position.set(0, 1.45, -.55);
-    station.add(glow);
+    if(!LOW_END_DEVICE){
+      const glow = new THREE.PointLight(
+        security ? 0x6fba75 : 0x6f9a76,
+        security ? 1.8 : .7,
+        6,
+        2
+      );
+      glow.position.set(0, 1.45, -.55);
+      station.add(glow);
+    }
 
     station.userData.interactable = {
       type: "computer",
@@ -773,6 +852,7 @@ export class World {
 
     for(let index=0; index<fixturePositions.length; index++){
       const [localX,localZ]=fixturePositions[index];
+      if(LOW_END_DEVICE && index%2===1) continue;
 
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
@@ -803,25 +883,27 @@ export class World {
 
       // Cracked fixtures are real light sources, not just emissive meshes.
       // Keep every fixture registered, then enable only the nearest few at runtime.
-      const point=new THREE.PointLight(
-        0xffe6a8,
-        power,
-        cracked ? 23 : 27,
-        1.8
-      );
-      point.position.set(x,y-.78,z);
-      point.visible=false;
-      point.name=cracked ? "CrackedFluorescentLight" : "FluorescentLight";
-      group.add(point);
-      this.fixtureLights.push({
-        light:point,
-        x,
-        z,
-        cracked,
-        baseIntensity:power,
-        phase,
-        flickerSpeed:cracked ? (8+rng()*5) : (4+rng()*3)
-      });
+      if(!LOW_END_DEVICE){
+        const point=new THREE.PointLight(
+          0xffe6a8,
+          power,
+          cracked ? 23 : 27,
+          1.8
+        );
+        point.position.set(x,y-.78,z);
+        point.visible=false;
+        point.name=cracked ? "CrackedFluorescentLight" : "FluorescentLight";
+        group.add(point);
+        this.fixtureLights.push({
+          light:point,
+          x,
+          z,
+          cracked,
+          baseIntensity:power,
+          phase,
+          flickerSpeed:cracked ? (8+rng()*5) : (4+rng()*3)
+        });
+      }
     }
 
     const mergeFixtureGeometries=(geometries,material,name)=>{
