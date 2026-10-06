@@ -995,7 +995,18 @@ let houseCollisionFocusX=NaN;
 let houseCollisionFocusZ=NaN;
 let gameStarted=false;
 let houseIntroMessageShown=false;
-let lastAutoSave=0;
+
+// First-room tutorial state. The apartment teaches movement, flashlight,
+// interaction, and finally gives the player one controlled spider encounter.
+let houseTutorialStage=0;
+let houseTutorialStartX=0;
+let houseTutorialStartZ=0;
+let houseTutorialSpiderState="hidden";
+let houseTutorialSpiderTime=0;
+let houseTutorialSpiderStuckTime=0;
+let houseTutorialSpiderPrepared=false;
+const houseTutorialSpiderPosition=new THREE.Vector3();
+const houseTutorialSpiderTarget=new THREE.Vector3();
 let pendingSaveLoad=null;
 let pendingNewGameSlot=null;
 
@@ -2436,6 +2447,7 @@ function resetForNewGame(slot=selectedSaveSlot){
   spiderBehaviorState="idle";
   spiderBehaviorTime=0;
   spiderEntity.visible=false;
+  resetHouseTutorial();
 
   gameStarted=false;
 
@@ -3457,6 +3469,19 @@ function placeHouseMagazineTeleporter(root){
 function useHouseReturnTeleporter(){
   if(!houseMode || backroomsFallTimer>0) return false;
 
+  if(houseTutorialStage<5){
+    eventText.textContent=houseTutorialStage>=3
+      ? "IT IS NOT SAFE YET."
+      : "EXPLORE THE ROOM FIRST.";
+    eventText.style.opacity="1";
+    setTimeout(()=>{
+      if(eventText.textContent==="IT IS NOT SAFE YET." || eventText.textContent==="EXPLORE THE ROOM FIRST."){
+        eventText.style.opacity="0";
+      }
+    },900);
+    return false;
+  }
+
   const bounds=houseReturnPortal.userData.interactionBounds;
   if(bounds){
     const nx=THREE.MathUtils.clamp(player.pos.x,bounds.minX,bounds.maxX);
@@ -3709,6 +3734,8 @@ function setHouseMode(enabled,options={}){
   const houseModeWasActive=houseMode;
   houseMode=enabled;
   houseUnloadTimer=0;
+
+  resetHouseTutorial();
 
   // Only switch the two level roots. The procedural Backrooms is otherwise untouched.
   world.root.visible=!houseMode;
@@ -4129,6 +4156,302 @@ function playerHasLineOfSightToSpider(){
 
   const hits=spiderSightRaycaster.intersectObjects(world.root.children,true);
   return hits.length===0;
+}
+
+function isHouseTutorialSpiderBlocked(x,z){
+  for(const box of houseCollisionBoxes){
+    const nx=THREE.MathUtils.clamp(x,box.minX,box.maxX);
+    const nz=THREE.MathUtils.clamp(z,box.minZ,box.maxZ);
+    const dx=x-nx;
+    const dz=z-nz;
+    if(dx*dx+dz*dz<=SPIDER_RADIUS*SPIDER_RADIUS) return true;
+  }
+  return false;
+}
+
+function houseTutorialSpiderSegmentClear(ax,az,bx,bz){
+  const distance=Math.hypot(bx-ax,bz-az);
+  const samples=Math.max(8,Math.ceil(distance/.55));
+
+  for(let i=1;i<samples;i++){
+    const t=i/samples;
+    const x=THREE.MathUtils.lerp(ax,bx,t);
+    const z=THREE.MathUtils.lerp(az,bz,t);
+    if(isHouseTutorialSpiderBlocked(x,z)) return false;
+  }
+  return true;
+}
+
+function houseTutorialSpiderCanBeSeen(){
+  if(!houseModel || !houseTutorialSpiderPrepared) return false;
+
+  const origin=camera.getWorldPosition(new THREE.Vector3());
+  const target=new THREE.Vector3(
+    spiderEntity.position.x,
+    spiderEntity.position.y+.78,
+    spiderEntity.position.z
+  );
+
+  const direction=target.sub(origin);
+  const length=direction.length();
+  if(length<.2) return true;
+
+  direction.normalize();
+  houseViewRaycaster.set(origin,direction);
+  houseViewRaycaster.far=Math.max(0,length-.12);
+
+  const hits=houseViewRaycaster.intersectObject(houseModel,true);
+  return hits.length===0;
+}
+
+function hideHouseTutorialSpider(){
+  houseTutorialSpiderState="hidden";
+  houseTutorialSpiderTime=0;
+  houseTutorialSpiderStuckTime=0;
+  houseTutorialSpiderPrepared=false;
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  spiderEntity.scale.setScalar(1);
+  spiderEntity.rotation.x=0;
+}
+
+function resetHouseTutorial(){
+  houseTutorialStage=0;
+  houseTutorialStartX=player.pos.x;
+  houseTutorialStartZ=player.pos.z;
+  hideHouseTutorialSpider();
+}
+
+function showHouseTutorialMessage(message,duration=1500){
+  eventText.textContent=message;
+  eventText.style.opacity="1";
+  setTimeout(()=>{
+    if(eventText.textContent===message){
+      eventText.style.opacity="0";
+    }
+  },duration);
+}
+
+function prepareHouseTutorialSpider(){
+  if(!spiderLoaded || !houseReturnPortal.userData.active) return false;
+
+  const anchor=houseReturnPortal.position;
+  const candidates=[];
+
+  for(let i=0;i<18;i++){
+    const angle=(i/18)*Math.PI*2 + Math.PI/18;
+    const distance=5.0 + (i%3)*.75;
+    candidates.push({
+      x:anchor.x+Math.cos(angle)*distance,
+      z:anchor.z+Math.sin(angle)*distance
+    });
+  }
+
+  const choose=(requireSight)=>{
+    for(const candidate of candidates){
+      if(isHouseTutorialSpiderBlocked(candidate.x,candidate.z)) continue;
+
+      const fromPlayer=Math.hypot(
+        candidate.x-player.pos.x,
+        candidate.z-player.pos.z
+      );
+
+      if(fromPlayer<4.5 || fromPlayer>14) continue;
+      if(requireSight && !houseTutorialSpiderSegmentClear(
+        player.pos.x,player.pos.z,candidate.x,candidate.z
+      )) continue;
+
+      return candidate;
+    }
+    return null;
+  };
+
+  const chosen=choose(true) || choose(false);
+  if(!chosen) return false;
+
+  houseTutorialSpiderPosition.set(
+    chosen.x,
+    SPIDER_GROUND_OFFSET,
+    chosen.z
+  );
+
+  spiderEntity.position.copy(houseTutorialSpiderPosition);
+  spiderEntity.rotation.x=0;
+  spiderEntity.rotation.y=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
+  spiderEntity.scale.setScalar(1);
+  spiderEntity.visible=true;
+  spiderVisibleToPlayer=true;
+  spiderRevealLight.visible=true;
+  spiderRevealLight.intensity=1.35;
+  setSpiderAnimation("idle");
+
+  houseTutorialSpiderPrepared=true;
+  houseTutorialSpiderState="static";
+  houseTutorialSpiderTime=0;
+  houseTutorialSpiderStuckTime=0;
+  return true;
+}
+
+function setHouseTutorialStage(stage){
+  if(!houseMode) return;
+
+  houseTutorialStage=stage;
+
+  if(stage===1){
+    houseTutorialStartX=player.pos.x;
+    houseTutorialStartZ=player.pos.z;
+    objective.textContent="Move around the room. W A S D to move.";
+    showHouseTutorialMessage("W A S D · MOVE",1400);
+  }else if(stage===2){
+    objective.textContent="Try your flashlight. Press F to toggle it.";
+    showHouseTutorialMessage("F · FLASHLIGHT",1400);
+  }else if(stage===3){
+    objective.textContent="Find the magazine on the couch. Press E to interact.";
+    if(!houseTutorialSpiderPrepared){
+      prepareHouseTutorialSpider();
+    }
+    showHouseTutorialMessage("SOMETHING IS STANDING NEARBY.",1700);
+  }else if(stage===4){
+    objective.textContent="RUN. Hold SHIFT to sprint.";
+    showHouseTutorialMessage(
+      arachnophobiaMode ? "THE DUCK IS CHASING YOU." : "IT MOVED. RUN.",
+      1500
+    );
+  }else if(stage===5){
+    objective.textContent="Find the magazine. Press E to enter the Backrooms.";
+    showHouseTutorialMessage(
+      arachnophobiaMode ? "YOU LOST THE DUCK." : "IT STOPPED.",
+      1400
+    );
+  }
+}
+
+function startHouseTutorialSpiderChase(){
+  if(houseTutorialSpiderState!=="static") return;
+
+  houseTutorialSpiderState="chase";
+  houseTutorialSpiderTime=0;
+  houseTutorialSpiderStuckTime=0;
+  spiderEntity.visible=true;
+  spiderRevealLight.visible=true;
+  spiderRevealLight.intensity=4.2;
+  setSpiderAnimation("runby");
+  pulse=.8;
+
+  if(arachnophobiaMode){
+    audio.quack();
+  }else{
+    audio.scare();
+  }
+
+  setHouseTutorialStage(4);
+}
+
+function finishHouseTutorialSpiderChase(){
+  hideHouseTutorialSpider();
+
+  if(houseMode && houseTutorialStage===4){
+    setHouseTutorialStage(5);
+  }
+}
+
+function updateHouseTutorialSpider(dt){
+  if(
+    !houseMode ||
+    !gameStarted ||
+    houseTutorialStage<3 ||
+    !spiderLoaded
+  ){
+    if(houseTutorialSpiderState!=="hidden"){
+      hideHouseTutorialSpider();
+    }
+    return;
+  }
+
+  if(
+    !houseTutorialSpiderPrepared &&
+    !prepareHouseTutorialSpider()
+  ){
+    return;
+  }
+
+  houseTutorialSpiderTime+=dt;
+
+  const dxToPlayer=player.pos.x-spiderEntity.position.x;
+  const dzToPlayer=player.pos.z-spiderEntity.position.z;
+  const distanceToPlayer=Math.hypot(dxToPlayer,dzToPlayer);
+
+  if(houseTutorialSpiderState==="static"){
+    spiderEntity.visible=true;
+    spiderRevealLight.intensity=1.35;
+    spiderRevealLight.visible=houseTutorialSpiderCanBeSeen();
+    spiderEntity.rotation.y=Math.atan2(
+      dxToPlayer,
+      dzToPlayer
+    );
+    setSpiderAnimation("idle");
+    groundSpiderEntity();
+
+    if(distanceToPlayer<=4.8){
+      startHouseTutorialSpiderChase();
+    }
+    return;
+  }
+
+  if(houseTutorialSpiderState!=="chase") return;
+
+  if(distanceToPlayer<=1.15 || houseTutorialSpiderTime>=3.2){
+    finishHouseTutorialSpiderChase();
+    return;
+  }
+
+  const step=Math.min(5.4*dt,Math.max(0,distanceToPlayer-.95));
+  if(step>0){
+    const inv=1/Math.max(distanceToPlayer,.001);
+    const moveX=dxToPlayer*inv*step;
+    const moveZ=dzToPlayer*inv*step;
+
+    if(!isHouseTutorialSpiderBlocked(
+      spiderEntity.position.x+moveX,
+      spiderEntity.position.z+moveZ
+    )){
+      spiderEntity.position.x+=moveX;
+      spiderEntity.position.z+=moveZ;
+      houseTutorialSpiderStuckTime=0;
+    }else if(!isHouseTutorialSpiderBlocked(
+      spiderEntity.position.x+moveX,
+      spiderEntity.position.z
+    )){
+      spiderEntity.position.x+=moveX;
+      houseTutorialSpiderStuckTime=0;
+    }else if(!isHouseTutorialSpiderBlocked(
+      spiderEntity.position.x,
+      spiderEntity.position.z+moveZ
+    )){
+      spiderEntity.position.z+=moveZ;
+      houseTutorialSpiderStuckTime=0;
+    }else{
+      houseTutorialSpiderStuckTime+=dt;
+    }
+  }
+
+  spiderEntity.rotation.x=0;
+  spiderEntity.rotation.y=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
+  spiderEntity.visible=houseTutorialSpiderCanBeSeen();
+  spiderRevealLight.visible=spiderEntity.visible;
+  spiderRevealLight.intensity=4.2;
+  setSpiderAnimation("runby");
+  groundSpiderEntity();
+
+  if(houseTutorialSpiderStuckTime>.65){
+    finishHouseTutorialSpiderChase();
+  }
 }
 
 function rotatePlayerTowardSpider(dt){
@@ -5708,6 +6031,10 @@ function updateStoryProgress(){
 function toggleFlashlight(){
   flashlightOn=!flashlightOn;
   player.setFlashlightVisual(flashlightOn);
+
+  if(houseMode && houseTutorialStage===2){
+    setHouseTutorialStage(3);
+  }
 }
 function refreshPhoneContent(){
   phoneAppName.textContent="DEEPSEEKER";
@@ -5843,6 +6170,11 @@ function togglePhone(){
   }else{
     adminOverlay.classList.remove("open");
     adminOverlay.setAttribute("aria-hidden","true");
+
+    if(houseMode && houseTutorialStage===0){
+      setHouseTutorialStage(1);
+    }
+
     if(!controlsOpen) player.lock();
   }
 }
@@ -6470,7 +6802,7 @@ function animate(){
     flashlight.distance=FLASHLIGHT_BASE_DISTANCE;
     flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
   }
-  if(!houseMode && spiderMixer && spiderActive){
+  if(spiderMixer && (spiderActive || houseTutorialSpiderState!=="hidden")){
     spiderMixer.update(dt);
   }
 
@@ -6624,6 +6956,13 @@ function animate(){
     spiderEntity.position.y=SPIDER_GROUND_OFFSET;
     spiderEntity.scale.setScalar(1);
   }
+
+  // The normal spider system is Backrooms-only. The apartment gets one
+  // deliberately scripted teaching encounter on top of it.
+  if(houseMode){
+    updateHouseTutorialSpider(dt);
+  }
+
   if(eventCooldown>0) eventCooldown-=dt;
   if(!houseMode && eventCooldown<=0 && t>nextEvent){
     triggerEvent();
