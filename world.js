@@ -301,7 +301,10 @@ export class World {
       LOW_END_DEVICE ? 1 : Math.min(anisotropy,4)
     );
     this.materials = {
-      wall: new THREE.MeshLambertMaterial({ map: tex.wall }),
+      wall: new THREE.MeshLambertMaterial({
+        map: tex.wall,
+        side: THREE.DoubleSide
+      }),
       floor: LOW_END_DEVICE
         ? new THREE.MeshBasicMaterial({ map: tex.floor, color: 0x8f876f })
         : new THREE.MeshLambertMaterial({ map: tex.floor }),

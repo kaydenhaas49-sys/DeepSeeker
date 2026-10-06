@@ -163,8 +163,18 @@ export class Player {
       const firstPersonFlashlight=attachFlashlight(firstPersonArms);
       if(firstPersonFlashlight){
         firstPersonFlashlight.visible=true;
-        firstPersonFlashlight.renderOrder=1101;
+        firstPersonFlashlight.renderOrder=2100;
         firstPersonFlashlight.scale.setScalar(1.05);
+        firstPersonFlashlight.traverse(obj=>{
+          if(!obj.isMesh) return;
+          obj.renderOrder=2100;
+          obj.frustumCulled=false;
+          if(obj.material){
+            obj.material.depthTest=false;
+            obj.material.depthWrite=false;
+            obj.material.needsUpdate=true;
+          }
+        });
       }
 
       this.hands.add(firstPersonArms);

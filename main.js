@@ -1445,10 +1445,18 @@ const flashlight=new THREE.SpotLight(
   0xf0dfad,
   LOW_END_PERFORMANCE?58:72,
   FLASHLIGHT_BASE_DISTANCE,
-  LOW_END_PERFORMANCE?Math.PI/4.0:Math.PI/4.2,
-  LOW_END_PERFORMANCE?.82:.78,
-  1.1
+  LOW_END_PERFORMANCE?Math.PI/3.0:Math.PI/3.15,
+  LOW_END_PERFORMANCE?.84:.80,
+  1.05
 );
+const flashlightFill=new THREE.PointLight(
+  0xf0dfad,
+  1.65,
+  10,
+  2
+);
+flashlightFill.castShadow=false;
+camera.add(flashlightFill);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
@@ -4984,6 +4992,7 @@ function startHouseTutorialSpiderChase(){
   houseTutorialSpiderState="chase";
   houseTutorialSpiderTime=0;
   houseTutorialSpiderStuckTime=0;
+  if(spiderMixer) spiderMixer.timeScale=1;
   spiderEntity.visible=true;
   spiderRevealLight.visible=true;
   spiderRevealLight.intensity=4.2;
@@ -5078,8 +5087,9 @@ function updateHouseTutorialSpider(dt){
     spiderEntity.visible=true;
     spiderRevealLight.intensity=1.1;
     spiderRevealLight.visible=houseTutorialSpiderCanBeSeen();
-    spiderEntity.rotation.y=Math.atan2(dxToPlayer,dzToPlayer);
-    setSpiderAnimation("idle");
+    // The spawn transform is deliberately preserved: no turning, walking, or
+    // animation until the player enters the trigger radius.
+    if(spiderMixer) spiderMixer.timeScale=0;
     groundSpiderEntity();
 
     if(distanceToPlayer<=5.2){
@@ -7487,13 +7497,24 @@ function animate(){
 
   flashlight.intensity=flashlightOn ? flashlightStrength : 0;
   flashlight.visible=flashlightOn && battery>0;
+  flashlightFill.intensity=flashlight.visible
+    ? (LOW_END_PERFORMANCE ? 1.15 : 1.65)
+    : 0;
+  flashlightFill.visible=flashlight.visible;
   if(flashlight.visible){
     updateFlashlightOcclusion(dt);
   }else{
     flashlight.distance=FLASHLIGHT_BASE_DISTANCE;
     flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
   }
-  if(spiderMixer && (spiderActive || houseTutorialSpiderState!=="hidden")){
+  if(
+    spiderMixer &&
+    (
+      spiderActive ||
+      houseTutorialSpiderState==="chase"
+    )
+  ){
+    spiderMixer.timeScale=1;
     spiderMixer.update(dt);
   }
 

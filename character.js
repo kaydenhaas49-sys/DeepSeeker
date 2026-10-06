@@ -485,40 +485,9 @@ export function createFirstPersonArms(model){
   root.name="FirstPersonActualArms";
   root.visible=true;
 
-  const sourceMeshes=[];
-  root.traverse(obj=>{
-    if(obj.isMesh) sourceMeshes.push(obj);
-  });
-
-  for(const source of sourceMeshes){
-    source.visible=false;
-
-    if(source.isSkinnedMesh){
-      const armGeometry=extractArmGeometry(source);
-      if(armGeometry){
-        const armMesh=new THREE.SkinnedMesh(
-          armGeometry,
-          Array.isArray(source.material)
-            ? source.material.map(material=>material.clone())
-            : source.material?.clone?.() || source.material
-        );
-
-        armMesh.position.copy(source.position);
-        armMesh.quaternion.copy(source.quaternion);
-        armMesh.scale.copy(source.scale);
-        armMesh.renderOrder=1000;
-        armMesh.frustumCulled=false;
-        armMesh.bind(source.skeleton,source.bindMatrix);
-        armMesh.bindMatrixInverse.copy(source.bindMatrixInverse);
-        source.parent.add(armMesh);
-      }
-    }else if(meshNameLooksLikeArm(source)){
-      source.visible=true;
-      source.renderOrder=1000;
-      source.frustumCulled=false;
-    }
-  }
-
+  // Use the actual player rig. The real arms are posed straight forward and
+  // the rest of the body stays behind the camera, avoiding fragile triangle
+  // extraction that can leave the hands invisible.
   applyFirstPersonArmPose(root);
   root.updateMatrixWorld(true);
 
@@ -529,29 +498,41 @@ export function createFirstPersonArms(model){
     "mixamorigrighthand","righthand","handr","wristr"
   ]);
 
-  // Place the real hands into the lower-middle of the camera view. This is
-  // derived from their actual skeleton positions, so model changes do not
-  // silently push them below the screen again.
   if(leftHand && rightHand){
     const leftWorld=leftHand.getWorldPosition(new THREE.Vector3());
     const rightWorld=rightHand.getWorldPosition(new THREE.Vector3());
     const handCenter=leftWorld.add(rightWorld).multiplyScalar(.5);
 
-    root.position.x-=handCenter.x;
-    root.position.y+=(-.22-handCenter.y);
-    root.position.z+=(-.92-handCenter.z);
-    root.updateMatrixWorld(true);
+    root.position.set(
+      -handCenter.x,
+      -.24-handCenter.y,
+      -.82-handCenter.z+.48
+    );
   }else{
-    // Fallback only when the rig has no discoverable hand bones.
-    root.position.set(0,-.55,-.92);
+    root.position.set(0,-.55,-.34);
   }
 
+  root.updateMatrixWorld(true);
+
+  // Viewmodel rendering should stay visible even when the player is very
+  // close to a wall or ceiling.
   root.traverse(obj=>{
     if(!obj.isMesh) return;
     obj.frustumCulled=false;
-    obj.renderOrder=1000;
+    obj.renderOrder=2000;
     obj.castShadow=false;
     obj.receiveShadow=false;
+
+    const materials=Array.isArray(obj.material)
+      ? obj.material
+      : [obj.material];
+
+    for(const material of materials){
+      if(!material) continue;
+      material.depthTest=false;
+      material.depthWrite=false;
+      material.needsUpdate=true;
+    }
   });
 
   return root;
