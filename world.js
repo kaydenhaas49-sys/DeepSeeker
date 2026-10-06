@@ -878,13 +878,12 @@ export class World {
         );
       }
 
-      // Cracked fixtures are real light sources, not just emissive meshes.
-      // Keep every fixture registered, then enable only the nearest few at runtime.
-      if(!LOW_END_DEVICE){
+      // One real light on weak hardware, nearest-light selection handles the rest.
+      if(!LOW_END_DEVICE ? true : index===0){
         const point=new THREE.PointLight(
           0xffe6a8,
-          power,
-          cracked ? 23 : 27,
+          LOW_END_DEVICE ? power*.72 : power,
+          LOW_END_DEVICE ? 18 : (cracked ? 23 : 27),
           1.8
         );
         point.position.set(x,y-.78,z);
@@ -896,7 +895,7 @@ export class World {
           x,
           z,
           cracked,
-          baseIntensity:power,
+          baseIntensity:LOW_END_DEVICE ? power*.72 : power,
           phase,
           flickerSpeed:cracked ? (8+rng()*5) : (4+rng()*3)
         });
