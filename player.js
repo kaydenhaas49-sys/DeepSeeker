@@ -1,7 +1,7 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
-import { createHazmatCharacter, createFirstPersonArms } from "./character.js";
+import { createHazmatCharacter, createFirstPersonArms, attachFlashlight } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -156,9 +156,18 @@ export class Player {
       this.characterFlashlight = character.flashlight;
 
       const firstPersonArms=createFirstPersonArms(character.model);
-      firstPersonArms.position.set(0,-1.05,-.68);
-      firstPersonArms.scale.setScalar(1.04);
-      firstPersonArms.rotation.x=THREE.MathUtils.degToRad(1.5);
+      firstPersonArms.position.set(0,-1.34,-.92);
+      firstPersonArms.scale.setScalar(1.02);
+      firstPersonArms.rotation.x=THREE.MathUtils.degToRad(0.5);
+
+      // The visible prop belongs to the actual cloned right-hand bone.
+      const firstPersonFlashlight=attachFlashlight(firstPersonArms);
+      if(firstPersonFlashlight){
+        firstPersonFlashlight.visible=true;
+        firstPersonFlashlight.renderOrder=1101;
+        firstPersonFlashlight.scale.setScalar(1.05);
+      }
+
       this.hands.add(firstPersonArms);
       this.hands.visible=true;
       this.characterFlashlightLens =

@@ -469,13 +469,13 @@ function applyFirstPersonArmPose(root){
     "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
   ]) || getBoneChild(rightUpper);
 
-  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(-.20,-.74,-.64).normalize());
-  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(.20,-.74,-.64).normalize());
+  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(-.16,-.06,-.986).normalize());
+  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(.16,-.06,-.986).normalize());
 
   root.updateMatrixWorld(true);
 
-  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(-.12,-.48,-.86).normalize());
-  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(.12,-.48,-.86).normalize());
+  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(-.10,-.03,-.995).normalize());
+  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(.10,-.03,-.995).normalize());
 
   root.updateMatrixWorld(true);
 }
