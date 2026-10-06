@@ -232,22 +232,28 @@ function ensureTutorialOpenRoom(){
   const h=WALL_H;
   const t=WALL_T;
 
-  const wallMaterial=new THREE.MeshBasicMaterial({
+  const wallMaterial=new THREE.MeshStandardMaterial({
     map:world.materials.wall.map,
-    color:0xb6a13f
+    color:0xb6a13f,
+    roughness:.92
   });
-  const floorMaterial=new THREE.MeshBasicMaterial({
+  const floorMaterial=new THREE.MeshStandardMaterial({
     map:world.materials.floor.map,
     color:0x8f876f,
+    roughness:1,
     side:THREE.DoubleSide
   });
-  const ceilingMaterial=new THREE.MeshBasicMaterial({
+  const ceilingMaterial=new THREE.MeshStandardMaterial({
     map:world.materials.ceiling.map,
     color:0x3a382e,
+    roughness:.96,
     side:THREE.DoubleSide
   });
-  const fixtureMaterial=new THREE.MeshBasicMaterial({
-    color:0xffedbd
+  const fixtureMaterial=new THREE.MeshStandardMaterial({
+    color:0xffedbd,
+    emissive:0xffe7ad,
+    emissiveIntensity:1.8,
+    roughness:.35
   });
 
   const addTutorialMesh=(geometry,material,position)=>{
