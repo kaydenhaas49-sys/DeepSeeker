@@ -174,6 +174,21 @@ dracoLoader.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.165.0/examples/
 gltfLoader.setDRACOLoader(dracoLoader);
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
+// Warm the geometry decoders during the boot screen so the first playable
+// scene never has to pause for decoder initialization after the menu appears.
+let geometryDecoderReady=false;
+const geometryDecoderPromise=(async()=>{
+  try{
+    dracoLoader.preload();
+    if(MeshoptDecoder?.ready){
+      await MeshoptDecoder.ready;
+    }
+  }catch(error){
+    console.warn("[DeepSeeker] Geometry decoder warmup failed; loaders will retry on demand:",error);
+  }
+  geometryDecoderReady=true;
+})();
+
 const renderer=new THREE.WebGLRenderer({
   antialias:!LOW_END_PERFORMANCE,
   powerPreference:"high-performance",
@@ -4041,25 +4056,35 @@ function ensureHouseCollisionSetup(){
   const build=()=>{
     const started=performance.now();
 
-    updateHouseLoadingUI(82,"PROCESSING HOUSE — PREPARING COLLISION…");
-    setupHouseDoors(houseModel);
-    updateHouseLoadingUI(86,"PROCESSING HOUSE — BUILDING WALL COLLISION…");
-    for(const door of houseDoors){
-      door.pivot.traverse(obj=>{
-        obj.userData.houseCollisionDoor=true;
-      });
+    try{
+      updateHouseLoadingUI(82,"PROCESSING HOUSE — PREPARING COLLISION…");
+      setupHouseDoors(houseModel);
+      updateHouseLoadingUI(86,"PROCESSING HOUSE — BUILDING WALL COLLISION…");
+      for(const door of houseDoors){
+        door.pivot.traverse(obj=>{
+          obj.userData.houseCollisionDoor=true;
+        });
+      }
+
+      buildHouseCollisionProxies(houseModel);
+      updateHouseLoadingUI(91,"PROCESSING HOUSE — FINALIZING STATIC HOUSE…");
+      freezeStaticHouseTransforms(houseModel);
+      chooseSafeHouseSpawn(houseModel);
+      placeHouseMagazineTeleporter(houseModel);
+      houseCollisionReady=true;
+      houseCollisionBuildStarted=false;
+
+      console.log("[DeepSeeker] house collision ready in",Math.round(performance.now()-started),"ms");
+      updateHouseLoadingUI(100,"HOUSE LOADED — GAME READY.");
+    }catch(error){
+      houseCollisionReady=false;
+      houseCollisionBuildStarted=false;
+      houseLoadFailed=true;
+      initialStartupError=String(error?.message||error||"Apartment collision preparation failed");
+      console.error("[DeepSeeker] Apartment collision preparation failed:",error);
+      updateHouseLoadingUI(0,"APARTMENT PREPARATION FAILED — RELOAD TO RETRY.");
+      return;
     }
-
-    buildHouseCollisionProxies(houseModel);
-    updateHouseLoadingUI(91,"PROCESSING HOUSE — FINALIZING STATIC HOUSE…");
-    freezeStaticHouseTransforms(houseModel);
-    chooseSafeHouseSpawn(houseModel);
-    placeHouseMagazineTeleporter(houseModel);
-    houseCollisionReady=true;
-    houseCollisionBuildStarted=false;
-
-    console.log("[DeepSeeker] house collision ready in",Math.round(performance.now()-started),"ms");
-    updateHouseLoadingUI(100,"HOUSE LOADED — GAME READY.");
 
     // A start request may have been queued while the GLB or collision setup
     // was loading. Only enter the playable level after both are ready.
@@ -4098,7 +4123,11 @@ function ensureHouseCollisionSetup(){
     }
   };
 
-  if("requestIdleCallback" in window){
+  // During the boot gate, run immediately so startup readiness cannot depend
+  // on browser idle scheduling. Later reloads may still use idle time.
+  if(!gameStarted){
+    setTimeout(build,0);
+  }else if("requestIdleCallback" in window){
     window.requestIdleCallback(build,{timeout:2500});
   }else{
     setTimeout(build,100);
@@ -4347,6 +4376,26 @@ if(initialParams.get("save")==="1"){
 
 let initialLandingShown=false;
 let initialLoadingTimer=null;
+let initialStartupPrepared=false;
+let initialStartupError="";
+
+function prepareInitialStartupAssets(){
+  if(initialStartupPrepared) return true;
+
+  try{
+    // Build the tutorial companion during the boot screen. It is procedural,
+    // but preparing it here guarantees NEW GAME does not do surprise work.
+    createTutorialMascot();
+    initialStartupPrepared=true;
+    initialStartupError="";
+    return true;
+  }catch(error){
+    initialStartupPrepared=false;
+    initialStartupError=String(error?.message||error||"Unknown startup asset error");
+    console.error("[DeepSeeker] Initial startup asset preparation failed:",error);
+    return false;
+  }
+}
 
 function updateInitialLoadingScreen(){
   if(initialLandingShown) return;
@@ -4362,8 +4411,14 @@ function updateInitialLoadingScreen(){
         ? 100
         : 0;
   const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
+  const decoderProgress=geometryDecoderReady ? 100 : 0;
+  const startupProgress=initialStartupPrepared ? 100 : 0;
   const total=Math.max(0,Math.min(100,Math.round(
-    houseProgress*.60 + spiderProgress*.35 + saveProgress*.05
+    houseProgress*.54 +
+    spiderProgress*.30 +
+    decoderProgress*.06 +
+    startupProgress*.05 +
+    saveProgress*.05
   )));
 
   const fill=document.getElementById("initialLoadFill");
@@ -4373,16 +4428,28 @@ function updateInitialLoadingScreen(){
   if(percent) percent.textContent=total+"%";
 
   if(status){
-    if(houseCollisionReady && spiderLoaded && window.__deepseekerSaveHydrationDone){
-      status.textContent="WORLD READY — STARTING MAIN MENU.";
+    if(initialStartupError){
+      status.textContent="STARTUP PREPARATION FAILED — RELOAD TO RETRY.";
+    }else if(
+      houseCollisionReady &&
+      spiderLoaded &&
+      geometryDecoderReady &&
+      initialStartupPrepared &&
+      window.__deepseekerSaveHydrationDone
+    ){
+      status.textContent="ALL GAME ASSETS READY — STARTING MAIN MENU.";
     }else if(!houseLoaded){
       status.textContent="LOADING APARTMENT ASSET…";
     }else if(!houseCollisionReady){
       status.textContent="BUILDING APARTMENT COLLISION…";
     }else if(!spiderLoaded && spiderStartupFailed){
-      status.textContent="SPIDER LOAD FAILED — MENU CAN CONTINUE; RETRYING IN BACKGROUND…";
+      status.textContent="SPIDER LOAD FAILED — RETRYING…";
     }else if(!spiderLoaded){
       status.textContent="LOADING SPIDER-Psionic…";
+    }else if(!geometryDecoderReady){
+      status.textContent="INITIALIZING GEOMETRY DECODERS…";
+    }else if(!initialStartupPrepared){
+      status.textContent="PREPARING FIRST-ROOM ASSETS…";
     }else{
       status.textContent="FINALIZING SAVE DATA…";
     }
@@ -4394,8 +4461,11 @@ function updateInitialLoadingScreen(){
 function finishInitialLoading(){
   if(initialLandingShown) return;
   if(
+    initialStartupError ||
     !houseCollisionReady ||
-    (!spiderLoaded && !spiderStartupFailed) ||
+    !spiderLoaded ||
+    !geometryDecoderReady ||
+    !initialStartupPrepared ||
     !window.__deepseekerSaveHydrationDone
   ){
     updateInitialLoadingScreen();
@@ -4421,6 +4491,10 @@ function beginInitialLoading(){
     window.__deepseekerSaveHydrationDone=true;
   });
 
+  // Everything needed by the playable experience starts together behind the
+  // loading screen. Nothing is intentionally deferred until after the menu.
+  prepareInitialStartupAssets();
+
   if(!houseLoaded && !houseLoadStarted){
     houseLoadStarted=true;
     loadHouse();
@@ -4429,6 +4503,9 @@ function beginInitialLoading(){
     spiderLoadStarted=true;
     loadSpiderFromPack();
   }
+
+  // Decoder warmup is already running; keep the same boot gate for it.
+  void geometryDecoderPromise;
 
   updateInitialLoadingScreen();
   initialLoadingTimer=setInterval(()=>{
