@@ -156,6 +156,21 @@ export class Player {
       this.characterFlashlight = character.flashlight;
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
+
+      // Stable first-person anchor: the animated hand can otherwise push the
+      // physical flashlight into the ceiling when the player looks upward.
+      if(this.characterFlashlight){
+        this.characterFlashlight.parent?.remove(this.characterFlashlight);
+        this.camera.add(this.characterFlashlight);
+        this.characterFlashlight.position.set(.30,-.22,-.58);
+        this.characterFlashlight.rotation.set(
+          THREE.MathUtils.degToRad(-4),
+          THREE.MathUtils.degToRad(-4),
+          THREE.MathUtils.degToRad(2)
+        );
+        this.characterFlashlight.renderOrder=1100;
+      }
+
       this.worldAvatar.add(character.model);
       this.characterLoaded = true;
 

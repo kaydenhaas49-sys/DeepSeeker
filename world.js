@@ -141,8 +141,8 @@ export function generateChunk(cx, cz, seed) {
   // Extra short partitions: these break up the big empty expanses and make
   // each chunk feel much more like a dense Backrooms floor plan.
   const nShort = LOW_END_DEVICE
-    ? 6 + Math.floor(rng() * 5)
-    : 12 + Math.floor(rng() * 8); // weak: 6–10, normal: 12–19 extra attempts
+    ? 8 + Math.floor(rng() * 5)
+    : 16 + Math.floor(rng() * 9); // weaker density on potato hardware
   for (let i = 0; i < nShort; i++) {
     const horiz = rng() < 0.5;
     const len = 2 + Math.floor(rng() * 4); // 2–5 cells
@@ -151,8 +151,61 @@ export function generateChunk(cx, cz, seed) {
     tryAdd(lx, lz, len, horiz);
   }
 
+  // True 90-degree corners: short L-shaped walls create blind turns and
+  // little recessed pockets instead of long office-style sightlines.
+  const tryAddCorner=(lx,lz,dirAX,dirAZ,dirBX,dirBZ,lenA,lenB)=>{
+    const points=[];
+    const seen=new Set();
+
+    for(const [dx,dz,len] of [
+      [dirAX,dirAZ,lenA],
+      [dirBX,dirBZ,lenB],
+    ]){
+      for(let i=0;i<len;i++){
+        const x=lx+dx*i;
+        const z=lz+dz*i;
+        const key=cellKey(cx*CHUNK_CELLS+x,cz*CHUNK_CELLS+z);
+        const shared=i===0;
+
+        if(x<=0||z<=0||x>=CHUNK_CELLS-1||z>=CHUNK_CELLS-1||inClear(x,z)){
+          return false;
+        }
+        if((cells.has(key)||seen.has(key))&&!shared) return false;
+
+        points.push({x,z,key});
+        seen.add(key);
+      }
+    }
+
+    for(const point of points) cells.add(point.key);
+    walls.push(
+      {x:cx*CHUNK_CELLS+lx,z:cz*CHUNK_CELLS+lz,len:lenA,horiz:dirAZ===0},
+      {x:cx*CHUNK_CELLS+lx,z:cz*CHUNK_CELLS+lz,len:lenB,horiz:dirBZ===0}
+    );
+    return true;
+  };
+
+  const cornerDirs=[
+    [1,0,0,1],
+    [1,0,0,-1],
+    [-1,0,0,1],
+    [-1,0,0,-1],
+  ];
+  const nCorners=LOW_END_DEVICE ? 3+Math.floor(rng()*2) : 6+Math.floor(rng()*4);
+
+  for(let i=0;i<nCorners;i++){
+    const [ax,az,bx,bz]=cornerDirs[Math.floor(rng()*cornerDirs.length)];
+    const lenA=2+Math.floor(rng()*3);
+    const lenB=2+Math.floor(rng()*3);
+    for(let attempt=0;attempt<10;attempt++){
+      const lx=1+Math.floor(rng()*(CHUNK_CELLS-2));
+      const lz=1+Math.floor(rng()*(CHUNK_CELLS-2));
+      if(tryAddCorner(lx,lz,ax,az,bx,bz,lenA,lenB)) break;
+    }
+  }
+
   // 2) Larger side rooms / service spaces with a deliberate doorway.
-  if (rng() < 0.82) {
+  if (rng() < 0.65) {
     const w = 4 + Math.floor(rng() * 5); // 4–8 cells
     const h = 4 + Math.floor(rng() * 5);
     const x0 = 1 + Math.floor(rng() * (CHUNK_CELLS - w - 2));
@@ -167,7 +220,7 @@ export function generateChunk(cx, cz, seed) {
 
   // 3) Main corridor spines: broad, long lanes with enough breathing room
   // to create readable spaces and strong lines of sight.
-  if (rng() < 0.72) {
+  if (rng() < 0.58) {
     const horiz = rng() < 0.5;
     const len = 9 + Math.floor(rng() * 8); // 9–16 cells
     const lane = 2 + Math.floor(rng() * 2); // 2–3 cells wide
@@ -788,7 +841,6 @@ export class World {
     }
 
     this.buildCeilingFixtures(group, cx, cz);
-    this.buildComputerProps(group, data, cx, cz);
     this.buildAtmosphereEffects(group, data, cx, cz);
 
     return group;
