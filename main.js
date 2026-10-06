@@ -232,108 +232,194 @@ let tutorialOpenRoomActive=false;
 let tutorialMascotRoot=null;
 let tutorialMascotReady=false;
 let tutorialMascotTime=0;
+let tutorialMascotMouth=null;
+let tutorialMascotSpeechStage=-1;
+let tutorialMascotSpeechTimer=0;
+const tutorialMascotPosition=new THREE.Vector3();
+const tutorialMascotCameraOffset=new THREE.Vector3(.78,-.48,-1.45);
+const tutorialMascotAimLocal=new THREE.Vector3(-.55,.08,-1).normalize();
+const tutorialMascotAimQuaternion=new THREE.Quaternion();
+tutorialMascotAimQuaternion.setFromUnitVectors(
+  new THREE.Vector3(1,0,0),
+  tutorialMascotAimLocal
+);
 
 function createTutorialMascot(){
   if(tutorialMascotReady) return;
 
   tutorialMascotRoot=new THREE.Group();
-  tutorialMascotRoot.name="TutorialBadgeAI";
+  tutorialMascotRoot.name="TutorialPromptBlaster";
   tutorialMascotRoot.visible=false;
   tutorialOpenRoomRoot.add(tutorialMascotRoot);
 
+  const bodyMaterial=new THREE.MeshStandardMaterial({
+    color:0xd1ae45,
+    roughness:.38,
+    metalness:.18,
+    emissive:0x4d3507,
+    emissiveIntensity:.32
+  });
+  const darkMaterial=new THREE.MeshStandardMaterial({
+    color:0x171913,
+    roughness:.42,
+    metalness:.28
+  });
+  const eyeMaterial=new THREE.MeshBasicMaterial({color:0xf4ffdf});
+  const mouthMaterial=new THREE.MeshBasicMaterial({color:0x050605});
+
   const body=new THREE.Mesh(
-    new THREE.CapsuleGeometry(.62,.52,6,12),
-    new THREE.MeshStandardMaterial({
-      color:0xe7c34f,
-      roughness:.42,
-      metalness:.08,
-      emissive:0x5b4309,
-      emissiveIntensity:.28
-    })
+    new THREE.BoxGeometry(.88,.28,.34),
+    bodyMaterial
   );
-  body.rotation.z=Math.PI/2;
-  body.scale.z=.72;
+  body.position.set(0,0,0);
   body.userData.tutorialOwnedGeometry=true;
   body.userData.tutorialOwnedMaterial=true;
   tutorialMascotRoot.add(body);
 
-  const visor=new THREE.Mesh(
-    new THREE.BoxGeometry(.14,.34,.58),
-    new THREE.MeshStandardMaterial({
-      color:0x121511,
-      roughness:.2,
-      metalness:.28,
-      emissive:0x66806f,
-      emissiveIntensity:.9
-    })
+  const top=new THREE.Mesh(
+    new THREE.BoxGeometry(.42,.16,.30),
+    darkMaterial
   );
-  visor.position.set(.58,.05,0);
-  visor.rotation.z=Math.PI/2;
-  visor.userData.tutorialOwnedGeometry=true;
-  visor.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(visor);
+  top.position.set(-.12,.21,0);
+  top.userData.tutorialOwnedGeometry=true;
+  top.userData.tutorialOwnedMaterial=true;
+  tutorialMascotRoot.add(top);
 
-  const eyeMaterial=new THREE.MeshBasicMaterial({color:0xe5f7df});
-  for(const z of [-.14,.14]){
+  const barrel=new THREE.Mesh(
+    new THREE.CylinderGeometry(.075,.10,.62,12),
+    darkMaterial
+  );
+  barrel.rotation.z=-Math.PI/2;
+  barrel.position.set(.67,0,0);
+  barrel.userData.tutorialOwnedGeometry=true;
+  barrel.userData.tutorialOwnedMaterial=true;
+  tutorialMascotRoot.add(barrel);
+
+  const muzzle=new THREE.Mesh(
+    new THREE.TorusGeometry(.092,.025,7,14),
+    bodyMaterial
+  );
+  muzzle.rotation.y=Math.PI/2;
+  muzzle.position.set(.99,0,0);
+  muzzle.userData.tutorialOwnedGeometry=true;
+  muzzle.userData.tutorialOwnedMaterial=true;
+  tutorialMascotRoot.add(muzzle);
+
+  const grip=new THREE.Mesh(
+    new THREE.BoxGeometry(.23,.55,.25),
+    darkMaterial
+  );
+  grip.rotation.z=-.17;
+  grip.position.set(-.14,-.34,0);
+  grip.userData.tutorialOwnedGeometry=true;
+  grip.userData.tutorialOwnedMaterial=true;
+  tutorialMascotRoot.add(grip);
+
+  for(const z of [-.075,.075]){
     const eye=new THREE.Mesh(
-      new THREE.SphereGeometry(.055,10,8),
+      new THREE.SphereGeometry(.045,9,7),
       eyeMaterial
     );
-    eye.position.set(.67,.11,z);
+    eye.position.set(-.34,.045,z);
     eye.userData.tutorialOwnedGeometry=true;
-    eye.userData.tutorialOwnedMaterial=false;
+    eye.userData.tutorialOwnedMaterial=true;
     tutorialMascotRoot.add(eye);
   }
 
-  const ring=new THREE.Mesh(
-    new THREE.TorusGeometry(.70,.035,8,24),
-    new THREE.MeshStandardMaterial({
-      color:0x55451a,
-      roughness:.5,
-      metalness:.15,
-      emissive:0x2a2108,
-      emissiveIntensity:.18
-    })
+  tutorialMascotMouth=new THREE.Mesh(
+    new THREE.BoxGeometry(.07,.15,.065),
+    mouthMaterial
   );
-  ring.rotation.y=Math.PI/2;
-  ring.userData.tutorialOwnedGeometry=true;
-  ring.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(ring);
+  tutorialMascotMouth.position.set(-.35,-.055,0);
+  tutorialMascotMouth.userData.tutorialOwnedGeometry=true;
+  tutorialMascotMouth.userData.tutorialOwnedMaterial=true;
+  tutorialMascotRoot.add(tutorialMascotMouth);
 
-  const light=new THREE.PointLight(0xd9c56c,1.8,8,1.8);
-  light.position.set(.4,.05,0);
+  const light=new THREE.PointLight(0xd9c56c,1.5,7,1.8);
+  light.position.set(.15,.12,.1);
   tutorialMascotRoot.add(light);
 
   tutorialMascotReady=true;
+}
+
+function speakTutorialMascot(stage){
+  const lines={
+    1:"JUST DO ITTT. W A S D. MOVE YOUR LITTLE HUMAN LEGS.",
+    2:"SPACE. JUMP. COME ON.",
+    3:"CTRL. CROUCH. GET DOWN THERE.",
+    4:"SHIFT. RUN FAST. I BELIEVE IN YOU. SORT OF.",
+    5:"F. FLASHLIGHT. THE DARKNESS IS NOT GOING TO FIX ITSELF.",
+    6:"P. PHONE. IT'S LITERALLY A PHONE.",
+    7:"READ THE MESSAGE. THEN CLOSE IT. I AM POINTING AT IT.",
+    8:"GO TOWARD THE THING. THIS IS DEFINITELY A GOOD IDEA.",
+    9:"RUN! RUN! RUN! WHY ARE YOU STILL READING THIS?"
+  };
+
+  if(tutorialMascotSpeechStage===stage) return;
+  tutorialMascotSpeechStage=stage;
+
+  const text=lines[stage];
+  if(!text || !("speechSynthesis" in window)) return;
+
+  try{
+    window.speechSynthesis.cancel();
+    const utterance=new SpeechSynthesisUtterance(text);
+    utterance.rate=1.22;
+    utterance.pitch=1.08;
+    utterance.volume=.62;
+    window.speechSynthesis.speak(utterance);
+  }catch(error){
+    console.debug("[DeepSeeker] Tutorial voice unavailable:",error);
+  }
 }
 
 function updateTutorialMascot(dt){
   if(!tutorialMascotRoot || !tutorialMascotReady) return;
 
   tutorialMascotTime+=dt;
+  tutorialMascotSpeechTimer=Math.max(0,tutorialMascotSpeechTimer-dt);
+
   const shouldShow=
     gameStarted &&
     !houseMode &&
     tutorialOpenRoomActive &&
-    houseTutorialStage>=6 &&
-    houseTutorialStage<=7;
+    houseTutorialStage>=1 &&
+    houseTutorialStage<=9;
 
   if(!shouldShow){
     tutorialMascotRoot.visible=false;
+    if("speechSynthesis" in window && houseTutorialStage>=10){
+      window.speechSynthesis.cancel();
+    }
     return;
   }
 
   tutorialMascotRoot.visible=true;
-  tutorialMascotRoot.position.set(
-    32,
-    5.25+Math.sin(tutorialMascotTime*1.7)*.18,
-    15
-  );
-  tutorialMascotRoot.rotation.y=Math.sin(tutorialMascotTime*.7)*.22;
-  tutorialMascotRoot.rotation.z=Math.sin(tutorialMascotTime*1.3)*.04;
+  tutorialMascotPosition.copy(tutorialMascotCameraOffset);
+  camera.localToWorld(tutorialMascotPosition);
+  tutorialMascotRoot.position.copy(tutorialMascotPosition);
+  tutorialMascotRoot.quaternion.copy(camera.quaternion).multiply(tutorialMascotAimQuaternion);
 
-  const scale=.82+Math.sin(tutorialMascotTime*3.1)*.06;
-  tutorialMascotRoot.scale.setScalar(scale);
+  const bob=Math.sin(tutorialMascotTime*3.2)*.035;
+  tutorialMascotRoot.position.y+=bob;
+
+  const talkActive=
+    tutorialMascotSpeechTimer>0 ||
+    (tutorialMascotSpeechStage===houseTutorialStage && tutorialMascotTime%2.6<.38);
+
+  if(tutorialMascotMouth){
+    tutorialMascotMouth.scale.y=talkActive
+      ? .72+Math.abs(Math.sin(tutorialMascotTime*15))*.8
+      : .38;
+  }
+
+  if(tutorialMascotSpeechStage!==houseTutorialStage){
+    speakTutorialMascot(houseTutorialStage);
+    tutorialMascotSpeechTimer=1.7;
+  }
+
+  const pulse=.94+Math.sin(tutorialMascotTime*4.0)*.04;
+  tutorialMascotRoot.scale.setScalar(pulse);
 }
 
 function clearTutorialOpenRoomGeometry(){
@@ -4625,6 +4711,7 @@ function updateTutorialGuide(){
   tutorialGuideStep.textContent=String(houseTutorialStage).padStart(2,"0")+"/09";
   tutorialGuideAction.textContent=lesson[0]+" · "+lesson[1];
   tutorialGuideHint.textContent=lesson[2];
+  speakTutorialMascot(houseTutorialStage);
   tutorialGuide.style.opacity="1";
   tutorialGuide.style.transform="translateX(-50%) translateY(0)";
 }
