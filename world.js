@@ -217,7 +217,17 @@ export class World {
     this.materials = {
       wall: new THREE.MeshStandardMaterial({ map: tex.wall, roughness: 0.92 }),
       floor: new THREE.MeshStandardMaterial({ map: tex.floor, roughness: 1.0 }),
-      ceiling: new THREE.MeshStandardMaterial({ map: tex.ceiling, roughness: 0.95 }),
+      // The drop ceiling sits directly under the player's light sources, so a
+      // white StandardMaterial gets blown out and reads as a flat white roof.
+      // Keep the real tile texture, darken the base, and render both sides so
+      // there is never a disappearing ceiling when the camera crosses a chunk.
+      ceiling: new THREE.MeshStandardMaterial({
+        map: tex.ceiling,
+        color: 0x77725e,
+        roughness: 0.98,
+        metalness: 0,
+        side: THREE.DoubleSide,
+      }),
     };
 
     // Shared fluorescent materials. Fixture meshes are per-chunk so they are
