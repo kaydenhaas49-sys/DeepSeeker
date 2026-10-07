@@ -6222,10 +6222,26 @@ function finishSpiderModel(model,animations,sourceName){
 
     // The pack contains animation data authored for a different FBX scene
     // hierarchy. Keep the bone rotations that actually animate the spider,
-    // but discard scene/root translation, scaling, and unknown-node tracks.
+    // but discard scene/root translation, scaling, facial deformation, and
+    // unknown-node tracks.
     stable.tracks=stable.tracks.filter(track=>{
       const target=trackTargetName(track);
       if(!animatedNodeNames.has(target)) return false;
+
+      const lowerTarget=target.toLowerCase();
+      const facialTarget=/face|head|eye|eyelid|jaw|mouth|lip|tongue|teeth|brow|cheek/.test(lowerTarget);
+
+      // Facial morphs are the source asset's least reliable animation data.
+      // Leave the authored face geometry static so it cannot tear or warp
+      // when the body animations blend.
+      if(track.name.endsWith(".morphTargetInfluences")) return false;
+      if(facialTarget && (
+        track.name.endsWith(".quaternion") ||
+        track.name.endsWith(".position") ||
+        track.name.endsWith(".scale")
+      )){
+        return false;
+      }
 
       if(track.name.endsWith(".position")){
         if(animationName==="walk") return false;
@@ -6238,8 +6254,7 @@ function finishSpiderModel(model,animations,sourceName){
 
       return track.name.endsWith(".quaternion") ||
         track.name.endsWith(".position") ||
-        track.name.endsWith(".color") ||
-        track.name.endsWith(".morphTargetInfluences");
+        track.name.endsWith(".color");
     });
 
     stable.resetDuration();
