@@ -6321,9 +6321,25 @@ async function loadSpiderFromPack(){
       }
     };
 
-    if(extracted.modelType==="fbx"){
-      // Use the rigged FBX as the actual visual model so its skeleton and
-      // animation clips remain attached to the rendered meshes.
+    // Diagnostic: prefer the raw OBJ geometry when the pack contains one.
+    // This bypasses FBX skeleton/bind-pose importing completely.
+    const objEntry=Array.from(extracted.resourceBlobs.keys())
+      .find(name=>name.endsWith(".obj"));
+
+    if(objEntry){
+      try{
+        const objBlob=extracted.resourceBlobs.get(objEntry);
+        const objLoader=new OBJLoader(packManager);
+        const object=objLoader.parse(
+          new TextDecoder().decode(await objBlob.arrayBuffer())
+        );
+        handleLoaded(object,[]);
+        console.log("[DeepSeeker] using RAW OBJ spider geometry diagnostic");
+      }catch(objError){
+        console.error("[DeepSeeker] RAW OBJ spider diagnostic failed:",objError);
+        failSpiderLoad(objError,"SPIDER OBJ PARSE FAILED");
+      }
+    }else if(extracted.modelType==="fbx"){
       const loader=new FBXLoader(packManager);
 
       try{
@@ -6331,35 +6347,11 @@ async function loadSpiderFromPack(){
           extracted.modelBytes.buffer,
           extracted.modelDirectory
         );
-        handleLoaded(object,object.animations||[]);
-
-        console.log("[DeepSeeker] using rigged FBX spider visual");
+        handleLoaded(object,[]);
+        console.log("[DeepSeeker] no OBJ available; using static FBX diagnostic");
       }catch(fbxError){
-        console.warn("[DeepSeeker] FBX visual failed; falling back to static OBJ:",fbxError);
-
-        const objEntry=Array.from(extracted.resourceBlobs.keys())
-          .find(name=>name.endsWith(".obj"));
-
-        const objBlob=objEntry
-          ? extracted.resourceBlobs.get(objEntry)
-          : null;
-
-        if(!objBlob){
-          failSpiderLoad(fbxError,"SPIDER MODEL PARSE FAILED");
-        }else{
-          try{
-            const objLoader=new OBJLoader(packManager);
-            const object=objLoader.parse(
-              new TextDecoder().decode(await objBlob.arrayBuffer())
-            );
-            handleLoaded(object,[]);
-            console.log("[DeepSeeker] using static OBJ spider fallback");
-          }catch(objError){
-            failSpiderLoad(objError,"SPIDER MODEL PARSE FAILED");
-          }
-        }
+        failSpiderLoad(fbxError,"SPIDER MODEL PARSE FAILED");
       }
-
     }else{
       const loader=new GLTFLoader(packManager);
       loader.setDRACOLoader(dracoLoader);
