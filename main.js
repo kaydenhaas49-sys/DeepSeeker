@@ -6077,12 +6077,44 @@ function finishSpiderModel(model,animations,sourceName){
   let meshCount=0;
   model.traverse(obj=>{
     if(!obj.isMesh) return;
+
     meshCount++;
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
     obj.receiveShadow=true;
     obj.renderOrder=10;
+
+    // Do not trust FBX transparency/alpha settings for this spider. Build an
+    // explicitly opaque material while retaining the authored color texture.
+    const sources=Array.isArray(obj.material) ? obj.material : [obj.material];
+    const rebuilt=sources.map(source=>{
+      const material=new THREE.MeshStandardMaterial({
+        color:source?.color?.clone?.() || new THREE.Color(0xffffff),
+        map:source?.map || null,
+        normalMap:source?.normalMap || null,
+        roughness:.92,
+        metalness:0,
+        side:THREE.DoubleSide,
+        transparent:false,
+        opacity:1,
+        alphaTest:0,
+        depthTest:true,
+        depthWrite:true
+      });
+
+      material.name=(source?.name || "SpiderOpaqueMaterial")+"Solid";
+      material.premultipliedAlpha=false;
+      material.alphaMap=null;
+      material.needsUpdate=true;
+      return material;
+    });
+
+    obj.material=Array.isArray(obj.material) ? rebuilt : rebuilt[0];
+
+    for(const source of sources){
+      if(source?.dispose) source.dispose();
+    }
   });
 
   if(meshCount===0){
