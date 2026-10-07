@@ -1311,7 +1311,10 @@ function applyArachnophobiaVisual(){
 
   if(spiderModel){
     spiderModel.visible=true;
-    spiderEntity.visible=spiderActive;
+    spiderEntity.visible=spiderActive || (
+      tutorialOpenRoomActive &&
+      houseTutorialSpiderPrepared
+    );
   }
 
   syncMenuSpiderFromGameplayModel();
@@ -4694,9 +4697,19 @@ function fitSpiderModel(model){
 function setSpiderAnimation(name){
   spiderWantedState=name;
 
-  const actualName=SPIDER_ANIMATION_ALIAS[name] || name;
-  const action=spiderActions.get(actualName);
-  if(!action || spiderAnimationState===actualName) return;
+  const requestedName=SPIDER_ANIMATION_ALIAS[name] || name;
+  let actualName=requestedName;
+  let action=spiderActions.get(actualName);
+
+  // Some GLBs only contain one safe animation. Never invent a missing attack,
+  // walk, or death clip and never let a bad state transition disturb the rig.
+  if(!action){
+    const fallbackNames=["walk","idle1","idle2"];
+    actualName=fallbackNames.find(key=>spiderActions.has(key)) || "";
+    action=actualName ? spiderActions.get(actualName) : null;
+  }
+
+  if(!action || !actualName || spiderAnimationState===actualName) return;
 
   const timeScale=name==="runby" ? 1.8 : 1;
   for(const [key,item] of spiderActions){
@@ -4834,6 +4847,7 @@ function hideHouseTutorialSpider(){
   spiderRevealLight.visible=false;
   spiderEntity.scale.setScalar(1);
   spiderEntity.rotation.x=0;
+  if(spiderMixer) spiderMixer.timeScale=1;
 }
 
 function resetHouseTutorial(){
@@ -4855,21 +4869,33 @@ function showHouseTutorialMessage(message,duration=1500){
 }
 
 function prepareHouseTutorialSpider(){
-  if(!spiderLoaded || houseMode || !tutorialOpenRoomActive) return false;
+  if(houseMode || !tutorialOpenRoomActive) return false;
+
+  if(!spiderLoaded){
+    // Stage 8 can be reached before the asynchronous spider load finishes.
+    // Keep asking for it here instead of silently abandoning the tutorial spawn.
+    ensureSpiderLoading();
+    return false;
+  }
 
   const forwardX=-Math.sin(player.yaw);
   const forwardZ=-Math.cos(player.yaw);
+  const roomMin=6.0;
+  const roomMax=58.0;
+  const clampRoom=(value)=>THREE.MathUtils.clamp(value,roomMin,roomMax);
   const candidates=[];
 
-  for(let i=0;i<10;i++){
-    const angle=Math.atan2(forwardX,forwardZ)+(i-4.5)*.26;
-    const distance=10.0+(i%3)*1.5;
+  for(let i=0;i<14;i++){
+    const angle=Math.atan2(forwardX,forwardZ)+(i-6.5)*.19;
+    const distance=9.0+(i%4)*1.2;
     candidates.push({
-      x:player.pos.x+Math.sin(angle)*distance,
-      z:player.pos.z+Math.cos(angle)*distance
+      x:clampRoom(player.pos.x+Math.sin(angle)*distance),
+      z:clampRoom(player.pos.z+Math.cos(angle)*distance)
     });
   }
 
+  // Prefer a visible point in the intended direction, but never allow the
+  // tutorial spider to spawn outside the room.
   let chosen=null;
   for(const candidate of candidates){
     if(isHouseTutorialSpiderBlocked(candidate.x,candidate.z)) continue;
@@ -4878,6 +4904,18 @@ function prepareHouseTutorialSpider(){
     )) continue;
     chosen=candidate;
     break;
+  }
+
+  // Last-resort deterministic fallback: always put it near the far end of the
+  // open tutorial room rather than failing the lesson entirely.
+  if(!chosen){
+    const fallbackX=clampRoom(player.pos.x+forwardX*18);
+    const fallbackZ=clampRoom(player.pos.z+forwardZ*18);
+    if(
+      !isHouseTutorialSpiderBlocked(fallbackX,fallbackZ)
+    ){
+      chosen={x:fallbackX,z:fallbackZ};
+    }
   }
 
   if(!chosen) return false;
@@ -6216,31 +6254,58 @@ function finishSpiderModel(model,animations,sourceName){
     }
   });
 
-  const trackTargetName=(track)=>{
-    if(!track?.name) return "";
+  const trackTargetNames=(track)=>{
+    if(!track?.name) return [];
     const raw=String(track.name);
-    const dot=raw.lastIndexOf(".");
-    if(dot<1) return "";
+    const names=new Set();
 
-    return raw
-      .slice(0,dot)
-      .split("|")
-      .pop()
-      .split(":")
-      .pop()
-      .toLowerCase();
+    // Three.js PropertyBinding understands glTF paths such as
+    // "Armature.bones[Bone_01].quaternion". Use it when possible.
+    try{
+      const parsed=THREE.PropertyBinding.parseTrackName(raw);
+      if(parsed?.nodeName){
+        names.add(String(parsed.nodeName).toLowerCase());
+      }
+    }catch(_error){}
+
+    // Keep explicit bone names too, because imported rigs can encode them in
+    // bracket paths that vary slightly between exporters.
+    const bracketMatches=raw.matchAll(/bones\[([^\]]+)\]/gi);
+    for(const match of bracketMatches){
+      names.add(String(match[1]).toLowerCase());
+    }
+
+    const dot=raw.lastIndexOf(".");
+    if(dot>0){
+      const fallback=raw
+        .slice(0,dot)
+        .split("|")
+        .pop()
+        .split(":")
+        .pop()
+        .toLowerCase();
+      if(fallback) names.add(fallback);
+    }
+
+    return [...names];
   };
 
   const makeStableSpiderClip=(clip)=>{
     if(!clip) return null;
     const stable=clip.clone();
 
-    // Validate track targets without changing the imported model.
+    // Keep only tracks that can actually bind to this imported rig. This
+    // prevents partial/invalid animation paths from deforming the spider.
+    let validTrackCount=0;
     stable.tracks=stable.tracks.filter(track=>{
-      const target=trackTargetName(track);
-      if(!animatedNodeNames.has(target)) return false;
-      return !track.name.endsWith(".morphTargetInfluences");
+      if(track.name.endsWith(".morphTargetInfluences")) return false;
+      const targets=trackTargetNames(track);
+      const valid=targets.some(target=>animatedNodeNames.has(target));
+      if(valid) validTrackCount++;
+      return valid;
     });
+
+    if(!validTrackCount) return null;
 
     stable.resetDuration();
     return stable;
@@ -6262,7 +6327,8 @@ function finishSpiderModel(model,animations,sourceName){
 
       const index=animations.indexOf(match);
       claimedAnimations.add(index);
-      directClips.set(documentedName,makeStableSpiderClip(match));
+      const stable=makeStableSpiderClip(match);
+      if(stable) directClips.set(documentedName,stable);
     }
 
     if(
@@ -6285,27 +6351,44 @@ function finishSpiderModel(model,animations,sourceName){
 
         const index=animations.indexOf(clip);
         claimedAnimations.add(index);
-        directClips.set(
-          documentedName,
-          makeStableSpiderClip(clip)
-        );
+        const stable=makeStableSpiderClip(clip);
+        if(stable) directClips.set(documentedName,stable);
       }
     }
   }
 
   if(animations?.length===1){
     const sourceClip=animations[0];
-    const sourceFPS=329/Math.max(sourceClip.duration,.001);
 
-    for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
-      const clip=THREE.AnimationUtils.subclip(
-        sourceClip,
-        "spider_"+name,
-        startFrame,
-        endFrame+1,
-        sourceFPS
-      );
-      directClips.set(name,makeStableSpiderClip(clip));
+    // The 329-frame slices below belong only to the original FBX pack.
+    // A standalone GLB has its own timeline; slicing it with those legacy
+    // ranges can create empty/out-of-range clips and badly deform the rig.
+    const isLegacyFbx=String(sourceName||"").toLowerCase().endsWith(".fbx");
+
+    if(isLegacyFbx){
+      const sourceFPS=329/Math.max(sourceClip.duration,.001);
+
+      for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
+        const clip=THREE.AnimationUtils.subclip(
+          sourceClip,
+          "spider_"+name,
+          startFrame,
+          endFrame+1,
+          sourceFPS
+        );
+        const stable=makeStableSpiderClip(clip);
+        if(stable) directClips.set(name,stable);
+      }
+    }else{
+      const stable=makeStableSpiderClip(sourceClip);
+      if(stable){
+        // One trustworthy clip is better than fabricating animation ranges.
+        // It becomes the safe movement/idle animation; missing special states
+        // fall back to it instead of touching unknown rig transforms.
+        for(const name of ["idle1","idle2","walk"]){
+          directClips.set(name,stable.clone());
+        }
+      }
     }
   }
 
@@ -6375,6 +6458,7 @@ function finishSpiderModel(model,animations,sourceName){
 }
 
 async function loadSpiderFromPack(){
+  const preferredSpiderUrl="./assets/animated_spider.glb";
   const packUrl="./assets/Spider-Psionic.zip";
   let objectUrls=[];
 
@@ -6421,6 +6505,41 @@ async function loadSpiderFromPack(){
   };
 
   try{
+    // Prefer the standalone glTF asset. It avoids the FBX skinning path that
+    // caused deformed limbs/poses in browsers while keeping the ZIP as a
+    // compatibility fallback for deployments missing the new asset.
+    try{
+      await new Promise((resolve,reject)=>{
+        const preferredLoader=new GLTFLoader();
+        preferredLoader.setDRACOLoader(dracoLoader);
+        preferredLoader.setMeshoptDecoder(MeshoptDecoder);
+        preferredLoader.load(
+          preferredSpiderUrl,
+          gltf=>{
+            try{
+              finishSpiderModel(
+                gltf.scene,
+                gltf.animations||[],
+                preferredSpiderUrl
+              );
+              console.log("[DeepSeeker] using standalone animated spider GLB");
+              resolve();
+            }catch(error){
+              reject(error);
+            }
+          },
+          undefined,
+          reject
+        );
+      });
+      return;
+    }catch(preferredError){
+      console.warn(
+        "[DeepSeeker] Standalone animated spider GLB failed; using Spider-Psionic fallback:",
+        preferredError
+      );
+    }
+
     const extracted=await extractSpiderPack(packUrl);
     const packManager=new THREE.LoadingManager();
     const resourceUrls=new Map();
@@ -7673,6 +7792,42 @@ function animate(){
   ){
     spiderMixer.timeScale=1;
     spiderMixer.update(dt);
+
+    // Kill a bad animation immediately instead of allowing one corrupted
+    // bone transform to poison every rendered frame.
+    let animationHealthy=true;
+    if(spiderModel){
+      spiderModel.traverse(obj=>{
+        if(!animationHealthy || !obj.isSkinnedMesh || !obj.skeleton) return;
+        for(const bone of obj.skeleton.bones){
+          const values=[
+            bone.position.x,bone.position.y,bone.position.z,
+            bone.quaternion.x,bone.quaternion.y,bone.quaternion.z,bone.quaternion.w,
+            bone.scale.x,bone.scale.y,bone.scale.z
+          ];
+          if(values.some(value=>!Number.isFinite(value)) ||
+             Math.abs(bone.position.x)>100 ||
+             Math.abs(bone.position.y)>100 ||
+             Math.abs(bone.position.z)>100 ||
+             Math.abs(bone.scale.x)>20 ||
+             Math.abs(bone.scale.y)>20 ||
+             Math.abs(bone.scale.z)>20){
+            animationHealthy=false;
+            return;
+          }
+        }
+      });
+    }
+
+    if(!animationHealthy){
+      console.warn("[DeepSeeker] disabling unstable spider animation frame");
+      spiderMixer.stopAllAction();
+      spiderMixer=null;
+      spiderActions.clear();
+      spiderAnimationClips.clear();
+      spiderAnimationState="";
+      spiderWantedState="idle";
+    }
   }
 
   if(!tutorialOpenRoomActive){
