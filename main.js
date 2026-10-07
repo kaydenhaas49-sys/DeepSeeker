@@ -4569,6 +4569,12 @@ const SPIDER_RUNBY_DURATION=3.2;
 const SPIDER_POUNCE_DURATION=.58;
 const SPIDER_POUNCE_HEIGHT=1.15;
 const SPIDER_SPEED=2.65;
+const SPIDER_ATTACK_RANGE=1.6;
+const SPIDER_CHASE_MIN_TIME=5.0;
+const SPIDER_CHASE_MAX_TIME=8.0;
+const SPIDER_CHASE_SPEED=3.8;
+const SPIDER_RUSH_SPEED=10.5;
+const SPIDER_RUSH_DURATION=1.35;
 const SPIDER_RADIUS=.68;
 const SPIDER_MIN_SPAWN_DISTANCE=13;
 const SPIDER_MAX_SPAWN_DISTANCE=21;
@@ -5254,6 +5260,7 @@ function startSpiderPeek(){
   const spawn=findSpiderSpawnPosition();
   if(!spawn) return false;
 
+  spiderActive=true;
   spiderBehaviorState="peek";
   spiderBehaviorTime=0;
   spiderScareRevealTimer=0;
@@ -5267,14 +5274,16 @@ function startSpiderPeek(){
   spiderEntity.scale.setScalar(1);
   spiderEntity.visible=true;
   spiderVisibleToPlayer=false;
+  spiderRevealLight.visible=false;
   setSpiderAnimation("stalk");
   return true;
 }
 
 function startSpiderRush(){
-  const spawn=findSpiderVisibleSpawnPosition();
+  const spawn=findSpiderVisibleSpawnPosition(10,16);
   if(!spawn) return false;
 
+  spiderActive=true;
   spiderBehaviorState="rush";
   spiderBehaviorTime=0;
   spiderScareRevealTimer=0;
@@ -5288,10 +5297,41 @@ function startSpiderRush(){
   spiderEntity.scale.setScalar(1);
   spiderEntity.visible=true;
   spiderVisibleToPlayer=true;
+  spiderRevealLight.visible=true;
+  spiderRevealLight.intensity=4.5;
   setSpiderAnimation("chase");
-  pulse=.9;
+  pulse=1;
   audio.scare();
   showSpiderScareMessage("RUN.",700);
+  return true;
+}
+
+function startSpiderChase(){
+  const spawn=findSpiderSpawnPosition(9,15);
+  if(!spawn) return false;
+
+  spiderActive=true;
+  spiderBehaviorState="chase";
+  spiderBehaviorTime=0;
+  spiderStuckTime=0;
+  clearSpiderPath();
+  spiderChaseDuration=THREE.MathUtils.lerp(
+    SPIDER_CHASE_MIN_TIME,
+    SPIDER_CHASE_MAX_TIME,
+    Math.random()
+  );
+  spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
+  spiderEntity.rotation.x=0;
+  spiderEntity.rotation.y=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
+  spiderEntity.scale.setScalar(1);
+  spiderEntity.visible=true;
+  spiderVisibleToPlayer=false;
+  spiderRevealLight.visible=false;
+  setSpiderAnimation("chase");
+  pulse=Math.max(pulse,.35);
   return true;
 }
 
@@ -5625,28 +5665,7 @@ function configureSpiderRunBy(){
 }
 
 function startSpiderRunBy(){
-  if(!configureSpiderRunBy()){
-    spiderActive=false;
-    spiderEntity.visible=false;
-    spiderRevealLight.visible=false;
-    return false;
-  }
-
-  spiderBehaviorState="runby";
-  spiderBehaviorTime=0;
-  spiderScareRevealTimer=0;
-  spiderStuckTime=0;
-  spiderEntity.position.copy(spiderRunbyStart);
-  spiderEntity.rotation.y=Math.atan2(
-    spiderRunbyTarget.x-spiderRunbyStart.x,
-    spiderRunbyTarget.z-spiderRunbyStart.z
-  );
-  spiderEntity.rotation.x=0;
-  spiderEntity.scale.setScalar(1);
-  spiderEntity.visible=true;
-  spiderVisibleToPlayer=true;
-  setSpiderAnimation("runby");
-  return true;
+  return startSpiderRush();
 }
 
 function startSpiderJumpscare(){
@@ -5783,7 +5802,12 @@ function resetPlayerAfterSpiderCatch(){
   spiderEntity.position.y=SPIDER_GROUND_OFFSET;
   spiderEntity.rotation.x=0;
   spiderEntity.visible=true;
-  startSpiderRunBy();
+  if(!startSpiderChase()){
+    spiderActive=false;
+    spiderEntity.visible=false;
+    spiderRevealLight.visible=false;
+    spiderBehaviorState="idle";
+  }
   pulse=1;
   eventText.style.opacity="1";
 }
@@ -7258,17 +7282,16 @@ function triggerEvent(){
   const roll=Math.random();
   let started=false;
 
-  if(roll<.38){
-    started=startSpiderRunBy();
-    if(started){
-      audio.scare();
-      pulse=.65;
-      showSpiderScareMessage("SOMETHING RAN PAST.",1000);
-    }
-  }else if(roll<.70){
+  if(roll<.30){
     started=startSpiderPeek();
-  }else{
+  }else if(roll<.63){
     started=startSpiderRush();
+  }else{
+    started=startSpiderChase();
+  }
+
+  if(started && roll>=.30){
+    audio.scare();
   }
 
   if(!started){
@@ -7685,11 +7708,16 @@ function animate(){
           if(seen){
             spiderScareRevealTimer+=dt;
             pulse=Math.max(pulse,.22);
-            if(spiderScareRevealTimer>=.55){
+            if(spiderScareRevealTimer>=.45){
               audio.scare();
               pulse=.72;
               showSpiderScareMessage("THERE.",650);
-              startSpiderRunBy();
+              if(!startSpiderChase()){
+                spiderActive=false;
+                spiderEntity.visible=false;
+                spiderRevealLight.visible=false;
+                spiderBehaviorState="idle";
+              }
             }
           }else if(spiderBehaviorTime>=4.2){
             spiderActive=false;
@@ -7706,35 +7734,31 @@ function animate(){
           const dz=player.pos.z-spiderEntity.position.z;
           const distance=Math.hypot(dx,dz);
           const inv=1/Math.max(distance,.001);
-          const step=Math.min(8.5*dt,distance);
+          const step=Math.min(SPIDER_RUSH_SPEED*dt,distance);
 
-          if(distance>1.8){
-            if(!tryMoveSpiderGround(dx*inv*step,dz*inv*step)){
+          if(distance<=SPIDER_ATTACK_RANGE){
+            startSpiderJumpscare();
+          }else if(spiderBehaviorTime>=SPIDER_RUSH_DURATION){
+            if(!startSpiderChase()){
               spiderActive=false;
               spiderEntity.visible=false;
               spiderRevealLight.visible=false;
               spiderBehaviorState="idle";
-              spiderBehaviorTime=0;
-            }else{
-              spiderEntity.rotation.y=Math.atan2(
-                player.pos.x-spiderEntity.position.x,
-                player.pos.z-spiderEntity.position.z
-              );
+              clearSpiderPath();
             }
-          }
-
-          if(
-            spiderActive &&
-            (distance<=1.8 || spiderBehaviorTime>=1.05)
-          ){
-            pulse=1;
-            spiderActive=false;
-            spiderEntity.visible=false;
-            spiderRevealLight.visible=false;
-            spiderBehaviorState="idle";
-            spiderBehaviorTime=0;
-            clearSpiderPath();
-            showSpiderScareMessage("...",450);
+          }else if(!tryMoveSpiderGround(dx*inv*step,dz*inv*step)){
+            if(!startSpiderChase()){
+              spiderActive=false;
+              spiderEntity.visible=false;
+              spiderRevealLight.visible=false;
+              spiderBehaviorState="idle";
+              clearSpiderPath();
+            }
+          }else{
+            spiderEntity.rotation.y=Math.atan2(
+              player.pos.x-spiderEntity.position.x,
+              player.pos.z-spiderEntity.position.z
+            );
           }
         }else if(spiderBehaviorState==="runby"){
           setSpiderAnimation("runby");
@@ -7767,11 +7791,26 @@ function animate(){
             }
           }
         }else if(spiderBehaviorState==="chase"){
-          spiderActive=false;
-          spiderEntity.visible=false;
-          spiderRevealLight.visible=false;
-          spiderBehaviorState="idle";
-          clearSpiderPath();
+          setSpiderAnimation("chase");
+
+          const distance=moveSpiderTowardPlayer(dt);
+
+          spiderRevealLight.visible=true;
+          spiderRevealLight.intensity=4.2;
+
+          if(distance<=SPIDER_ATTACK_RANGE){
+            spiderBehaviorState="attack";
+            spiderBehaviorTime=0;
+            spiderAttackPlayed=false;
+            setSpiderAnimation("attack");
+          }else if(spiderBehaviorTime>=spiderChaseDuration){
+            spiderActive=false;
+            spiderEntity.visible=false;
+            spiderRevealLight.visible=false;
+            spiderBehaviorState="idle";
+            spiderBehaviorTime=0;
+            clearSpiderPath();
+          }
         }else if(spiderBehaviorState==="attack"){
           setSpiderAnimation("attack");
   
