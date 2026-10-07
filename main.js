@@ -6085,15 +6085,13 @@ function finishSpiderModel(model,animations,sourceName){
     obj.receiveShadow=true;
     obj.renderOrder=10;
 
-    // Do not trust FBX transparency/alpha settings for this spider. Build an
-    // explicitly opaque material while retaining the authored color texture.
+    // Diagnostic solid pass: ignore every FBX texture/alpha channel and render
+    // the actual imported triangles as an opaque surface.
     const sources=Array.isArray(obj.material) ? obj.material : [obj.material];
     const rebuilt=sources.map(source=>{
       const material=new THREE.MeshStandardMaterial({
-        color:source?.color?.clone?.() || new THREE.Color(0xffffff),
-        map:source?.map || null,
-        normalMap:source?.normalMap || null,
-        roughness:.92,
+        color:new THREE.Color(0x241512),
+        roughness:1,
         metalness:0,
         side:THREE.DoubleSide,
         transparent:false,
@@ -6102,10 +6100,7 @@ function finishSpiderModel(model,animations,sourceName){
         depthTest:true,
         depthWrite:true
       });
-
-      material.name=(source?.name || "SpiderOpaqueMaterial")+"Solid";
-      material.premultipliedAlpha=false;
-      material.alphaMap=null;
+      material.name="SpiderSolidDiagnostic";
       material.needsUpdate=true;
       return material;
     });
