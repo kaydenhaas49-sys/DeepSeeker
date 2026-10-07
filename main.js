@@ -420,6 +420,7 @@ function addFixtureCracks(fixture,x,z,index,rotationY=0){
   }
 }
 
+const menuDynamicFixtures=[];
 const menuLightFixtures3D=[
   [-46,25,4.8,.2],[-31,26,6.0,.7],[-15,25,7.5,1.2],[1,25,5.6,1.7],[17,25,8.0,2.2],[34,25,5.0,2.7],
   [-40,10,7.0,3.1],[-23,11,5.2,3.6],[-7,10,8.5,4.1],[10,10,6.4,4.6],[27,10,7.8,5.1],
@@ -536,6 +537,7 @@ for(let fixtureIndex=0;fixtureIndex<menuLightFixtures3D.length;fixtureIndex++){
   point.userData.phase=phase;
   point.userData.cracked=cracked;
   menuSet.add(point);
+  menuDynamicFixtures.push({fixture,light:point});
   addFixtureCracks(fixture,x,z,fixtureIndex,0);
 }
 
@@ -651,6 +653,7 @@ menuCamera.far=180;
 menuCamera.updateProjectionMatrix();
 
 let menuBackdropWasActive=false;
+let menuFixtureUpdateTimer=0;
 
 function updateMenuScene(t,dt){
   const menuBackdropElement=document.getElementById("menuBackdrop");
@@ -722,30 +725,37 @@ function updateMenuScene(t,dt){
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
 
-  menuSet.traverse(node=>{
-    if(node.userData?.basePower===undefined) return;
+  // Fixture animation is intentionally throttled; the room itself still renders every frame.
+  menuFixtureUpdateTimer-=dt;
+  if(menuFixtureUpdateTimer<=0){
+    menuFixtureUpdateTimer=.08;
 
-    const phase=node.userData.phase||0;
-    const base=node.userData.basePower;
-    const wave=Math.sin(t*1.55+phase)*.055;
+    for(const item of menuDynamicFixtures){
+      const node=item.light;
+      const phase=node.userData.phase||0;
+      const base=node.userData.basePower;
+      const wave=Math.sin(t*1.55+phase)*.055;
 
-    // Cracked fixtures run much dimmer even before their ballast flickers.
-    const cracked=node.userData.cracked===true;
-    const crackedDim=cracked ? .52 : 1;
+      // Cracked fixtures run much dimmer even before their ballast flickers.
+      const cracked=node.userData.cracked===true;
+      const crackedDim=cracked ? .52 : 1;
 
-    // Occasional hard ballast dropout, staggered per fixture.
-    const dropout=Math.sin(t*3.65+phase*3.3)>.996 ? -.82 : 0;
-
-    if(node.isLight){
+      // Occasional hard ballast dropout, staggered per fixture.
+      const dropout=Math.sin(t*3.65+phase*3.3)>.996 ? -.82 : 0;
       node.intensity=Math.max(.025,base*crackedDim*(1+wave+dropout));
-    }else if(node.material?.emissiveIntensity!==undefined){
-      node.material.emissiveIntensity=Math.max(
-        .06,
-        (cracked ? 1.28 : 3.15)*
-          (1+Math.sin(t*1.55+phase)*.045+dropout*.55)
-      );
+
+      const material=item.fixture?.material;
+      const materialList=Array.isArray(material) ? material : [material];
+      for(const mat of materialList){
+        if(!mat || mat.emissiveIntensity===undefined) continue;
+        mat.emissiveIntensity=Math.max(
+          .06,
+          (cracked ? 1.28 : 3.15)*
+            (1+Math.sin(t*1.55+phase)*.045+dropout*.55)
+        );
+      }
     }
-  });
+  }
 
   return true;
 }
@@ -2375,6 +2385,7 @@ const multiplayer=new Multiplayer({
 
 
 let multiplayerMapOpen=false;
+let multiplayerMapRefreshTimer=0;
 const multiplayerMap=document.createElement("div");
 multiplayerMap.id="multiplayerMap";
 multiplayerMap.innerHTML="<div id='multiplayerMapHeader'><span>MULTIPLAYER MAP</span><span id='multiplayerMapLevel'>BACKROOMS</span></div><canvas id='multiplayerMapCanvas' width='240' height='240'></canvas><div id='multiplayerMapLegend'>N · CLOSE MAP</div>";
@@ -2400,7 +2411,12 @@ function toggleMultiplayerMap(force=null){
   if(!gameStarted && force!==true) return;
   multiplayerMapOpen=force===null ? !multiplayerMapOpen : Boolean(force);
   multiplayerMap.classList.toggle("visible",multiplayerMapOpen);
-  if(multiplayerMapOpen) updateMultiplayerMap();
+  if(multiplayerMapOpen){
+    multiplayerMapRefreshTimer=0;
+    updateMultiplayerMap();
+  }else{
+    multiplayerMapRefreshTimer=0;
+  }
 }
 
 function projectMapPoint(x,z,centerX,centerY,scale,yaw){
@@ -5706,7 +5722,13 @@ function animate(){
   }
 
   multiplayer.update(dt);
-  if(multiplayerMapOpen) updateMultiplayerMap();
+  if(multiplayerMapOpen){
+    multiplayerMapRefreshTimer-=dt;
+    if(multiplayerMapRefreshTimer<=0){
+      multiplayerMapRefreshTimer=.10;
+      updateMultiplayerMap();
+    }
+  }
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
     if(!houseMode) updateStoryProgress();
@@ -5726,9 +5748,9 @@ function animate(){
       player.vel.set(0,0,0);
       player.jumpY=0;
       player.jumpVelocity=0;
-      world.update(MENU_WORLD_X,MENU_WORLD_Z);
+      world.update(MENU_WORLD_X,MENU_WORLD_Z,dt);
     }else{
-      world.update(player.pos.x,player.pos.z);
+      world.update(player.pos.x,player.pos.z,dt);
     }
   }
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
@@ -5743,10 +5765,14 @@ function animate(){
     player.setFlashlightVisual(false);
   }
 
-  const flicker=flashlightFlicker(t);
+  const normalFlicker=flashlightFlicker(t);
   const lowBattery=Math.pow(THREE.MathUtils.clamp((35-battery)/35,0,1),1.15);
-  const lowBatteryWave=Math.sin(t*(9+lowBattery*28)+battery*.19);
-  const lowBatteryDrop=lowBattery>0 && lowBatteryWave>.35 ? THREE.MathUtils.lerp(1,.20,lowBattery) : 1;
+  // As the battery gets low, blend toward a slow, shallow modulation instead of
+  // increasing flicker frequency. This keeps the warning creepy without rapid flashing.
+  const slowBatteryWave=.5+.5*Math.sin(t*2.2 + Math.sin(t*.35)*.45);
+  const lowBatteryFlicker=.90+.10*slowBatteryWave;
+  const flicker=THREE.MathUtils.lerp(normalFlicker,lowBatteryFlicker,lowBattery);
+  const lowBatteryDrop=THREE.MathUtils.lerp(1,.62,lowBattery);
   let flashlightStrength=68.0*flicker*lowBatteryDrop;
 
   if(flashlightOn && !houseMode && spiderActive){

@@ -66,12 +66,22 @@ export class Player {
         e.code === "KeyW" ||
         e.code === "KeyA" ||
         e.code === "KeyS" ||
-        e.code === "KeyD"
+        e.code === "KeyD" ||
+        e.code === "ControlLeft" ||
+        e.code === "ControlRight"
       ) {
         e.preventDefault();
       }
-      if(e.repeat && (e.code === "KeyC" || e.code === "Space")) return;
-      if(e.code === "KeyC" && this.locked) this.crouched = !this.crouched;
+      if(
+        e.repeat &&
+        ((e.code === "ControlLeft" || e.code === "ControlRight") || e.code === "Space")
+      ) return;
+      if(
+        (e.code === "ControlLeft" || e.code === "ControlRight") &&
+        this.locked
+      ){
+        this.crouched = !this.crouched;
+      }
       if(e.code === "Space" && this.locked && this.jumpY <= 0.001 && !this.crouched){
         this.jumpVelocity = JUMP_SPEED;
         this.stamina = Math.max(0, this.stamina - 8);

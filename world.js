@@ -253,6 +253,10 @@ export class World {
     // are enabled at once so the damaged lights can illuminate the room without
     // recreating the severe multi-light performance hit.
     this.fixtureLights = [];
+    this.fixtureLightsDirty = true;
+    this.fixtureLightCooldown = 0;
+    this.fixtureLightFocusX = NaN;
+    this.fixtureLightFocusZ = NaN;
 
     // Shared per-chunk geometry templates (never disposed per chunk).
     this.floorGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE);
@@ -284,6 +288,7 @@ export class World {
 
     this.root.add(group);
     this.chunks.set(cellKey(cx, cz), { data, group, wallBounds });
+    this.fixtureLightsDirty = true;
   }
 
   disposeChunk(key) {
@@ -297,11 +302,22 @@ export class World {
     });
 
     this.fixtureLights = this.fixtureLights.filter(item => item.light.parent);
+    this.fixtureLightsDirty = true;
     this.chunks.delete(key);
   }
 
   // Called every frame with the player position.
-  updateFixtureLights(px,pz){
+  updateFixtureLights(px,pz,dt=0){
+    const movedEnough =
+      !Number.isFinite(this.fixtureLightFocusX) ||
+      !Number.isFinite(this.fixtureLightFocusZ) ||
+      Math.hypot(px-this.fixtureLightFocusX,pz-this.fixtureLightFocusZ) >= 1.5;
+
+    if(!this.fixtureLightsDirty && this.fixtureLightCooldown>0 && !movedEnough){
+      this.fixtureLightCooldown=Math.max(0,this.fixtureLightCooldown-dt);
+      return;
+    }
+
     const maxActive=LOW_END_DEVICE ? 8 : 12;
     const maxDistance=18;
     const maxDistanceSq=maxDistance*maxDistance;
@@ -324,16 +340,23 @@ export class World {
     candidates.sort((a,b)=>a.priority-b.priority);
 
     const now=performance.now()*.003;
+    // Only the nearest handful of fixtures become real dynamic lights.
+    // This selection runs at a low cadence instead of sorting every frame.
     for(let i=0;i<Math.min(maxActive,candidates.length);i++){
       const item=candidates[i].item;
       item.light.visible=true;
       const flicker=.93+.07*Math.sin(now*item.flickerSpeed+item.phase);
       item.light.intensity=item.baseIntensity*flicker;
     }
+
+    this.fixtureLightFocusX=px;
+    this.fixtureLightFocusZ=pz;
+    this.fixtureLightCooldown=.10;
+    this.fixtureLightsDirty=false;
   }
 
-  update(px, pz) {
-    this.updateFixtureLights(px,pz);
+  update(px, pz, dt=0) {
+    this.updateFixtureLights(px,pz,dt);
     const pcx = Math.floor(px / CHUNK_SIZE);
     const pcz = Math.floor(pz / CHUNK_SIZE);
 
