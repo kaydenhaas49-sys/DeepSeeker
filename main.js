@@ -4603,6 +4603,12 @@ const SPIDER_ANIMATION_ALIAS={
 
 
 function fitSpiderModel(model){
+  // The source Spider-Psionic FBX is authored with the opposite horizontal
+  // facing from this game's runtime convention. Normalize that once on the
+  // actual imported model so every consumer (ground, tutorial, menu clone)
+  // receives the same forward axis instead of stacking one-off 180° fixes.
+  model.rotation.y=Math.PI;
+
   model.traverse(obj=>{
     if(!obj.isMesh) return;
     obj.visible=true;
