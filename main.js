@@ -1478,8 +1478,11 @@ function updateMenuScene(t,dt){
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
 
-  for(const node of menuFlickerNodes){
-    const phase=node.userData.phase||0;
+  menuFixtureUpdateTimer-=dt;
+  if(menuFixtureUpdateTimer<=0){
+    menuFixtureUpdateTimer=.08;
+    for(const node of menuFlickerNodes){
+      const phase=node.userData.phase||0;
     const base=node.userData.basePower;
     const wave=Math.sin(t*1.55+phase)*.055;
     const cracked=node.userData.cracked===true;
@@ -1497,6 +1500,7 @@ function updateMenuScene(t,dt){
     }
   }
 
+  }
   return true;
 }
 
@@ -4636,12 +4640,28 @@ function fitSpiderModel(model){
     obj.receiveShadow=true;
     obj.renderOrder=10;
 
+    // FBX skin weights/normals can be slightly dirty after conversion.
+    // Normalize once here so animation does not tear the mesh apart.
+    if(obj.isSkinnedMesh){
+      obj.normalizeSkinWeights?.();
+      if(obj.skeleton) obj.skeleton.update();
+    }
+
+    const geometry=obj.geometry;
+    if(geometry){
+      if(!geometry.getAttribute("normal") && geometry.computeVertexNormals){
+        geometry.computeVertexNormals();
+      }else if(geometry.normalizeNormals){
+        geometry.normalizeNormals();
+      }
+    }
+
     const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
     for(const material of materials){
       if(!material) continue;
 
-      // Preserve the source material/texture setup. Only remove transparency
-      // states that make thin spider geometry disappear.
+      // The source spider is opaque. Clear imported alpha/blending state so
+      // the FBX cannot turn the body or legs into translucent holes.
       material.visible=true;
       material.transparent=false;
       material.opacity=1;
@@ -4656,6 +4676,7 @@ function fitSpiderModel(model){
 
       if("transmission" in material) material.transmission=0;
       if("thickness" in material) material.thickness=0;
+      if("clearcoat" in material) material.clearcoat=0;
       material.needsUpdate=true;
     }
   });
@@ -6236,36 +6257,23 @@ function finishSpiderModel(model,animations,sourceName){
       .toLowerCase();
   };
 
-  const makeStableSpiderClip=(clip,animationName="")=>{
+  const makeStableSpiderClip=(clip)=>{
     if(!clip) return null;
     const stable=clip.clone();
 
+    // Keep the source rig's real transform tracks. The previous sanitizer
+    // stripped non-root position/scale tracks, which can produce severe
+    // skinned-mesh deformation on this spider even though the FBX is valid.
     stable.tracks=stable.tracks.filter(track=>{
       const target=trackTargetName(track);
       if(!animatedNodeNames.has(target)) return false;
-
-      const facialTarget=/face|eye|eyelid|jaw|mouth|lip|tongue|teeth|brow|cheek/.test(target);
-
       if(track.name.endsWith(".morphTargetInfluences")) return false;
-
-      if(facialTarget && (
+      return (
         track.name.endsWith(".quaternion") ||
         track.name.endsWith(".position") ||
-        track.name.endsWith(".scale")
-      )){
-        return false;
-      }
-
-      if(track.name.endsWith(".position")){
-        return !rootBoneNames.has(target) && animationName!=="walk";
-      }
-
-      if(track.name.endsWith(".scale")) return false;
-
-      // Do not strip root-bone quaternion tracks; they contain real pose data.
-      return track.name.endsWith(".quaternion") ||
-        track.name.endsWith(".position") ||
-        track.name.endsWith(".color");
+        track.name.endsWith(".scale") ||
+        track.name.endsWith(".color")
+      );
     });
 
     stable.resetDuration();
@@ -6289,19 +6297,8 @@ function finishSpiderModel(model,animations,sourceName){
       const index=animations.indexOf(match);
       claimedAnimations.add(index);
 
-      if(documentedName==="walk"){
-        const walkFPS=45/Math.max(match.duration,.001);
-        const walkClip=THREE.AnimationUtils.subclip(
-          match,
-          "spider_walk",
-          3,
-          45,
-          walkFPS
-        );
-        directClips.set(documentedName,makeStableSpiderClip(walkClip,"walk"));
-      }else{
-        directClips.set(documentedName,makeStableSpiderClip(match,documentedName));
-      }
+      // Separate named FBX clips are already bounded to their animation.
+      directClips.set(documentedName,makeStableSpiderClip(match));
     }
 
     if(directClips.size<documentedClipNames.length && animations.length>=documentedClipNames.length){
@@ -7541,7 +7538,14 @@ function animate(){
   multiplayer.update(dt);
   interaction.update(dt);
   navigation.update(dt);
-  if(multiplayerMapOpen) updateMultiplayerMap();
+
+  if(multiplayerMapOpen){
+    multiplayerMapRefreshTimer-=dt;
+    if(multiplayerMapRefreshTimer<=0){
+      multiplayerMapRefreshTimer=.10;
+      updateMultiplayerMap();
+    }
+  }
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
     if(!houseMode && storyRefreshElapsed>=(
