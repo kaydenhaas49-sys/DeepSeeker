@@ -6336,6 +6336,7 @@ function setupSpiderAnimationSet(model,animations){
 }
 
 function finishSpiderModel(model,animations,sourceName){
+  const isWolfSpider=sourceName==="assets/animated_spider.glb";
   model.name="SpiderSource";
   model.visible=true;
 
@@ -6346,42 +6347,99 @@ function finishSpiderModel(model,animations,sourceName){
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
-    obj.receiveShadow=true;
+    obj.receiveShadow=false;
     obj.renderOrder=10;
+
+    if(isWolfSpider){
+      // Leave the imported GLB material exactly as authored. The problem
+      // appears in the shared transform pipeline, not the asset itself.
+      return;
+    }
+
+    // Legacy spider diagnostic material path.
+    const originalMaterials=Array.isArray(obj.material)
+      ? obj.material
+      : [obj.material];
+    const source=originalMaterials[0];
+    const baseColor=source?.color?.clone
+      ? source.color.clone()
+      : new THREE.Color(0x17100e);
+
+    obj.material=new THREE.MeshPhongMaterial({
+      color:baseColor,
+      shininess:8,
+      specular:0x080606,
+      flatShading:true,
+      side:THREE.DoubleSide,
+      transparent:false,
+      opacity:1,
+      alphaTest:0,
+      depthTest:true,
+      depthWrite:true,
+      fog:true
+    });
+
+    if(obj.isSkinnedMesh && obj.skeleton){
+      obj.skeleton.pose();
+      obj.skeleton.update();
+    }
   });
 
   if(meshCount===0){
     throw new Error("Spider model contains no meshes.");
   }
 
-  model.updateMatrixWorld(true);
-  const parsedBounds=new THREE.Box3().setFromObject(model);
-  const parsedSize=parsedBounds.getSize(new THREE.Vector3());
-
-  if(
-    !Number.isFinite(parsedSize.x) ||
-    !Number.isFinite(parsedSize.y) ||
-    !Number.isFinite(parsedSize.z) ||
-    Math.max(parsedSize.x,parsedSize.y,parsedSize.z)<.001
-  ){
-    throw new Error("Spider model parsed, but its geometry has zero or invalid bounds.");
-  }
-
-  const isWolfSpider=sourceName==="assets/animated_spider.glb";
-  fitSpiderModel(model,isWolfSpider);
-
-  // The wrapper owns the ground contact point. The imported FBX stays centered
-  // so the exact same rig can be rotated 180 degrees for the ceiling.
+  // IMPORTANT: never mutate a rigged wolf GLB's own transform hierarchy.
+  // The gameplay wrapper owns scale, centering, and ground placement instead.
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
-  visualRoot.position.y=SPIDER_GROUND_OFFSET+spiderModelHalfHeight;
-  visualRoot.add(model);
+
+  let fittedSize;
+  if(isWolfSpider){
+    model.position.set(0,0,0);
+    model.rotation.set(0,0,0);
+    model.scale.set(1,1,1);
+    model.updateMatrixWorld(true);
+
+    const rawBounds=new THREE.Box3().setFromObject(model);
+    const rawSize=rawBounds.getSize(new THREE.Vector3());
+    const maxDimension=Math.max(rawSize.x,rawSize.y,rawSize.z);
+
+    if(!Number.isFinite(maxDimension) || maxDimension<.0001){
+      throw new Error("Wolf spider model has invalid or empty bounds.");
+    }
+
+    visualRoot.add(model);
+    visualRoot.scale.setScalar(SPIDER_TARGET_SPAN/maxDimension);
+    visualRoot.updateMatrixWorld(true);
+
+    const bounds=new THREE.Box3().setFromObject(visualRoot);
+    fittedSize=bounds.getSize(new THREE.Vector3());
+    const center=bounds.getCenter(new THREE.Vector3());
+
+    visualRoot.position.set(
+      -center.x,
+      -center.y + SPIDER_GROUND_OFFSET + fittedSize.y*.5,
+      -center.z
+    );
+  }else{
+    fitSpiderModel(model);
+    visualRoot.position.y=SPIDER_GROUND_OFFSET+spiderModelHalfHeight;
+    visualRoot.add(model);
+    fittedSize=new THREE.Vector3(
+      SPIDER_TARGET_SPAN,
+      spiderModelHalfHeight*2,
+      SPIDER_TARGET_SPAN
+    );
+  }
 
   spiderModel=visualRoot;
   spiderOriginalModel=visualRoot;
   spiderEntity.add(visualRoot);
   spiderLoaded=true;
   spiderStartupFailed=false;
+
+  spiderModelHalfHeight=Math.max(.001,fittedSize.y*.5);
 
   if(gameStarted && !houseMode){
     nextEvent=Math.min(nextEvent,clock.elapsedTime+8);
@@ -6392,30 +6450,22 @@ function finishSpiderModel(model,animations,sourceName){
     spiderRetryTimer=null;
   }
 
-  spiderMixer=null;
-  spiderActions.clear();
-  spiderAnimationClips.clear();
-  spiderAnimationState="";
-  spiderWantedState="idle";
+  if(isWolfSpider){
+    setupSpiderAnimationSet(visualRoot,animations);
+  }else{
+    spiderMixer=null;
+    spiderActions.clear();
+    spiderAnimationClips.clear();
+    spiderAnimationState="";
+    spiderWantedState="idle";
+  }
 
-  console.log("[DeepSeeker] Spider bind-pose diagnostic",{
+  console.log("[DeepSeeker] Spider loaded",{
     source:sourceName,
+    wolf:isWolfSpider,
     animationsFound:animations?.length||0,
     meshCount,
     skinnedMeshes:model.getObjectsByProperty("isSkinnedMesh",true).length,
-    skeletons:model.getObjectsByProperty("skeleton",undefined).length
-  });
-
-  // IMPORTANT: this pass intentionally creates no AnimationMixer/actions.
-  // The spider remains in the FBX bind pose so we can isolate mesh corruption
-  // from animation corruption.
-
-  console.log("[DeepSeeker] Spider rebuilt as solid closed-volume mesh",{
-    source:sourceName,
-    format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
-    animations:animations?.map(animation=>animation.name)||[],
-    animationCount:animations?.length||0,
-    meshCount,
     halfHeight:spiderModelHalfHeight
   });
 
