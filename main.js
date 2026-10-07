@@ -6272,26 +6272,18 @@ function finishSpiderModel(model,animations,sourceName){
     if(!clip) return null;
     const stable=clip.clone();
 
-    // Spider-Psionic's FBX contains exporter tracks for scene/root transforms
-    // that do not belong on the rendered rig. Keep real bone animation, but
-    // discard root motion, scale tracks, and tracks aimed at unknown nodes.
+    // This rig was validated with its authored transform tracks intact.
+    // Only discard tracks aimed at nodes that are not actually present in
+    // the imported FBX scene.
     stable.tracks=stable.tracks.filter(track=>{
       const target=trackTargetName(track);
       if(!animatedNodeNames.has(target)) return false;
-
-      if(track.name.endsWith(".position")){
-        return !rootBoneNames.has(target);
-      }
-
-      if(track.name.endsWith(".scale")){
-        return false;
-      }
-
+      if(track.name.endsWith(".morphTargetInfluences")) return false;
       return (
         track.name.endsWith(".quaternion") ||
         track.name.endsWith(".position") ||
-        track.name.endsWith(".color") ||
-        track.name.endsWith(".morphTargetInfluences")
+        track.name.endsWith(".scale") ||
+        track.name.endsWith(".color")
       );
     });
 
