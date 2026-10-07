@@ -4649,12 +4649,13 @@ function fitSpiderModel(model){
     obj.receiveShadow=false;
     obj.renderOrder=10;
 
-    // Force every spider part to the same fully opaque lit material.
+    // Force every spider part to the same fully opaque, polygonal lit material.
     // This intentionally ignores the source textures/alpha/normal maps.
-    const solidMaterial=new THREE.MeshStandardMaterial({
+    const solidMaterial=new THREE.MeshPhongMaterial({
       color:0x17100e,
-      roughness:0.92,
-      metalness:0,
+      shininess:8,
+      specular:0x080606,
+      flatShading:true,
       side:THREE.DoubleSide,
       transparent:false,
       opacity:1,
@@ -6363,10 +6364,11 @@ async function loadSpiderFromPack(){
           const geometry=source.geometry.clone();
           geometry.applyMatrix4(source.matrixWorld);
 
-          const material=new THREE.MeshStandardMaterial({
+          const material=new THREE.MeshPhongMaterial({
             color:0x17100e,
-            roughness:0.92,
-            metalness:0,
+            shininess:8,
+            specular:0x080606,
+            flatShading:true,
             side:THREE.DoubleSide,
             transparent:false,
             opacity:1,
