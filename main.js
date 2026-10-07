@@ -1303,12 +1303,32 @@ function applyArachnophobiaVisual(){
 function syncMenuSpiderFromGameplayModel(){
   if(menuSpiderActual || !spiderModel) return;
 
-  menuSpiderActual=SkeletonUtils.clone(spiderModel);
+  // Do not clone the gameplay wrapper: it contains world-space placement
+  // for the tutorial/gameplay entity. Clone only the authored model itself.
+  const sourceModel=
+    spiderModel.getObjectByName("SpiderSource") ||
+    spiderModel.children[0] ||
+    spiderModel;
+
+  menuSpiderActual=SkeletonUtils.clone(sourceModel);
   menuSpiderActual.name="MenuSpiderActualModel";
   menuSpiderActual.visible=true;
+
+  // Presentation owns its own scale and placement.
+  menuSpiderActual.position.set(0,0,0);
+  menuSpiderActual.rotation.set(0,0,0);
   menuSpiderActual.scale.setScalar(
     arachnophobiaMode ? MENU_DUCK_SCALE : MENU_SPIDER_SCALE
   );
+
+  // Center only the menu clone. The gameplay model remains untouched.
+  menuSpiderActual.updateMatrixWorld(true);
+  if(!arachnophobiaMode){
+    const menuBounds=new THREE.Box3().setFromObject(menuSpiderActual);
+    const menuCenter=menuBounds.getCenter(new THREE.Vector3());
+    menuSpiderActual.position.sub(menuCenter);
+    menuSpiderActual.updateMatrixWorld(true);
+  }
 
   // The shared visual is centered around its origin. Flip this wrapper around
   // X so the spider hangs below the ceiling instead of sitting on top of it.
@@ -6103,6 +6123,7 @@ function finishSpiderModel(model,animations,sourceName){
 
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
+  visualRoot.visible=true;
   visualRoot.add(model);
 
   // Keep the imported model's own transforms untouched. The wrapper only
