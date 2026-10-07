@@ -22,37 +22,39 @@ function makeLoader(){
 
 function hardenCharacterMaterial(material){
   if(!material) return;
-  material.visible=true;
-  material.transparent=false;
-  material.opacity=1;
-  material.alphaTest=0;
-  if("alphaHash" in material) material.alphaHash=false;
-  if("alphaToCoverage" in material) material.alphaToCoverage=false;
-  material.premultipliedAlpha=false;
-  material.blending=THREE.NormalBlending;
-  material.depthTest=true;
-  material.depthWrite=true;
-  material.side=THREE.DoubleSide;
-  if("transmission" in material) material.transmission=0;
-  if("thickness" in material) material.thickness=0;
-  if("attenuationDistance" in material) material.attenuationDistance=Infinity;
-  if("clearcoat" in material) material.clearcoat=0;
-  if("iridescence" in material) material.iridescence=0;
-  material.needsUpdate=true;
+  const clean=new THREE.MeshStandardMaterial({
+    color:material.color?.clone?.() || new THREE.Color(0xffffff),
+    map:material.map || null,
+    normalMap:material.normalMap || null,
+    normalScale:material.normalScale?.clone?.() || new THREE.Vector2(1,1),
+    roughness:Number.isFinite(material.roughness) ? material.roughness : .72,
+    metalness:Number.isFinite(material.metalness) ? material.metalness : 0,
+    roughnessMap:material.roughnessMap || null,
+    metalnessMap:material.metalnessMap || null,
+    aoMap:material.aoMap || null,
+    aoMapIntensity:Number.isFinite(material.aoMapIntensity) ? material.aoMapIntensity : 1,
+    emissive:material.emissive?.clone?.() || new THREE.Color(0x000000),
+    emissiveMap:material.emissiveMap || null,
+    emissiveIntensity:Number.isFinite(material.emissiveIntensity) ? material.emissiveIntensity : 1,
+    vertexColors:Boolean(material.vertexColors),
+    side:THREE.DoubleSide,
+    transparent:false, opacity:1, alphaTest:0, depthTest:true, depthWrite:true
+  });
+  clean.name=(material.name || "CharacterMaterial")+"__Clean";
+  clean.premultipliedAlpha=false;
+  if("alphaHash" in clean) clean.alphaHash=false;
+  if("alphaToCoverage" in clean) clean.alphaToCoverage=false;
+  clean.blending=THREE.NormalBlending;
+  clean.needsUpdate=true;
+  return clean;
 }
 function cloneCharacterMaterials(root){
   root.traverse(obj=>{
     if(!obj.isMesh) return;
     if(Array.isArray(obj.material)){
-      obj.material=obj.material.map(material=>{
-        const clone=material?.clone ? material.clone() : material;
-        hardenCharacterMaterial(clone);
-        return clone;
-      });
+      obj.material=obj.material.map(hardenCharacterMaterial);
     }else{
-      const clone=obj.material?.clone ? obj.material.clone() : obj.material;
-      obj.material=clone;
-      hardenCharacterMaterial(clone);
+      obj.material=hardenCharacterMaterial(obj.material);
     }
     if(obj.isSkinnedMesh && obj.normalizeSkinWeights) obj.normalizeSkinWeights();
     obj.frustumCulled=false;
@@ -88,7 +90,6 @@ function normalizeTemplate(scene){
     for(const mat of materials){
       if(!mat) continue;
       mat.toneMapped=true;
-      hardenCharacterMaterial(mat);
     }
   });
 
@@ -624,8 +625,7 @@ export function createFirstPersonArms(model){
     const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
     for(const material of materials){
       if(!material) continue;
-      hardenCharacterMaterial(material);
-      material.depthTest=false;
+      material.depthTest=true;
       material.depthWrite=false;
       material.needsUpdate=true;
     }
@@ -685,8 +685,7 @@ export async function createHazmatCharacter(){
   const mixer=null;
   const action=null;
 
-  applyNeutralMixamoPose(model);
-
+  // Keep the authored bind pose on the full model; pose only the first-person clone.
   const flashlight=attachFlashlight(model);
 
   return {

@@ -4401,23 +4401,16 @@ function prepareInitialStartupAssets(){
 function updateInitialLoadingScreen(){
   if(initialLandingShown) return;
 
-  const spiderProgress=spiderLoaded
-    ? 100
-    : spiderLoadStarted
-      ? 18
-      : spiderStartupFailed
-        ? 100
-        : 0;
+  // Spider-Psionic is optional background content and must never block boot.
   const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
   const decoderProgress=geometryDecoderReady ? 100 : 0;
   const characterProgress=player.characterLoaded ? 100 : 0;
   const startupProgress=initialStartupPrepared ? 100 : 0;
   const total=Math.max(0,Math.min(100,Math.round(
-    spiderProgress*.54 +
-    decoderProgress*.06 +
-    characterProgress*.18 +
-    startupProgress*.08 +
-    saveProgress*.10
+    decoderProgress*.10 +
+    characterProgress*.50 +
+    startupProgress*.15 +
+    saveProgress*.25
   )));
 
   const fill=document.getElementById("initialLoadFill");
@@ -4430,17 +4423,14 @@ function updateInitialLoadingScreen(){
     if(initialStartupError){
       status.textContent="STARTUP PREPARATION FAILED — RELOAD TO RETRY.";
     }else if(
-      spiderLoaded &&
       geometryDecoderReady &&
       player.characterLoaded &&
       initialStartupPrepared &&
       window.__deepseekerSaveHydrationDone
     ){
-      status.textContent="ALL GAME ASSETS READY — STARTING MAIN MENU.";
-    }else if(!spiderLoaded && spiderStartupFailed){
-      status.textContent="SPIDER LOAD FAILED — RETRYING…";
-    }else if(!spiderLoaded){
-      status.textContent="LOADING SPIDER-Psionic…";
+      status.textContent=spiderLoaded
+        ? "ALL GAME ASSETS READY — STARTING MAIN MENU."
+        : "WORLD READY — SPIDER LOADING IN BACKGROUND.";
     }else if(!geometryDecoderReady){
       status.textContent="INITIALIZING GEOMETRY DECODERS…";
     }else if(!player.characterLoaded && player.characterLoadFailed){
@@ -4461,7 +4451,6 @@ function finishInitialLoading(){
   if(initialLandingShown) return;
   if(
     initialStartupError ||
-    !spiderLoaded ||
     !geometryDecoderReady ||
     !player.characterLoaded ||
     player.characterLoadFailed ||
