@@ -4634,79 +4634,6 @@ const SPIDER_ANIMATION_ALIAS={
 
 
 function fitSpiderModel(model){
-  // Keep the imported FBX neutral. Gameplay/menu parents own heading and
-  // ceiling inversion; the asset itself should never carry a hidden yaw hack.
-  model.position.set(0,0,0);
-  model.rotation.set(0,0,0);
-  model.scale.set(1,1,1);
-
-  model.traverse(obj=>{
-    if(!obj.isMesh) return;
-
-    obj.visible=true;
-    obj.frustumCulled=false;
-    obj.castShadow=true;
-    obj.receiveShadow=false;
-    obj.renderOrder=10;
-
-    // Keep the source material's base color, but deliberately remove every
-    // texture/alpha cutout. This makes the spider an opaque polygon shell
-    // visible from both sides, including when viewed from underneath.
-    const originalMaterial=Array.isArray(obj.material)
-      ? obj.material[0]
-      : obj.material;
-    const baseColor=originalMaterial?.color?.clone
-      ? originalMaterial.color.clone()
-      : new THREE.Color(0x17100e);
-
-    obj.material=new THREE.MeshPhongMaterial({
-      color:baseColor,
-      shininess:8,
-      specular:0x080606,
-      flatShading:true,
-      side:THREE.DoubleSide,
-      transparent:false,
-      opacity:1,
-      alphaTest:0,
-      depthTest:true,
-      depthWrite:true,
-      fog:true
-    });
-
-    // Diagnostic bind-pose test: preserve the FBX's authored skin data and
-    // reset each skeleton to its imported bind pose before any animation.
-    if(obj.isSkinnedMesh && obj.skeleton){
-      obj.skeleton.pose();
-      obj.skeleton.update();
-    }
-
-    const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
-    for(const material of materials){
-      if(!material) continue;
-
-      // Kept for compatibility with non-diagnostic loaders; the spider's
-      // Preserve the imported material's color/map/texture while normalizing its render state.
-      material.visible=true;
-      material.transparent=false;
-      material.opacity=1;
-      material.alphaTest=0;
-      material.alphaHash=false;
-      material.alphaToCoverage=false;
-      material.premultipliedAlpha=false;
-      material.blending=THREE.NormalBlending;
-      material.depthTest=true;
-      material.depthWrite=true;
-      material.side=THREE.DoubleSide;
-
-      if("transmission" in material) material.transmission=0;
-      if("thickness" in material) material.thickness=0;
-      if("clearcoat" in material) material.clearcoat=0;
-      material.needsUpdate=true;
-    }
-  });
-
-  model.updateMatrixWorld(true);
-
   const rawBox=new THREE.Box3().setFromObject(model);
   const rawSize=rawBox.getSize(new THREE.Vector3());
   const maxDimension=Math.max(rawSize.x,rawSize.y,rawSize.z);
@@ -4715,21 +4642,16 @@ function fitSpiderModel(model){
     throw new Error("Spider model has invalid or empty bounds.");
   }
 
-  model.scale.setScalar(SPIDER_TARGET_SPAN/maxDimension);
+  // This is intentionally the only transform applied to the imported model.
+  // Preserve the asset's authored position/rotation/scale ratios and only
+  // multiply its existing scale to reach the gameplay target size.
+  const scaleFactor=SPIDER_TARGET_SPAN/maxDimension;
+  model.scale.multiplyScalar(scaleFactor);
   model.updateMatrixWorld(true);
 
-  // Center the imported rig around its origin. Rotating this centered rig by
-  // 180 degrees for the ceiling now flips it without moving its pivot above it.
-  const fittedBox=new THREE.Box3().setFromObject(model);
-  const center=fittedBox.getCenter(new THREE.Vector3());
-  const fittedSize=fittedBox.getSize(new THREE.Vector3());
-
-  model.position.x-=center.x;
-  model.position.y-=center.y;
-  model.position.z-=center.z;
-  model.updateMatrixWorld(true);
-
-  spiderModelHalfHeight=Math.max(.001,fittedSize.y*.5);
+  const scaledBox=new THREE.Box3().setFromObject(model);
+  const scaledSize=scaledBox.getSize(new THREE.Vector3());
+  spiderModelHalfHeight=Math.max(.001,scaledSize.y*.5);
 }
 
 function setSpiderAnimation(name){
@@ -6148,141 +6070,12 @@ async function extractSpiderPack(zipUrl){
 }
 
 
-function buildSolidSpiderReplacement(){
-  const root=new THREE.Group();
-  root.name="SpiderRebuiltSolid";
-
-  const bodyMaterial=new THREE.MeshPhongMaterial({
-    color:0x3a211b,
-    shininess:8,
-    specular:0x0b0706,
-    flatShading:true,
-    side:THREE.DoubleSide
-  });
-
-  const legMaterial=new THREE.MeshPhongMaterial({
-    color:0x21100d,
-    shininess:5,
-    specular:0x070403,
-    flatShading:true,
-    side:THREE.DoubleSide
-  });
-
-  const eyeMaterial=new THREE.MeshPhongMaterial({
-    color:0x090706,
-    shininess:25,
-    specular:0x18100c,
-    flatShading:true,
-    side:THREE.DoubleSide
-  });
-
-  const addBall=(name,x,y,z,sx,sy,sz,material,detail=1)=>{
-    const geometry=new THREE.IcosahedronGeometry(1,detail);
-    geometry.scale(sx,sy,sz);
-    const mesh=new THREE.Mesh(geometry,material);
-    mesh.name=name;
-    mesh.position.set(x,y,z);
-    mesh.castShadow=true;
-    mesh.receiveShadow=false;
-    mesh.frustumCulled=false;
-    root.add(mesh);
-    return mesh;
-  };
-
-  const addTube=(name,ax,ay,az,bx,by,bz,r1,r2,material)=>{
-    const start=new THREE.Vector3(ax,ay,az);
-    const end=new THREE.Vector3(bx,by,bz);
-    const direction=end.clone().sub(start);
-    const length=direction.length();
-
-    const geometry=new THREE.CylinderGeometry(
-      r2,r1,Math.max(length,0.001),6,1,false
-    );
-    const mesh=new THREE.Mesh(geometry,material);
-    mesh.name=name;
-    mesh.position.copy(start).add(end).multiplyScalar(0.5);
-    mesh.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0,1,0),
-      direction.normalize()
-    );
-    mesh.castShadow=true;
-    mesh.receiveShadow=false;
-    mesh.frustumCulled=false;
-    root.add(mesh);
-    return mesh;
-  };
-
-  // Every primitive below is a closed 3D volume. There are no planes,
-  // alpha cutouts, or single-sided surfaces to look through.
-  addBall("Thorax",0,0.30,0,0.82,0.55,0.72,bodyMaterial,2);
-  addBall("Abdomen",0,0.24,-0.78,1.00,0.66,1.12,bodyMaterial,2);
-  addBall("Head",0,0.38,0.72,0.55,0.45,0.54,bodyMaterial,1);
-
-  const legs=[
-    [ 1,0.74,0.30, 1.55,0.24, 2.42,0.02],
-    [ 1,0.67,0.10, 1.85,0.00, 2.92,-0.38],
-    [ 1,0.55,-0.08,1.82,-0.38, 2.66,-0.92],
-    [ 1,0.42,-0.26,1.52,-0.70, 2.16,-1.28],
-    [-1,0.74,0.30,-1.55,0.24,-2.42,0.02],
-    [-1,0.67,0.10,-1.85,0.00,-2.92,-0.38],
-    [-1,0.55,-0.08,-1.82,-0.38,-2.66,-0.92],
-    [-1,0.42,-0.26,-1.52,-0.70,-2.16,-1.28]
-  ];
-
-  legs.forEach((p,index)=>{
-    const [side,ry,rz,kx,kz,fx,fz]=p;
-    const rootX=side*0.58;
-    const rootY=ry;
-    const kneeY=ry-0.10;
-    const footY=ry-0.26;
-
-    addTube(
-      "Leg"+index+"Upper",
-      rootX,rootY,rz,
-      kx,kneeY,kz,
-      0.18,0.13,legMaterial
-    );
-    addTube(
-      "Leg"+index+"Lower",
-      kx,kneeY,kz,
-      fx,footY,fz,
-      0.13,0.08,legMaterial
-    );
-
-    addBall("Leg"+index+"Knee",kx,kneeY,kz,0.15,0.15,0.15,legMaterial,1);
-    addBall("Leg"+index+"Foot",fx,footY,fz,0.11,0.08,0.16,legMaterial,1);
-  });
-
-  // Solid mouth/fang masses.
-  addBall("Mouth",0,0.18,1.08,0.25,0.16,0.25,legMaterial,1);
-  addBall("EyeL",-0.21,0.60,1.11,0.09,0.09,0.07,eyeMaterial,1);
-  addBall("EyeR", 0.21,0.60,1.11,0.09,0.09,0.07,eyeMaterial,1);
-
-  root.updateMatrixWorld(true);
-  const bounds=new THREE.Box3().setFromObject(root);
-  const center=bounds.getCenter(new THREE.Vector3());
-  root.position.sub(center);
-  root.updateMatrixWorld(true);
-
-  return root;
-}
-
 function finishSpiderModel(model,animations,sourceName){
-  const importedSpider=model;
-  importedSpider.visible=false;
-  model=buildSolidSpiderReplacement();
   model.name="SpiderSource";
-  model.visible=true;
 
   let meshCount=0;
   model.traverse(obj=>{
-    if(!obj.isMesh) return;
-    meshCount++;
-    obj.visible=true;
-    obj.frustumCulled=false;
-    obj.castShadow=true;
-    obj.receiveShadow=true;
-    obj.renderOrder=10;
+    if(obj.isMesh) meshCount++;
   });
 
   if(meshCount===0){
@@ -6290,25 +6083,24 @@ function finishSpiderModel(model,animations,sourceName){
   }
 
   model.updateMatrixWorld(true);
-  const parsedBounds=new THREE.Box3().setFromObject(model);
-  const parsedSize=parsedBounds.getSize(new THREE.Vector3());
+  const bounds=new THREE.Box3().setFromObject(model);
+  const size=bounds.getSize(new THREE.Vector3());
 
   if(
-    !Number.isFinite(parsedSize.x) ||
-    !Number.isFinite(parsedSize.y) ||
-    !Number.isFinite(parsedSize.z) ||
-    Math.max(parsedSize.x,parsedSize.y,parsedSize.z)<.001
+    !Number.isFinite(size.x) ||
+    !Number.isFinite(size.y) ||
+    !Number.isFinite(size.z) ||
+    Math.max(size.x,size.y,size.z)<.001
   ){
-    throw new Error("Spider model parsed, but its geometry has zero or invalid bounds.");
+    throw new Error("Spider model has zero or invalid bounds.");
   }
 
+  // Scale only. No material edits, geometry edits, skeleton edits,
+  // centering, forced rotation, or shadow/render-property rewrites.
   fitSpiderModel(model);
 
-  // The wrapper owns the ground contact point. The imported FBX stays centered
-  // so the exact same rig can be rotated 180 degrees for the ceiling.
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
-  visualRoot.position.y=SPIDER_GROUND_OFFSET+spiderModelHalfHeight;
   visualRoot.add(model);
 
   spiderModel=visualRoot;
@@ -6326,30 +6118,19 @@ function finishSpiderModel(model,animations,sourceName){
     spiderRetryTimer=null;
   }
 
+  // Keep the current diagnostic static state. Animation setup can be added
+  // separately without touching the imported mesh itself.
   spiderMixer=null;
   spiderActions.clear();
   spiderAnimationClips.clear();
   spiderAnimationState="";
   spiderWantedState="idle";
 
-  console.log("[DeepSeeker] Spider bind-pose diagnostic",{
+  console.log("[DeepSeeker] Spider loaded without model mutation",{
     source:sourceName,
     animationsFound:animations?.length||0,
     meshCount,
-    skinnedMeshes:model.getObjectsByProperty("isSkinnedMesh",true).length,
-    skeletons:model.getObjectsByProperty("skeleton",undefined).length
-  });
-
-  // IMPORTANT: this pass intentionally creates no AnimationMixer/actions.
-  // The spider remains in the FBX bind pose so we can isolate mesh corruption
-  // from animation corruption.
-
-  console.log("[DeepSeeker] Spider rebuilt as solid closed-volume mesh",{
-    source:sourceName,
-    format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
-    animations:animations?.map(animation=>animation.name)||[],
-    animationCount:animations?.length||0,
-    meshCount,
+    scale: model.scale.toArray(),
     halfHeight:spiderModelHalfHeight
   });
 
@@ -6362,14 +6143,11 @@ function finishSpiderModel(model,animations,sourceName){
     spawnSpiderAtPlayer();
   }
 
-  eventText.textContent=spiderActions.size ? "SPIDER READY" : "SPIDER READY (STATIC)";
+  eventText.textContent="SPIDER READY (STATIC)";
   eventText.style.opacity="1";
 
   setTimeout(()=>{
-    if(
-      eventText.textContent==="SPIDER READY" ||
-      eventText.textContent==="SPIDER READY (STATIC)"
-    ){
+    if(eventText.textContent==="SPIDER READY (STATIC)"){
       eventText.style.opacity="0";
     }
   },1800);
@@ -6468,89 +6246,21 @@ async function loadSpiderFromPack(){
       }
     };
 
-    // Diagnostic: prefer the raw OBJ geometry when the pack contains one.
-    // This bypasses FBX skeleton/bind-pose importing completely.
-    const objEntry=Array.from(extracted.resourceBlobs.keys())
-      .find(name=>name.endsWith(".obj"));
-
-    if(objEntry){
-      try{
-        const objBlob=extracted.resourceBlobs.get(objEntry);
-        const objLoader=new OBJLoader(packManager);
-        const parsed=objLoader.parse(
-          new TextDecoder().decode(await objBlob.arrayBuffer())
-        );
-        parsed.updateMatrixWorld(true);
-
-        // Flatten every OBJ part into one clean geometry group. This removes
-        // any per-object translation/rotation/scale that could be splitting
-        // the spider down the middle after OBJ import.
-        const flattened=new THREE.Group();
-        flattened.name="SpiderRawOBJFlattened";
-
-        let flattenedMeshes=0;
-        parsed.traverse(source=>{
-          if(!source.isMesh || !source.geometry) return;
-
-          const geometry=source.geometry.clone();
-          geometry.applyMatrix4(source.matrixWorld);
-
-          const sourceMaterial=Array.isArray(source.material)
-            ? source.material[0]
-            : source.material;
-          const material=new THREE.MeshPhongMaterial({
-            color:sourceMaterial?.color?.clone
-              ? sourceMaterial.color.clone()
-              : new THREE.Color(0x17100e),
-            shininess:8,
-            specular:0x080606,
-            flatShading:true,
-            side:THREE.DoubleSide,
-            transparent:false,
-            opacity:1,
-            alphaTest:0,
-            depthTest:true,
-            depthWrite:true,
-            fog:true
-          });
-
-          const mesh=new THREE.Mesh(geometry,material);
-          mesh.name=source.name || "SpiderOBJPart";
-          mesh.position.set(0,0,0);
-          mesh.rotation.set(0,0,0);
-          mesh.scale.set(1,1,1);
-          mesh.frustumCulled=false;
-          mesh.castShadow=true;
-          mesh.receiveShadow=true;
-          flattened.add(mesh);
-          flattenedMeshes++;
-        });
-
-        if(!flattenedMeshes){
-          throw new Error("Spider OBJ contained no renderable geometry.");
-        }
-
-        handleLoaded(flattened,[]);
-        console.log("[DeepSeeker] using FLATTENED RAW OBJ spider diagnostic",{
-          sourceMeshes:flattenedMeshes
-        });
-      }catch(objError){
-        console.error("[DeepSeeker] RAW OBJ spider diagnostic failed:",objError);
-        failSpiderLoad(objError,"SPIDER OBJ PARSE FAILED");
-      }
-    }else if(extracted.modelType==="fbx"){
+    if(extracted.modelType==="fbx"){
       const loader=new FBXLoader(packManager);
-
-      try{
-        const object=loader.parse(
-          extracted.modelBytes.buffer,
-          extracted.modelDirectory
-        );
-        handleLoaded(object,[]);
-        console.log("[DeepSeeker] no OBJ available; using static FBX diagnostic");
-      }catch(fbxError){
-        failSpiderLoad(fbxError,"SPIDER MODEL PARSE FAILED");
-      }
+      const object=loader.parse(
+        extracted.modelBytes.buffer,
+        extracted.modelDirectory
+      );
+      handleLoaded(object,object.animations||[]);
+      console.log("[DeepSeeker] using source FBX spider");
+    }else if(extracted.modelType==="obj"){
+      const loader=new OBJLoader(packManager);
+      const object=loader.parse(
+        new TextDecoder().decode(extracted.modelBytes)
+      );
+      handleLoaded(object,[]);
+      console.log("[DeepSeeker] using source OBJ spider");
     }else{
       const loader=new GLTFLoader(packManager);
       loader.setDRACOLoader(dracoLoader);
