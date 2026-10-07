@@ -1302,42 +1302,54 @@ function applyArachnophobiaVisual(){
 
 function syncMenuSpiderFromGameplayModel(){
   if(menuSpiderActual || !spiderModel) return;
+
   menuSpiderActual=SkeletonUtils.clone(spiderModel);
   menuSpiderActual.name="MenuSpiderActualModel";
   menuSpiderActual.visible=true;
   menuSpiderActual.scale.setScalar(
     arachnophobiaMode ? MENU_DUCK_SCALE : MENU_SPIDER_SCALE
   );
-  menuSpiderActual.rotation.x=arachnophobiaMode ? 0 : Math.PI;
-  menuSpiderActual.rotation.y=0;
+
+  // The shared visual is centered around its origin. Flip this wrapper around
+  // X so the spider hangs below the ceiling instead of sitting on top of it.
+  menuSpiderActual.rotation.set(
+    arachnophobiaMode ? 0 : Math.PI,
+    0,
+    0
+  );
+
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
+
     node.frustumCulled=false;
     node.castShadow=false;
     node.receiveShadow=false;
     node.renderOrder=50;
 
-    // The title-screen ceiling is opaque; keep the actual spider visibly
-    // attached to that ceiling without changing the gameplay spider.
-    if(node.material){
-      const materials=Array.isArray(node.material)?node.material:[node.material];
-      for(const material of materials){
-        if(arachnophobiaMode){
-          material.transparent=false;
-          material.opacity=1;
-          material.depthTest=true;
-          material.depthWrite=true;
-        }else{
-          material.depthTest=false;
-          material.depthWrite=false;
-        }
-        material.needsUpdate=true;
+    if(!node.material) return;
+
+    const materials=Array.isArray(node.material)
+      ? node.material
+      : [node.material];
+
+    for(const material of materials){
+      if(arachnophobiaMode){
+        material.transparent=false;
+        material.opacity=1;
+        material.depthTest=true;
+        material.depthWrite=true;
+      }else{
+        // The menu ceiling is solid. Disable depth writes so the underside
+        // cannot disappear into the ceiling surface.
+        material.depthTest=false;
+        material.depthWrite=false;
       }
+      material.needsUpdate=true;
     }
   });
+
   menuSpider.add(menuSpiderActual);
   menuSpider.updateMatrixWorld(true);
-  menuSpider.position.y=MENU_SPIDER_CEILING_Y;
 
   if(arachnophobiaMode){
     menuSpiderMixer=null;
@@ -1346,13 +1358,18 @@ function syncMenuSpiderFromGameplayModel(){
   }
 
   menuSpiderMixer=new THREE.AnimationMixer(menuSpiderActual);
-  const menuClip=spiderAnimationClips.get("walk")||spiderAnimationClips.get("idle1")||spiderAnimationClips.get("idle2");
+  const menuClip=
+    spiderAnimationClips.get("walk") ||
+    spiderAnimationClips.get("idle1") ||
+    spiderAnimationClips.get("idle2");
+
   if(menuClip){
     const action=menuSpiderMixer.clipAction(menuClip);
     action.setLoop(THREE.LoopRepeat,Infinity);
     action.timeScale=.42;
     action.play();
   }
+
   menuSpider.visible=true;
 }
 
@@ -4516,6 +4533,7 @@ let spiderLoadStarted=false;
 let spiderStartupFailed=false;
 let spiderRetryTimer=null;
 let spiderModel=null;
+let spiderModelHalfHeight=0;
 let spiderMixer=null;
 const spiderActions=new Map();
 const spiderAnimationClips=new Map();
@@ -4603,40 +4621,27 @@ const SPIDER_ANIMATION_ALIAS={
 
 
 function fitSpiderModel(model){
-  // The source Spider-Psionic FBX is authored with the opposite horizontal
-  // facing from this game's runtime convention. Normalize that once on the
-  // actual imported model so every consumer (ground, tutorial, menu clone)
-  // receives the same forward axis instead of stacking one-off 180° fixes.
-  model.rotation.y=Math.PI;
+  // Keep the imported FBX neutral. Gameplay/menu parents own heading and
+  // ceiling inversion; the asset itself should never carry a hidden yaw hack.
+  model.position.set(0,0,0);
+  model.rotation.set(0,0,0);
+  model.scale.set(1,1,1);
 
   model.traverse(obj=>{
     if(!obj.isMesh) return;
+
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
     obj.receiveShadow=true;
+    obj.renderOrder=10;
 
-    if(Array.isArray(obj.material)){
-      obj.material=obj.material.map(material=>material||new THREE.MeshStandardMaterial({
-        color:0x38251f,
-        roughness:.8,
-        metalness:.04
-      }));
-    }else if(!obj.material){
-      obj.material=new THREE.MeshStandardMaterial({
-        color:0x38251f,
-        roughness:.8,
-        metalness:.04
-      });
-    }
-
-    const materials=Array.isArray(obj.material)?obj.material:[obj.material];
+    const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
     for(const material of materials){
       if(!material) continue;
 
-      // Spider-Psionic materials can arrive with alpha/transmission settings
-      // from the source DCC scene. Force the in-game spider to render as
-      // solid opaque geometry so limbs/body parts cannot disappear.
+      // Preserve the source material/texture setup. Only remove transparency
+      // states that make thin spider geometry disappear.
       material.visible=true;
       material.transparent=false;
       material.opacity=1;
@@ -4651,13 +4656,12 @@ function fitSpiderModel(model){
 
       if("transmission" in material) material.transmission=0;
       if("thickness" in material) material.thickness=0;
-      if("attenuationDistance" in material) material.attenuationDistance=Infinity;
-
       material.needsUpdate=true;
     }
   });
 
   model.updateMatrixWorld(true);
+
   const rawBox=new THREE.Box3().setFromObject(model);
   const rawSize=rawBox.getSize(new THREE.Vector3());
   const maxDimension=Math.max(rawSize.x,rawSize.y,rawSize.z);
@@ -4669,16 +4673,23 @@ function fitSpiderModel(model){
   model.scale.setScalar(SPIDER_TARGET_SPAN/maxDimension);
   model.updateMatrixWorld(true);
 
+  // Center the imported rig around its origin. Rotating this centered rig by
+  // 180 degrees for the ceiling now flips it without moving its pivot above it.
   const fittedBox=new THREE.Box3().setFromObject(model);
   const center=fittedBox.getCenter(new THREE.Vector3());
+  const fittedSize=fittedBox.getSize(new THREE.Vector3());
 
   model.position.x-=center.x;
+  model.position.y-=center.y;
   model.position.z-=center.z;
-  model.position.y+=SPIDER_GROUND_OFFSET-fittedBox.min.y;
   model.updateMatrixWorld(true);
+
+  spiderModelHalfHeight=Math.max(.001,fittedSize.y*.5);
 }
+
 function setSpiderAnimation(name){
   spiderWantedState=name;
+
   const actualName=SPIDER_ANIMATION_ALIAS[name] || name;
   const action=spiderActions.get(actualName);
   if(!action || spiderAnimationState===actualName) return;
@@ -4699,13 +4710,10 @@ function setSpiderAnimation(name){
 }
 
 function groundSpiderEntity(){
-  if(!spiderEntity.visible) return;
+  if(!spiderEntity.visible || !spiderModel) return;
 
-  const activeModel=spiderModel;
-  if(!activeModel) return;
-
-  activeModel.updateMatrixWorld(true);
-  const box=new THREE.Box3().setFromObject(activeModel);
+  spiderModel.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(spiderModel);
   if(!Number.isFinite(box.min.y)) return;
 
   const correction=SPIDER_GROUND_OFFSET-box.min.y;
@@ -6095,7 +6103,7 @@ async function extractSpiderPack(zipUrl){
 }
 
 function finishSpiderModel(model,animations,sourceName){
-  model.name="SpiderVisual";
+  model.name="SpiderSource";
   model.visible=true;
 
   let meshCount=0;
@@ -6107,43 +6115,6 @@ function finishSpiderModel(model,animations,sourceName){
     obj.castShadow=true;
     obj.receiveShadow=true;
     obj.renderOrder=10;
-
-    const originalMaterials=Array.isArray(obj.material)
-      ? obj.material
-      : [obj.material];
-
-    const makeUnlitMaterial=(source)=>{
-      if(!source){
-        return new THREE.MeshBasicMaterial({
-          color:0x6b5145,
-          side:THREE.DoubleSide
-        });
-      }
-
-      const spiderTint=source.color?.clone?.().multiplyScalar(.45) || new THREE.Color(0x3a2b26);
-      const material=new THREE.MeshBasicMaterial({
-        color:spiderTint,
-        map:source.map || null,
-        alphaMap:source.alphaMap || null,
-        transparent:Boolean(source.transparent),
-        opacity:Number.isFinite(source.opacity) ? source.opacity : 1,
-        side:source.side ?? THREE.FrontSide,
-        vertexColors:Boolean(source.vertexColors)
-      });
-
-      material.name=source.name || "SpiderOriginalUnlit";
-      material.depthTest=true;
-      material.depthWrite=true;
-      material.needsUpdate=true;
-      return material;
-    };
-
-    if(Array.isArray(obj.material)){
-      obj.material=originalMaterials.map(makeUnlitMaterial);
-    }else{
-      obj.material=makeUnlitMaterial(originalMaterials[0]);
-    }
-
   });
 
   if(meshCount===0){
@@ -6153,6 +6124,7 @@ function finishSpiderModel(model,animations,sourceName){
   model.updateMatrixWorld(true);
   const parsedBounds=new THREE.Box3().setFromObject(model);
   const parsedSize=parsedBounds.getSize(new THREE.Vector3());
+
   if(
     !Number.isFinite(parsedSize.x) ||
     !Number.isFinite(parsedSize.y) ||
@@ -6162,25 +6134,25 @@ function finishSpiderModel(model,animations,sourceName){
     throw new Error("Spider model parsed, but its geometry has zero or invalid bounds.");
   }
 
-  console.log("[DeepSeeker] Spider geometry validated before spawn",{
-    meshCount,
-    bounds:{
-      x:parsedSize.x,
-      y:parsedSize.y,
-      z:parsedSize.z
-    }
-  });
-
   fitSpiderModel(model);
 
-  spiderModel=model;
-  spiderOriginalModel=model;
-  spiderEntity.add(model);
+  // The wrapper owns the ground contact point. The imported FBX stays centered
+  // so the exact same rig can be rotated 180 degrees for the ceiling.
+  const visualRoot=new THREE.Group();
+  visualRoot.name="SpiderVisualRoot";
+  visualRoot.position.y=SPIDER_GROUND_OFFSET+spiderModelHalfHeight;
+  visualRoot.add(model);
+
+  spiderModel=visualRoot;
+  spiderOriginalModel=visualRoot;
+  spiderEntity.add(visualRoot);
   spiderLoaded=true;
   spiderStartupFailed=false;
+
   if(gameStarted && !houseMode){
     nextEvent=Math.min(nextEvent,clock.elapsedTime+8);
   }
+
   if(spiderRetryTimer!==null){
     clearTimeout(spiderRetryTimer);
     spiderRetryTimer=null;
@@ -6191,12 +6163,6 @@ function finishSpiderModel(model,animations,sourceName){
   spiderAnimationClips.clear();
   spiderAnimationState="";
 
-  const normalizedAnimationName=(clip)=>String(clip?.name||"")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g," ");
-
-  // This asset is documented as 15 separate animations. FBXLoader commonly
-  // exposes those as 15 clips, so use the clips directly in documented order.
   const documentedClipNames=[
     "walk",
     "attack1",
@@ -6239,23 +6205,30 @@ function finishSpiderModel(model,animations,sourceName){
 
   const rootBoneNames=new Set();
   const animatedNodeNames=new Set();
+
   model.traverse(obj=>{
-    animatedNodeNames.add(String(obj.name||"").toLowerCase());
+    const nodeName=String(obj.name||"").toLowerCase();
+    if(nodeName) animatedNodeNames.add(nodeName);
 
     if(!obj.isSkinnedMesh || !obj.skeleton) return;
     for(const bone of obj.skeleton.bones){
       const boneName=String(bone.name||"").toLowerCase();
+      if(!boneName) continue;
+
       animatedNodeNames.add(boneName);
-      if(!bone.parent?.isBone){
-        rootBoneNames.add(boneName);
-      }
+      // Keep bone rotations intact: the root bone can carry real body pose.
+      if(!bone.parent?.isBone) rootBoneNames.add(boneName);
     }
   });
 
   const trackTargetName=(track)=>{
     if(!track?.name) return "";
-    return String(track.name)
-      .slice(0,Math.max(0,String(track.name).lastIndexOf(".")))
+    const raw=String(track.name);
+    const dot=raw.lastIndexOf(".");
+    if(dot<1) return "";
+
+    return raw
+      .slice(0,dot)
       .split("|")
       .pop()
       .split(":")
@@ -6267,21 +6240,14 @@ function finishSpiderModel(model,animations,sourceName){
     if(!clip) return null;
     const stable=clip.clone();
 
-    // The pack contains animation data authored for a different FBX scene
-    // hierarchy. Keep the bone rotations that actually animate the spider,
-    // but discard scene/root translation, scaling, facial deformation, and
-    // unknown-node tracks.
     stable.tracks=stable.tracks.filter(track=>{
       const target=trackTargetName(track);
       if(!animatedNodeNames.has(target)) return false;
 
-      const lowerTarget=target.toLowerCase();
-      const facialTarget=/face|head|eye|eyelid|jaw|mouth|lip|tongue|teeth|brow|cheek/.test(lowerTarget);
+      const facialTarget=/face|eye|eyelid|jaw|mouth|lip|tongue|teeth|brow|cheek/.test(target);
 
-      // Facial morphs are the source asset's least reliable animation data.
-      // Leave the authored face geometry static so it cannot tear or warp
-      // when the body animations blend.
       if(track.name.endsWith(".morphTargetInfluences")) return false;
+
       if(facialTarget && (
         track.name.endsWith(".quaternion") ||
         track.name.endsWith(".position") ||
@@ -6291,21 +6257,12 @@ function finishSpiderModel(model,animations,sourceName){
       }
 
       if(track.name.endsWith(".position")){
-        if(animationName==="walk") return false;
-        return !rootBoneNames.has(target);
+        return !rootBoneNames.has(target) && animationName!=="walk";
       }
 
-      // The root bone must not animate the spider's heading. The parent entity
-    // owns facing for gameplay and the menu path; child-bone rotations still
-    // provide the actual leg/body locomotion.
-      if(track.name.endsWith(".quaternion") && rootBoneNames.has(target)){
-        return false;
-      }
+      if(track.name.endsWith(".scale")) return false;
 
-      if(track.name.endsWith(".scale")){
-        return false;
-      }
-
+      // Do not strip root-bone quaternion tracks; they contain real pose data.
       return track.name.endsWith(".quaternion") ||
         track.name.endsWith(".position") ||
         track.name.endsWith(".color");
@@ -6319,8 +6276,6 @@ function finishSpiderModel(model,animations,sourceName){
   const claimedAnimations=new Set();
 
   if(animations?.length>1){
-    // Prefer the animation's real FBX name. This avoids assuming the exporter
-    // kept the documented array order.
     for(const documentedName of documentedClipNames){
       const aliases=animationAliases[documentedName]||[documentedName];
       const match=animations.find((clip,index)=>{
@@ -6328,49 +6283,49 @@ function finishSpiderModel(model,animations,sourceName){
         const name=normalizeAnimationKey(clip.name);
         return aliases.some(alias=>name.includes(normalizeAnimationKey(alias)));
       });
-      if(match){
-        const index=animations.indexOf(match);
-        claimedAnimations.add(index);
 
-        if(documentedName==="walk"){
-          // Test a slightly trimmed section of the walk clip instead of the
-          // exact 0–45 range that previously caused the rig to break.
-          const walkFPS=45/Math.max(match.duration,.001);
-          const walkClip=THREE.AnimationUtils.subclip(
-            match,
-            "spider_walk_test",
-            3,
-            45,
-            walkFPS
-          );
-          directClips.set(documentedName,makeStableSpiderClip(walkClip,"walk"));
-        }else{
-          directClips.set(documentedName,makeStableSpiderClip(match,documentedName));
-        }
+      if(!match) continue;
+
+      const index=animations.indexOf(match);
+      claimedAnimations.add(index);
+
+      if(documentedName==="walk"){
+        const walkFPS=45/Math.max(match.duration,.001);
+        const walkClip=THREE.AnimationUtils.subclip(
+          match,
+          "spider_walk",
+          3,
+          45,
+          walkFPS
+        );
+        directClips.set(documentedName,makeStableSpiderClip(walkClip,"walk"));
+      }else{
+        directClips.set(documentedName,makeStableSpiderClip(match,documentedName));
       }
     }
 
-    // If the exporter used generic names, fall back to documented array order
-    // only for animations that were not identified by name.
     if(directClips.size<documentedClipNames.length && animations.length>=documentedClipNames.length){
       for(let i=0;i<documentedClipNames.length;i++){
         const documentedName=documentedClipNames[i];
         if(directClips.has(documentedName)) continue;
-        const clip=animations.find((candidate,index)=>index===i && !claimedAnimations.has(index))
-          || animations.find((candidate,index)=>!claimedAnimations.has(index));
+
+        const clip=
+          animations.find((candidate,index)=>index===i && !claimedAnimations.has(index)) ||
+          animations.find((candidate,index)=>!claimedAnimations.has(index));
+
         if(!clip) continue;
+
         const index=animations.indexOf(clip);
         claimedAnimations.add(index);
-        directClips.set(documentedName,makeStableSpiderClip(clip));
+        directClips.set(documentedName,makeStableSpiderClip(clip,documentedName));
       }
     }
   }
 
-  // If the exporter combines everything into one long clip, retain the original
-  // frame-range fallback used by the asset documentation.
   if(animations?.length===1){
     const sourceClip=animations[0];
     const sourceFPS=329/Math.max(sourceClip.duration,.001);
+
     for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
       const clip=THREE.AnimationUtils.subclip(
         sourceClip,
@@ -6383,18 +6338,17 @@ function finishSpiderModel(model,animations,sourceName){
     }
   }
 
-  spiderAnimationClips.clear();
   for(const [name,clip] of directClips){
     if(clip) spiderAnimationClips.set(name,clip);
   }
 
   if(directClips.size){
-    spiderMixer=new THREE.AnimationMixer(model);
+    spiderMixer=new THREE.AnimationMixer(spiderModel);
 
     for(const [name,clip] of directClips){
-      if(!clip) continue;
       const action=spiderMixer.clipAction(clip);
       const oneShot=name.startsWith("die") || name.startsWith("attack");
+
       action.setLoop(
         oneShot ? THREE.LoopOnce : THREE.LoopRepeat,
         oneShot ? 1 : Infinity
@@ -6405,7 +6359,6 @@ function finishSpiderModel(model,animations,sourceName){
 
     console.log("[DeepSeeker] Spider animation map",{
       selected:[...directClips.keys()],
-      aliases:SPIDER_ANIMATION_ALIAS,
       rootBones:[...rootBoneNames],
       trackCounts:[...directClips.entries()].map(([name,clip])=>[
         name,
@@ -6418,62 +6371,38 @@ function finishSpiderModel(model,animations,sourceName){
     spiderWantedState="idle";
   }
 
-  if(spiderActions.size===0 && animations?.length===0){
-    console.log("[DeepSeeker] Spider visual loaded without animation clips (static fallback).");
-  }
-
-  console.log("[DeepSeeker] Spider render material",{
-    sourceMaterialTypes:[...new Set(
-      [].concat(...model.children.map(child=>[])
-    )).values()]
+  console.log("[DeepSeeker] Spider-Psionic rig loaded",{
+    source:sourceName,
+    format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
+    animations:animations?.map(animation=>animation.name)||[],
+    animationCount:animations?.length||0,
+    meshCount,
+    halfHeight:spiderModelHalfHeight
   });
 
-  console.log(
-    "[DeepSeeker] Spider-Psionic asset loaded from ZIP",
-    {
-      source:sourceName,
-      format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
-      animations:animations?.map(animation=>animation.name)||[],
-      animationCount:animations?.length||0,
-      meshCount
-    }
-  );
-
-  // Swap the rendered entity after the real rig has been prepared. The
-  // original model stays cached so the accessibility setting can be changed
-  // without another network download.
-  applyArachnophobiaVisual();
+  syncMenuSpiderFromGameplayModel();
 
   spiderLoadStarted=false;
 
-  if(spiderSpawnPending){
-    const canResumeNormalSpider=
-      gameStarted &&
-      !houseMode &&
-      !tutorialOpenRoomActive;
-
+  if(spiderSpawnPending && gameStarted && !houseMode){
     spiderSpawnPending=false;
-    if(canResumeNormalSpider){
-      spawnSpiderAtPlayer();
-    }
+    spawnSpiderAtPlayer();
   }
 
-  eventText.textContent=arachnophobiaMode
-    ? "ENTITY READY · DUCK MODE"
-    : (spiderActions.size ? "SPIDER READY" : "SPIDER READY (STATIC)");
+  eventText.textContent=spiderActions.size ? "SPIDER READY" : "SPIDER READY (STATIC)";
   eventText.style.opacity="1";
+
   setTimeout(()=>{
     if(
       eventText.textContent==="SPIDER READY" ||
-      eventText.textContent==="SPIDER READY (STATIC)" ||
-      eventText.textContent==="ENTITY READY · DUCK MODE"
+      eventText.textContent==="SPIDER READY (STATIC)"
     ){
       eventText.style.opacity="0";
     }
   },1800);
 }
 
-async function loadSpiderFromPack(){
+function loadSpiderFromPack(){
   const packUrl="./assets/Spider-Psionic.zip";
   let objectUrls=[];
 
