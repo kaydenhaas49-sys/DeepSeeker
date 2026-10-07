@@ -4646,7 +4646,9 @@ function fitSpiderModel(model){
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
-    obj.receiveShadow=true;
+    // Keep the animated spider lit by the flashlight without letting its
+    // skinned surface self-shadow into a black silhouette.
+    obj.receiveShadow=false;
     obj.renderOrder=10;
 
     // FBX skin weights/normals can be slightly dirty after conversion.
