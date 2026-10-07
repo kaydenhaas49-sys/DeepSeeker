@@ -4433,14 +4433,15 @@ function prepareInitialStartupAssets(){
 function updateInitialLoadingScreen(){
   if(initialLandingShown) return;
 
-  // Spider-Psionic is optional background content and must never block boot.
+  const spiderProgress=spiderLoaded ? 100 : 0;
   const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
   const decoderProgress=geometryDecoderReady ? 100 : 0;
   const startupProgress=initialStartupPrepared ? 100 : 0;
   const total=Math.max(0,Math.min(100,Math.round(
-    decoderProgress*.20 +
-    startupProgress*.30 +
-    saveProgress*.50
+    spiderProgress*.30 +
+    decoderProgress*.15 +
+    startupProgress*.25 +
+    saveProgress*.30
   )));
 
   const fill=document.getElementById("initialLoadFill");
@@ -4453,13 +4454,18 @@ function updateInitialLoadingScreen(){
     if(initialStartupError){
       status.textContent="STARTUP PREPARATION FAILED — RELOAD TO RETRY.";
     }else if(
+      spiderLoaded &&
       geometryDecoderReady &&
       initialStartupPrepared &&
       window.__deepseekerSaveHydrationDone
     ){
       status.textContent=player.characterLoaded
-        ? "WORLD READY — STARTING MAIN MENU."
+        ? "WORLD + ENTITY PACK READY — STARTING MAIN MENU."
         : "WORLD READY — PLAYER MODEL LOADING IN BACKGROUND.";
+    }else if(!spiderLoaded){
+      status.textContent=spiderStartupFailed
+        ? "SPIDER PACK FAILED — RETRYING…"
+        : "LOADING ANIMATED SPIDER…";
     }else if(!geometryDecoderReady){
       status.textContent="INITIALIZING GEOMETRY DECODERS…";
     }else if(!initialStartupPrepared){
@@ -4476,6 +4482,7 @@ function finishInitialLoading(){
   if(initialLandingShown) return;
   if(
     initialStartupError ||
+    !spiderLoaded ||
     !geometryDecoderReady ||
     !initialStartupPrepared ||
     !window.__deepseekerSaveHydrationDone
@@ -4504,10 +4511,11 @@ function beginInitialLoading(){
   });
 
   // Everything needed by the playable experience starts together behind the
-  // loading screen. Nothing is intentionally deferred until after the menu.
+  // loading screen. The animated spider is part of this gate so gameplay/menu
+  // never has to pop it in later.
   prepareInitialStartupAssets();
+  ensureSpiderLoading();
 
-  // Spider-Psionic loads after gameplay starts so its ZIP parsing cannot block boot.
   // Decoder warmup is already running; keep the same boot gate for it.
   void geometryDecoderPromise;
 
@@ -4638,7 +4646,9 @@ function fitSpiderModel(model){
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
-    obj.receiveShadow=true;
+    // The flashlight is a shadow-casting light. Skinned spider geometry can
+    // self-shadow badly, making the creature turn black inside the beam.
+    obj.receiveShadow=false;
     obj.renderOrder=10;
 
     // FBX skin weights/normals can be slightly dirty after conversion.
@@ -7352,12 +7362,24 @@ async function toggleFitScreen(){
     if(document.fullscreenElement){
       await document.exitFullscreen();
     }else{
-      await document.documentElement.requestFullscreen({navigationUI:"hide"});
+      const fullscreenTarget=document.documentElement || document.body;
+      if(!fullscreenTarget?.requestFullscreen){
+        throw new Error("Fullscreen API unavailable in this browser.");
+      }
+
+      try{
+        await fullscreenTarget.requestFullscreen({navigationUI:"hide"});
+      }catch(_optionsError){
+        // Firefox/browser builds that reject navigationUI should still enter
+        // fullscreen normally.
+        await fullscreenTarget.requestFullscreen();
+      }
     }
   }catch(error){
     console.warn("[DeepSeeker] Fullscreen unavailable:",error);
+  }finally{
+    requestAnimationFrame(fitGameToScreen);
   }
-  fitGameToScreen();
 }
 
 addEventListener("resize",fitGameToScreen);
