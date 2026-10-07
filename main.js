@@ -4872,6 +4872,7 @@ function prepareHouseTutorialSpider(){
 
   spiderEntity.position.copy(houseTutorialSpiderPosition);
   spiderEntity.rotation.x=0;
+  if(spiderModel) spiderModel.visible=true;
   spiderEntity.rotation.y=Math.atan2(
     player.pos.x-spiderEntity.position.x,
     player.pos.z-spiderEntity.position.z
@@ -4926,6 +4927,27 @@ function setHouseTutorialStage(stage){
   if(!gameStarted || houseMode) return;
 
   houseTutorialStage=stage;
+
+  // Hard-reset the normal director for every tutorial stage. This covers stale
+  // chases, pounces, pending asset loads, and timers from a previous run.
+  if(stage>=1 && stage<=9){
+    spiderActive=false;
+    spiderSpawnPending=false;
+    spiderJumpscareTimer=0;
+    spiderJumpscareScale=1;
+    spiderBehaviorState="idle";
+    spiderBehaviorTime=0;
+    spiderScareRevealTimer=0;
+    spiderVisibleToPlayer=true;
+    spiderStuckTime=0;
+    clearSpiderPath();
+    spiderEntity.visible=false;
+    spiderRevealLight.visible=false;
+    spiderEntity.rotation.x=0;
+    spiderEntity.scale.setScalar(1);
+    if(spiderModel) spiderModel.visible=true;
+  }
+
   updateTutorialGuide();
 
   if(stage===1){
@@ -4982,6 +5004,11 @@ function setHouseTutorialStage(stage){
     );
     updateTutorialGuide();
     disableTutorialOpenRoom();
+
+    // Resume normal encounters only after a fresh post-tutorial delay.
+    spiderSpawnPending=false;
+    eventCooldown=0;
+    nextEvent=clock.elapsedTime+24+Math.random()*24;
   }
 }
 
@@ -5077,6 +5104,11 @@ function updateHouseTutorialSpider(dt){
   }
 
   houseTutorialSpiderTime+=dt;
+
+  // The tutorial is the sole owner of this shared entity during stages 8–9.
+  // Force the model visible so normal Backrooms line-of-sight state cannot
+  // leave the tutorial spider as an invisible shell.
+  if(spiderModel) spiderModel.visible=true;
 
   const dxToPlayer=player.pos.x-spiderEntity.position.x;
   const dzToPlayer=player.pos.z-spiderEntity.position.z;
@@ -5839,7 +5871,9 @@ function finishSpiderJumpscare(){
 }
 
 function spawnSpiderAtPlayer(){
-  if(!gameStarted || houseMode) return false;
+  // The scripted tutorial owns the shared spider entity. Never allow a normal
+  // spawn path to start or queue an encounter inside the tutorial room.
+  if(!gameStarted || houseMode || tutorialOpenRoomActive) return false;
   if(spiderActive) return true;
 
   if(!spiderLoaded){
@@ -6255,6 +6289,13 @@ function finishSpiderModel(model,animations,sourceName){
         return !rootBoneNames.has(target);
       }
 
+      // The root bone must not animate the spider's heading. The parent entity
+    // owns facing for gameplay and the menu path; child-bone rotations still
+    // provide the actual leg/body locomotion.
+      if(track.name.endsWith(".quaternion") && rootBoneNames.has(target)){
+        return false;
+      }
+
       if(track.name.endsWith(".scale")){
         return false;
       }
@@ -6399,9 +6440,16 @@ function finishSpiderModel(model,animations,sourceName){
 
   spiderLoadStarted=false;
 
-  if(spiderSpawnPending && gameStarted && !houseMode){
+  if(spiderSpawnPending){
+    const canResumeNormalSpider=
+      gameStarted &&
+      !houseMode &&
+      !tutorialOpenRoomActive;
+
     spiderSpawnPending=false;
-    spawnSpiderAtPlayer();
+    if(canResumeNormalSpider){
+      spawnSpiderAtPlayer();
+    }
   }
 
   eventText.textContent=arachnophobiaMode
@@ -6431,7 +6479,12 @@ async function loadSpiderFromPack(){
     spiderActions.clear();
     spiderAnimationState="";
     spiderLoadStarted=false;
-    spiderSpawnPending=gameStarted && !houseMode;
+    // A failed load may finish later, after the tutorial has started. Never
+    // queue a surprise normal encounter while the scripted lesson is active.
+    spiderSpawnPending=
+      gameStarted &&
+      !houseMode &&
+      !tutorialOpenRoomActive;
 
     for(const url of objectUrls){
       URL.revokeObjectURL(url);
