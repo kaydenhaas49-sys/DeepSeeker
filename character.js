@@ -690,7 +690,9 @@ export function disposeRemoteFlashlight(scene, remoteLight){
 }
 
 export function flashlightFlicker(time){
-  return .90 + .10 * Math.sin(time * 12.0) * Math.sin(time * 5.2);
+  // Keep the normal beam subtle and slow. Fast strobing is especially
+  // unpleasant at low battery, where the separate battery modulation also runs.
+  return .94 + .06 * Math.sin(time * 4.2) * Math.sin(time * 2.15);
 }
 
 export async function createHazmatCharacter(){

@@ -7586,8 +7586,22 @@ function animate(){
 
   const flicker=flashlightFlicker(t);
   const lowBattery=Math.pow(THREE.MathUtils.clamp((35-battery)/35,0,1),1.15);
-  const lowBatteryWave=Math.sin(t*(9+lowBattery*28)+battery*.19);
-  const lowBatteryDrop=lowBattery>0 && lowBatteryWave>.35 ? THREE.MathUtils.lerp(1,.20,lowBattery) : 1;
+
+  // Low battery should feel unstable, not become a high-frequency strobe.
+  // Keep the modulation deliberately slow and smooth so the beam breathes
+  // between dim/bright states instead of snapping dozens of times per second.
+  const lowBatteryWave=
+    .5+
+    .5*Math.sin(
+      t*(1.15+lowBattery*1.1)+
+      Math.sin(t*.37)*.7+
+      battery*.035
+    );
+  const lowBatteryDrop=
+    lowBattery>0
+      ? THREE.MathUtils.lerp(1,.58,lowBattery*lowBatteryWave)
+      : 1;
+
   let flashlightStrength=20.0*flicker*lowBatteryDrop;
 
   if(flashlightOn && !houseMode && spiderActive){
