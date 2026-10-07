@@ -38,13 +38,24 @@ function detectLowEndHardware(){
     gl?.getExtension("WEBGL_lose_context")?.loseContext();
   }catch{}
 
-  const weakGpu=/swiftshader|llvmpipe|software rasterizer|intel(?:r)?\s+(?:hd|uhd|iris)|mesa.*intel|microsoft basic render/i.test(gpu);
+  // Modern Chromebook Intel UHD/Iris graphics are not automatically treated as
+  // potato hardware anymore. Reserve the lowest visual tier for software
+  // rendering, old Intel HD-class GPUs, or very small CPU/RAM systems.
+  const softwareRasterizer=/swiftshader|llvmpipe|software rasterizer|microsoft basic render/i.test(gpu);
+  const oldIntelGpu=/intel(?:r)?\s+hd\s+graphics|mesa.*intel\s+hd/i.test(gpu);
   const weakCpu=cores<=4 && memory<=4;
-  const forcedLow=QUALITY_PARAM==="low"||QUALITY_PARAM==="potato";
-  return forcedLow || weakGpu || weakCpu;
+  const forcedLow=QUALITY_PARAM==="low";
+  const forcedPotato=QUALITY_PARAM==="potato";
+
+  return {
+    low:forcedLow || forcedPotato || softwareRasterizer || oldIntelGpu || weakCpu,
+    ultraLow:forcedPotato || softwareRasterizer || (cores<=2 && memory<=2)
+  };
 }
 
-const LOW_END_PERFORMANCE=QUALITY_PARAM!=="high" && detectLowEndHardware();
+const PERFORMANCE_TIER=detectLowEndHardware();
+const LOW_END_PERFORMANCE=QUALITY_PARAM!=="high" && PERFORMANCE_TIER.low;
+const ULTRA_LOW_PERFORMANCE=QUALITY_PARAM!=="high" && PERFORMANCE_TIER.ultraLow;
 if(LOW_END_PERFORMANCE) document.documentElement.classList.add("deepseeker-low");
 
 const container=document.getElementById("app");
@@ -190,20 +201,27 @@ const geometryDecoderPromise=(async()=>{
 })();
 
 const renderer=new THREE.WebGLRenderer({
-  antialias:!LOW_END_PERFORMANCE,
+  // Keep antialiasing on for normal Chromebook/low-end hardware. Only the
+  // ultra-low tier disables it because aliasing was a major part of the
+  // blurry/cheap look on ChromeOS.
+  antialias:!ULTRA_LOW_PERFORMANCE,
   powerPreference:"high-performance",
-  precision:LOW_END_PERFORMANCE?"mediump":"highp",
+  precision:ULTRA_LOW_PERFORMANCE?"mediump":"highp",
   alpha:false,
   stencil:false
 });
 renderer.setSize(innerWidth,innerHeight,false);
 
 const BASE_PIXEL_RATIO=LOW_END_PERFORMANCE
-  ? Math.min(devicePixelRatio,.55)
+  ? Math.min(devicePixelRatio,ULTRA_LOW_PERFORMANCE?.55:.78)
   : Math.min(devicePixelRatio,1.0);
-const HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE?.50:.66;
-const MIN_HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE?.34:.52;
-const PERFORMANCE_TARGET_FPS=LOW_END_PERFORMANCE?100:60;
+const HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE
+  ? (ULTRA_LOW_PERFORMANCE?.50:.70)
+  : .66;
+const MIN_HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE
+  ? (ULTRA_LOW_PERFORMANCE?.34:.54)
+  : .52;
+const PERFORMANCE_TARGET_FPS=60;
 let currentPixelRatio=BASE_PIXEL_RATIO;
 let housePixelRatio=HOUSE_PIXEL_RATIO;
 let perfElapsed=0;
@@ -213,9 +231,8 @@ let uiRefreshElapsed=0;
 let storyRefreshElapsed=0;
 let debugPerfElapsed=0;
 renderer.setPixelRatio(currentPixelRatio);
-renderer.toneMapping=LOW_END_PERFORMANCE
-  ? THREE.NoToneMapping
-  : THREE.ACESFilmicToneMapping;
+// Keep the game's contrast/lighting response intact on Chromebooks.
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.08;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
@@ -224,15 +241,15 @@ const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x000100);
 scene.fog=new THREE.Fog(
   0x030302,
-  LOW_END_PERFORMANCE?12:14,
-  LOW_END_PERFORMANCE?46:62
+  LOW_END_PERFORMANCE?13:14,
+  LOW_END_PERFORMANCE?56:62
 );
 
 const camera=new THREE.PerspectiveCamera(
   70,
   innerWidth/innerHeight,
   .08,
-  LOW_END_PERFORMANCE?100:300
+  LOW_END_PERFORMANCE?180:300
 );
 const world=new World(scene,SEED,Math.min(renderer.capabilities.getMaxAnisotropy(),4));
 
