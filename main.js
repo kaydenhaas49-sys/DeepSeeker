@@ -6272,18 +6272,26 @@ function finishSpiderModel(model,animations,sourceName){
     if(!clip) return null;
     const stable=clip.clone();
 
-    // Keep the source rig's real transform tracks. The previous sanitizer
-    // stripped non-root position/scale tracks, which can produce severe
-    // skinned-mesh deformation on this spider even though the FBX is valid.
+    // Spider-Psionic's FBX contains exporter tracks for scene/root transforms
+    // that do not belong on the rendered rig. Keep real bone animation, but
+    // discard root motion, scale tracks, and tracks aimed at unknown nodes.
     stable.tracks=stable.tracks.filter(track=>{
       const target=trackTargetName(track);
       if(!animatedNodeNames.has(target)) return false;
-      if(track.name.endsWith(".morphTargetInfluences")) return false;
+
+      if(track.name.endsWith(".position")){
+        return !rootBoneNames.has(target);
+      }
+
+      if(track.name.endsWith(".scale")){
+        return false;
+      }
+
       return (
         track.name.endsWith(".quaternion") ||
         track.name.endsWith(".position") ||
-        track.name.endsWith(".scale") ||
-        track.name.endsWith(".color")
+        track.name.endsWith(".color") ||
+        track.name.endsWith(".morphTargetInfluences")
       );
     });
 
