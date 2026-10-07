@@ -4651,20 +4651,11 @@ function fitSpiderModel(model){
     obj.receiveShadow=false;
     obj.renderOrder=10;
 
-    // FBX skin weights/normals can be slightly dirty after conversion.
-    // Normalize once here so animation does not tear the mesh apart.
-    if(obj.isSkinnedMesh){
-      obj.normalizeSkinWeights?.();
-      if(obj.skeleton) obj.skeleton.update();
-    }
-
-    const geometry=obj.geometry;
-    if(geometry){
-      if(!geometry.getAttribute("normal") && geometry.computeVertexNormals){
-        geometry.computeVertexNormals();
-      }else if(geometry.normalizeNormals){
-        geometry.normalizeNormals();
-      }
+    // Do not rewrite the imported rig's skin weights or geometry normals.
+    // This asset already contains its authored deformation data; changing it
+    // at runtime can alter the skinned mesh and cause visible deformation.
+    if(obj.isSkinnedMesh && obj.skeleton){
+      obj.skeleton.update();
     }
 
     const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
