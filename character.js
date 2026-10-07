@@ -4,7 +4,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
 
-const CHARACTER_PATH = "./assets/hazmat_suit_pack-_character_a.glb";
+const CHARACTER_PATH = "./assets/hazmat suit 3d model.glb";
 const CHARACTER_HEIGHT = 1.8;
 
 let templatePromise = null;
