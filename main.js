@@ -6250,10 +6250,10 @@ function finishSpiderModel(model,animations,sourceName){
       const target=trackTargetName(track);
       if(!animatedNodeNames.has(target)) return false;
       if(track.name.endsWith(".morphTargetInfluences")) return false;
+      // The spider is a skinned FBX. Bone rotations are the safe deformation
+      // channels; animated position/scale tracks can split the skin apart.
       return (
         track.name.endsWith(".quaternion") ||
-        track.name.endsWith(".position") ||
-        track.name.endsWith(".scale") ||
         track.name.endsWith(".color")
       );
     });
