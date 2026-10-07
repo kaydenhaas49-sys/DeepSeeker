@@ -4640,12 +4640,27 @@ function fitSpiderModel(model){
 
     const materials=Array.isArray(obj.material)?obj.material:[obj.material];
     for(const material of materials){
+      if(!material) continue;
+
+      // Spider-Psionic materials can arrive with alpha/transmission settings
+      // from the source DCC scene. Force the in-game spider to render as
+      // solid opaque geometry so limbs/body parts cannot disappear.
       material.visible=true;
       material.transparent=false;
       material.opacity=1;
+      material.alphaTest=0;
+      material.alphaHash=false;
+      material.alphaToCoverage=false;
+      material.premultipliedAlpha=false;
+      material.blending=THREE.NormalBlending;
       material.depthTest=true;
       material.depthWrite=true;
       material.side=THREE.DoubleSide;
+
+      if("transmission" in material) material.transmission=0;
+      if("thickness" in material) material.thickness=0;
+      if("attenuationDistance" in material) material.attenuationDistance=Infinity;
+
       material.needsUpdate=true;
     }
   });
