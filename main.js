@@ -4646,8 +4646,21 @@ function fitSpiderModel(model){
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
-    obj.receiveShadow=true;
+    obj.receiveShadow=false;
     obj.renderOrder=10;
+
+    // Force every spider part to the same fully opaque unlit material.
+    // This intentionally ignores the source textures/alpha/normal maps.
+    const solidMaterial=new THREE.MeshBasicMaterial({
+      color:0x17100e,
+      side:THREE.DoubleSide,
+      transparent:false,
+      opacity:1,
+      depthTest:true,
+      depthWrite:true,
+      fog:true
+    });
+    obj.material=solidMaterial;
 
     // Diagnostic bind-pose test: preserve the FBX's authored skin data and
     // reset each skeleton to its imported bind pose before any animation.
@@ -4660,8 +4673,8 @@ function fitSpiderModel(model){
     for(const material of materials){
       if(!material) continue;
 
-      // The source spider is opaque. Clear imported alpha/blending state so
-      // the FBX cannot turn the body or legs into translucent holes.
+      // Kept for compatibility with non-diagnostic loaders; the spider's
+      // actual render material is replaced above with an opaque MeshBasicMaterial.
       material.visible=true;
       material.transparent=false;
       material.opacity=1;
@@ -6197,7 +6210,7 @@ function finishSpiderModel(model,animations,sourceName){
   // The spider remains in the FBX bind pose so we can isolate mesh corruption
   // from animation corruption.
 
-  console.log("[DeepSeeker] Spider-Psionic rig loaded",{
+  console.log("[DeepSeeker] Spider loaded as SOLID OPAQUE MESH",{
     source:sourceName,
     format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
     animations:animations?.map(animation=>animation.name)||[],
@@ -6348,15 +6361,14 @@ async function loadSpiderFromPack(){
           const geometry=source.geometry.clone();
           geometry.applyMatrix4(source.matrixWorld);
 
-          const material=new THREE.MeshStandardMaterial({
-            color:0x241512,
-            roughness:1,
-            metalness:0,
+          const material=new THREE.MeshBasicMaterial({
+            color:0x17100e,
             side:THREE.DoubleSide,
             transparent:false,
             opacity:1,
             depthTest:true,
-            depthWrite:true
+            depthWrite:true,
+            fog:true
           });
 
           const mesh=new THREE.Mesh(geometry,material);
