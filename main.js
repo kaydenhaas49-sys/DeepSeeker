@@ -1309,7 +1309,7 @@ function syncMenuSpiderFromGameplayModel(){
     arachnophobiaMode ? MENU_DUCK_SCALE : MENU_SPIDER_SCALE
   );
   menuSpiderActual.rotation.x=arachnophobiaMode ? 0 : Math.PI;
-  menuSpiderActual.rotation.y=arachnophobiaMode ? 0 : Math.PI;
+  menuSpiderActual.rotation.y=0;
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
     node.frustumCulled=false;
@@ -2926,6 +2926,10 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   gameStarted=true;
   overlay.classList.add("hidden");
   audio.start();
+
+  // Character loading now happens after gameplay starts instead of holding
+  // the startup screen hostage.
+  player.ensureCharacterLoaded();
 
   pendingHouseStart=false;
   pendingSaveLoad=null;
@@ -5254,6 +5258,7 @@ function showSpiderScareMessage(message,duration=900){
 }
 
 function startSpiderPeek(){
+  if(tutorialOpenRoomActive || houseMode) return false;
   const spawn=findSpiderSpawnPosition();
   if(!spawn) return false;
 
@@ -5277,6 +5282,7 @@ function startSpiderPeek(){
 }
 
 function startSpiderRush(){
+  if(tutorialOpenRoomActive || houseMode) return false;
   const spawn=findSpiderVisibleSpawnPosition(10,16);
   if(!spawn) return false;
 
@@ -5304,6 +5310,7 @@ function startSpiderRush(){
 }
 
 function startSpiderChase(){
+  if(tutorialOpenRoomActive || houseMode) return false;
   const spawn=findSpiderSpawnPosition(9,15);
   if(!spawn) return false;
 
@@ -7287,6 +7294,7 @@ document.addEventListener("keydown",e=>{
 });
 
 function triggerEvent(){
+  if(tutorialOpenRoomActive || houseMode) return;
   eventCooldown=4.5;
 
   if(!spiderLoaded || spiderActive){
@@ -7892,7 +7900,7 @@ function animate(){
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
-  if(!houseMode && eventCooldown<=0 && t>nextEvent){
+  if(!houseMode && !tutorialOpenRoomActive && eventCooldown<=0 && t>nextEvent){
     triggerEvent();
     nextEvent=t+28+Math.random()*35;
   }

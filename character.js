@@ -438,7 +438,7 @@ function vertexArmWeight(skinnedMesh,vertexIndex,armBoneIndices){
   return total;
 }
 
-function extractArmGeometry(source){
+function extractArmGeometry(source, armRoot){
   const geometry=source.geometry;
   const position=geometry.getAttribute("position");
   if(!position || !geometry.getAttribute("skinIndex") || !geometry.getAttribute("skinWeight")) return null;
@@ -448,8 +448,8 @@ function extractArmGeometry(source){
   bones.forEach((bone,index)=>{ if(isArmBoneName(bone.name)) armBoneIndices.add(index); });
 
   if(!armBoneIndices.size){
-    const leftUpper=findArmBoneByHierarchy(source,"left");
-    const rightUpper=findArmBoneByHierarchy(source,"right");
+    const leftUpper=findArmBoneByHierarchy(armRoot || source,"left");
+    const rightUpper=findArmBoneByHierarchy(armRoot || source,"right");
     for(const rootBone of [leftUpper,rightUpper].filter(Boolean)){
       rootBone.traverse(bone=>{
         if(!bone.isBone) return;
@@ -589,7 +589,7 @@ export function createFirstPersonArms(model){
   root.traverse(obj=>{
     if(!obj.isMesh) return;
     if(obj.isSkinnedMesh){
-      const armGeometry=extractArmGeometry(obj);
+      const armGeometry=extractArmGeometry(obj,root);
       if(armGeometry){
         obj.geometry=armGeometry;
         extractedArmMeshCount++;
@@ -613,11 +613,20 @@ export function createFirstPersonArms(model){
     "mixamorigrighthand","righthand","handr","wristr"
   ]);
 
-  // Keep the raised arms in the lower-middle of the camera view.
-  root.position.set(0,-.88,-.78);
+  // Recenter the extracted arm geometry after posing so the viewmodel
+  // lands in the camera regardless of the GLB export origin.
+  const armBounds=new THREE.Box3().setFromObject(root);
+  if(!armBounds.isEmpty()){
+    const armCenter=armBounds.getCenter(new THREE.Vector3());
+    root.position.x-=armCenter.x;
+    root.position.y+=(-.56-armCenter.y);
+    root.position.z+=(-.86-armCenter.z);
+  }else{
+    root.position.set(0,-.56,-.86);
+  }
 
   if(!leftHand || !rightHand){
-    console.warn("[DeepSeeker] First-person hand bones not found; using fixed camera anchor.");
+    console.warn("[DeepSeeker] First-person hand bones not found; centered the extracted arm viewmodel by bounds.");
   }
 
   root.updateMatrixWorld(true);

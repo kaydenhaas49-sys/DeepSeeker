@@ -146,7 +146,18 @@ export class Player {
     const worldRoot = this.camera.parent || this.camera;
     worldRoot.add(this.worldAvatar);
 
+    // Defer the 16+ MB player GLB until gameplay actually starts so the
+    // title screen does not wait for its network/decode/clone work.
+    this.characterReadyPromise=null;
+  }
+
+  ensureCharacterLoaded(){
+    if(this.characterLoaded) return Promise.resolve(true);
+    if(this.characterReadyPromise) return this.characterReadyPromise;
+
+    this.characterLoadFailed=false;
     this.characterReadyPromise=this.loadCharacterModel();
+    return this.characterReadyPromise;
   }
 
   async loadCharacterModel() {
