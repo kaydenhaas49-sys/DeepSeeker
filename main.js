@@ -6092,6 +6092,7 @@ async function extractSpiderPack(zipUrl){
 
 function finishSpiderModel(model,animations,sourceName){
   model.name="SpiderSource";
+  model.visible=true;
 
   let meshCount=0;
   model.traverse(obj=>{
@@ -6117,8 +6118,9 @@ function finishSpiderModel(model,animations,sourceName){
     throw new Error("Spider model has zero or invalid bounds.");
   }
 
-  // Scale the imported model only. Its authored geometry, materials,
-  // skeleton, rotation, and local transforms remain untouched.
+  // Only scale the imported model. Do not alter its materials, geometry,
+  // skeleton, rotation, authored local transforms, or visibility beyond
+  // making the existing mesh objects visible.
   fitSpiderModel(model);
 
   const visualRoot=new THREE.Group();
@@ -6126,8 +6128,6 @@ function finishSpiderModel(model,animations,sourceName){
   visualRoot.visible=true;
   visualRoot.add(model);
 
-  // Keep the imported model's own transforms untouched. The wrapper only
-  // places the scaled bounds where the gameplay system expects the spider.
   model.updateMatrixWorld(true);
   const placedBounds=new THREE.Box3().setFromObject(model);
   const placedCenter=placedBounds.getCenter(new THREE.Vector3());
@@ -6153,19 +6153,183 @@ function finishSpiderModel(model,animations,sourceName){
     spiderRetryTimer=null;
   }
 
-  // Keep the current diagnostic static state. Animation setup can be added
-  // separately without touching the imported mesh itself.
   spiderMixer=null;
   spiderActions.clear();
   spiderAnimationClips.clear();
   spiderAnimationState="";
-  spiderWantedState="idle";
 
-  console.log("[DeepSeeker] Spider loaded without model mutation",{
+  const documentedClipNames=[
+    "walk","attack1","attack2","eat","defend",
+    "hit1","hit2","crouch","stand","idle1","idle2",
+    "jump","sidestep","die1","die2"
+  ];
+
+  const normalizeAnimationKey=(value)=>String(value||"")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g," ");
+
+  const animationAliases={
+    walk:["walk","walking"],
+    attack1:["attack 1","attack1","attack 01","attack01"],
+    attack2:["attack 2","attack2","attack 02","attack02"],
+    eat:["eat"],
+    defend:["defend","defence"],
+    hit1:["hit 1","hit1","hit 01","hit01"],
+    hit2:["hit 2","hit2","hit 02","hit02"],
+    crouch:["crouch"],
+    stand:["stand"],
+    idle1:["idle 1","idle1"],
+    idle2:["idle 2","idle2"],
+    jump:["jump"],
+    sidestep:["side step","sidestep"],
+    die1:["die 1","die1","death 1","death1"],
+    die2:["die 2","die2","death 2","death2"]
+  };
+
+  const animatedNodeNames=new Set();
+
+  model.traverse(obj=>{
+    const nodeName=String(obj.name||"").toLowerCase();
+    if(nodeName) animatedNodeNames.add(nodeName);
+
+    if(!obj.isSkinnedMesh || !obj.skeleton) return;
+    for(const bone of obj.skeleton.bones){
+      const boneName=String(bone.name||"").toLowerCase();
+      if(boneName) animatedNodeNames.add(boneName);
+    }
+  });
+
+  const trackTargetName=(track)=>{
+    if(!track?.name) return "";
+    const raw=String(track.name);
+    const dot=raw.lastIndexOf(".");
+    if(dot<1) return "";
+
+    return raw
+      .slice(0,dot)
+      .split("|")
+      .pop()
+      .split(":")
+      .pop()
+      .toLowerCase();
+  };
+
+  const makeStableSpiderClip=(clip)=>{
+    if(!clip) return null;
+    const stable=clip.clone();
+
+    // Validate track targets without changing the imported model.
+    stable.tracks=stable.tracks.filter(track=>{
+      const target=trackTargetName(track);
+      if(!animatedNodeNames.has(target)) return false;
+      return !track.name.endsWith(".morphTargetInfluences");
+    });
+
+    stable.resetDuration();
+    return stable;
+  };
+
+  const directClips=new Map();
+  const claimedAnimations=new Set();
+
+  if(animations?.length>1){
+    for(const documentedName of documentedClipNames){
+      const aliases=animationAliases[documentedName]||[documentedName];
+      const match=animations.find((clip,index)=>{
+        if(claimedAnimations.has(index)) return false;
+        const name=normalizeAnimationKey(clip.name);
+        return aliases.some(alias=>name.includes(normalizeAnimationKey(alias)));
+      });
+
+      if(!match) continue;
+
+      const index=animations.indexOf(match);
+      claimedAnimations.add(index);
+      directClips.set(documentedName,makeStableSpiderClip(match));
+    }
+
+    if(
+      directClips.size<documentedClipNames.length &&
+      animations.length>=documentedClipNames.length
+    ){
+      for(let i=0;i<documentedClipNames.length;i++){
+        const documentedName=documentedClipNames[i];
+        if(directClips.has(documentedName)) continue;
+
+        const clip=
+          animations.find((candidate,index)=>
+            index===i && !claimedAnimations.has(index)
+          ) ||
+          animations.find((candidate,index)=>
+            !claimedAnimations.has(index)
+          );
+
+        if(!clip) continue;
+
+        const index=animations.indexOf(clip);
+        claimedAnimations.add(index);
+        directClips.set(
+          documentedName,
+          makeStableSpiderClip(clip)
+        );
+      }
+    }
+  }
+
+  if(animations?.length===1){
+    const sourceClip=animations[0];
+    const sourceFPS=329/Math.max(sourceClip.duration,.001);
+
+    for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
+      const clip=THREE.AnimationUtils.subclip(
+        sourceClip,
+        "spider_"+name,
+        startFrame,
+        endFrame+1,
+        sourceFPS
+      );
+      directClips.set(name,makeStableSpiderClip(clip));
+    }
+  }
+
+  for(const [name,clip] of directClips){
+    if(clip) spiderAnimationClips.set(name,clip);
+  }
+
+  if(directClips.size){
+    spiderMixer=new THREE.AnimationMixer(spiderModel);
+
+    for(const [name,clip] of directClips){
+      const action=spiderMixer.clipAction(clip);
+      const oneShot=name.startsWith("die") || name.startsWith("attack");
+
+      action.setLoop(
+        oneShot ? THREE.LoopOnce : THREE.LoopRepeat,
+        oneShot ? 1 : Infinity
+      );
+      if(oneShot) action.clampWhenFinished=true;
+      spiderActions.set(name,action);
+    }
+
+    console.log("[DeepSeeker] Spider animation map",{
+      selected:[...directClips.keys()],
+      tracks:[...directClips.entries()].map(([name,clip])=>[
+        name,
+        clip?.tracks?.length||0
+      ])
+    });
+
+    setSpiderAnimation(spiderWantedState);
+  }else{
+    spiderWantedState="idle";
+  }
+
+  console.log("[DeepSeeker] Spider-Psionic rig loaded",{
     source:sourceName,
-    animationsFound:animations?.length||0,
+    format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
+    animations:animations?.map(animation=>animation.name)||[],
+    animationCount:animations?.length||0,
     meshCount,
-    scale: model.scale.toArray(),
     halfHeight:spiderModelHalfHeight
   });
 
@@ -6178,11 +6342,16 @@ function finishSpiderModel(model,animations,sourceName){
     spawnSpiderAtPlayer();
   }
 
-  eventText.textContent="SPIDER READY (STATIC)";
+  eventText.textContent=spiderActions.size
+    ? "SPIDER READY"
+    : "SPIDER READY (STATIC)";
   eventText.style.opacity="1";
 
   setTimeout(()=>{
-    if(eventText.textContent==="SPIDER READY (STATIC)"){
+    if(
+      eventText.textContent==="SPIDER READY" ||
+      eventText.textContent==="SPIDER READY (STATIC)"
+    ){
       eventText.style.opacity="0";
     }
   },1800);
@@ -6200,8 +6369,6 @@ async function loadSpiderFromPack(){
     spiderActions.clear();
     spiderAnimationState="";
     spiderLoadStarted=false;
-    // A failed load may finish later, after the tutorial has started. Never
-    // queue a surprise normal encounter while the scripted lesson is active.
     spiderSpawnPending=
       gameStarted &&
       !houseMode &&
@@ -6256,7 +6423,12 @@ async function loadSpiderFromPack(){
     packManager.onLoad=cleanupPackUrls;
 
     packManager.setURLModifier((url)=>{
-      const normalized=String(url||"").replace(/\\/g,"/").split("?")[0].split("#")[0].toLowerCase();
+      const normalized=String(url||"")
+        .replace(/\\/g,"/")
+        .split("?")[0]
+        .split("#")[0]
+        .toLowerCase();
+
       const decoded=(()=>{
         try{
           return decodeURIComponent(normalized);
@@ -6264,17 +6436,23 @@ async function loadSpiderFromPack(){
           return normalized;
         }
       })();
+
       const shortName=decoded.slice(decoded.lastIndexOf("/")+1);
-      return resourceUrls.get(decoded) || resourceUrls.get(shortName) || url;
+      return resourceUrls.get(decoded) ||
+        resourceUrls.get(shortName) ||
+        url;
     });
 
     packManager.onError=(url)=>{
-      console.warn("[DeepSeeker] Spider pack resource could not be resolved:",url);
+      console.warn(
+        "[DeepSeeker] Spider pack resource could not be resolved:",
+        url
+      );
     };
 
-    const handleLoaded=(model,animations)=>{
+    const handleLoaded=(model,animations,sourceName=extracted.sourceName)=>{
       try{
-        finishSpiderModel(model,animations,extracted.sourceName);
+        finishSpiderModel(model,animations,sourceName);
       }catch(error){
         cleanupPackUrls();
         failSpiderLoad(error,"SPIDER MODEL FAILED TO LOAD");
@@ -6283,30 +6461,64 @@ async function loadSpiderFromPack(){
 
     if(extracted.modelType==="fbx"){
       const loader=new FBXLoader(packManager);
-      const object=loader.parse(
-        extracted.modelBytes.buffer,
-        extracted.modelDirectory
-      );
-      handleLoaded(object,object.animations||[]);
-      console.log("[DeepSeeker] using source FBX spider");
-    }else if(extracted.modelType==="obj"){
-      const loader=new OBJLoader(packManager);
-      const object=loader.parse(
-        new TextDecoder().decode(extracted.modelBytes)
-      );
-      handleLoaded(object,[]);
-      console.log("[DeepSeeker] using source OBJ spider");
-    }else{
-      const loader=new GLTFLoader(packManager);
-      loader.setDRACOLoader(dracoLoader);
-      loader.setMeshoptDecoder(MeshoptDecoder);
-      loader.load(
-        extracted.modelName,
-        gltf=>handleLoaded(gltf.scene,gltf.animations||[]),
-        undefined,
-        error=>failSpiderLoad(error,"SPIDER GLB FAILED TO LOAD")
-      );
+
+      try{
+        const object=loader.parse(
+          extracted.modelBytes.buffer,
+          extracted.modelDirectory
+        );
+
+        handleLoaded(object,object.animations||[],extracted.sourceName);
+        console.log("[DeepSeeker] using rigged FBX spider visual");
+      }catch(fbxError){
+        console.warn(
+          "[DeepSeeker] FBX visual failed; using static OBJ fallback:",
+          fbxError
+        );
+
+        const objEntry=[...extracted.resourceBlobs.keys()]
+          .find(name=>name.endsWith(".obj"));
+
+        if(!objEntry){
+          failSpiderLoad(
+            fbxError,
+            "SPIDER MODEL PARSE FAILED"
+          );
+          return;
+        }
+
+        try{
+          const objBlob=extracted.resourceBlobs.get(objEntry);
+          const objLoader=new OBJLoader(packManager);
+          const object=objLoader.parse(
+            new TextDecoder().decode(await objBlob.arrayBuffer())
+          );
+
+          handleLoaded(object,[],objEntry);
+          console.log("[DeepSeeker] using static OBJ spider fallback");
+        }catch(objError){
+          failSpiderLoad(
+            objError,
+            "SPIDER MODEL PARSE FAILED"
+          );
+        }
+      }
+      return;
     }
+
+    const loader=new GLTFLoader(packManager);
+    loader.setDRACOLoader(dracoLoader);
+    loader.setMeshoptDecoder(MeshoptDecoder);
+    loader.load(
+      extracted.modelName,
+      gltf=>handleLoaded(
+        gltf.scene,
+        gltf.animations||[],
+        extracted.sourceName
+      ),
+      undefined,
+      error=>failSpiderLoad(error,"SPIDER GLB FAILED TO LOAD")
+    );
   }catch(error){
     failSpiderLoad(error,"SPIDER PACK FAILED TO LOAD");
   }
