@@ -4633,7 +4633,7 @@ const SPIDER_ANIMATION_ALIAS={
 };
 
 
-function fitSpiderModel(model,preserveMaterials=false){
+function fitSpiderModel(model){
   // Keep the imported FBX neutral. Gameplay/menu parents own heading and
   // ceiling inversion; the asset itself should never carry a hidden yaw hack.
   model.position.set(0,0,0);
@@ -4649,50 +4649,33 @@ function fitSpiderModel(model,preserveMaterials=false){
     obj.receiveShadow=false;
     obj.renderOrder=10;
 
-    const originalMaterials=Array.isArray(obj.material)
-      ? obj.material
-      : [obj.material];
+    // Keep the source material's base color, but deliberately remove every
+    // texture/alpha cutout. This makes the spider an opaque polygon shell
+    // visible from both sides, including when viewed from underneath.
+    const originalMaterial=Array.isArray(obj.material)
+      ? obj.material[0]
+      : obj.material;
+    const baseColor=originalMaterial?.color?.clone
+      ? originalMaterial.color.clone()
+      : new THREE.Color(0x17100e);
 
-    if(preserveMaterials){
-      obj.material=originalMaterials.map(material=>{
-        if(!material) return material;
-        const clone=material.clone ? material.clone() : material;
-        clone.visible=true;
-        clone.transparent=false;
-        clone.opacity=1;
-        clone.alphaTest=0;
-        clone.alphaHash=false;
-        clone.alphaToCoverage=false;
-        clone.premultipliedAlpha=false;
-        clone.blending=THREE.NormalBlending;
-        clone.depthTest=true;
-        clone.depthWrite=true;
-        clone.side=THREE.DoubleSide;
-        clone.needsUpdate=true;
-        return clone;
-      });
-      if(obj.material.length===1) obj.material=obj.material[0];
-    }else{
-      const source=originalMaterials[0];
-      const baseColor=source?.color?.clone
-        ? source.color.clone()
-        : new THREE.Color(0x17100e);
-      obj.material=new THREE.MeshPhongMaterial({
-        color:baseColor,
-        shininess:8,
-        specular:0x080606,
-        flatShading:true,
-        side:THREE.DoubleSide,
-        transparent:false,
-        opacity:1,
-        alphaTest:0,
-        depthTest:true,
-        depthWrite:true,
-        fog:true
-      });
-    }
+    obj.material=new THREE.MeshPhongMaterial({
+      color:baseColor,
+      shininess:8,
+      specular:0x080606,
+      flatShading:true,
+      side:THREE.DoubleSide,
+      transparent:false,
+      opacity:1,
+      alphaTest:0,
+      depthTest:true,
+      depthWrite:true,
+      fog:true
+    });
 
-    if(!preserveMaterials && obj.isSkinnedMesh && obj.skeleton){
+    // Diagnostic bind-pose test: preserve the FBX's authored skin data and
+    // reset each skeleton to its imported bind pose before any animation.
+    if(obj.isSkinnedMesh && obj.skeleton){
       obj.skeleton.pose();
       obj.skeleton.update();
     }
@@ -4700,6 +4683,9 @@ function fitSpiderModel(model,preserveMaterials=false){
     const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
     for(const material of materials){
       if(!material) continue;
+
+      // Kept for compatibility with non-diagnostic loaders; the spider's
+      // Preserve the imported material's color/map/texture while normalizing its render state.
       material.visible=true;
       material.transparent=false;
       material.opacity=1;
@@ -6281,62 +6267,10 @@ function buildSolidSpiderReplacement(){
   return root;
 }
 
-
-function setupSpiderAnimationSet(model,animations){
-  if(sourceName==="assets/animated_spider.glb"){
-    setupSpiderAnimationSet(visualRoot,animations);
-  }else{
-    spiderMixer=null;
-    spiderActions.clear();
-    spiderAnimationClips.clear();
-    spiderAnimationState="";
-    spiderWantedState="idle";
-  }
-
-  if(!Array.isArray(animations) || !animations.length) return;
-
-  const pick=(patterns,indexFallback)=>{
-    for(const clip of animations){
-      const name=String(clip?.name||"").toLowerCase();
-      if(patterns.some(pattern=>pattern.test(name))) return clip;
-    }
-    return animations[indexFallback] || null;
-  };
-
-  const mapping={
-    idle1:pick([/idle/,/stand/,/rest/,/breath/,/wait/],0),
-    walk:pick([/walk/,/crawl/,/stalk/,/run/,/sprint/],1),
-    attack1:pick([/attack/,/bite/,/strike/,/pounce/,/lunge/],2),
-    hit1:pick([/hit/,/hurt/,/damage/],3),
-    die1:pick([/die/,/death/,/dead/],animations.length-1),
-    jump:pick([/jump/,/leap/],4)
-  };
-
-  spiderMixer=new THREE.AnimationMixer(model);
-
-  for(const [name,clip] of Object.entries(mapping)){
-    if(!clip) continue;
-    spiderAnimationClips.set(name,clip);
-    const action=spiderMixer.clipAction(clip);
-    const oneShot=/^(attack|hit|die|jump)/.test(name);
-    action.setLoop(
-      oneShot ? THREE.LoopOnce : THREE.LoopRepeat,
-      oneShot ? 1 : Infinity
-    );
-    if(oneShot) action.clampWhenFinished=true;
-    spiderActions.set(name,action);
-  }
-
-  console.log("[DeepSeeker] Animated wolf spider clips",{
-    available:animations.map(clip=>clip.name),
-    mapped:[...spiderAnimationClips.keys()]
-  });
-
-  setSpiderAnimation("idle");
-}
-
 function finishSpiderModel(model,animations,sourceName){
-  const isWolfSpider=sourceName==="assets/animated_spider.glb";
+  const importedSpider=model;
+  importedSpider.visible=false;
+  model=buildSolidSpiderReplacement();
   model.name="SpiderSource";
   model.visible=true;
 
@@ -6347,99 +6281,41 @@ function finishSpiderModel(model,animations,sourceName){
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
-    obj.receiveShadow=false;
+    obj.receiveShadow=true;
     obj.renderOrder=10;
-
-    if(isWolfSpider){
-      // Leave the imported GLB material exactly as authored. The problem
-      // appears in the shared transform pipeline, not the asset itself.
-      return;
-    }
-
-    // Legacy spider diagnostic material path.
-    const originalMaterials=Array.isArray(obj.material)
-      ? obj.material
-      : [obj.material];
-    const source=originalMaterials[0];
-    const baseColor=source?.color?.clone
-      ? source.color.clone()
-      : new THREE.Color(0x17100e);
-
-    obj.material=new THREE.MeshPhongMaterial({
-      color:baseColor,
-      shininess:8,
-      specular:0x080606,
-      flatShading:true,
-      side:THREE.DoubleSide,
-      transparent:false,
-      opacity:1,
-      alphaTest:0,
-      depthTest:true,
-      depthWrite:true,
-      fog:true
-    });
-
-    if(obj.isSkinnedMesh && obj.skeleton){
-      obj.skeleton.pose();
-      obj.skeleton.update();
-    }
   });
 
   if(meshCount===0){
     throw new Error("Spider model contains no meshes.");
   }
 
-  // IMPORTANT: never mutate a rigged wolf GLB's own transform hierarchy.
-  // The gameplay wrapper owns scale, centering, and ground placement instead.
+  model.updateMatrixWorld(true);
+  const parsedBounds=new THREE.Box3().setFromObject(model);
+  const parsedSize=parsedBounds.getSize(new THREE.Vector3());
+
+  if(
+    !Number.isFinite(parsedSize.x) ||
+    !Number.isFinite(parsedSize.y) ||
+    !Number.isFinite(parsedSize.z) ||
+    Math.max(parsedSize.x,parsedSize.y,parsedSize.z)<.001
+  ){
+    throw new Error("Spider model parsed, but its geometry has zero or invalid bounds.");
+  }
+
+  fitSpiderModel(model);
+
+  // The wrapper owns the ground contact point. The imported FBX stays centered
+  // so the exact same rig can be rotated 180 degrees for the ceiling.
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
-
-  let fittedSize;
-  if(isWolfSpider){
-    model.position.set(0,0,0);
-    model.rotation.set(0,0,0);
-    model.scale.set(1,1,1);
-    model.updateMatrixWorld(true);
-
-    const rawBounds=new THREE.Box3().setFromObject(model);
-    const rawSize=rawBounds.getSize(new THREE.Vector3());
-    const maxDimension=Math.max(rawSize.x,rawSize.y,rawSize.z);
-
-    if(!Number.isFinite(maxDimension) || maxDimension<.0001){
-      throw new Error("Wolf spider model has invalid or empty bounds.");
-    }
-
-    visualRoot.add(model);
-    visualRoot.scale.setScalar(SPIDER_TARGET_SPAN/maxDimension);
-    visualRoot.updateMatrixWorld(true);
-
-    const bounds=new THREE.Box3().setFromObject(visualRoot);
-    fittedSize=bounds.getSize(new THREE.Vector3());
-    const center=bounds.getCenter(new THREE.Vector3());
-
-    visualRoot.position.set(
-      -center.x,
-      -center.y + SPIDER_GROUND_OFFSET + fittedSize.y*.5,
-      -center.z
-    );
-  }else{
-    fitSpiderModel(model);
-    visualRoot.position.y=SPIDER_GROUND_OFFSET+spiderModelHalfHeight;
-    visualRoot.add(model);
-    fittedSize=new THREE.Vector3(
-      SPIDER_TARGET_SPAN,
-      spiderModelHalfHeight*2,
-      SPIDER_TARGET_SPAN
-    );
-  }
+  visualRoot.position.y=SPIDER_GROUND_OFFSET+spiderModelHalfHeight;
+  visualRoot.add(model);
 
   spiderModel=visualRoot;
   spiderOriginalModel=visualRoot;
   spiderEntity.add(visualRoot);
   spiderLoaded=true;
   spiderStartupFailed=false;
-
-  spiderModelHalfHeight=Math.max(.001,fittedSize.y*.5);
 
   if(gameStarted && !houseMode){
     nextEvent=Math.min(nextEvent,clock.elapsedTime+8);
@@ -6450,22 +6326,30 @@ function finishSpiderModel(model,animations,sourceName){
     spiderRetryTimer=null;
   }
 
-  if(isWolfSpider){
-    setupSpiderAnimationSet(visualRoot,animations);
-  }else{
-    spiderMixer=null;
-    spiderActions.clear();
-    spiderAnimationClips.clear();
-    spiderAnimationState="";
-    spiderWantedState="idle";
-  }
+  spiderMixer=null;
+  spiderActions.clear();
+  spiderAnimationClips.clear();
+  spiderAnimationState="";
+  spiderWantedState="idle";
 
-  console.log("[DeepSeeker] Spider loaded",{
+  console.log("[DeepSeeker] Spider bind-pose diagnostic",{
     source:sourceName,
-    wolf:isWolfSpider,
     animationsFound:animations?.length||0,
     meshCount,
     skinnedMeshes:model.getObjectsByProperty("isSkinnedMesh",true).length,
+    skeletons:model.getObjectsByProperty("skeleton",undefined).length
+  });
+
+  // IMPORTANT: this pass intentionally creates no AnimationMixer/actions.
+  // The spider remains in the FBX bind pose so we can isolate mesh corruption
+  // from animation corruption.
+
+  console.log("[DeepSeeker] Spider rebuilt as solid closed-volume mesh",{
+    source:sourceName,
+    format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
+    animations:animations?.map(animation=>animation.name)||[],
+    animationCount:animations?.length||0,
+    meshCount,
     halfHeight:spiderModelHalfHeight
   });
 
@@ -6540,33 +6424,6 @@ async function loadSpiderFromPack(){
   };
 
   try{
-    const wolfLoaded=await new Promise(resolve=>{
-      const loader=new GLTFLoader();
-      loader.setDRACOLoader(dracoLoader);
-      loader.setMeshoptDecoder(MeshoptDecoder);
-
-      loader.load(
-        "./assets/animated_spider.glb",
-        gltf=>{
-          try{
-            finishSpiderModel(
-              gltf.scene,
-              gltf.animations||[],
-              "assets/animated_spider.glb"
-            );
-            resolve(true);
-          }catch(error){
-            console.error("[DeepSeeker] Wolf spider render setup failed; using legacy spider:",error);
-            resolve(false);
-          }
-        },
-        undefined,
-        ()=>resolve(false)
-      );
-    });
-
-    if(wolfLoaded) return;
-
     const extracted=await extractSpiderPack(packUrl);
     const packManager=new THREE.LoadingManager();
     const resourceUrls=new Map();
