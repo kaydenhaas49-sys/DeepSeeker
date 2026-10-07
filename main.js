@@ -4649,34 +4649,29 @@ function fitSpiderModel(model){
     obj.receiveShadow=false;
     obj.renderOrder=10;
 
-    // Keep the source material's base color, but deliberately remove every
-    // texture/alpha cutout. This makes the spider an opaque polygon shell
-    // visible from both sides, including when viewed from underneath.
-    const originalMaterial=Array.isArray(obj.material)
-      ? obj.material[0]
-      : obj.material;
-    const baseColor=originalMaterial?.color?.clone
-      ? originalMaterial.color.clone()
-      : new THREE.Color(0x17100e);
+    // Preserve the wolf spider's authored colors and texture maps.
+    // Only normalize alpha/depth state so the model stays opaque and lit.
+    const sourceMaterials=Array.isArray(obj.material)
+      ? obj.material
+      : [obj.material];
 
-    obj.material=new THREE.MeshPhongMaterial({
-      color:baseColor,
-      shininess:8,
-      specular:0x080606,
-      flatShading:true,
-      side:THREE.DoubleSide,
-      transparent:false,
-      opacity:1,
-      alphaTest:0,
-      depthTest:true,
-      depthWrite:true,
-      fog:true
-    });
+    for(const material of sourceMaterials){
+      if(!material) continue;
+      material.visible=true;
+      material.transparent=false;
+      material.opacity=1;
+      material.alphaTest=0;
+      material.alphaHash=false;
+      material.alphaToCoverage=false;
+      material.premultipliedAlpha=false;
+      material.blending=THREE.NormalBlending;
+      material.side=THREE.DoubleSide;
+      material.depthTest=true;
+      material.depthWrite=true;
+      material.needsUpdate=true;
+    }
 
-    // Diagnostic bind-pose test: preserve the FBX's authored skin data and
-    // reset each skeleton to its imported bind pose before any animation.
     if(obj.isSkinnedMesh && obj.skeleton){
-      obj.skeleton.pose();
       obj.skeleton.update();
     }
 
@@ -6267,10 +6262,65 @@ function buildSolidSpiderReplacement(){
   return root;
 }
 
+
+function prepareSpiderAnimations(model,animations){
+  prepareSpiderAnimations(visualRoot,animations);
+
+  if(!Array.isArray(animations) || !animations.length) return;
+
+  const candidates=new Map();
+
+  const choose=(state,clip,priority)=>{
+    if(!clip) return;
+    const current=candidates.get(state);
+    if(!current || priority<current.priority){
+      candidates.set(state,{clip,priority});
+    }
+  };
+
+  for(const clip of animations){
+    const n=String(clip?.name||"").toLowerCase();
+
+    if(/idle|stand|rest|wait|breath/.test(n)) choose("idle1",clip,0);
+    if(/walk|stalk|crawl/.test(n)) choose("walk",clip,0);
+    if(/run|sprint/.test(n)) choose("walk",clip,1);
+    if(/attack|bite|strike|pounce|lunge/.test(n)) choose("attack1",clip,0);
+    if(/hit|hurt|damage/.test(n)) choose("hit1",clip,0);
+    if(/death|dead|die/.test(n)) choose("die1",clip,0);
+    if(/jump|leap/.test(n)) choose("jump",clip,0);
+  }
+
+  if(!candidates.has("idle1") && animations[0]) choose("idle1",animations[0],99);
+  if(!candidates.has("walk") && animations[1]) choose("walk",animations[1],99);
+  if(!candidates.has("attack1") && animations[2]) choose("attack1",animations[2],99);
+  if(!candidates.has("die1") && animations.at(-1)) choose("die1",animations.at(-1),99);
+
+  for(const state of ["idle1","walk","attack1","hit1","die1","jump"]){
+    const entry=candidates.get(state);
+    if(entry?.clip) spiderAnimationClips.set(state,entry.clip);
+  }
+
+  spiderMixer=new THREE.AnimationMixer(model);
+  for(const [name,clip] of spiderAnimationClips){
+    const action=spiderMixer.clipAction(clip);
+    const oneShot=/^(attack|hit|die|jump)/.test(name);
+    action.setLoop(
+      oneShot ? THREE.LoopOnce : THREE.LoopRepeat,
+      oneShot ? 1 : Infinity
+    );
+    if(oneShot) action.clampWhenFinished=true;
+    spiderActions.set(name,action);
+  }
+
+  console.log("[DeepSeeker] Wolf spider animation map",{
+    available:animations.map(clip=>clip.name),
+    mapped:[...spiderAnimationClips.keys()]
+  });
+
+  setSpiderAnimation("idle");
+}
+
 function finishSpiderModel(model,animations,sourceName){
-  const importedSpider=model;
-  importedSpider.visible=false;
-  model=buildSolidSpiderReplacement();
   model.name="SpiderSource";
   model.visible=true;
 
@@ -6344,7 +6394,7 @@ function finishSpiderModel(model,animations,sourceName){
   // The spider remains in the FBX bind pose so we can isolate mesh corruption
   // from animation corruption.
 
-  console.log("[DeepSeeker] Spider rebuilt as solid closed-volume mesh",{
+  console.log("[DeepSeeker] Animated wolf spider loaded",{
     source:sourceName,
     format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
     animations:animations?.map(animation=>animation.name)||[],
@@ -6424,45 +6474,21 @@ async function loadSpiderFromPack(){
   };
 
   try{
-    const extracted=await extractSpiderPack(packUrl);
-    const packManager=new THREE.LoadingManager();
-    const resourceUrls=new Map();
+    const loader=new GLTFLoader();
+    loader.setDRACOLoader(dracoLoader);
+    loader.setMeshoptDecoder(MeshoptDecoder);
 
-    for(const [name,blob] of extracted.resourceBlobs){
-      const url=URL.createObjectURL(blob);
-      resourceUrls.set(name,url);
-      objectUrls.push(url);
-    }
-
-    const cleanupPackUrls=()=>{
-      for(const url of objectUrls){
-        URL.revokeObjectURL(url);
-      }
-      objectUrls=[];
-    };
-    packManager.onLoad=cleanupPackUrls;
-
-    packManager.setURLModifier((url)=>{
-      const normalized=String(url||"").replace(/\\/g,"/").split("?")[0].split("#")[0].toLowerCase();
-      const decoded=(()=>{
-        try{
-          return decodeURIComponent(normalized);
-        }catch(_error){
-          return normalized;
-        }
-      })();
-      const shortName=decoded.slice(decoded.lastIndexOf("/")+1);
-      return resourceUrls.get(decoded) || resourceUrls.get(shortName) || url;
-    });
-
-    packManager.onError=(url)=>{
-      console.warn("[DeepSeeker] Spider pack resource could not be resolved:",url);
-    };
-
-    const handleLoaded=(model,animations)=>{
-      try{
-        finishSpiderModel(model,animations,extracted.sourceName);
-      }catch(error){
+    loader.load(
+      "./assets/animated_spider.glb",
+      gltf=>finishSpiderModel(
+        gltf.scene,
+        gltf.animations||[],
+        "assets/animated_spider.glb"
+      ),
+      undefined,
+      error=>failSpiderLoad(error,"SPIDER GLB FAILED TO LOAD")
+    );
+  }catch(error){
         cleanupPackUrls();
         failSpiderLoad(error,"SPIDER MODEL FAILED TO LOAD");
       }
