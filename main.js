@@ -4562,6 +4562,7 @@ let spiderPathTargetZ=NaN;
 let spiderStuckTime=0;
 let spiderLastMoveX=NaN;
 let spiderLastMoveZ=NaN;
+let spiderScareRevealTimer=0;
 
 const SPIDER_RUNBY_SPEED=7.2;
 const SPIDER_RUNBY_DURATION=3.2;
@@ -5216,6 +5217,84 @@ function clearSpiderPath(){
   spiderPathTargetZ=NaN;
 }
 
+function findSpiderVisibleSpawnPosition(minDistance=7,maxDistance=11){
+  const forwardAngle=player.yaw;
+  const candidates=[];
+
+  for(let i=0;i<28;i++){
+    const angle=forwardAngle+THREE.MathUtils.lerp(-.72,.72,Math.random());
+    const distance=THREE.MathUtils.lerp(minDistance,maxDistance,Math.random());
+    const x=player.pos.x-Math.sin(angle)*distance;
+    const z=player.pos.z-Math.cos(angle)*distance;
+
+    if(isSpiderBlocked(x,z)) continue;
+    if(!spiderPathSegmentClear(player.pos.x,player.pos.z,x,z)) continue;
+
+    candidates.push({x,z});
+  }
+
+  if(candidates.length){
+    return candidates[Math.floor(Math.random()*candidates.length)];
+  }
+
+  return null;
+}
+
+function showSpiderScareMessage(message,duration=900){
+  eventText.textContent=message;
+  eventText.style.opacity="1";
+  setTimeout(()=>{
+    if(eventText.textContent===message){
+      eventText.style.opacity="0";
+    }
+  },duration);
+}
+
+function startSpiderPeek(){
+  const spawn=findSpiderSpawnPosition();
+  if(!spawn) return false;
+
+  spiderBehaviorState="peek";
+  spiderBehaviorTime=0;
+  spiderScareRevealTimer=0;
+  spiderStuckTime=0;
+  spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
+  spiderEntity.rotation.x=0;
+  spiderEntity.rotation.y=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
+  spiderEntity.scale.setScalar(1);
+  spiderEntity.visible=true;
+  spiderVisibleToPlayer=false;
+  setSpiderAnimation("stalk");
+  return true;
+}
+
+function startSpiderRush(){
+  const spawn=findSpiderVisibleSpawnPosition();
+  if(!spawn) return false;
+
+  spiderBehaviorState="rush";
+  spiderBehaviorTime=0;
+  spiderScareRevealTimer=0;
+  spiderStuckTime=0;
+  spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
+  spiderEntity.rotation.x=0;
+  spiderEntity.rotation.y=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
+  spiderEntity.scale.setScalar(1);
+  spiderEntity.visible=true;
+  spiderVisibleToPlayer=true;
+  setSpiderAnimation("chase");
+  pulse=.9;
+  audio.scare();
+  showSpiderScareMessage("RUN.",700);
+  return true;
+}
+
 function spiderPathSegmentClear(ax,az,bx,bz){
   const dx=bx-ax;
   const dz=bz-az;
@@ -5555,6 +5634,7 @@ function startSpiderRunBy(){
 
   spiderBehaviorState="runby";
   spiderBehaviorTime=0;
+  spiderScareRevealTimer=0;
   spiderStuckTime=0;
   spiderEntity.position.copy(spiderRunbyStart);
   spiderEntity.rotation.y=Math.atan2(
@@ -7168,27 +7248,41 @@ document.addEventListener("keydown",e=>{
 });
 
 function triggerEvent(){
-  eventCooldown=3.5;
-  pulse=1;
+  eventCooldown=4.5;
 
   if(!spiderLoaded || spiderActive){
     audio.scare();
-  }else{
-    spawnSpiderAtPlayer();
-    audio.scare();
+    return;
   }
 
-  objective.textContent=Math.random()>.5
-    ? "Something moved nearby."
-    : "Something is following you.";
+  const roll=Math.random();
+  let started=false;
 
-  eventText.textContent=Math.random()>.5
-    ? "DID YOU HEAR THAT?"
-    : "RUN.";
+  if(roll<.38){
+    started=startSpiderRunBy();
+    if(started){
+      audio.scare();
+      pulse=.65;
+      showSpiderScareMessage("SOMETHING RAN PAST.",1000);
+    }
+  }else if(roll<.70){
+    started=startSpiderPeek();
+  }else{
+    started=startSpiderRush();
+  }
 
-  eventText.style.opacity="1";
+  if(!started){
+    audio.scare();
+    pulse=.55;
+    showSpiderScareMessage("DID YOU HEAR THAT?",900);
+  }
+
+  objective.textContent=
+    roll<.45
+      ? "Something moved nearby."
+      : "Something is following you.";
+
   setTimeout(()=>{
-    eventText.style.opacity="0";
     objective.textContent=STORY[storyStage].objective;
   },1800);
 }
@@ -7584,7 +7678,65 @@ function animate(){
           rotatePlayerTowardSpider(dt);
         }
   
-        if(spiderBehaviorState==="runby"){
+        if(spiderBehaviorState==="peek"){
+          setSpiderAnimation("stalk");
+
+          const seen=playerHasLineOfSightToSpider();
+          if(seen){
+            spiderScareRevealTimer+=dt;
+            pulse=Math.max(pulse,.22);
+            if(spiderScareRevealTimer>=.55){
+              audio.scare();
+              pulse=.72;
+              showSpiderScareMessage("THERE.",650);
+              startSpiderRunBy();
+            }
+          }else if(spiderBehaviorTime>=4.2){
+            spiderActive=false;
+            spiderEntity.visible=false;
+            spiderRevealLight.visible=false;
+            spiderBehaviorState="idle";
+            spiderBehaviorTime=0;
+            spiderScareRevealTimer=0;
+          }
+        }else if(spiderBehaviorState==="rush"){
+          setSpiderAnimation("chase");
+
+          const dx=player.pos.x-spiderEntity.position.x;
+          const dz=player.pos.z-spiderEntity.position.z;
+          const distance=Math.hypot(dx,dz);
+          const inv=1/Math.max(distance,.001);
+          const step=Math.min(8.5*dt,distance);
+
+          if(distance>1.8){
+            if(!tryMoveSpiderGround(dx*inv*step,dz*inv*step)){
+              spiderActive=false;
+              spiderEntity.visible=false;
+              spiderRevealLight.visible=false;
+              spiderBehaviorState="idle";
+              spiderBehaviorTime=0;
+            }else{
+              spiderEntity.rotation.y=Math.atan2(
+                player.pos.x-spiderEntity.position.x,
+                player.pos.z-spiderEntity.position.z
+              );
+            }
+          }
+
+          if(
+            spiderActive &&
+            (distance<=1.8 || spiderBehaviorTime>=1.05)
+          ){
+            pulse=1;
+            spiderActive=false;
+            spiderEntity.visible=false;
+            spiderRevealLight.visible=false;
+            spiderBehaviorState="idle";
+            spiderBehaviorTime=0;
+            clearSpiderPath();
+            showSpiderScareMessage("...",450);
+          }
+        }else if(spiderBehaviorState==="runby"){
           setSpiderAnimation("runby");
   
           const dx=spiderRunbyTarget.x-spiderEntity.position.x;
@@ -7671,6 +7823,7 @@ function animate(){
       spiderBehaviorTime=0;
       spiderAutoLookTimer=0;
       spiderAutoLookStarted=false;
+      spiderScareRevealTimer=0;
       clearSpiderPath();
       spiderEntity.rotation.x=0;
       spiderEntity.position.y=SPIDER_GROUND_OFFSET;
