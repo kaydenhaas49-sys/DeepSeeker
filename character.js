@@ -401,9 +401,28 @@ function extractArmGeometry(source){
   if(!position || !geometry.getAttribute("skinIndex") || !geometry.getAttribute("skinWeight")) return null;
 
   const armBoneIndices=new Set();
-  source.skeleton?.bones.forEach((bone,index)=>{
+  const bones=source.skeleton?.bones || [];
+
+  bones.forEach((bone,index)=>{
     if(isArmBoneName(bone.name)) armBoneIndices.add(index);
   });
+
+  // Some AI-generated rigs use generic bone names. Fall back to the
+  // spatial/hierarchical arm detector and include each upper arm's children.
+  if(!armBoneIndices.size){
+    const leftUpper=findArmBoneByHierarchy(source,"left");
+    const rightUpper=findArmBoneByHierarchy(source,"right");
+    const armRoots=[leftUpper,rightUpper].filter(Boolean);
+
+    for(const rootBone of armRoots){
+      rootBone.traverse(bone=>{
+        if(!bone.isBone) return;
+        const index=bones.indexOf(bone);
+        if(index>=0) armBoneIndices.add(index);
+      });
+    }
+  }
+
   if(!armBoneIndices.size) return null;
 
   const sourceIndex=geometry.index;
@@ -485,9 +504,29 @@ export function createFirstPersonArms(model){
   root.name="FirstPersonActualArms";
   root.visible=true;
 
-  // Use the actual player rig. The real arms are posed straight forward and
-  // the rest of the body stays behind the camera, avoiding fragile triangle
-  // extraction that can leave the hands invisible.
+  // The previous implementation cloned the entire body into the camera.
+  // Build a real arms-only viewmodel from the character's skinned geometry.
+  let extractedArmMeshCount=0;
+
+  root.traverse(obj=>{
+    if(!obj.isMesh) return;
+
+    if(obj.isSkinnedMesh){
+      const armGeometry=extractArmGeometry(obj);
+      if(armGeometry){
+        obj.geometry=armGeometry;
+        extractedArmMeshCount++;
+        obj.visible=true;
+      }else{
+        obj.visible=meshNameLooksLikeArm(obj);
+      }
+    }else{
+      obj.visible=meshNameLooksLikeArm(obj);
+    }
+  });
+
+  // If the model uses unusual non-skinned arm meshes, keep those; otherwise
+  // the extracted skinned-arm geometry above is the source of truth.
   applyFirstPersonArmPose(root);
   root.updateMatrixWorld(true);
 
@@ -498,8 +537,6 @@ export function createFirstPersonArms(model){
     "mixamorigrighthand","righthand","handr","wristr"
   ]);
 
-  // Match the orientation used by the world-space character and bring
-  // the real hands into the lower-middle of the first-person frame.
   root.rotation.y=Math.PI;
 
   if(leftHand && rightHand){
@@ -518,8 +555,6 @@ export function createFirstPersonArms(model){
 
   root.updateMatrixWorld(true);
 
-  // Viewmodel rendering should stay visible even when the player is very
-  // close to a wall or ceiling.
   root.traverse(obj=>{
     if(!obj.isMesh) return;
     obj.frustumCulled=false;
@@ -539,6 +574,7 @@ export function createFirstPersonArms(model){
     }
   });
 
+  root.userData.extractedArmMeshCount=extractedArmMeshCount;
   return root;
 }
 
