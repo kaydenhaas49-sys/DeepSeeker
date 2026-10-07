@@ -4634,25 +4634,87 @@ const SPIDER_ANIMATION_ALIAS={
 
 
 function fitSpiderModel(model){
-  // Never rewrite the imported FBX root transform or geometry. The authored
-  // rig stays in its original local pose; the gameplay wrapper handles scale
-  // and world placement outside the asset.
+  // Keep the imported FBX neutral. Gameplay/menu parents own heading and
+  // ceiling inversion; the asset itself should never carry a hidden yaw hack.
+  model.position.set(0,0,0);
+  model.rotation.set(0,0,0);
+  model.scale.set(1,1,1);
+
+  model.traverse(obj=>{
+    if(!obj.isMesh) return;
+
+    obj.visible=true;
+    obj.frustumCulled=false;
+    obj.castShadow=true;
+    obj.receiveShadow=true;
+    obj.renderOrder=10;
+
+    // FBX skin weights/normals can be slightly dirty after conversion.
+    // Normalize once here so animation does not tear the mesh apart.
+    if(obj.isSkinnedMesh){
+      obj.normalizeSkinWeights?.();
+      if(obj.skeleton) obj.skeleton.update();
+    }
+
+    const geometry=obj.geometry;
+    if(geometry){
+      if(!geometry.getAttribute("normal") && geometry.computeVertexNormals){
+        geometry.computeVertexNormals();
+      }else if(geometry.normalizeNormals){
+        geometry.normalizeNormals();
+      }
+    }
+
+    const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
+    for(const material of materials){
+      if(!material) continue;
+
+      // The source spider is opaque. Clear imported alpha/blending state so
+      // the FBX cannot turn the body or legs into translucent holes.
+      material.visible=true;
+      material.transparent=false;
+      material.opacity=1;
+      material.alphaTest=0;
+      material.alphaHash=false;
+      material.alphaToCoverage=false;
+      material.premultipliedAlpha=false;
+      material.blending=THREE.NormalBlending;
+      material.depthTest=true;
+      material.depthWrite=true;
+      material.side=THREE.DoubleSide;
+
+      if("transmission" in material) material.transmission=0;
+      if("thickness" in material) material.thickness=0;
+      if("clearcoat" in material) material.clearcoat=0;
+      material.needsUpdate=true;
+    }
+  });
+
   model.updateMatrixWorld(true);
 
-  const bounds=new THREE.Box3().setFromObject(model);
-  const size=bounds.getSize(new THREE.Vector3());
-  const maxDimension=Math.max(size.x,size.y,size.z);
+  const rawBox=new THREE.Box3().setFromObject(model);
+  const rawSize=rawBox.getSize(new THREE.Vector3());
+  const maxDimension=Math.max(rawSize.x,rawSize.y,rawSize.z);
 
   if(!Number.isFinite(maxDimension) || maxDimension<.0001){
     throw new Error("Spider model has invalid or empty bounds.");
   }
 
-  return {
-    bounds,
-    size,
-    maxDimension,
-    scale:SPIDER_TARGET_SPAN/maxDimension
-  };
+  model.scale.setScalar(SPIDER_TARGET_SPAN/maxDimension);
+  model.updateMatrixWorld(true);
+
+  // Center the imported rig around its origin. Rotating this centered rig by
+  // 180 degrees for the ceiling now flips it without moving its pivot above it.
+  const fittedBox=new THREE.Box3().setFromObject(model);
+  const center=fittedBox.getCenter(new THREE.Vector3());
+  const fittedSize=fittedBox.getSize(new THREE.Vector3());
+
+  model.position.x-=center.x;
+  model.position.y-=center.y;
+  model.position.z-=center.z;
+  model.updateMatrixWorld(true);
+
+  spiderModelHalfHeight=Math.max(.001,fittedSize.y*.5);
 }
 
 function setSpiderAnimation(name){
@@ -6077,39 +6139,12 @@ function finishSpiderModel(model,animations,sourceName){
   let meshCount=0;
   model.traverse(obj=>{
     if(!obj.isMesh) return;
-
     meshCount++;
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
     obj.receiveShadow=true;
     obj.renderOrder=10;
-
-    // Diagnostic solid pass: ignore every FBX texture/alpha channel and render
-    // the actual imported triangles as an opaque surface.
-    const sources=Array.isArray(obj.material) ? obj.material : [obj.material];
-    const rebuilt=sources.map(source=>{
-      const material=new THREE.MeshStandardMaterial({
-        color:new THREE.Color(0x241512),
-        roughness:1,
-        metalness:0,
-        side:THREE.DoubleSide,
-        transparent:false,
-        opacity:1,
-        alphaTest:0,
-        depthTest:true,
-        depthWrite:true
-      });
-      material.name="SpiderSolidDiagnostic";
-      material.needsUpdate=true;
-      return material;
-    });
-
-    obj.material=Array.isArray(obj.material) ? rebuilt : rebuilt[0];
-
-    for(const source of sources){
-      if(source?.dispose) source.dispose();
-    }
   });
 
   if(meshCount===0){
@@ -6129,21 +6164,13 @@ function finishSpiderModel(model,animations,sourceName){
     throw new Error("Spider model parsed, but its geometry has zero or invalid bounds.");
   }
 
-  const fit=fitSpiderModel(model);
-  const center=fit.bounds.getCenter(new THREE.Vector3());
+  fitSpiderModel(model);
 
-  // Keep every transform on the authored FBX untouched. Only this external
-  // wrapper is scaled/positioned for gameplay and menu presentation.
-  spiderModelHalfHeight=Math.max(.001,fit.size.y*fit.scale*.5);
-
+  // The wrapper owns the ground contact point. The imported FBX stays centered
+  // so the exact same rig can be rotated 180 degrees for the ceiling.
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
-  visualRoot.scale.setScalar(fit.scale);
-  visualRoot.position.set(
-    -center.x*fit.scale,
-    SPIDER_GROUND_OFFSET-center.y*fit.scale+spiderModelHalfHeight,
-    -center.z*fit.scale
-  );
+  visualRoot.position.y=SPIDER_GROUND_OFFSET+spiderModelHalfHeight;
   visualRoot.add(model);
 
   spiderModel=visualRoot;
@@ -6250,10 +6277,10 @@ function finishSpiderModel(model,animations,sourceName){
       const target=trackTargetName(track);
       if(!animatedNodeNames.has(target)) return false;
       if(track.name.endsWith(".morphTargetInfluences")) return false;
-      // The spider is a skinned FBX. Bone rotations are the safe deformation
-      // channels; animated position/scale tracks can split the skin apart.
       return (
         track.name.endsWith(".quaternion") ||
+        track.name.endsWith(".position") ||
+        track.name.endsWith(".scale") ||
         track.name.endsWith(".color")
       );
     });
