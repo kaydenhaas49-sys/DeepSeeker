@@ -6330,11 +6330,55 @@ async function loadSpiderFromPack(){
       try{
         const objBlob=extracted.resourceBlobs.get(objEntry);
         const objLoader=new OBJLoader(packManager);
-        const object=objLoader.parse(
+        const parsed=objLoader.parse(
           new TextDecoder().decode(await objBlob.arrayBuffer())
         );
-        handleLoaded(object,[]);
-        console.log("[DeepSeeker] using RAW OBJ spider geometry diagnostic");
+        parsed.updateMatrixWorld(true);
+
+        // Flatten every OBJ part into one clean geometry group. This removes
+        // any per-object translation/rotation/scale that could be splitting
+        // the spider down the middle after OBJ import.
+        const flattened=new THREE.Group();
+        flattened.name="SpiderRawOBJFlattened";
+
+        let flattenedMeshes=0;
+        parsed.traverse(source=>{
+          if(!source.isMesh || !source.geometry) return;
+
+          const geometry=source.geometry.clone();
+          geometry.applyMatrix4(source.matrixWorld);
+
+          const material=new THREE.MeshStandardMaterial({
+            color:0x241512,
+            roughness:1,
+            metalness:0,
+            side:THREE.DoubleSide,
+            transparent:false,
+            opacity:1,
+            depthTest:true,
+            depthWrite:true
+          });
+
+          const mesh=new THREE.Mesh(geometry,material);
+          mesh.name=source.name || "SpiderOBJPart";
+          mesh.position.set(0,0,0);
+          mesh.rotation.set(0,0,0);
+          mesh.scale.set(1,1,1);
+          mesh.frustumCulled=false;
+          mesh.castShadow=true;
+          mesh.receiveShadow=true;
+          flattened.add(mesh);
+          flattenedMeshes++;
+        });
+
+        if(!flattenedMeshes){
+          throw new Error("Spider OBJ contained no renderable geometry.");
+        }
+
+        handleLoaded(flattened,[]);
+        console.log("[DeepSeeker] using FLATTENED RAW OBJ spider diagnostic",{
+          sourceMeshes:flattenedMeshes
+        });
       }catch(objError){
         console.error("[DeepSeeker] RAW OBJ spider diagnostic failed:",objError);
         failSpiderLoad(objError,"SPIDER OBJ PARSE FAILED");
