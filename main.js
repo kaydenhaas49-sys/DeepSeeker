@@ -6147,7 +6147,130 @@ async function extractSpiderPack(zipUrl){
   };
 }
 
+
+function buildSolidSpiderReplacement(){
+  const root=new THREE.Group();
+  root.name="SpiderRebuiltSolid";
+
+  const bodyMaterial=new THREE.MeshPhongMaterial({
+    color:0x3a211b,
+    shininess:8,
+    specular:0x0b0706,
+    flatShading:true,
+    side:THREE.DoubleSide
+  });
+
+  const legMaterial=new THREE.MeshPhongMaterial({
+    color:0x21100d,
+    shininess:5,
+    specular:0x070403,
+    flatShading:true,
+    side:THREE.DoubleSide
+  });
+
+  const eyeMaterial=new THREE.MeshPhongMaterial({
+    color:0x090706,
+    shininess:25,
+    specular:0x18100c,
+    flatShading:true,
+    side:THREE.DoubleSide
+  });
+
+  const addBall=(name,x,y,z,sx,sy,sz,material,detail=1)=>{
+    const geometry=new THREE.IcosahedronGeometry(1,detail);
+    geometry.scale(sx,sy,sz);
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name=name;
+    mesh.position.set(x,y,z);
+    mesh.castShadow=true;
+    mesh.receiveShadow=false;
+    mesh.frustumCulled=false;
+    root.add(mesh);
+    return mesh;
+  };
+
+  const addTube=(name,ax,ay,az,bx,by,bz,r1,r2,material)=>{
+    const start=new THREE.Vector3(ax,ay,az);
+    const end=new THREE.Vector3(bx,by,bz);
+    const direction=end.clone().sub(start);
+    const length=direction.length();
+
+    const geometry=new THREE.CylinderGeometry(
+      r2,r1,Math.max(length,0.001),6,1,false
+    );
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name=name;
+    mesh.position.copy(start).add(end).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0,1,0),
+      direction.normalize()
+    );
+    mesh.castShadow=true;
+    mesh.receiveShadow=false;
+    mesh.frustumCulled=false;
+    root.add(mesh);
+    return mesh;
+  };
+
+  // Every primitive below is a closed 3D volume. There are no planes,
+  // alpha cutouts, or single-sided surfaces to look through.
+  addBall("Thorax",0,0.30,0,0.82,0.55,0.72,bodyMaterial,2);
+  addBall("Abdomen",0,0.24,-0.78,1.00,0.66,1.12,bodyMaterial,2);
+  addBall("Head",0,0.38,0.72,0.55,0.45,0.54,bodyMaterial,1);
+
+  const legs=[
+    [ 1,0.74,0.30, 1.55,0.24, 2.42,0.02],
+    [ 1,0.67,0.10, 1.85,0.00, 2.92,-0.38],
+    [ 1,0.55,-0.08,1.82,-0.38, 2.66,-0.92],
+    [ 1,0.42,-0.26,1.52,-0.70, 2.16,-1.28],
+    [-1,0.74,0.30,-1.55,0.24,-2.42,0.02],
+    [-1,0.67,0.10,-1.85,0.00,-2.92,-0.38],
+    [-1,0.55,-0.08,-1.82,-0.38,-2.66,-0.92],
+    [-1,0.42,-0.26,-1.52,-0.70,-2.16,-1.28]
+  ];
+
+  legs.forEach((p,index)=>{
+    const [side,ry,rz,kx,kz,fx,fz]=p;
+    const rootX=side*0.58;
+    const rootY=ry;
+    const kneeY=ry-0.10;
+    const footY=ry-0.26;
+
+    addTube(
+      "Leg"+index+"Upper",
+      rootX,rootY,rz,
+      kx,kneeY,kz,
+      0.18,0.13,legMaterial
+    );
+    addTube(
+      "Leg"+index+"Lower",
+      kx,kneeY,kz,
+      fx,footY,fz,
+      0.13,0.08,legMaterial
+    );
+
+    addBall("Leg"+index+"Knee",kx,kneeY,kz,0.15,0.15,0.15,legMaterial,1);
+    addBall("Leg"+index+"Foot",fx,footY,fz,0.11,0.08,0.16,legMaterial,1);
+  });
+
+  // Solid mouth/fang masses.
+  addBall("Mouth",0,0.18,1.08,0.25,0.16,0.25,legMaterial,1);
+  addBall("EyeL",-0.21,0.60,1.11,0.09,0.09,0.07,eyeMaterial,1);
+  addBall("EyeR", 0.21,0.60,1.11,0.09,0.09,0.07,eyeMaterial,1);
+
+  root.updateMatrixWorld(true);
+  const bounds=new THREE.Box3().setFromObject(root);
+  const center=bounds.getCenter(new THREE.Vector3());
+  root.position.sub(center);
+  root.updateMatrixWorld(true);
+
+  return root;
+}
+
 function finishSpiderModel(model,animations,sourceName){
+  const importedSpider=model;
+  importedSpider.visible=false;
+  model=buildSolidSpiderReplacement();
   model.name="SpiderSource";
   model.visible=true;
 
@@ -6221,7 +6344,7 @@ function finishSpiderModel(model,animations,sourceName){
   // The spider remains in the FBX bind pose so we can isolate mesh corruption
   // from animation corruption.
 
-  console.log("[DeepSeeker] Spider loaded as fully opaque double-sided solid",{
+  console.log("[DeepSeeker] Spider rebuilt as solid closed-volume mesh",{
     source:sourceName,
     format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
     animations:animations?.map(animation=>animation.name)||[],
