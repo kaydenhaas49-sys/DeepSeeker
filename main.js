@@ -6075,7 +6075,9 @@ function finishSpiderModel(model,animations,sourceName){
 
   let meshCount=0;
   model.traverse(obj=>{
-    if(obj.isMesh) meshCount++;
+    if(!obj.isMesh) return;
+    meshCount++;
+    obj.visible=true;
   });
 
   if(meshCount===0){
@@ -6095,13 +6097,25 @@ function finishSpiderModel(model,animations,sourceName){
     throw new Error("Spider model has zero or invalid bounds.");
   }
 
-  // Scale only. No material edits, geometry edits, skeleton edits,
-  // centering, forced rotation, or shadow/render-property rewrites.
+  // Scale the imported model only. Its authored geometry, materials,
+  // skeleton, rotation, and local transforms remain untouched.
   fitSpiderModel(model);
 
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
   visualRoot.add(model);
+
+  // Keep the imported model's own transforms untouched. The wrapper only
+  // places the scaled bounds where the gameplay system expects the spider.
+  model.updateMatrixWorld(true);
+  const placedBounds=new THREE.Box3().setFromObject(model);
+  const placedCenter=placedBounds.getCenter(new THREE.Vector3());
+  const placedMinY=placedBounds.min.y;
+  visualRoot.position.set(
+    -placedCenter.x,
+    SPIDER_GROUND_OFFSET-placedMinY,
+    -placedCenter.z
+  );
 
   spiderModel=visualRoot;
   spiderOriginalModel=visualRoot;
