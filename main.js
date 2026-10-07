@@ -6402,7 +6402,7 @@ function finishSpiderModel(model,animations,sourceName){
   },1800);
 }
 
-function loadSpiderFromPack(){
+async function loadSpiderFromPack(){
   const packUrl="./assets/Spider-Psionic.zip";
   let objectUrls=[];
 
