@@ -1216,7 +1216,7 @@ const menuDust=new THREE.Points(dustGeometry,dustMaterial);
 menuDust.name="MenuDust";
 menuSet.add(menuDust);
 
-// The title screen uses a clone of the real Spider-Psionic rig loaded by the
+// The title screen uses a clone of the real Huntsman model loaded by the
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
 const MENU_SPIDER_SCALE=.06;
@@ -1247,6 +1247,7 @@ menuSet.add(menuSpider);
 let menuSpiderActual=null;
 let menuSpiderMixer=null;
 let menuSpiderLoadRequested=false;
+let menuFixtureUpdateTimer=0;
 
 function applyArachnophobiaVisual(){
   if(!spiderOriginalModel) return;
@@ -1437,7 +1438,7 @@ function updateMenuScene(t,dt){
   menuDust.position.z=Math.cos(t*.029)*.55;
   menuSet.rotation.y=Math.sin(t*.008)*.004;
 
-  // Load the real Spider-Psionic pack for the title screen; the menu gets an isolated clone.
+  // Load the real Huntsman model for the title screen; the menu gets an isolated clone.
   if(!menuSpiderActual){
     if(!menuSpiderLoadRequested){
       menuSpiderLoadRequested=true;
@@ -1478,22 +1479,26 @@ function updateMenuScene(t,dt){
     if(menuSpiderMixer) menuSpiderMixer.update(dt);
   }
 
-  for(const node of menuFlickerNodes){
-    const phase=node.userData.phase||0;
-    const base=node.userData.basePower;
-    const wave=Math.sin(t*1.55+phase)*.055;
-    const cracked=node.userData.cracked===true;
-    const crackedDim=cracked ? .52 : 1;
-    const dropout=Math.sin(t*3.65+phase*3.3)>.996 ? -.82 : 0;
+  menuFixtureUpdateTimer-=dt;
+  if(menuFixtureUpdateTimer<=0){
+    menuFixtureUpdateTimer=.08;
+    for(const node of menuFlickerNodes){
+      const phase=node.userData.phase||0;
+      const base=node.userData.basePower;
+      const wave=Math.sin(t*1.55+phase)*.055;
+      const cracked=node.userData.cracked===true;
+      const crackedDim=cracked ? .52 : 1;
+      const dropout=Math.sin(t*3.65+phase*3.3)>.996 ? -.82 : 0;
 
-    if(node.isLight){
-      node.intensity=Math.max(.025,base*crackedDim*(1+wave+dropout));
-    }else if(node.material?.emissiveIntensity!==undefined){
-      node.material.emissiveIntensity=Math.max(
-        .06,
-        (cracked ? 1.28 : 3.15)*
-          (1+Math.sin(t*1.55+phase)*.045+dropout*.55)
-      );
+      if(node.isLight){
+        node.intensity=Math.max(.025,base*crackedDim*(1+wave+dropout));
+      }else if(node.material?.emissiveIntensity!==undefined){
+        node.material.emissiveIntensity=Math.max(
+          .06,
+          (cracked ? 1.28 : 3.15)*
+            (1+Math.sin(t*1.55+phase)*.045+dropout*.55)
+        );
+      }
     }
   }
 
@@ -3318,6 +3323,7 @@ arachnophobiaModeButton?.addEventListener("click",()=>{
 arachnophobiaContinueButton?.addEventListener("click",continueFromArachnophobiaWarning);
 
 let multiplayerMapOpen=false;
+let multiplayerMapRefreshTimer=0;
 const multiplayerMap=document.createElement("div");
 multiplayerMap.id="multiplayerMap";
 multiplayerMap.innerHTML="<div id='multiplayerMapHeader'><span>MULTIPLAYER MAP</span><span id='multiplayerMapLevel'>BACKROOMS</span></div><canvas id='multiplayerMapCanvas' width='240' height='240'></canvas><div id='multiplayerMapLegend'>N · CLOSE MAP</div>";
@@ -3343,7 +3349,10 @@ function toggleMultiplayerMap(force=null){
   if(!gameStarted && force!==true) return;
   multiplayerMapOpen=force===null ? !multiplayerMapOpen : Boolean(force);
   multiplayerMap.classList.toggle("visible",multiplayerMapOpen);
-  if(multiplayerMapOpen) updateMultiplayerMap();
+  if(multiplayerMapOpen){
+    multiplayerMapRefreshTimer=0;
+    updateMultiplayerMap();
+  }
 }
 
 function projectMapPoint(x,z,centerX,centerY,scale,yaw){
@@ -5918,6 +5927,139 @@ function spawnSpiderAtPlayer(){
   return true;
 }
 
+const HUNTSMAN_RAR_MODULE_URL="https://unpkg.com/node-unrar-js@2.0.2/esm/index.esm.js";
+const HUNTSMAN_RAR_WASM_URL="https://unpkg.com/node-unrar-js@2.0.2/esm/js/unrar.wasm";
+let huntsmanRarRuntimePromise=null;
+
+async function getHuntsmanRarRuntime(){
+  if(!huntsmanRarRuntimePromise){
+    huntsmanRarRuntimePromise=(async()=>{
+      const module=await import(HUNTSMAN_RAR_MODULE_URL);
+      const response=await fetch(HUNTSMAN_RAR_WASM_URL,{cache:"force-cache",credentials:"omit"});
+      if(!response.ok){
+        throw new Error(`Huntsman RAR decoder request failed: ${response.status} ${response.statusText}`);
+      }
+      const wasmBinary=await response.arrayBuffer();
+      if(typeof module.createExtractorFromData!=="function"){
+        throw new Error("Huntsman RAR decoder API is unavailable.");
+      }
+      return {createExtractorFromData:module.createExtractorFromData,wasmBinary};
+    })();
+  }
+  return huntsmanRarRuntimePromise;
+}
+
+async function extractHuntsmanSpiderPack(rarUrl){
+  const response=await fetch(rarUrl,{cache:"no-store"});
+  if(!response.ok){
+    throw new Error(`Huntsman spider pack request failed: ${response.status} ${response.statusText}`);
+  }
+
+  const data=await response.arrayBuffer();
+  const runtime=await getHuntsmanRarRuntime();
+  const extractor=await runtime.createExtractorFromData({
+    wasmBinary:runtime.wasmBinary,
+    data
+  });
+
+  // Huntsman_Spider_FREE.rar is RAR5. Use the maintained unRAR/WASM decoder
+  // rather than the older browser ZIP parser used by Spider-Psionic.
+  const list=extractor.getFileList();
+  const fileHeaders=[...list.fileHeaders];
+
+  const modelCandidates=fileHeaders
+    .filter(header=>!header.flags?.directory && /\.(fbx|obj|glb)$/i.test(String(header.name||"")))
+    .sort((a,b)=>{
+      const score=(header)=>{
+        const name=String(header.name||"").toLowerCase();
+        const formatScore=
+          name.endsWith(".fbx") ? 130 :
+          name.endsWith(".glb") ? 80 :
+          70;
+        return formatScore+(name.includes("spider")?20:0)+Number(header.unpSize||0)/1e7;
+      };
+      return score(b)-score(a);
+    });
+
+  const modelHeader=modelCandidates[0];
+  if(!modelHeader){
+    throw new Error("Huntsman spider RAR contains no FBX, OBJ, or GLB model.");
+  }
+
+  const imageHeaders=fileHeaders.filter(header=>
+    !header.flags?.directory &&
+    /\.(png|jpe?g|webp|tga|bmp)$/i.test(String(header.name||""))
+  );
+
+  const wantedNames=[modelHeader,...imageHeaders]
+    .map(header=>String(header.name||""))
+    .filter(Boolean);
+
+  const extracted=extractor.extract({
+    files:header=>wantedNames.includes(String(header.name||""))
+  });
+  const extractedFiles=[...extracted.files];
+
+  const normalizeName=(value)=>{
+    let normalized=String(value||"").replace(/\\/g,"/").split("?")[0].split("#")[0];
+    try{
+      normalized=decodeURIComponent(normalized);
+    }catch(_error){}
+    return normalized.toLowerCase();
+  };
+  const basename=(value)=>{
+    const normalized=normalizeName(value);
+    return normalized.slice(normalized.lastIndexOf("/")+1);
+  };
+
+  const resourceBlobs=new Map();
+  let modelBytes=null;
+  let modelName="";
+  let modelType="fbx";
+  let sourceName=String(modelHeader.name||"");
+
+  for(const file of extractedFiles){
+    const bytes=file.extraction;
+    if(!bytes) continue;
+
+    const fullName=normalizeName(file.fileHeader.name);
+    const shortName=basename(file.fileHeader.name);
+    const fileName=String(file.fileHeader.name||"");
+    const mime=/\.fbx$/i.test(fileName)
+      ?"application/octet-stream"
+      :/\.glb$/i.test(fileName)
+        ?"model/gltf-binary"
+        :"image/*";
+
+    const blob=new Blob([bytes],{type:mime});
+    resourceBlobs.set(fullName,blob);
+    if(!resourceBlobs.has(shortName)) resourceBlobs.set(shortName,blob);
+
+    if(fullName===normalizeName(modelHeader.name)){
+      modelBytes=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);
+      modelName=shortName;
+      modelType=/\.obj$/i.test(fullName)
+        ?"obj"
+        :/\.fbx$/i.test(fullName)
+          ?"fbx"
+          :"glb";
+    }
+  }
+
+  if(!modelBytes){
+    throw new Error(`Huntsman spider model extraction failed: ${sourceName}`);
+  }
+
+  return {
+    modelType,
+    modelName,
+    modelDirectory:"",
+    modelBytes,
+    sourceName,
+    resourceBlobs
+  };
+}
+
 async function extractSpiderPack(zipUrl){
   const response=await fetch(zipUrl,{cache:"no-store"});
   if(!response.ok){
@@ -6403,7 +6545,7 @@ function finishSpiderModel(model,animations,sourceName){
 }
 
 async function loadSpiderFromPack(){
-  const packUrl="./assets/Spider-Psionic.zip";
+  const packUrl="./assets/Huntsman_Spider_FREE.rar";
   let objectUrls=[];
 
   const failSpiderLoad=(error,message)=>{
@@ -6426,7 +6568,7 @@ async function loadSpiderFromPack(){
     }
     objectUrls=[];
 
-    console.error("[DeepSeeker] Spider-Psionic pack load failed:",error);
+    console.error("[DeepSeeker] Huntsman spider pack load failed:",error);
 
     if(gameStarted){
       eventText.textContent=message+" · RETRYING";
@@ -6451,7 +6593,7 @@ async function loadSpiderFromPack(){
   };
 
   try{
-    const extracted=await extractSpiderPack(packUrl);
+    const extracted=await extractHuntsmanSpiderPack(packUrl);
     const packManager=new THREE.LoadingManager();
     const resourceUrls=new Map();
 
@@ -7541,7 +7683,14 @@ function animate(){
   multiplayer.update(dt);
   interaction.update(dt);
   navigation.update(dt);
-  if(multiplayerMapOpen) updateMultiplayerMap();
+
+  if(multiplayerMapOpen){
+    multiplayerMapRefreshTimer-=dt;
+    if(multiplayerMapRefreshTimer<=0){
+      multiplayerMapRefreshTimer=.10;
+      updateMultiplayerMap();
+    }
+  }
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
     if(!houseMode && storyRefreshElapsed>=(

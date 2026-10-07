@@ -75,7 +75,9 @@ export class Player {
         e.code === "KeyW" ||
         e.code === "KeyA" ||
         e.code === "KeyS" ||
-        e.code === "KeyD"
+        e.code === "KeyD" ||
+        e.code === "ControlLeft" ||
+        e.code === "ControlRight"
       ) {
         e.preventDefault();
       }
