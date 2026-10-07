@@ -6272,9 +6272,9 @@ function finishSpiderModel(model,animations,sourceName){
     if(!clip) return null;
     const stable=clip.clone();
 
-    // This rig was validated with its authored transform tracks intact.
-    // Only discard tracks aimed at nodes that are not actually present in
-    // the imported FBX scene.
+    // Keep the source rig's real transform tracks. The previous sanitizer
+    // stripped non-root position/scale tracks, which can produce severe
+    // skinned-mesh deformation on this spider even though the FBX is valid.
     stable.tracks=stable.tracks.filter(track=>{
       const target=trackTargetName(track);
       if(!animatedNodeNames.has(target)) return false;
