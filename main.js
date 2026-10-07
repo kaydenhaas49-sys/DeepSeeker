@@ -4649,20 +4649,11 @@ function fitSpiderModel(model){
     obj.receiveShadow=true;
     obj.renderOrder=10;
 
-    // FBX skin weights/normals can be slightly dirty after conversion.
-    // Normalize once here so animation does not tear the mesh apart.
-    if(obj.isSkinnedMesh){
-      obj.normalizeSkinWeights?.();
-      if(obj.skeleton) obj.skeleton.update();
-    }
-
-    const geometry=obj.geometry;
-    if(geometry){
-      if(!geometry.getAttribute("normal") && geometry.computeVertexNormals){
-        geometry.computeVertexNormals();
-      }else if(geometry.normalizeNormals){
-        geometry.normalizeNormals();
-      }
+    // Diagnostic bind-pose test: preserve the FBX's authored skin data and
+    // reset each skeleton to its imported bind pose before any animation.
+    if(obj.isSkinnedMesh && obj.skeleton){
+      obj.skeleton.pose();
+      obj.skeleton.update();
     }
 
     const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
@@ -6192,190 +6183,19 @@ function finishSpiderModel(model,animations,sourceName){
   spiderActions.clear();
   spiderAnimationClips.clear();
   spiderAnimationState="";
+  spiderWantedState="idle";
 
-  const documentedClipNames=[
-    "walk",
-    "attack1",
-    "attack2",
-    "eat",
-    "defend",
-    "hit1",
-    "hit2",
-    "crouch",
-    "stand",
-    "idle1",
-    "idle2",
-    "jump",
-    "sidestep",
-    "die1",
-    "die2"
-  ];
-
-  const normalizeAnimationKey=(value)=>String(value||"")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g," ");
-
-  const animationAliases={
-    walk:["walk","walking"],
-    attack1:["attack 1","attack1","attack 01","attack01"],
-    attack2:["attack 2","attack2","attack 02","attack02"],
-    eat:["eat"],
-    defend:["defend","defence"],
-    hit1:["hit 1","hit1","hit 01","hit01"],
-    hit2:["hit 2","hit2","hit 02","hit02"],
-    crouch:["crouch"],
-    stand:["stand"],
-    idle1:["idle 1","idle1"],
-    idle2:["idle 2","idle2"],
-    jump:["jump"],
-    sidestep:["side step","sidestep"],
-    die1:["die 1","die1","death 1","death1"],
-    die2:["die 2","die2","death 2","death2"]
-  };
-
-  const rootBoneNames=new Set();
-  const animatedNodeNames=new Set();
-
-  model.traverse(obj=>{
-    const nodeName=String(obj.name||"").toLowerCase();
-    if(nodeName) animatedNodeNames.add(nodeName);
-
-    if(!obj.isSkinnedMesh || !obj.skeleton) return;
-    for(const bone of obj.skeleton.bones){
-      const boneName=String(bone.name||"").toLowerCase();
-      if(!boneName) continue;
-
-      animatedNodeNames.add(boneName);
-      // Keep bone rotations intact: the root bone can carry real body pose.
-      if(!bone.parent?.isBone) rootBoneNames.add(boneName);
-    }
+  console.log("[DeepSeeker] Spider bind-pose diagnostic",{
+    source:sourceName,
+    animationsFound:animations?.length||0,
+    meshCount,
+    skinnedMeshes:model.getObjectsByProperty("isSkinnedMesh",true).length,
+    skeletons:model.getObjectsByProperty("skeleton",undefined).length
   });
 
-  const trackTargetName=(track)=>{
-    if(!track?.name) return "";
-    const raw=String(track.name);
-    const dot=raw.lastIndexOf(".");
-    if(dot<1) return "";
-
-    return raw
-      .slice(0,dot)
-      .split("|")
-      .pop()
-      .split(":")
-      .pop()
-      .toLowerCase();
-  };
-
-  const makeStableSpiderClip=(clip)=>{
-    if(!clip) return null;
-    const stable=clip.clone();
-
-    // Keep the source rig's real transform tracks. The previous sanitizer
-    // stripped non-root position/scale tracks, which can produce severe
-    // skinned-mesh deformation on this spider even though the FBX is valid.
-    stable.tracks=stable.tracks.filter(track=>{
-      const target=trackTargetName(track);
-      if(!animatedNodeNames.has(target)) return false;
-      if(track.name.endsWith(".morphTargetInfluences")) return false;
-      return (
-        track.name.endsWith(".quaternion") ||
-        track.name.endsWith(".position") ||
-        track.name.endsWith(".scale") ||
-        track.name.endsWith(".color")
-      );
-    });
-
-    stable.resetDuration();
-    return stable;
-  };
-
-  const directClips=new Map();
-  const claimedAnimations=new Set();
-
-  if(animations?.length>1){
-    for(const documentedName of documentedClipNames){
-      const aliases=animationAliases[documentedName]||[documentedName];
-      const match=animations.find((clip,index)=>{
-        if(claimedAnimations.has(index)) return false;
-        const name=normalizeAnimationKey(clip.name);
-        return aliases.some(alias=>name.includes(normalizeAnimationKey(alias)));
-      });
-
-      if(!match) continue;
-
-      const index=animations.indexOf(match);
-      claimedAnimations.add(index);
-
-      // Separate named FBX clips are already bounded to their animation.
-      directClips.set(documentedName,makeStableSpiderClip(match));
-    }
-
-    if(directClips.size<documentedClipNames.length && animations.length>=documentedClipNames.length){
-      for(let i=0;i<documentedClipNames.length;i++){
-        const documentedName=documentedClipNames[i];
-        if(directClips.has(documentedName)) continue;
-
-        const clip=
-          animations.find((candidate,index)=>index===i && !claimedAnimations.has(index)) ||
-          animations.find((candidate,index)=>!claimedAnimations.has(index));
-
-        if(!clip) continue;
-
-        const index=animations.indexOf(clip);
-        claimedAnimations.add(index);
-        directClips.set(documentedName,makeStableSpiderClip(clip,documentedName));
-      }
-    }
-  }
-
-  if(animations?.length===1){
-    const sourceClip=animations[0];
-    const sourceFPS=329/Math.max(sourceClip.duration,.001);
-
-    for(const [name,[startFrame,endFrame]] of Object.entries(SPIDER_ANIMATION_RANGES)){
-      const clip=THREE.AnimationUtils.subclip(
-        sourceClip,
-        "spider_"+name,
-        startFrame,
-        endFrame+1,
-        sourceFPS
-      );
-      directClips.set(name,makeStableSpiderClip(clip,name));
-    }
-  }
-
-  for(const [name,clip] of directClips){
-    if(clip) spiderAnimationClips.set(name,clip);
-  }
-
-  if(directClips.size){
-    spiderMixer=new THREE.AnimationMixer(spiderModel);
-
-    for(const [name,clip] of directClips){
-      const action=spiderMixer.clipAction(clip);
-      const oneShot=name.startsWith("die") || name.startsWith("attack");
-
-      action.setLoop(
-        oneShot ? THREE.LoopOnce : THREE.LoopRepeat,
-        oneShot ? 1 : Infinity
-      );
-      if(oneShot) action.clampWhenFinished=true;
-      spiderActions.set(name,action);
-    }
-
-    console.log("[DeepSeeker] Spider animation map",{
-      selected:[...directClips.keys()],
-      rootBones:[...rootBoneNames],
-      trackCounts:[...directClips.entries()].map(([name,clip])=>[
-        name,
-        clip?.tracks?.length||0
-      ])
-    });
-
-    setSpiderAnimation(spiderWantedState);
-  }else{
-    spiderWantedState="idle";
-  }
+  // IMPORTANT: this pass intentionally creates no AnimationMixer/actions.
+  // The spider remains in the FBX bind pose so we can isolate mesh corruption
+  // from animation corruption.
 
   console.log("[DeepSeeker] Spider-Psionic rig loaded",{
     source:sourceName,
