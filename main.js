@@ -4649,22 +4649,8 @@ function fitSpiderModel(model){
     obj.receiveShadow=false;
     obj.renderOrder=10;
 
-    // Force every spider part to the same fully opaque, polygonal lit material.
-    // This intentionally ignores the source textures/alpha/normal maps.
-    const solidMaterial=new THREE.MeshPhongMaterial({
-      color:0x17100e,
-      shininess:8,
-      specular:0x080606,
-      flatShading:true,
-      side:THREE.DoubleSide,
-      transparent:false,
-      opacity:1,
-      depthTest:true,
-      depthWrite:true,
-      fog:true
-    });
-    obj.material=solidMaterial;
-
+    // Preserve the model's authored colors/textures while keeping the
+    // diagnostic flat-shaded polygon look and fully opaque rendering.
     // Diagnostic bind-pose test: preserve the FBX's authored skin data and
     // reset each skeleton to its imported bind pose before any animation.
     if(obj.isSkinnedMesh && obj.skeleton){
@@ -4677,7 +4663,7 @@ function fitSpiderModel(model){
       if(!material) continue;
 
       // Kept for compatibility with non-diagnostic loaders; the spider's
-      // actual render material is replaced above with an opaque MeshStandardMaterial.
+      // Preserve the imported material's color/map/texture while normalizing its render state.
       material.visible=true;
       material.transparent=false;
       material.opacity=1;
@@ -6213,7 +6199,7 @@ function finishSpiderModel(model,animations,sourceName){
   // The spider remains in the FBX bind pose so we can isolate mesh corruption
   // from animation corruption.
 
-  console.log("[DeepSeeker] Spider loaded as SOLID OPAQUE MESH",{
+  console.log("[DeepSeeker] Spider loaded with original colors/materials",{
     source:sourceName,
     format:sourceName.toLowerCase().endsWith(".fbx") ? "FBX" : "GLB",
     animations:animations?.map(animation=>animation.name)||[],
@@ -6364,18 +6350,22 @@ async function loadSpiderFromPack(){
           const geometry=source.geometry.clone();
           geometry.applyMatrix4(source.matrixWorld);
 
-          const material=new THREE.MeshPhongMaterial({
-            color:0x17100e,
-            shininess:8,
-            specular:0x080606,
-            flatShading:true,
-            side:THREE.DoubleSide,
-            transparent:false,
-            opacity:1,
-            depthTest:true,
-            depthWrite:true,
-            fog:true
-          });
+          const sourceMaterials=Array.isArray(source.material)
+            ? source.material
+            : [source.material];
+          const material=sourceMaterials[0]?.clone
+            ? sourceMaterials[0].clone()
+            : new THREE.MeshPhongMaterial({color:0xaaaaaa});
+
+          if("flatShading" in material) material.flatShading=true;
+          material.side=THREE.DoubleSide;
+          material.transparent=false;
+          material.opacity=1;
+          material.alphaTest=0;
+          material.depthTest=true;
+          material.depthWrite=true;
+          if("blending" in material) material.blending=THREE.NormalBlending;
+          material.needsUpdate=true;
 
           const mesh=new THREE.Mesh(geometry,material);
           mesh.name=source.name || "SpiderOBJPart";
