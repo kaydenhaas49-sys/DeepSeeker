@@ -159,13 +159,23 @@ export class Multiplayer {
   }
 
   getPlayerName() {
-    const key = "deepseeker-player-name";
-    let name = localStorage.getItem(key);
+    const sessionKey="deepseeker-player-name-session";
+    const playerKey=this.playerId
+      ? "deepseeker-player-name-"+this.playerId
+      : sessionKey;
 
-    if (!name) {
-      name = "Player-" + Math.floor(1000 + Math.random() * 9000);
-      localStorage.setItem(key, name);
-    }
+    let name=null;
+    try{
+      name=sessionStorage.getItem(sessionKey) || null;
+      if(this.playerId) name=localStorage.getItem(playerKey) || name;
+    }catch{}
+
+    if(!name) name="Player-"+Math.floor(1000+Math.random()*9000);
+
+    try{
+      sessionStorage.setItem(sessionKey,name);
+      if(this.playerId) localStorage.setItem(playerKey,name);
+    }catch{}
 
     return this.sanitizeName(name);
   }
@@ -346,7 +356,10 @@ export class Multiplayer {
 
   setPlayerName(name){
     const clean=this.sanitizeName(name);
-    localStorage.setItem("deepseeker-player-name",clean);
+    try{
+      sessionStorage.setItem("deepseeker-player-name-session",clean);
+      if(this.playerId) localStorage.setItem("deepseeker-player-name-"+this.playerId,clean);
+    }catch{}
     this.sendState(true);
     return clean;
   }

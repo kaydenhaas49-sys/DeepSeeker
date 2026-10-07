@@ -327,9 +327,9 @@ function findArmBoneByHierarchy(root, side){
 
     const horizontal=Math.hypot(delta.x,delta.z);
     const vertical=Math.abs(delta.y);
-    const sideOk=side==="left" ? delta.x<-.03 : delta.x>.03;
-    const heightOk=p.y>.75 && p.y<1.65;
-    const armShape=horizontal>.04 && horizontal>vertical*.55;
+    const sideOk=side==="left" ? delta.x<-.015 : delta.x>.015;
+    const heightOk=p.y>.55 && p.y<1.75;
+    const armShape=horizontal>.015;
 
     if(!sideOk || !heightOk || !armShape) return;
 
@@ -484,8 +484,13 @@ function extractArmGeometry(source){
     ];
     const weights=vertices.map(index=>vertexArmWeight(source,index,armBoneIndices));
     const average=(weights[0]+weights[1]+weights[2])/3;
-    const strongVertices=weights.filter(weight=>weight>=.18).length;
-    if(average>=.22 && strongVertices>=2){
+    const strongVertices=weights.filter(weight=>weight>=.08).length;
+    const maxWeight=Math.max(...weights);
+
+    if(
+      (average>=.055 && strongVertices>=1) ||
+      maxWeight>=.22
+    ){
       keptVertices.push(...vertices);
       keptMaterialIndices.push(materialForTriangle(tri));
     }
@@ -546,12 +551,16 @@ function extractArmGeometry(source){
 function applyFirstPersonArmPose(root){
   root.updateMatrixWorld(true);
 
-  const leftUpper=findBoneByNameParts(root,[
+  let leftUpper=findBoneByNameParts(root,[
     "mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"
   ]);
-  const rightUpper=findBoneByNameParts(root,[
+  let rightUpper=findBoneByNameParts(root,[
     "mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"
   ]);
+
+  if(!leftUpper) leftUpper=findArmBoneByHierarchy(root,"left");
+  if(!rightUpper) rightUpper=findArmBoneByHierarchy(root,"right");
+
   const leftForearm=findBoneByNameParts(root,[
     "mixamorigleftforearm","leftforearm","leftlowerarm","leftelbow","forearml"
   ]) || getBoneChild(leftUpper);
@@ -604,13 +613,11 @@ export function createFirstPersonArms(model){
     "mixamorigrighthand","righthand","handr","wristr"
   ]);
 
-  if(leftHand && rightHand){
-    const leftWorld=leftHand.getWorldPosition(new THREE.Vector3());
-    const rightWorld=rightHand.getWorldPosition(new THREE.Vector3());
-    const handCenter=leftWorld.add(rightWorld).multiplyScalar(.5);
-    root.position.set(-handCenter.x,-.28-handCenter.y,-.88-handCenter.z);
-  }else{
-    root.position.set(0,-.50,-.98);
+  // Keep the raised arms in the lower-middle of the camera view.
+  root.position.set(0,-.88,-.78);
+
+  if(!leftHand || !rightHand){
+    console.warn("[DeepSeeker] First-person hand bones not found; using fixed camera anchor.");
   }
 
   root.updateMatrixWorld(true);
@@ -632,6 +639,10 @@ export function createFirstPersonArms(model){
   });
 
   root.userData.extractedArmMeshCount=extractedArmMeshCount;
+  console.log("[DeepSeeker] first-person arm viewmodel",{
+    extractedArmMeshCount,
+    position:root.position.toArray()
+  });
   return root;
 }
 

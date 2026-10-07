@@ -2947,6 +2947,12 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
 
   player.lock();
 
+  setTimeout(()=>{
+    if(gameStarted && !houseMode){
+      ensureSpiderLoading();
+    }
+  },1000);
+
   // Creating a new slot immediately writes an initial checkpoint instead of
   // leaving the slot empty until the 20-second autosave.
   if(!save){
@@ -4404,13 +4410,11 @@ function updateInitialLoadingScreen(){
   // Spider-Psionic is optional background content and must never block boot.
   const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
   const decoderProgress=geometryDecoderReady ? 100 : 0;
-  const characterProgress=player.characterLoaded ? 100 : 0;
   const startupProgress=initialStartupPrepared ? 100 : 0;
   const total=Math.max(0,Math.min(100,Math.round(
-    decoderProgress*.10 +
-    characterProgress*.50 +
-    startupProgress*.15 +
-    saveProgress*.25
+    decoderProgress*.20 +
+    startupProgress*.30 +
+    saveProgress*.50
   )));
 
   const fill=document.getElementById("initialLoadFill");
@@ -4424,19 +4428,14 @@ function updateInitialLoadingScreen(){
       status.textContent="STARTUP PREPARATION FAILED — RELOAD TO RETRY.";
     }else if(
       geometryDecoderReady &&
-      player.characterLoaded &&
       initialStartupPrepared &&
       window.__deepseekerSaveHydrationDone
     ){
-      status.textContent=spiderLoaded
-        ? "ALL GAME ASSETS READY — STARTING MAIN MENU."
-        : "WORLD READY — SPIDER LOADING IN BACKGROUND.";
+      status.textContent=player.characterLoaded
+        ? "WORLD READY — STARTING MAIN MENU."
+        : "WORLD READY — PLAYER MODEL LOADING IN BACKGROUND.";
     }else if(!geometryDecoderReady){
       status.textContent="INITIALIZING GEOMETRY DECODERS…";
-    }else if(!player.characterLoaded && player.characterLoadFailed){
-      status.textContent="PLAYER MODEL FAILED TO LOAD — RELOAD TO RETRY.";
-    }else if(!player.characterLoaded){
-      status.textContent="LOADING PLAYER MODEL + ARMS…";
     }else if(!initialStartupPrepared){
       status.textContent="PREPARING FIRST-ROOM ASSETS…";
     }else{
@@ -4452,8 +4451,6 @@ function finishInitialLoading(){
   if(
     initialStartupError ||
     !geometryDecoderReady ||
-    !player.characterLoaded ||
-    player.characterLoadFailed ||
     !initialStartupPrepared ||
     !window.__deepseekerSaveHydrationDone
   ){
@@ -4484,11 +4481,7 @@ function beginInitialLoading(){
   // loading screen. Nothing is intentionally deferred until after the menu.
   prepareInitialStartupAssets();
 
-  if(!spiderLoaded && !spiderLoadStarted){
-    spiderLoadStarted=true;
-    loadSpiderFromPack();
-  }
-
+  // Spider-Psionic loads after gameplay starts so its ZIP parsing cannot block boot.
   // Decoder warmup is already running; keep the same boot gate for it.
   void geometryDecoderPromise;
 
@@ -6138,6 +6131,9 @@ function finishSpiderModel(model,animations,sourceName){
   spiderEntity.add(model);
   spiderLoaded=true;
   spiderStartupFailed=false;
+  if(gameStarted && !houseMode){
+    nextEvent=Math.min(nextEvent,clock.elapsedTime+8);
+  }
   if(spiderRetryTimer!==null){
     clearTimeout(spiderRetryTimer);
     spiderRetryTimer=null;
@@ -7625,10 +7621,9 @@ function animate(){
 
   flashlight.intensity=flashlightOn ? flashlightStrength : 0;
   flashlight.visible=flashlightOn && battery>0;
-  flashlightFill.intensity=flashlight.visible
-    ? (LOW_END_PERFORMANCE ? .32 : .48)
-    : 0;
-  flashlightFill.visible=flashlight.visible;
+  // The camera-local point fill created a concentrated white floor hotspot.
+  flashlightFill.intensity=0;
+  flashlightFill.visible=false;
   // Keep beam range and aim stable. Wall-hit occlusion was changing the
   // spotlight target dozens of times per second and could make surfaces snap
   // or flicker as the center ray crossed a wall edge.

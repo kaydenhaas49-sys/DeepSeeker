@@ -159,7 +159,6 @@ export class Player {
 
       const firstPersonArms=createFirstPersonArms(character.model);
       firstPersonArms.scale.setScalar(1.02);
-      firstPersonArms.rotation.set(0,0,0);
 
       // The visible prop belongs to the actual cloned right-hand bone.
       const firstPersonFlashlight=attachFlashlight(firstPersonArms);
