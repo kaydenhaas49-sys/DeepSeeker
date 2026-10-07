@@ -1381,6 +1381,7 @@ menuCamera.far=180;
 menuCamera.updateProjectionMatrix();
 
 let menuBackdropWasActive=false;
+let menuFixtureUpdateTimer=0;
 
 function updateMenuScene(t,dt){
   const menuBackdropElement=document.getElementById("menuBackdrop");
