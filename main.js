@@ -4646,9 +4646,7 @@ function fitSpiderModel(model){
     obj.visible=true;
     obj.frustumCulled=false;
     obj.castShadow=true;
-    // The flashlight is a shadow-casting light. Skinned spider geometry can
-    // self-shadow badly, making the creature turn black inside the beam.
-    obj.receiveShadow=false;
+    obj.receiveShadow=true;
     obj.renderOrder=10;
 
     // FBX skin weights/normals can be slightly dirty after conversion.
