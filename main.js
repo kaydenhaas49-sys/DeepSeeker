@@ -4634,80 +4634,25 @@ const SPIDER_ANIMATION_ALIAS={
 
 
 function fitSpiderModel(model){
-  // Keep the imported FBX neutral. Gameplay/menu parents own heading and
-  // ceiling inversion; the asset itself should never carry a hidden yaw hack.
-  model.position.set(0,0,0);
-  model.rotation.set(0,0,0);
-  model.scale.set(1,1,1);
-
-  model.traverse(obj=>{
-    if(!obj.isMesh) return;
-
-    obj.visible=true;
-    obj.frustumCulled=false;
-    obj.castShadow=true;
-    // Keep the animated spider lit by the flashlight without letting its
-    // skinned surface self-shadow into a black silhouette.
-    obj.receiveShadow=false;
-    obj.renderOrder=10;
-
-    // Do not rewrite the imported rig's skin weights or geometry normals.
-    // This asset already contains its authored deformation data; changing it
-    // at runtime can alter the skinned mesh and cause visible deformation.
-    if(obj.isSkinnedMesh && obj.skeleton){
-      obj.skeleton.update();
-    }
-
-    const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
-    for(const material of materials){
-      if(!material) continue;
-
-      // The source spider is opaque. Clear imported alpha/blending state so
-      // the FBX cannot turn the body or legs into translucent holes.
-      material.visible=true;
-      material.transparent=false;
-      material.opacity=1;
-      material.alphaTest=0;
-      material.alphaHash=false;
-      material.alphaToCoverage=false;
-      material.premultipliedAlpha=false;
-      material.blending=THREE.NormalBlending;
-      material.depthTest=true;
-      material.depthWrite=true;
-      material.side=THREE.DoubleSide;
-
-      if("transmission" in material) material.transmission=0;
-      if("thickness" in material) material.thickness=0;
-      if("clearcoat" in material) material.clearcoat=0;
-      material.needsUpdate=true;
-    }
-  });
-
+  // Never rewrite the imported FBX root transform or geometry. The authored
+  // rig stays in its original local pose; the gameplay wrapper handles scale
+  // and world placement outside the asset.
   model.updateMatrixWorld(true);
 
-  const rawBox=new THREE.Box3().setFromObject(model);
-  const rawSize=rawBox.getSize(new THREE.Vector3());
-  const maxDimension=Math.max(rawSize.x,rawSize.y,rawSize.z);
+  const bounds=new THREE.Box3().setFromObject(model);
+  const size=bounds.getSize(new THREE.Vector3());
+  const maxDimension=Math.max(size.x,size.y,size.z);
 
   if(!Number.isFinite(maxDimension) || maxDimension<.0001){
     throw new Error("Spider model has invalid or empty bounds.");
   }
 
-  model.scale.setScalar(SPIDER_TARGET_SPAN/maxDimension);
-  model.updateMatrixWorld(true);
-
-  // Center the imported rig around its origin. Rotating this centered rig by
-  // 180 degrees for the ceiling now flips it without moving its pivot above it.
-  const fittedBox=new THREE.Box3().setFromObject(model);
-  const center=fittedBox.getCenter(new THREE.Vector3());
-  const fittedSize=fittedBox.getSize(new THREE.Vector3());
-
-  model.position.x-=center.x;
-  model.position.y-=center.y;
-  model.position.z-=center.z;
-  model.updateMatrixWorld(true);
-
-  spiderModelHalfHeight=Math.max(.001,fittedSize.y*.5);
+  return {
+    bounds,
+    size,
+    maxDimension,
+    scale:SPIDER_TARGET_SPAN/maxDimension
+  };
 }
 
 function setSpiderAnimation(name){
@@ -6157,13 +6102,21 @@ function finishSpiderModel(model,animations,sourceName){
     throw new Error("Spider model parsed, but its geometry has zero or invalid bounds.");
   }
 
-  fitSpiderModel(model);
+  const fit=fitSpiderModel(model);
+  const center=fit.bounds.getCenter(new THREE.Vector3());
 
-  // The wrapper owns the ground contact point. The imported FBX stays centered
-  // so the exact same rig can be rotated 180 degrees for the ceiling.
+  // Keep every transform on the authored FBX untouched. Only this external
+  // wrapper is scaled/positioned for gameplay and menu presentation.
+  spiderModelHalfHeight=Math.max(.001,fit.size.y*fit.scale*.5);
+
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
-  visualRoot.position.y=SPIDER_GROUND_OFFSET+spiderModelHalfHeight;
+  visualRoot.scale.setScalar(fit.scale);
+  visualRoot.position.set(
+    -center.x*fit.scale,
+    SPIDER_GROUND_OFFSET-center.y*fit.scale+spiderModelHalfHeight,
+    -center.z*fit.scale
+  );
   visualRoot.add(model);
 
   spiderModel=visualRoot;
