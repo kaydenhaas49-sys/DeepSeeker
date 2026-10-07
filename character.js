@@ -20,6 +20,45 @@ function makeLoader(){
   return loader;
 }
 
+function hardenCharacterMaterial(material){
+  if(!material) return;
+  material.visible=true;
+  material.transparent=false;
+  material.opacity=1;
+  material.alphaTest=0;
+  if("alphaHash" in material) material.alphaHash=false;
+  if("alphaToCoverage" in material) material.alphaToCoverage=false;
+  material.premultipliedAlpha=false;
+  material.blending=THREE.NormalBlending;
+  material.depthTest=true;
+  material.depthWrite=true;
+  material.side=THREE.DoubleSide;
+  if("transmission" in material) material.transmission=0;
+  if("thickness" in material) material.thickness=0;
+  if("attenuationDistance" in material) material.attenuationDistance=Infinity;
+  if("clearcoat" in material) material.clearcoat=0;
+  if("iridescence" in material) material.iridescence=0;
+  material.needsUpdate=true;
+}
+function cloneCharacterMaterials(root){
+  root.traverse(obj=>{
+    if(!obj.isMesh) return;
+    if(Array.isArray(obj.material)){
+      obj.material=obj.material.map(material=>{
+        const clone=material?.clone ? material.clone() : material;
+        hardenCharacterMaterial(clone);
+        return clone;
+      });
+    }else{
+      const clone=obj.material?.clone ? obj.material.clone() : obj.material;
+      obj.material=clone;
+      hardenCharacterMaterial(clone);
+    }
+    if(obj.isSkinnedMesh && obj.normalizeSkinWeights) obj.normalizeSkinWeights();
+    obj.frustumCulled=false;
+  });
+}
+
 function normalizeTemplate(scene){
   scene.updateMatrixWorld(true);
 
@@ -43,15 +82,17 @@ function normalizeTemplate(scene){
 
     obj.castShadow=false;
     obj.receiveShadow=false;
-    obj.frustumCulled=true;
+    obj.frustumCulled=false;
 
     const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
     for(const mat of materials){
       if(!mat) continue;
       mat.toneMapped=true;
+      hardenCharacterMaterial(mat);
     }
   });
 
+  cloneCharacterMaterials(scene);
   return scene;
 }
 
@@ -365,7 +406,8 @@ function pickIdleAnimation(clips){
 
 function isArmBoneName(name){
   const n=normalizeBoneName(name);
-  return /shoulder|clavicle|upperarm|lowerarm|forearm|elbow|wrist|hand|arm/.test(n);
+  if(!n || n==="armature" || n==="root" || n==="hips" || n==="pelvis") return false;
+  return /shoulder|clavicle|upperarm|lowerarm|forearm|elbow|wrist|hand|arm(?:l|r)$|leftarm|rightarm/.test(n);
 }
 
 function meshNameLooksLikeArm(mesh){
@@ -402,19 +444,12 @@ function extractArmGeometry(source){
 
   const armBoneIndices=new Set();
   const bones=source.skeleton?.bones || [];
+  bones.forEach((bone,index)=>{ if(isArmBoneName(bone.name)) armBoneIndices.add(index); });
 
-  bones.forEach((bone,index)=>{
-    if(isArmBoneName(bone.name)) armBoneIndices.add(index);
-  });
-
-  // Some AI-generated rigs use generic bone names. Fall back to the
-  // spatial/hierarchical arm detector and include each upper arm's children.
   if(!armBoneIndices.size){
     const leftUpper=findArmBoneByHierarchy(source,"left");
     const rightUpper=findArmBoneByHierarchy(source,"right");
-    const armRoots=[leftUpper,rightUpper].filter(Boolean);
-
-    for(const rootBone of armRoots){
+    for(const rootBone of [leftUpper,rightUpper].filter(Boolean)){
       rootBone.traverse(bone=>{
         if(!bone.isBone) return;
         const index=bones.indexOf(bone);
@@ -422,14 +457,23 @@ function extractArmGeometry(source){
       });
     }
   }
-
   if(!armBoneIndices.size) return null;
 
   const sourceIndex=geometry.index;
-  const triangleCount=sourceIndex
-    ? Math.floor(sourceIndex.count/3)
-    : Math.floor(position.count/3);
+  const triangleCount=sourceIndex ? Math.floor(sourceIndex.count/3) : Math.floor(position.count/3);
   const keptVertices=[];
+  const keptMaterialIndices=[];
+  const groups=geometry.groups || [];
+
+  const materialForTriangle=(triangleIndex)=>{
+    const sourceOffset=triangleIndex*3;
+    for(const group of groups){
+      if(sourceOffset>=group.start && sourceOffset<group.start+group.count){
+        return group.materialIndex || 0;
+      }
+    }
+    return 0;
+  };
 
   for(let tri=0;tri<triangleCount;tri++){
     const vertices=[
@@ -440,12 +484,11 @@ function extractArmGeometry(source){
     const weights=vertices.map(index=>vertexArmWeight(source,index,armBoneIndices));
     const average=(weights[0]+weights[1]+weights[2])/3;
     const strongVertices=weights.filter(weight=>weight>=.18).length;
-
     if(average>=.22 && strongVertices>=2){
       keptVertices.push(...vertices);
+      keptMaterialIndices.push(materialForTriangle(tri));
     }
   }
-
   if(!keptVertices.length) return null;
 
   const result=new THREE.BufferGeometry();
@@ -456,7 +499,6 @@ function extractArmGeometry(source){
         values.push(attributeComponent(attribute,sourceVertex,component));
       }
     }
-
     result.setAttribute(
       name,
       new THREE.BufferAttribute(
@@ -465,6 +507,34 @@ function extractArmGeometry(source){
         attribute.normalized
       )
     );
+  }
+
+  for(const [name,targets] of Object.entries(geometry.morphAttributes || {})){
+    result.morphAttributes[name]=targets.map(attribute=>{
+      const values=[];
+      for(const sourceVertex of keptVertices){
+        for(let component=0;component<attribute.itemSize;component++){
+          values.push(attributeComponent(attribute,sourceVertex,component));
+        }
+      }
+      return new THREE.BufferAttribute(
+        new attribute.array.constructor(values),
+        attribute.itemSize,
+        attribute.normalized
+      );
+    });
+  }
+  result.morphTargetsRelative=geometry.morphTargetsRelative;
+
+  let runStart=0;
+  let runMaterial=keptMaterialIndices[0] ?? 0;
+  for(let i=1;i<=keptMaterialIndices.length;i++){
+    const material=keptMaterialIndices[i];
+    if(i<keptMaterialIndices.length && material===runMaterial) continue;
+    const runCount=(i-runStart)*3;
+    if(runCount>0) result.addGroup(runStart*3,runCount,runMaterial);
+    runStart=i;
+    runMaterial=material ?? 0;
   }
 
   result.computeBoundingBox();
@@ -488,29 +558,26 @@ function applyFirstPersonArmPose(root){
     "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
   ]) || getBoneChild(rightUpper);
 
-  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(-.16,-.06,.986).normalize());
-  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(.16,-.06,.986).normalize());
+  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(-.34,-.34,-.88).normalize());
+  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(.34,-.34,-.88).normalize());
 
   root.updateMatrixWorld(true);
 
-  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(-.10,-.03,.995).normalize());
-  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(.10,-.03,.995).normalize());
+  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(.04,-.12,-.99).normalize());
+  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(-.04,-.12,-.99).normalize());
 
   root.updateMatrixWorld(true);
 }
 
 export function createFirstPersonArms(model){
   const root=cloneSkeleton(model);
+  cloneCharacterMaterials(root);
   root.name="FirstPersonActualArms";
   root.visible=true;
 
-  // The previous implementation cloned the entire body into the camera.
-  // Build a real arms-only viewmodel from the character's skinned geometry.
   let extractedArmMeshCount=0;
-
   root.traverse(obj=>{
     if(!obj.isMesh) return;
-
     if(obj.isSkinnedMesh){
       const armGeometry=extractArmGeometry(obj);
       if(armGeometry){
@@ -525,8 +592,7 @@ export function createFirstPersonArms(model){
     }
   });
 
-  // If the model uses unusual non-skinned arm meshes, keep those; otherwise
-  // the extracted skinned-arm geometry above is the source of truth.
+  root.rotation.set(0,Math.PI,0);
   applyFirstPersonArmPose(root);
   root.updateMatrixWorld(true);
 
@@ -537,20 +603,13 @@ export function createFirstPersonArms(model){
     "mixamorigrighthand","righthand","handr","wristr"
   ]);
 
-  root.rotation.y=Math.PI;
-
   if(leftHand && rightHand){
     const leftWorld=leftHand.getWorldPosition(new THREE.Vector3());
     const rightWorld=rightHand.getWorldPosition(new THREE.Vector3());
     const handCenter=leftWorld.add(rightWorld).multiplyScalar(.5);
-
-    root.position.set(
-      -handCenter.x,
-      -.30-handCenter.y,
-      -.90-handCenter.z
-    );
+    root.position.set(-handCenter.x,-.28-handCenter.y,-.88-handCenter.z);
   }else{
-    root.position.set(0,-.55,-1.05);
+    root.position.set(0,-.50,-.98);
   }
 
   root.updateMatrixWorld(true);
@@ -562,12 +621,10 @@ export function createFirstPersonArms(model){
     obj.castShadow=false;
     obj.receiveShadow=false;
 
-    const materials=Array.isArray(obj.material)
-      ? obj.material
-      : [obj.material];
-
+    const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
     for(const material of materials){
       if(!material) continue;
+      hardenCharacterMaterial(material);
       material.depthTest=false;
       material.depthWrite=false;
       material.needsUpdate=true;
@@ -619,6 +676,7 @@ export function flashlightFlicker(time){
 export async function createHazmatCharacter(){
   const template=await loadHazmatCharacter();
   const model=cloneSkeleton(template.scene);
+  cloneCharacterMaterials(model);
 
   // The supplied rig has a bind-pose/animation combination that can
   // snap back to a T-pose. Use a deterministic relaxed pose instead
