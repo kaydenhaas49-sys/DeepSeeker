@@ -4633,7 +4633,7 @@ const SPIDER_ANIMATION_ALIAS={
 };
 
 
-function fitSpiderModel(model){
+function fitSpiderModel(model,preserveMaterials=false){
   // Keep the imported FBX neutral. Gameplay/menu parents own heading and
   // ceiling inversion; the asset itself should never carry a hidden yaw hack.
   model.position.set(0,0,0);
@@ -4649,33 +4649,50 @@ function fitSpiderModel(model){
     obj.receiveShadow=false;
     obj.renderOrder=10;
 
-    // Keep the source material's base color, but deliberately remove every
-    // texture/alpha cutout. This makes the spider an opaque polygon shell
-    // visible from both sides, including when viewed from underneath.
-    const originalMaterial=Array.isArray(obj.material)
-      ? obj.material[0]
-      : obj.material;
-    const baseColor=originalMaterial?.color?.clone
-      ? originalMaterial.color.clone()
-      : new THREE.Color(0x17100e);
+    const originalMaterials=Array.isArray(obj.material)
+      ? obj.material
+      : [obj.material];
 
-    obj.material=new THREE.MeshPhongMaterial({
-      color:baseColor,
-      shininess:8,
-      specular:0x080606,
-      flatShading:true,
-      side:THREE.DoubleSide,
-      transparent:false,
-      opacity:1,
-      alphaTest:0,
-      depthTest:true,
-      depthWrite:true,
-      fog:true
-    });
+    if(preserveMaterials){
+      obj.material=originalMaterials.map(material=>{
+        if(!material) return material;
+        const clone=material.clone ? material.clone() : material;
+        clone.visible=true;
+        clone.transparent=false;
+        clone.opacity=1;
+        clone.alphaTest=0;
+        clone.alphaHash=false;
+        clone.alphaToCoverage=false;
+        clone.premultipliedAlpha=false;
+        clone.blending=THREE.NormalBlending;
+        clone.depthTest=true;
+        clone.depthWrite=true;
+        clone.side=THREE.DoubleSide;
+        clone.needsUpdate=true;
+        return clone;
+      });
+      if(obj.material.length===1) obj.material=obj.material[0];
+    }else{
+      const source=originalMaterials[0];
+      const baseColor=source?.color?.clone
+        ? source.color.clone()
+        : new THREE.Color(0x17100e);
+      obj.material=new THREE.MeshPhongMaterial({
+        color:baseColor,
+        shininess:8,
+        specular:0x080606,
+        flatShading:true,
+        side:THREE.DoubleSide,
+        transparent:false,
+        opacity:1,
+        alphaTest:0,
+        depthTest:true,
+        depthWrite:true,
+        fog:true
+      });
+    }
 
-    // Diagnostic bind-pose test: preserve the FBX's authored skin data and
-    // reset each skeleton to its imported bind pose before any animation.
-    if(obj.isSkinnedMesh && obj.skeleton){
+    if(!preserveMaterials && obj.isSkinnedMesh && obj.skeleton){
       obj.skeleton.pose();
       obj.skeleton.update();
     }
@@ -4683,9 +4700,6 @@ function fitSpiderModel(model){
     const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
     for(const material of materials){
       if(!material) continue;
-
-      // Kept for compatibility with non-diagnostic loaders; the spider's
-      // Preserve the imported material's color/map/texture while normalizing its render state.
       material.visible=true;
       material.transparent=false;
       material.opacity=1;
@@ -6267,10 +6281,61 @@ function buildSolidSpiderReplacement(){
   return root;
 }
 
+
+function setupSpiderAnimationSet(model,animations){
+  if(sourceName==="assets/animated_spider.glb"){
+    setupSpiderAnimationSet(visualRoot,animations);
+  }else{
+    spiderMixer=null;
+    spiderActions.clear();
+    spiderAnimationClips.clear();
+    spiderAnimationState="";
+    spiderWantedState="idle";
+  }
+
+  if(!Array.isArray(animations) || !animations.length) return;
+
+  const pick=(patterns,indexFallback)=>{
+    for(const clip of animations){
+      const name=String(clip?.name||"").toLowerCase();
+      if(patterns.some(pattern=>pattern.test(name))) return clip;
+    }
+    return animations[indexFallback] || null;
+  };
+
+  const mapping={
+    idle1:pick([/idle/,/stand/,/rest/,/breath/,/wait/],0),
+    walk:pick([/walk/,/crawl/,/stalk/,/run/,/sprint/],1),
+    attack1:pick([/attack/,/bite/,/strike/,/pounce/,/lunge/],2),
+    hit1:pick([/hit/,/hurt/,/damage/],3),
+    die1:pick([/die/,/death/,/dead/],animations.length-1),
+    jump:pick([/jump/,/leap/],4)
+  };
+
+  spiderMixer=new THREE.AnimationMixer(model);
+
+  for(const [name,clip] of Object.entries(mapping)){
+    if(!clip) continue;
+    spiderAnimationClips.set(name,clip);
+    const action=spiderMixer.clipAction(clip);
+    const oneShot=/^(attack|hit|die|jump)/.test(name);
+    action.setLoop(
+      oneShot ? THREE.LoopOnce : THREE.LoopRepeat,
+      oneShot ? 1 : Infinity
+    );
+    if(oneShot) action.clampWhenFinished=true;
+    spiderActions.set(name,action);
+  }
+
+  console.log("[DeepSeeker] Animated wolf spider clips",{
+    available:animations.map(clip=>clip.name),
+    mapped:[...spiderAnimationClips.keys()]
+  });
+
+  setSpiderAnimation("idle");
+}
+
 function finishSpiderModel(model,animations,sourceName){
-  const importedSpider=model;
-  importedSpider.visible=false;
-  model=buildSolidSpiderReplacement();
   model.name="SpiderSource";
   model.visible=true;
 
@@ -6302,7 +6367,8 @@ function finishSpiderModel(model,animations,sourceName){
     throw new Error("Spider model parsed, but its geometry has zero or invalid bounds.");
   }
 
-  fitSpiderModel(model);
+  const isWolfSpider=sourceName==="assets/animated_spider.glb";
+  fitSpiderModel(model,isWolfSpider);
 
   // The wrapper owns the ground contact point. The imported FBX stays centered
   // so the exact same rig can be rotated 180 degrees for the ceiling.
@@ -6424,6 +6490,33 @@ async function loadSpiderFromPack(){
   };
 
   try{
+    const wolfLoaded=await new Promise(resolve=>{
+      const loader=new GLTFLoader();
+      loader.setDRACOLoader(dracoLoader);
+      loader.setMeshoptDecoder(MeshoptDecoder);
+
+      loader.load(
+        "./assets/animated_spider.glb",
+        gltf=>{
+          try{
+            finishSpiderModel(
+              gltf.scene,
+              gltf.animations||[],
+              "assets/animated_spider.glb"
+            );
+            resolve(true);
+          }catch(error){
+            console.error("[DeepSeeker] Wolf spider render setup failed; using legacy spider:",error);
+            resolve(false);
+          }
+        },
+        undefined,
+        ()=>resolve(false)
+      );
+    });
+
+    if(wolfLoaded) return;
+
     const extracted=await extractSpiderPack(packUrl);
     const packManager=new THREE.LoadingManager();
     const resourceUrls=new Map();
