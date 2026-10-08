@@ -2264,7 +2264,7 @@ function installMainMenuRedesign(){
 .menuNav{
   position:absolute;
   left:clamp(24px,4vw,60px);
-  top:clamp(455px,52vh,485px);
+  top:clamp(395px,52vh,425px);
   width:min(390px,calc(100vw - 48px));
   display:flex;
   flex-direction:column;
@@ -2357,7 +2357,7 @@ function installMainMenuRedesign(){
   }
   .menuNav{
     left:46px;
-    top:438px;
+    top:378px;
     width:380px;
     gap:9px;
   }
@@ -2378,9 +2378,14 @@ function installMainMenuRedesign(){
     padding-left:12px;
   }
   .menuHomeRedesign #saveSlots{
-    grid-template-columns:1fr;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:6px;
   }
-  .menuNav{top:430px}
+  .menuHomeRedesign .saveSlotCard{
+    min-height:94px;
+    padding:9px 7px;
+  }
+  .menuNav{top:370px}
 }
 `;
   document.head.appendChild(style);
