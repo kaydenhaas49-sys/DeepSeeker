@@ -16,6 +16,7 @@ import { NavigationSystem } from "./navigation.js";
 import { ComputerSystem } from "./computer.js";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode } from "./entityMode.js";
+import { SpiderHunter } from "./spiderHunter.js";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -4414,15 +4415,13 @@ function prepareInitialStartupAssets(){
 function updateInitialLoadingScreen(){
   if(initialLandingShown) return;
 
-  const spiderProgress=spiderLoaded ? 100 : 0;
-  const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
+    const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
   const decoderProgress=geometryDecoderReady ? 100 : 0;
   const startupProgress=initialStartupPrepared ? 100 : 0;
   const total=Math.max(0,Math.min(100,Math.round(
-    spiderProgress*.30 +
-    decoderProgress*.15 +
-    startupProgress*.25 +
-    saveProgress*.30
+    decoderProgress*.20 +
+    startupProgress*.35 +
+    saveProgress*.45
   )));
 
   const fill=document.getElementById("initialLoadFill");
@@ -4443,10 +4442,6 @@ function updateInitialLoadingScreen(){
       status.textContent=player.characterLoaded
         ? "WORLD + ENTITY PACK READY — STARTING MAIN MENU."
         : "WORLD READY — PLAYER MODEL LOADING IN BACKGROUND.";
-    }else if(!spiderLoaded){
-      status.textContent=spiderStartupFailed
-        ? "SPIDER PACK FAILED — RETRYING…"
-        : "LOADING ANIMATED SPIDER…";
     }else if(!geometryDecoderReady){
       status.textContent="INITIALIZING GEOMETRY DECODERS…";
     }else if(!initialStartupPrepared){
@@ -4463,7 +4458,6 @@ function finishInitialLoading(){
   if(initialLandingShown) return;
   if(
     initialStartupError ||
-    !spiderLoaded ||
     !geometryDecoderReady ||
     !initialStartupPrepared ||
     !window.__deepseekerSaveHydrationDone
@@ -4521,6 +4515,41 @@ spiderRevealLight.position.set(0,1.2,0);
 spiderEntity.add(spiderRevealLight);
 
 scene.add(spiderEntity);
+
+const spiderHunter=new SpiderHunter({
+  group:spiderEntity,
+  scene,
+  world,
+  player,
+  isBlocked:(x,z)=>{
+    if(tutorialOpenRoomActive){
+      for(const box of tutorialOpenRoomCollisionBoxes){
+        const nx=Math.max(box.minX,Math.min(x,box.maxX));
+        const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
+        const dx=x-nx;
+        const dz=z-nz;
+        if(dx*dx+dz*dz<=0.68*0.68) return true;
+      }
+      return false;
+    }
+
+    const walls=world.getNearbyWallBounds(x,z,0.9);
+    for(const wall of walls){
+      const nx=Math.max(wall.minX,Math.min(x,wall.maxX));
+      const nz=Math.max(wall.minZ,Math.min(z,wall.maxZ));
+      const dx=x-nx;
+      const dz=z-nz;
+      if(dx*dx+dz*dz<=0.68*0.68) return true;
+    }
+    return false;
+  },
+  getOccluders:()=>tutorialOpenRoomActive ? tutorialOpenRoomOccluders : world.root.children,
+  onStateChange:(mode)=>{
+    if(mode==="hunt" && !arachnophobiaMode){
+      spiderRevealLight.intensity=4.2;
+    }
+  }
+});
 
 let spiderLoaded=false;
 let spiderLoadStarted=false;
@@ -4784,11 +4813,8 @@ function hideHouseTutorialSpider(){
   houseTutorialSpiderTime=0;
   houseTutorialSpiderStuckTime=0;
   houseTutorialSpiderPrepared=false;
-  spiderEntity.visible=false;
+  spiderHunter.hide();
   spiderRevealLight.visible=false;
-  spiderEntity.scale.setScalar(1);
-  spiderEntity.rotation.x=0;
-  if(spiderMixer) spiderMixer.timeScale=1;
 }
 
 function resetHouseTutorial(){
@@ -4812,13 +4838,6 @@ function showHouseTutorialMessage(message,duration=1500){
 function prepareHouseTutorialSpider(){
   if(houseMode || !tutorialOpenRoomActive) return false;
 
-  if(!spiderLoaded){
-    // Stage 8 can be reached before the asynchronous spider load finishes.
-    // Keep asking for it here instead of silently abandoning the tutorial spawn.
-    ensureSpiderLoading();
-    return false;
-  }
-
   const forwardX=-Math.sin(player.yaw);
   const forwardZ=-Math.cos(player.yaw);
   const roomMin=6.0;
@@ -4835,52 +4854,46 @@ function prepareHouseTutorialSpider(){
     });
   }
 
-  // Prefer a visible point in the intended direction, but never allow the
-  // tutorial spider to spawn outside the room.
   let chosen=null;
   for(const candidate of candidates){
-    if(isHouseTutorialSpiderBlocked(candidate.x,candidate.z)) continue;
-    if(!houseTutorialSpiderSegmentClear(
-      player.pos.x,player.pos.z,candidate.x,candidate.z
-    )) continue;
+    let blocked=false;
+    for(const box of tutorialOpenRoomCollisionBoxes){
+      const nx=Math.max(box.minX,Math.min(candidate.x,box.maxX));
+      const nz=Math.max(box.minZ,Math.min(candidate.z,box.maxZ));
+      const dx=candidate.x-nx;
+      const dz=candidate.z-nz;
+      if(dx*dx+dz*dz<=0.68*0.68){
+        blocked=true;
+        break;
+      }
+    }
+    if(blocked) continue;
     chosen=candidate;
     break;
   }
 
-  // Last-resort deterministic fallback: always put it near the far end of the
-  // open tutorial room rather than failing the lesson entirely.
   if(!chosen){
-    const fallbackX=clampRoom(player.pos.x+forwardX*18);
-    const fallbackZ=clampRoom(player.pos.z+forwardZ*18);
-    if(
-      !isHouseTutorialSpiderBlocked(fallbackX,fallbackZ)
-    ){
-      chosen={x:fallbackX,z:fallbackZ};
-    }
+    chosen={
+      x:clampRoom(player.pos.x+forwardX*18),
+      z:clampRoom(player.pos.z+forwardZ*18)
+    };
   }
 
-  if(!chosen) return false;
-
-  houseTutorialSpiderPosition.set(
+  const position=new THREE.Vector3(
     chosen.x,
-    SPIDER_GROUND_OFFSET,
+    0.02,
     chosen.z
   );
+  const lookTarget=new THREE.Vector3(player.pos.x,0.02,player.pos.z);
 
-  spiderEntity.position.copy(houseTutorialSpiderPosition);
-  spiderEntity.rotation.x=0;
-  if(spiderModel) spiderModel.visible=true;
-  spiderEntity.rotation.y=Math.atan2(
-    player.pos.x-spiderEntity.position.x,
-    player.pos.z-spiderEntity.position.z
-  );
-  spiderEntity.scale.setScalar(1);
+  if(!spiderHunter.prepareTutorial(position,lookTarget)){
+    return false;
+  }
+
+  if(spiderModel) spiderModel.visible=false;
   spiderEntity.visible=true;
-  spiderVisibleToPlayer=true;
   spiderRevealLight.visible=true;
   spiderRevealLight.intensity=1.1;
-  setSpiderAnimation("idle");
-
   houseTutorialSpiderPrepared=true;
   houseTutorialSpiderState="static";
   houseTutorialSpiderTime=0;
@@ -5012,14 +5025,15 @@ function setHouseTutorialStage(stage){
 function startHouseTutorialSpiderChase(){
   if(houseTutorialSpiderState!=="static") return;
 
+  setHouseTutorialStage(9);
   houseTutorialSpiderState="chase";
   houseTutorialSpiderTime=0;
   houseTutorialSpiderStuckTime=0;
-  if(spiderMixer) spiderMixer.timeScale=1;
+  spiderHunter.beginChase();
+  if(spiderModel) spiderModel.visible=false;
   spiderEntity.visible=true;
   spiderRevealLight.visible=true;
   spiderRevealLight.intensity=4.2;
-  setSpiderAnimation("chase");
   pulse=.8;
 
   if(arachnophobiaMode){
@@ -5027,8 +5041,6 @@ function startHouseTutorialSpiderChase(){
   }else{
     audio.scare();
   }
-
-  setHouseTutorialStage(9);
 }
 
 function finishHouseTutorialSpiderChase(){
@@ -5056,23 +5068,17 @@ function updateHouseTutorialSpider(dt){
       player.pos.x-houseTutorialStartX,
       player.pos.z-houseTutorialStartZ
     );
-    if(movedDistance>=4.0){
-      setHouseTutorialStage(2);
-    }
+    if(movedDistance>=4.0) setHouseTutorialStage(2);
     return;
   }
 
   if(houseTutorialStage===2){
-    if(player.jumpY>.25 || player.jumpVelocity>1.2){
-      setHouseTutorialStage(3);
-    }
+    if(player.jumpY>.25 || player.jumpVelocity>1.2) setHouseTutorialStage(3);
     return;
   }
 
   if(houseTutorialStage===3){
-    if(player.crouched){
-      setHouseTutorialStage(4);
-    }
+    if(player.crouched) setHouseTutorialStage(4);
     return;
   }
 
@@ -5082,103 +5088,33 @@ function updateHouseTutorialSpider(dt){
       player.pos.z-houseTutorialStartZ
     );
     const sprinting=player.isRunning && Math.hypot(player.vel.x,player.vel.z)>2.0;
-    if(sprinting && sprintDistance>=4.0){
-      setHouseTutorialStage(5);
-    }
+    if(sprinting && sprintDistance>=4.0) setHouseTutorialStage(5);
     return;
   }
 
-  if(houseTutorialStage<8){
-    return;
-  }
+  if(houseTutorialStage<8) return;
 
-  if(!spiderLoaded){
-    // Keep the tutorial encounter alive while the model finishes loading.
-    ensureSpiderLoading(true);
-    return;
-  }
-
-  if(
-    !houseTutorialSpiderPrepared &&
-    !prepareHouseTutorialSpider()
-  ){
+  if(!houseTutorialSpiderPrepared && !prepareHouseTutorialSpider()){
     return;
   }
 
   houseTutorialSpiderTime+=dt;
+  const result=spiderHunter.updateTutorial(dt,player);
 
-  // The tutorial is the sole owner of this shared entity during stages 8–9.
-  // Force the model visible so normal Backrooms line-of-sight state cannot
-  // leave the tutorial spider as an invisible shell.
-  if(spiderModel) spiderModel.visible=true;
-
-  const dxToPlayer=player.pos.x-spiderEntity.position.x;
-  const dzToPlayer=player.pos.z-spiderEntity.position.z;
-  const distanceToPlayer=Math.hypot(dxToPlayer,dzToPlayer);
-
-  if(houseTutorialSpiderState==="static"){
-    spiderEntity.visible=true;
-    spiderRevealLight.intensity=1.1;
-    spiderRevealLight.visible=houseTutorialSpiderCanBeSeen();
-    // The spawn transform is deliberately preserved: no turning, walking, or
-    // animation until the player enters the trigger radius.
-    if(spiderMixer) spiderMixer.timeScale=0;
-    groundSpiderEntity();
-
-    if(distanceToPlayer<=5.2){
-      startHouseTutorialSpiderChase();
-    }
+  if(houseTutorialStage===8 && result.triggered){
+    startHouseTutorialSpiderChase();
     return;
   }
 
-  if(houseTutorialSpiderState!=="chase") return;
-
-  if(distanceToPlayer<=1.15 || houseTutorialSpiderTime>=3.25){
+  if(houseTutorialStage===9 && result.finished){
     finishHouseTutorialSpiderChase();
     return;
   }
 
-  const step=Math.min(5.5*dt,Math.max(0,distanceToPlayer-.95));
-  const inv=1/Math.max(distanceToPlayer,.001);
-  const moveX=dxToPlayer*inv*step;
-  const moveZ=dzToPlayer*inv*step;
-
-  if(!isHouseTutorialSpiderBlocked(
-    spiderEntity.position.x+moveX,
-    spiderEntity.position.z+moveZ
-  )){
-    spiderEntity.position.x+=moveX;
-    spiderEntity.position.z+=moveZ;
-    houseTutorialSpiderStuckTime=0;
-  }else if(!isHouseTutorialSpiderBlocked(
-    spiderEntity.position.x+moveX,
-    spiderEntity.position.z
-  )){
-    spiderEntity.position.x+=moveX;
-    houseTutorialSpiderStuckTime=0;
-  }else if(!isHouseTutorialSpiderBlocked(
-    spiderEntity.position.x,
-    spiderEntity.position.z+moveZ
-  )){
-    spiderEntity.position.z+=moveZ;
-    houseTutorialSpiderStuckTime=0;
-  }else{
-    houseTutorialSpiderStuckTime+=dt;
-  }
-
-  spiderEntity.rotation.x=0;
-  spiderEntity.rotation.y=Math.atan2(
-    player.pos.x-spiderEntity.position.x,
-    player.pos.z-spiderEntity.position.z
-  );
+  if(spiderModel) spiderModel.visible=false;
   spiderEntity.visible=true;
-  spiderRevealLight.visible=true;
-  spiderRevealLight.intensity=4.2;
-  setSpiderAnimation("chase");
-
-  if(houseTutorialSpiderStuckTime>.65){
-    finishHouseTutorialSpiderChase();
-  }
+  spiderRevealLight.visible=houseTutorialSpiderState==="chase";
+  spiderRevealLight.intensity=houseTutorialSpiderState==="chase" ? 4.2 : 1.1;
 }
 
 function rotatePlayerTowardSpider(dt){
@@ -8014,6 +7950,7 @@ function animate(){
   // deliberately scripted teaching encounter on top of it.
   if(houseMode || tutorialOpenRoomActive){
     updateHouseTutorialSpider(dt);
+    spiderHunter.step(dt);
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
