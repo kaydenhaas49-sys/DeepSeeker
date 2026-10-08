@@ -2169,86 +2169,98 @@ function installMainMenuRedesign(){
   color:#8d8979;
 }
 
-/* Terminal directly below the title. */
-.menuRightPanel{
+/* Save slots replace the old field terminal on the right side. */
+.menuSlotBar{
   position:absolute;
-  left:clamp(24px,4vw,60px);
-  top:clamp(205px,23vh,235px);
-  width:min(390px,calc(100vw - 48px));
-  min-height:205px;
-  box-sizing:border-box;
-  padding:14px 0 16px 14px;
-  border-left:1px solid rgba(223,173,69,.32);
-  color:#918b79;
+  right:clamp(24px,4vw,60px);
+  top:clamp(154px,20vh,176px);
+  width:min(540px,calc(100vw - 48px));
+  color:#8c8675;
   text-shadow:0 2px 8px #000;
+  padding-left:14px;
+  border-left:1px solid rgba(223,173,69,.32);
+  box-sizing:border-box;
 }
-.menuRightHeader{
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:9px;
-  font-size:7px;
-  letter-spacing:2px;
-  color:#8b8573;
-}
-.menuSignalState{
+.menuSlotHeader{
   display:flex;
   align-items:center;
-  gap:8px;
-  margin-bottom:8px;
-  font-size:14px;
-  letter-spacing:2.2px;
-  color:#ddd1a7;
-}
-.menuSignalDot{
-  width:6px;
-  height:6px;
-  border-radius:50%;
-  background:#d2a13c;
-  box-shadow:0 0 10px rgba(223,173,69,.55);
-}
-.menuRightLead{
-  margin:0 0 9px;
-  max-width:360px;
-  font-size:9px;
-  line-height:1.8;
-  color:#777165;
-}
-.menuRightRule{
-  height:1px;
-  background:rgba(226,211,164,.08);
-  margin:12px 0 13px;
-}
-.menuRightSectionLabel{
-  margin-bottom:5px;
-  font-size:7px;
-  letter-spacing:2.2px;
-  color:#9c9580;
-}
-.menuHomeRedesign .houseLoader{
-  width:100%;
-  margin:7px 0 0;
-  text-align:left;
-}
-.menuHomeRedesign .houseLoaderTop{color:#817b6c}
-.menuHomeRedesign .houseLoaderStatus{color:#646055;min-height:14px}
-.menuRightMeta{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin-top:13px;
-}
-.menuRightMetaRow{
-  display:flex;
   justify-content:space-between;
-  gap:6px;
-  font-size:7px;
-  letter-spacing:1.1px;
+  gap:14px;
+  margin-bottom:9px;
+  padding:0 1px;
+  font-size:8px;
+  letter-spacing:2.4px;
 }
-.menuRightMetaRow span:first-child{color:#514e46}
-.menuRightMetaRow span:last-child{color:#878071}
+.menuSlotHeader strong{color:#d2c8a5;font-weight:500}
+.menuSlotHeader span{color:#625e54}
+.menuHomeRedesign #saveSlots{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  max-height:none;
+  overflow:visible;
+}
+.menuHomeRedesign .saveSlotCard{
+  min-width:0;
+  min-height:112px;
+  padding:12px 11px;
+  border:1px solid rgba(231,220,171,.09);
+  border-radius:4px;
+  background:rgba(5,6,5,.34);
+  color:#b2ac99;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  box-shadow:inset 0 1px rgba(255,255,255,.018);
+  backdrop-filter:blur(3px);
+}
+.menuHomeRedesign .saveSlotCard:hover{
+  background:rgba(223,173,69,.08);
+  border-color:rgba(231,220,171,.18);
+}
+.menuHomeRedesign .saveSlotCard.selected{
+  border-color:rgba(223,173,69,.66);
+  background:rgba(223,173,69,.11);
+}
+.menuHomeRedesign .saveSlotTitle{font-size:9px;letter-spacing:1.7px;color:#ddd4b9}
+.menuHomeRedesign .saveSlotMode{font-size:7px;color:#7e796d}
+.menuHomeRedesign .saveSlotDetail{
+  margin-top:4px;
+  font-size:8px;
+  color:#676258;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.menuHomeRedesign .saveSlotActions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin-top:8px;
+}
+.menuHomeRedesign .saveSlotActions button{
+  padding:5px 4px;
+  border:1px solid rgba(231,220,171,.07);
+  border-radius:3px;
+  background:rgba(255,255,255,.018);
+  color:#8e8877;
+  font:inherit;
+  font-size:7px;
+  letter-spacing:1px;
+  cursor:pointer;
+}
+.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.075);color:#e7dabd}
+.menuHomeRedesign .saveSlotActions button:disabled{opacity:.27;cursor:not-allowed}
+.menuSaveStatus{
+  margin-top:7px;
+  padding-left:1px;
+  font-size:7px;
+  letter-spacing:1.2px;
+  color:#625e54;
+}
 
-/* Play buttons below the terminal. */
+/* Play buttons below the save slots. */
 .menuNav{
   position:absolute;
   left:clamp(24px,4vw,60px);
@@ -2323,102 +2335,52 @@ function installMainMenuRedesign(){
 .menuNavButton:hover .menuNavArrow{transform:translateX(4px);color:#e7be68}
 .menuNavButton.active .menuNavArrow{color:#e2b253}
 
-/* Save slots stacked vertically beneath the play section. */
-.menuSlotBar{
-  position:absolute;
-  left:clamp(24px,4vw,60px);
-  top:clamp(800px,68vh,840px);
-  width:min(390px,calc(100vw - 48px));
-  color:#8c8675;
-  text-shadow:0 2px 8px #000;
+@media (min-width:1200px) and (max-width:1450px) and (min-height:700px) and (max-height:820px){
+  .menuLogo{
+    left:46px;
+    top:30px;
+  }
+  .menuHomeLayout::before{
+    width:500px;
+  }
+  .menuSlotBar{
+    right:46px;
+    top:156px;
+    width:520px;
+  }
+  .menuHomeRedesign #saveSlots{
+    gap:7px;
+  }
+  .menuHomeRedesign .saveSlotCard{
+    min-height:104px;
+    padding:10px;
+  }
+  .menuNav{
+    left:46px;
+    top:438px;
+    width:380px;
+    gap:9px;
+  }
+  .menuNavButton{
+    min-height:39px;
+  }
 }
-.menuSlotHeader{
-  display:flex;
-  justify-content:space-between;
-  margin-bottom:7px;
-  padding:0 1px;
-  font-size:7px;
-  letter-spacing:2.2px;
-}
-.menuSlotHeader strong{color:#d2c8a5;font-weight:500}
-.menuHomeRedesign #saveSlots{
-  width:100%;
-  display:grid;
-  grid-template-columns:1fr;
-  gap:6px;
-  max-height:none;
-  overflow:visible;
-}
-.menuHomeRedesign .saveSlotCard{
-  min-width:0;
-  min-height:118px;
-  padding:13px 13px;
-  border:1px solid rgba(231,220,171,.09);
-  border-radius:4px;
-  background:rgba(5,6,5,.34);
-  color:#b2ac99;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  box-shadow:inset 0 1px rgba(255,255,255,.018);
-  backdrop-filter:blur(3px);
-}
-.menuHomeRedesign .saveSlotCard:hover{
-  background:rgba(223,173,69,.08);
-  border-color:rgba(231,220,171,.18);
-}
-.menuHomeRedesign .saveSlotCard.selected{
-  border-color:rgba(223,173,69,.66);
-  background:rgba(223,173,69,.11);
-}
-.menuHomeRedesign .saveSlotTitle{font-size:9px;letter-spacing:1.7px;color:#ddd4b9}
-.menuHomeRedesign .saveSlotMode{font-size:7px;color:#7e796d}
-.menuHomeRedesign .saveSlotDetail{
-  margin-top:4px;
-  font-size:8px;
-  color:#676258;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.menuHomeRedesign .saveSlotActions{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:6px;
-  margin-top:8px;
-}
-.menuHomeRedesign .saveSlotActions button{
-  padding:5px 4px;
-  border:1px solid rgba(231,220,171,.07);
-  border-radius:3px;
-  background:rgba(255,255,255,.018);
-  color:#8e8877;
-  font:inherit;
-  font-size:7px;
-  letter-spacing:1px;
-  cursor:pointer;
-}
-.menuHomeRedesign .saveSlotActions button:hover{background:rgba(223,173,69,.075);color:#e7dabd}
-.menuHomeRedesign .saveSlotActions button:disabled{opacity:.27;cursor:not-allowed}
-.menuSaveStatus{
-  margin-top:5px;
-  padding-left:1px;
-  font-size:7px;
-  letter-spacing:1.2px;
-  color:#625e54;
-}
-
 @media(max-width:750px){
   .menuHomeLayout::before{width:100%;background:linear-gradient(90deg,rgba(3,4,3,.93),rgba(3,4,3,.58) 80%,transparent)}
   .menuLogo{left:20px;top:20px}
-  .menuRightPanel,.menuNav,.menuSlotBar{
+  .menuNav,.menuSlotBar{
     left:20px;
+    right:auto;
     width:calc(100vw - 40px);
   }
-  .menuRightPanel{top:182px;min-height:205px}
-  .menuNav{top:405px}
-  .menuSlotBar{top:770px}
-  .menuRightMeta{grid-template-columns:1fr 1fr 1fr}
+  .menuSlotBar{
+    top:145px;
+    padding-left:12px;
+  }
+  .menuHomeRedesign #saveSlots{
+    grid-template-columns:1fr;
+  }
+  .menuNav{top:430px}
 }
 `;
   document.head.appendChild(style);
@@ -2666,34 +2628,11 @@ function installMainMenuRedesign(){
   saveStatus.appendChild(saveInfo);
   slotBar.appendChild(saveStatus);
 
-  const terminal=document.createElement("aside");
-  terminal.className="menuRightPanel";
-  terminal.innerHTML=`
-    <div class="menuRightHeader"><span>FIELD TERMINAL</span><span>DS-01</span></div>
-    <div class="menuSignalState"><span class="menuSignalDot"></span><span>SIGNAL: LOST</span></div>
-    <p class="menuRightLead">The halls are only the beginning. Something is waiting deeper inside.</p>
-    <div class="menuRightRule"></div>
-    <div class="menuRightSectionLabel">ENTRY SYSTEM</div>
-  `;
+  // The old FIELD TERMINAL has been replaced by the live LOCAL SAVES panel.
+  // Keep the existing save-slot DOM so selection/new-game/continue logic remains
+  // shared with the rest of the menu.
 
-  if(houseLoader){
-    const loaderLabel=document.createElement("div");
-    loaderLabel.style.cssText="margin-top:13px;font-size:8px;letter-spacing:2px;color:#b5ae96;";
-    loaderLabel.textContent="APARTMENT";
-    terminal.appendChild(loaderLabel);
-    terminal.appendChild(houseLoader);
-  }
-
-  const meta=document.createElement("div");
-  meta.className="menuRightMeta";
-  meta.innerHTML=`
-    <div class="menuRightMetaRow"><span>WORLD</span><span>BACKROOMS</span></div>
-    <div class="menuRightMetaRow"><span>ENTRY</span><span>LEVEL 0</span></div>
-    <div class="menuRightMetaRow"><span>LINK</span><span>STANDBY</span></div>
-  `;
-  terminal.appendChild(meta);
-
-  layout.append(logo,terminal,nav,slotBar);
+  layout.append(logo,slotBar,nav);
   homeScreen.appendChild(layout);
 
   window.__deepseekerMenu={
