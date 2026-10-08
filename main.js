@@ -2264,7 +2264,7 @@ function installMainMenuRedesign(){
 .menuNav{
   position:absolute;
   left:clamp(24px,4vw,60px);
-  top:clamp(335px,52vh,365px);
+  top:clamp(315px,52vh,345px);
   width:min(390px,calc(100vw - 48px));
   display:flex;
   flex-direction:column;
@@ -2357,7 +2357,7 @@ function installMainMenuRedesign(){
   }
   .menuNav{
     left:46px;
-    top:318px;
+    top:298px;
     width:380px;
     gap:9px;
   }
@@ -2385,7 +2385,7 @@ function installMainMenuRedesign(){
     min-height:94px;
     padding:9px 7px;
   }
-  .menuNav{top:310px}
+  .menuNav{top:290px}
 }
 `;
   document.head.appendChild(style);
