@@ -2349,7 +2349,7 @@ function installMainMenuRedesign(){
     width:520px;
   }
   .menuHomeRedesign #saveSlots{
-    gap:16px;
+    gap:116px;
   }
   .menuHomeRedesign .saveSlotCard{
     min-height:104px;
@@ -2379,7 +2379,7 @@ function installMainMenuRedesign(){
   }
   .menuHomeRedesign #saveSlots{
     grid-template-columns:1fr;
-    gap:12px;
+    gap:112px;
   }
   .menuHomeRedesign .saveSlotCard{
     min-height:94px;
