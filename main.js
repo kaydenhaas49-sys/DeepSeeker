@@ -2173,7 +2173,7 @@ function installMainMenuRedesign(){
 .menuSlotBar{
   position:absolute;
   right:clamp(24px,4vw,60px);
-  top:clamp(154px,20vh,176px);
+  top:clamp(114px,20vh,136px);
   width:min(540px,calc(100vw - 48px));
   color:#8c8675;
   text-shadow:0 2px 8px #000;
@@ -2345,11 +2345,11 @@ function installMainMenuRedesign(){
   }
   .menuSlotBar{
     right:46px;
-    top:156px;
+    top:116px;
     width:520px;
   }
   .menuHomeRedesign #saveSlots{
-    gap:116px;
+    gap:76px;
   }
   .menuHomeRedesign .saveSlotCard{
     min-height:104px;
@@ -2374,12 +2374,12 @@ function installMainMenuRedesign(){
     width:calc(100vw - 40px);
   }
   .menuSlotBar{
-    top:145px;
+    top:105px;
     padding-left:12px;
   }
   .menuHomeRedesign #saveSlots{
     grid-template-columns:1fr;
-    gap:112px;
+    gap:72px;
   }
   .menuHomeRedesign .saveSlotCard{
     min-height:94px;
