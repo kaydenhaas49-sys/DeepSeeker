@@ -2957,11 +2957,8 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
 
   player.lock();
 
-  setTimeout(()=>{
-    if(gameStarted && !houseMode){
-      ensureSpiderLoading();
-    }
-  },1000);
+  // Start the tutorial spider load immediately; stage 8 depends on it.
+  ensureSpiderLoading(true);
 
   // Creating a new slot immediately writes an initial checkpoint instead of
   // leaving the slot empty until the 20-second autosave.
@@ -5046,8 +5043,7 @@ function updateHouseTutorialSpider(dt){
   if(
     houseMode ||
     !gameStarted ||
-    !tutorialOpenRoomActive ||
-    !spiderLoaded
+    !tutorialOpenRoomActive
   ){
     if(houseTutorialSpiderState!=="hidden"){
       hideHouseTutorialSpider();
@@ -5093,6 +5089,12 @@ function updateHouseTutorialSpider(dt){
   }
 
   if(houseTutorialStage<8){
+    return;
+  }
+
+  if(!spiderLoaded){
+    // Keep the tutorial encounter alive while the model finishes loading.
+    ensureSpiderLoading(true);
     return;
   }
 
@@ -6604,11 +6606,15 @@ async function loadSpiderFromPack(){
   }
 }
 
-function ensureSpiderLoading(){
+function ensureSpiderLoading(immediate=false){
   if(spiderLoadStarted || spiderLoaded) return;
   spiderLoadStarted=true;
 
   const start=()=>loadSpiderFromPack();
+  if(immediate){
+    start();
+    return;
+  }
   if("requestIdleCallback" in window){
     window.requestIdleCallback(start,{timeout:1800});
   }else{
