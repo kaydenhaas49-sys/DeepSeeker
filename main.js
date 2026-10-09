@@ -390,7 +390,7 @@ function createTutorialMascot(){
   tutorialMascotReady=true;
 }
 
-function speakTutorialMascot(stage,allowDefaultVoice=false){
+function speakTutorialMascot(stage){
   const lines={
     1:"Hey, let's start with WASD. Move around a bit.",
     2:"Nice. Space makes you jump.",
@@ -403,20 +403,19 @@ function speakTutorialMascot(stage,allowDefaultVoice=false){
     9:"Time to go. We can panic while we're moving."
   };
   const text=lines[stage];
-  if(!text || !("speechSynthesis" in window)) return;
+  if(!text || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance==="undefined") return;
 
   const speech=window.speechSynthesis;
   if(tutorialMascotSpeechStage===stage) return;
-  let voices=speech.getVoices();
+  const voices=speech.getVoices();
 
-  // Some browsers populate their voice list asynchronously. Wait briefly for
-  // a better voice to arrive instead of immediately locking Badgey to eSpeak.
-  if(!voices.length && !allowDefaultVoice){
+  // Voice lists can arrive after the tutorial starts. Wait for them once;
+  // never fall back to an obviously robotic synth just to force audio output.
+  if(!voices.length){
     tutorialMascotPendingSpeechStage=stage;
     if(!tutorialMascotVoiceWaiter && typeof speech.addEventListener==="function"){
       tutorialMascotVoiceWaiter=()=>{
-        voices=speech.getVoices();
-        if(!voices.length) return;
+        if(!speech.getVoices().length) return;
         speech.removeEventListener("voiceschanged",tutorialMascotVoiceWaiter);
         tutorialMascotVoiceWaiter=null;
         const pending=tutorialMascotPendingSpeechStage;
@@ -429,48 +428,71 @@ function speakTutorialMascot(stage,allowDefaultVoice=false){
     }
     window.setTimeout(()=>{
       if(tutorialMascotPendingSpeechStage!==stage) return;
-      if(speech.getVoices().length) return;
+      if(speech.getVoices().length){
+        if(tutorialMascotVoiceWaiter){
+          speech.removeEventListener("voiceschanged",tutorialMascotVoiceWaiter);
+          tutorialMascotVoiceWaiter=null;
+        }
+        tutorialMascotPendingSpeechStage=-1;
+        if(houseTutorialStage===stage && tutorialMascotSpeechStage!==stage){
+          speakTutorialMascot(stage);
+        }
+        return;
+      }
       if(tutorialMascotVoiceWaiter){
         speech.removeEventListener("voiceschanged",tutorialMascotVoiceWaiter);
         tutorialMascotVoiceWaiter=null;
       }
       tutorialMascotPendingSpeechStage=-1;
-      if(houseTutorialStage===stage) speakTutorialMascot(stage,true);
-    },1200);
+      tutorialMascotSpeechStage=stage;
+      console.info("[DeepSeeker] No speech voice loaded; Badgey's tutorial captions remain available.");
+    },1600);
+    return;
+  }
+
+  const english=voices.filter(voice=>/^en([_-]|$)/i.test(voice.lang||""));
+  const badVoice=/espeak|festival|flite|mbrola|robot|compact/i;
+  const naturalVoice=/neural|natural|online|premium|aria|jenny|ava|samantha|alex|daniel|guy|sonia|libby|james|zira|david|ryan|sara|google.*english|microsoft.*(?:natural|online|david|zira|aria|jenny|guy|ryan)/i;
+  const candidates=english.filter(voice=>{
+    const name=voice.name||"";
+    return !badVoice.test(name) && (naturalVoice.test(name) || voice.localService===false);
+  });
+  const qualityScore=voice=>{
+    const name=voice.name||"";
+    let score=0;
+    if(/neural|natural|online|premium/i.test(name)) score+=160;
+    if(/aria|jenny|ava|samantha|alex|daniel|guy|sonia|libby|james|zira|david|ryan|sara|google.*english|microsoft/i.test(name)) score+=80;
+    if(/en[-_]CA/i.test(voice.lang||"")) score+=20;
+    else if(/en[-_]US/i.test(voice.lang||"")) score+=12;
+    if(voice.localService===false) score+=8;
+    return score;
+  };
+  candidates.sort((a,b)=>qualityScore(b)-qualityScore(a));
+
+  // Linux browsers often expose only eSpeak. Captions are preferable to
+  // forcing that robotic voice on everyone; use a known natural/online voice.
+  if(!candidates.length){
+    tutorialMascotSpeechStage=stage;
+    tutorialMascotPendingSpeechStage=-1;
+    console.info("[DeepSeeker] No natural English voice found; keeping Badgey silent instead of using a robotic system voice.");
     return;
   }
 
   tutorialMascotSpeechStage=stage;
+  tutorialMascotPendingSpeechStage=-1;
   try{
     speech.cancel();
     const utterance=new SpeechSynthesisUtterance(text);
-    utterance.lang="en-CA";
-    const english=voices.filter(voice=>/^en([_-]|$)/i.test(voice.lang||""));
-    const qualityScore=voice=>{
-      const name=voice.name||"";
-      let score=0;
-      if(/neural|natural|online|premium/i.test(name)) score+=160;
-      if(/aria|jenny|ava|samantha|daniel|guy|sonia|libby|james|google.*english|microsoft.*(natural|online)/i.test(name)) score+=80;
-      if(/en[-_]CA/i.test(voice.lang||"")) score+=20;
-      else if(/en[-_]US/i.test(voice.lang||"")) score+=12;
-      if(/espeak|festival|flite|robot|compact/i.test(name)) score-=140;
-      if(voice.localService===false) score+=8;
-      return score;
-    };
-    english.sort((a,b)=>qualityScore(b)-qualityScore(a));
-    // Prefer a recognizable natural voice where available. If the only
-    // installed voice is robotic, leave voice unset so the browser can choose
-    // its best default instead of forcing that voice on every utterance.
-    if(english[0] && qualityScore(english[0])>-60) utterance.voice=english[0];
-    utterance.rate=.90;
+    utterance.lang=candidates[0].lang||"en-US";
+    utterance.voice=candidates[0];
+    utterance.rate=.98;
     utterance.pitch=1.02;
-    utterance.volume=.66;
+    utterance.volume=.78;
     speech.speak(utterance);
   }catch(error){
-    console.debug("[DeepSeeker] Tutorial voice unavailable:",error);
+    console.debug("[DeepSeeker] Natural Badgey voice unavailable; use the visible tutorial captions:",error);
   }
 }
-
 function updateTutorialMascot(dt){
   if(!tutorialMascotRoot || !tutorialMascotReady) return;
 

@@ -654,17 +654,23 @@ export function createFirstPersonArms(model){
   });
   const modelSize=modelBounds.getSize(new THREE.Vector3());
   const modelCenter=modelBounds.getCenter(new THREE.Vector3());
-  const torsoHalfWidth=Math.max(modelSize.y*.15,modelSize.x*.105);
-  const armBandMinY=modelBounds.min.y+modelSize.y*.50;
-  const armBandMaxY=modelBounds.min.y+modelSize.y*.93;
-  const armOutermostX=Math.max(modelSize.x*.14,modelSize.y*.16);
+  // The source GLB is in a T-pose. Its arms sit near shoulder height and extend
+  // sideways from the torso. Keep the crop wide enough to include sleeves,
+  // cuffs and hands instead of only the outermost forearm triangles.
+  const torsoHalfWidth=Math.max(modelSize.x*.08,modelSize.y*.065);
+  const armBandMinY=modelBounds.min.y+modelSize.y*.45;
+  const armBandMaxY=modelBounds.min.y+modelSize.y*.84;
+  const armOutermostX=Math.max(modelSize.x*.055,modelSize.y*.045);
 
   const isNearModelArmRegion=(points)=>{
-    const center=points.reduce((sum,point)=>sum+point.x/3,0);
-    const cy=points.reduce((sum,point)=>sum+point.y/3,0);
-    const anyOutside=points.some(point=>Math.abs(point.x-modelCenter.x)>torsoHalfWidth);
-    const outerEnough=points.some(point=>Math.abs(point.x-modelCenter.x)>armOutermostX);
-    return anyOutside && outerEnough && cy>=armBandMinY && cy<=armBandMaxY;
+    const centerX=points.reduce((sum,point)=>sum+point.x/3,0);
+    const centerY=points.reduce((sum,point)=>sum+point.y/3,0);
+    const outsideTorso=Math.abs(centerX-modelCenter.x)>torsoHalfWidth*.72;
+    const outerVertexCount=points.filter(
+      point=>Math.abs(point.x-modelCenter.x)>armOutermostX
+    ).length;
+    return outsideTorso && outerVertexCount>=2 &&
+      centerY>=armBandMinY && centerY<=armBandMaxY;
   };
 
   const triangleIndices=(geometry,triangle)=>{
@@ -695,58 +701,60 @@ export function createFirstPersonArms(model){
     const uv2=geometry.getAttribute("uv2");
     const color=geometry.getAttribute("color");
     const positions=[],uvs=[],uvs2=[],colors=[],materialIndices=[];
+    const bakedIndices=[];
+    const bakedVertexBySource=new Map();
     const triCount=geometry.index
       ? Math.floor(geometry.index.count/3)
       : Math.floor(sourcePosition.count/3);
-    const localPoints=[new THREE.Vector3(),new THREE.Vector3(),new THREE.Vector3()];
+
+    const bakeVertex=(vertexIndex)=>{
+      const existing=bakedVertexBySource.get(vertexIndex);
+      if(existing!==undefined) return existing;
+      positionScratch.fromBufferAttribute(sourcePosition,vertexIndex);
+      if(skinned && typeof source.getVertexPosition==="function"){
+        source.getVertexPosition(vertexIndex,positionScratch);
+      }
+      positionScratch
+        .applyMatrix4(source.matrixWorld)
+        .applyMatrix4(inverseRigWorld);
+      const bakedIndex=positions.length/3;
+      positions.push(positionScratch.x,positionScratch.y,positionScratch.z);
+      if(uv) uvs.push(uv.getX(vertexIndex),uv.getY(vertexIndex));
+      if(uv2) uvs2.push(uv2.getX(vertexIndex),uv2.getY(vertexIndex));
+      if(color){
+        for(let component=0;component<color.itemSize;component++){
+          colors.push(attributeComponent(color,vertexIndex,component));
+        }
+      }
+      bakedVertexBySource.set(vertexIndex,bakedIndex);
+      return bakedIndex;
+    };
 
     for(let tri=0;tri<triCount;tri++){
-      const indices=triangleIndices(geometry,tri);
+      const triangle=triangleIndices(geometry,tri);
       const rawPoints=[];
       const armWeights=[];
       for(let k=0;k<3;k++){
-        const vertexIndex=indices[k];
+        const vertexIndex=triangle[k];
         rawScratch.fromBufferAttribute(sourcePosition,vertexIndex);
         rawPoints.push(rawScratch.clone().applyMatrix4(source.matrixWorld).applyMatrix4(inverseRigWorld));
         armWeights.push(canWeightFilter ? vertexArmWeight(source,vertexIndex,armBoneIndices) : 0);
       }
 
-      // Prefer real arm skin weights. If this GLB's arm weights are poorly
-      // named/painted, fall back to its actual T-pose shoulder/arm silhouette.
       const maximumWeight=Math.max(...armWeights);
       const averageWeight=(armWeights[0]+armWeights[1]+armWeights[2])/3;
       const strongCount=armWeights.filter(weight=>weight>=.08).length;
-      const weightedArm=canWeightFilter && (
-        (averageWeight>=.035 && strongCount>=1) ||
-        maximumWeight>=.12
-      );
+      // Require multiple vertices with arm influence; one weighted corner is
+      // not enough to classify a triangle as an arm surface.
+      const weightedArm=canWeightFilter && averageWeight>=.08 && strongCount>=2;
       const namedLooseArm=meshNameLooksLikeArm(source) && !canWeightFilter;
       const spatialArm=isNearModelArmRegion(rawPoints);
-      // If usable skin weights exist, never mix in spatial torso triangles.
-      // The spatial crop is strictly a fallback for rigs with no usable arm weights.
       const keep=filterByArmWeights
         ? (canWeightFilter ? weightedArm : (spatialArm || namedLooseArm))
         : spatialArm;
       if(!keep) continue;
 
-      for(let k=0;k<3;k++){
-        const vertexIndex=indices[k];
-        positionScratch.fromBufferAttribute(sourcePosition,vertexIndex);
-        if(skinned && typeof source.getVertexPosition==="function"){
-          source.getVertexPosition(vertexIndex,positionScratch);
-        }
-        positionScratch
-          .applyMatrix4(source.matrixWorld)
-          .applyMatrix4(inverseRigWorld);
-        positions.push(positionScratch.x,positionScratch.y,positionScratch.z);
-        if(uv) uvs.push(uv.getX(vertexIndex),uv.getY(vertexIndex));
-        if(uv2) uvs2.push(uv2.getX(vertexIndex),uv2.getY(vertexIndex));
-        if(color){
-          for(let component=0;component<color.itemSize;component++){
-            colors.push(attributeComponent(color,vertexIndex,component));
-          }
-        }
-      }
+      for(const vertexIndex of triangle) bakedIndices.push(bakeVertex(vertexIndex));
       materialIndices.push(triangleMaterialIndex(geometry,tri));
     }
 
@@ -756,6 +764,7 @@ export function createFirstPersonArms(model){
     if(uv) baked.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
     if(uv2) baked.setAttribute("uv2",new THREE.Float32BufferAttribute(uvs2,2));
     if(color) baked.setAttribute("color",new THREE.Float32BufferAttribute(colors,color.itemSize));
+    baked.setIndex(bakedIndices);
 
     let runStart=0,runMaterial=materialIndices[0]??0;
     for(let i=1;i<=materialIndices.length;i++){
@@ -789,21 +798,21 @@ export function createFirstPersonArms(model){
     if(obj.name==="HeldFlashlight" || obj.parent?.name==="HeldFlashlight") return;
     const meshName=normalizeBoneName(obj.name);
     const explicitArmMesh=meshNameLooksLikeArm(obj);
-    const extracted=buildBakedArmMesh(obj,true);
+    // Use the broad shoulder-to-hand crop first. The old low skin-weight
+    // threshold could select isolated torso triangles and leave shredded hands.
+    const extracted=buildBakedArmMesh(obj,false);
     if(extracted){
       viewmodel.add(extracted);
-    }else if(explicitArmMesh && !obj.isSkinnedMesh){
-      const loose=buildBakedArmMesh(obj,false);
-      if(loose) viewmodel.add(loose);
+    }else if(explicitArmMesh){
+      const named=buildBakedArmMesh(obj,true);
+      if(named) viewmodel.add(named);
     }
   });
 
-  // The primary extraction already uses arm bone weights, explicit arm mesh
-  // names, and a geometric T-pose fallback on the original model triangles.
-  // Require enough triangles to form real sleeve surfaces. A handful of
-  // skin-weight matches are fragments, not arms, so replace those with the
-  // original model's shoulder/arm silhouette rather than displaying fragments.
-  const MIN_ARM_TRIANGLES=160;
+  // Accept the region crop only if it produced enough continuous arm geometry.
+  // If the GLB axes differ from its expected T-pose, retry with strict bone
+  // weights rather than displaying a small handful of disconnected triangles.
+  const MIN_ARM_TRIANGLES=500;
   if(armTriangleCount<MIN_ARM_TRIANGLES){
     for(const child of [...viewmodel.children]){
       viewmodel.remove(child);
@@ -815,8 +824,8 @@ export function createFirstPersonArms(model){
     rig.updateMatrixWorld(true);
     rig.traverse(obj=>{
       if(!obj.isSkinnedMesh || !obj.geometry) return;
-      const cropped=buildBakedArmMesh(obj,false);
-      if(cropped) viewmodel.add(cropped);
+      const weighted=buildBakedArmMesh(obj,true);
+      if(weighted) viewmodel.add(weighted);
     });
   }
 
