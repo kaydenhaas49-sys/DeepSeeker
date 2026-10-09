@@ -413,7 +413,8 @@ function isArmBoneName(name){
 
 function meshNameLooksLikeArm(mesh){
   const n=normalizeBoneName(mesh.name);
-  return /shoulder|sleeve|upperarm|lowerarm|forearm|elbow|wrist|hand|glove|cuff|arm/.test(n);
+  // Avoid treating an object called "Armature" as the entire arm mesh.
+  return /shoulder|sleeve|upperarm|lowerarm|forearm|elbow|wrist|hand|glove|cuff|leftarm|rightarm|armleft|armright|arm[lr]$/.test(n);
 }
 
 function attributeComponent(attribute,index,component){
@@ -618,21 +619,52 @@ export function createFirstPersonArms(model){
   // Ignore hidden torso/body meshes when framing the first-person arms.
   // Box3.setFromObject() includes invisible meshes, which can pull the arm
   // viewmodel off-screen when the source GLB is a single combined body mesh.
+  // Measure the posed, skinned arm vertices in the cloned rig's local space.
+  // Do not use the unskinned geometry.boundingBox: this model's arms start in
+  // a T-pose, and a bind-pose AABB produces a bad camera offset after posing.
   const armBounds=new THREE.Box3();
   root.updateMatrixWorld(true);
+  // The skeleton palettes are updated explicitly because this pose happens
+  // before the renderer's first frame for this clone.
+  root.traverse(obj=>{
+    if(obj.isSkinnedMesh && obj.skeleton) obj.skeleton.update();
+  });
+  const inverseRootWorld=root.matrixWorld.clone().invert();
+  const vertex=new THREE.Vector3();
   root.traverse(obj=>{
     if(!obj.isMesh || !obj.visible || !obj.geometry) return;
-    if(!obj.geometry.boundingBox) obj.geometry.computeBoundingBox();
-    if(!obj.geometry.boundingBox) return;
-    armBounds.union(obj.geometry.boundingBox.clone().applyMatrix4(obj.matrixWorld));
+    const position=obj.geometry.getAttribute("position");
+    if(!position) return;
+    for(let i=0;i<position.count;i++){
+      if(typeof obj.getVertexPosition==="function"){
+        obj.getVertexPosition(i,vertex);
+      }else{
+        vertex.fromBufferAttribute(position,i);
+      }
+      vertex.applyMatrix4(obj.matrixWorld);
+      vertex.applyMatrix4(inverseRootWorld);
+      if(
+        Number.isFinite(vertex.x) &&
+        Number.isFinite(vertex.y) &&
+        Number.isFinite(vertex.z)
+      ){
+        armBounds.expandByPoint(vertex);
+      }
+    }
   });
+
   if(!armBounds.isEmpty()){
-    const armCenter=armBounds.getCenter(new THREE.Vector3());
-    root.position.x-=armCenter.x;
-    root.position.y+=(-.56-armCenter.y);
-    root.position.z+=(-.86-armCenter.z);
+    const centerInRigSpace=armBounds.getCenter(new THREE.Vector3());
+    // Convert the rig-local center through the viewmodel's rotation/scale,
+    // then place that center directly in camera-local space.
+    centerInRigSpace.multiply(root.scale).applyQuaternion(root.quaternion);
+    root.position.set(
+      -centerInRigSpace.x,
+      -.47-centerInRigSpace.y,
+      -.88-centerInRigSpace.z
+    );
   }else{
-    root.position.set(0,-.56,-.86);
+    root.position.set(0,-.47,-.88);
   }
 
   if(!leftHand || !rightHand){

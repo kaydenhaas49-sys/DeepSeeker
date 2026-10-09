@@ -54,7 +54,6 @@ export class Player {
     this.characterMixer = null;
     this.characterFlashlight = null;
     this.characterFlashlightLens = null;
-    this.viewmodelFlashlightLens = null;
     this.actualArmViewmodel = null;
     this.actualArmFlashlightLens = null;
     this.characterLoaded = false;
@@ -148,9 +147,8 @@ export class Player {
     this.hands.renderOrder = 2999;
     this.camera.add(this.hands);
 
-    // Create camera-local hazmat sleeves/gloves immediately. First-person
-    // visibility must not depend on the imported character's skinning data.
-    this.ensureFallbackArmViewmodel();
+    // First-person hands are built from the real skinned hazmat model once
+    // it loads. Never draw handmade placeholder arms over the actual rig.
 
     this.characterModel = null;
     this.characterMixer = null;
@@ -190,11 +188,11 @@ export class Player {
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
-      // Use a skinned clone of the hazmat model's own arm/hand geometry.
-      // Keep the lightweight viewmodel only as a failure fallback.
+      // Use the model's own skinned arm/hand geometry. No handmade arms are
+      // added if extraction fails; log the rig issue rather than hiding it.
       const actualArmsInstalled=this.installActualArmViewmodel(character.model);
       if(!actualArmsInstalled){
-        this.ensureFallbackArmViewmodel().visible=true;
+        console.error("[DeepSeeker] Actual hazmat arm viewmodel could not be installed.");
       }
       this.hands.visible=true;
       this.hands.renderOrder=2999;
@@ -222,9 +220,8 @@ export class Player {
       return true;
     }catch(error){
       this.characterLoadFailed = true;
-      // If the model fails to load, preserve the simple fallback so gameplay
-      // still has visible arms and a flashlight.
-      this.ensureFallbackArmViewmodel();
+      // Do not silently substitute the handmade arm shapes. Keep first-person
+      // hands empty if the real model failed so the loading error is explicit.
       this.hands.visible=true;
       console.error("[DeepSeeker] local hazmat avatar failed:",error);
       return false;
@@ -246,8 +243,11 @@ export class Player {
       if(obj.isMesh && obj.visible) visibleMeshCount++;
     });
     const extractedArmMeshCount=Number(viewmodel.userData.extractedArmMeshCount)||0;
-    if(extractedArmMeshCount===0 && visibleMeshCount===0){
-      console.warn("[DeepSeeker] No visible arm geometry was found; keeping fallback viewmodel.");
+    // Only install a rig containing extracted skin-weighted arm vertices.
+    // A named mesh alone is not enough: many GLBs name the whole body
+    // "Armature", which would otherwise leave the old body/arms in view.
+    if(extractedArmMeshCount===0 || visibleMeshCount===0){
+      console.warn("[DeepSeeker] No extracted, visible skinned arm geometry was found.");
       return false;
     }
 
@@ -293,7 +293,6 @@ export class Player {
     this.actualArmViewmodel=viewmodel;
     this.hands.add(viewmodel);
     this.hands.visible=true;
-    if(this.fallbackArmViewmodel) this.fallbackArmViewmodel.visible=false;
 
     console.log("[DeepSeeker] using actual hazmat arms",{
       extractedArmMeshCount,
@@ -303,177 +302,6 @@ export class Player {
     return true;
   }
 
-  ensureFallbackArmViewmodel(){
-    if(this.fallbackArmViewmodel){
-      this.fallbackArmViewmodel.visible=true;
-      return this.fallbackArmViewmodel;
-    }
-
-    // Simple, camera-local hazmat viewmodel: both forearms extend forward
-    // in parallel instead of curling down into the middle of the screen.
-    const root=new THREE.Group();
-    root.name="FirstPersonHazmatArms3D";
-
-    const material=(color,emissive,emissiveIntensity,roughness=.82,metalness=0)=>new THREE.MeshStandardMaterial({
-      color,
-      emissive,
-      emissiveIntensity,
-      roughness,
-      metalness,
-      depthTest:false,
-      depthWrite:false
-    });
-    const suitMaterial=material(0xc1b697,0x62563e,.55,.9);
-    const gloveMaterial=material(0x292e29,0x11150f,.55,.78,.02);
-    const cuffMaterial=material(0x42483c,0x1b2118,.45,.72,.06);
-    const seamMaterial=material(0x8b8066,0x30291b,.32,.9);
-    const flashlightMaterial=material(0x202522,0x070a08,.25,.48,.5);
-    const flashlightRingMaterial=material(0x6d7167,0x20231e,.25,.33,.72);
-    const lensMaterial=new THREE.MeshStandardMaterial({
-      color:0x514e40,
-      emissive:0x17160e,
-      emissiveIntensity:.08,
-      roughness:.24,
-      metalness:.05,
-      transparent:true,
-      opacity:.96,
-      depthTest:false,
-      depthWrite:false
-    });
-
-    const addSleeveBand=(x,y,z,radius,materialRef)=>{
-      const band=new THREE.Mesh(
-        new THREE.TorusGeometry(radius,.005,5,14),
-        materialRef
-      );
-      band.position.set(x,y,z);
-      band.renderOrder=2999;
-      root.add(band);
-      return band;
-    };
-    const addGloveMesh=(geometry,materialRef,position,rotation,scale,order=3002)=>{
-      const mesh=new THREE.Mesh(geometry,materialRef);
-      mesh.position.set(position[0],position[1],position[2]);
-      if(rotation) mesh.rotation.set(rotation[0]||0,rotation[1]||0,rotation[2]||0);
-      if(scale) mesh.scale.set(scale[0],scale[1],scale[2]);
-      mesh.renderOrder=order;
-      mesh.frustumCulled=false;
-      root.add(mesh);
-      return mesh;
-    };
-
-    const armX={left:-.235,right:.235};
-    for(const side of ["left","right"]){
-      const x=armX[side];
-      // Long, nearly straight sleeves; their cylinder axis is rotated into -Z.
-      const sleeve=new THREE.Mesh(
-        new THREE.CylinderGeometry(.078,.096,.49,16,1,false),
-        suitMaterial
-      );
-      sleeve.position.set(x,-.285,-.575);
-      sleeve.rotation.x=-Math.PI/2;
-      sleeve.renderOrder=2998;
-      root.add(sleeve);
-
-      // Two low-profile fabric seams and a dark wrist cuff, not armour plates.
-      addSleeveBand(x,-.285,-.43,.086,seamMaterial);
-      addSleeveBand(x,-.285,-.69,.078,seamMaterial);
-      const cuff=addGloveMesh(
-        new THREE.TorusGeometry(.079,.010,6,16),
-        cuffMaterial,[x,-.285,-.812],null,null,3000
-      );
-      cuff.rotation.x=0;
-
-      // The wrist and palm line up with the forearm so the hand reaches out.
-      addGloveMesh(
-        new THREE.SphereGeometry(1,12,10),gloveMaterial,
-        [x,-.29,-.85],null,[.070,.050,.075],3001
-      );
-
-      if(side==="left"){
-        // Open left hand: four fingers point forward, with a separate thumb.
-        for(let i=0;i<4;i++){
-          const fingerX=x+(i-1.5)*.031;
-          const fingerLength=[.040,.052,.049,.036][i];
-          addGloveMesh(
-            new THREE.CapsuleGeometry(.010,fingerLength,3,7),gloveMaterial,
-            [fingerX,-.30,-.918],[-Math.PI/2,0,(i-1.5)*-.035],null,3003
-          );
-        }
-        addGloveMesh(
-          new THREE.CapsuleGeometry(.012,.045,3,7),gloveMaterial,
-          [x+.066,-.295,-.885],[0,0,-.70],null,3003
-        );
-      }
-    }
-
-    // The right hand visibly wraps around a real flashlight body. Its lens
-    // points down the same -Z direction as the player's view and beam.
-    const torchX=.235;
-    const torchY=-.265;
-    const torchBarrel=new THREE.Mesh(
-      new THREE.CylinderGeometry(.030,.037,.32,12,1,false),
-      flashlightMaterial
-    );
-    torchBarrel.position.set(torchX,torchY,-1.005);
-    torchBarrel.rotation.x=-Math.PI/2;
-    torchBarrel.renderOrder=3004;
-    root.add(torchBarrel);
-
-    const torchHead=new THREE.Mesh(
-      new THREE.CylinderGeometry(.050,.040,.085,12,1,false),
-      flashlightMaterial
-    );
-    torchHead.position.set(torchX,torchY,-1.205);
-    torchHead.rotation.x=-Math.PI/2;
-    torchHead.renderOrder=3004;
-    root.add(torchHead);
-
-    const torchRing=new THREE.Mesh(
-      new THREE.TorusGeometry(.047,.006,6,14),
-      flashlightRingMaterial
-    );
-    torchRing.position.set(torchX,torchY,-1.249);
-    torchRing.renderOrder=3005;
-    root.add(torchRing);
-
-    this.viewmodelFlashlightLens=new THREE.Mesh(
-      new THREE.CylinderGeometry(.037,.037,.010,12,1,false),
-      lensMaterial
-    );
-    this.viewmodelFlashlightLens.name="ViewmodelFlashlightLens";
-    this.viewmodelFlashlightLens.position.set(torchX,torchY,-1.253);
-    this.viewmodelFlashlightLens.rotation.x=-Math.PI/2;
-    this.viewmodelFlashlightLens.renderOrder=3006;
-    root.add(this.viewmodelFlashlightLens);
-
-    // Three rounded fingers cross the handle, making the grip read as a hand
-    // holding a torch rather than a separate floating object.
-    for(let i=0;i<3;i++){
-      addGloveMesh(
-        new THREE.CapsuleGeometry(.009,.045,3,7),gloveMaterial,
-        [torchX,-.292-i*.014,-.905],[0,0,-Math.PI/2],null,3007
-      );
-    }
-    addGloveMesh(
-      new THREE.CapsuleGeometry(.012,.042,3,7),gloveMaterial,
-      [torchX-.055,-.267,-.905],[0,0,-.72],null,3007
-    );
-
-    root.traverse(obj=>{
-      if(!obj.isMesh) return;
-      obj.visible=true;
-      obj.frustumCulled=false;
-      obj.castShadow=false;
-      obj.receiveShadow=false;
-    });
-
-    this.fallbackArmViewmodel=root;
-    this.hands.add(root);
-    root.visible=true;
-    this.setFlashlightVisual(false);
-    return root;
-  }
 
   setFlashlightVisual(on){
     const updateLens=(lens)=>{
@@ -482,7 +310,6 @@ export class Player {
       lens.material.color.set(on ? 0xf4e8be : 0x514f40);
     };
 
-    updateLens(this.viewmodelFlashlightLens);
     updateLens(this.characterFlashlightLens);
     updateLens(this.actualArmFlashlightLens);
 
