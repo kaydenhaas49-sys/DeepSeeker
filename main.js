@@ -297,7 +297,7 @@ function createTutorialMascot(){
   tutorialMascotRoot=new THREE.Group();
   tutorialMascotRoot.name="BadgeyHologram";
   tutorialMascotRoot.visible=false;
-  tutorialMascotRoot.position.set(-.235,-.125,-.585);
+  tutorialMascotRoot.position.set(-.235,-.39,-.86);
   player.hands.add(tutorialMascotRoot);
 
   const holoMaterial=new THREE.MeshBasicMaterial({
@@ -474,8 +474,8 @@ function updateTutorialMascot(dt){
   // the left forearm instead of drifting into the room or covering the crosshair.
   tutorialMascotRoot.position.set(
     -.235,
-    -.125+Math.sin(tutorialMascotTime*3.2)*.008,
-    -.585
+    -.39+Math.sin(tutorialMascotTime*3.2)*.008,
+    -.86
   );
 
   const talkActive=

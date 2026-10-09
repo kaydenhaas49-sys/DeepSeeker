@@ -1,7 +1,7 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
-import { createHazmatCharacter } from "./character.js";
+import { createHazmatCharacter, createFirstPersonArms } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -55,6 +55,8 @@ export class Player {
     this.characterFlashlight = null;
     this.characterFlashlightLens = null;
     this.viewmodelFlashlightLens = null;
+    this.actualArmViewmodel = null;
+    this.actualArmFlashlightLens = null;
     this.characterLoaded = false;
 
     camera.rotation.order = "YXZ";
@@ -184,22 +186,25 @@ export class Player {
       this.characterModel = character.model;
       this.characterMixer = character.mixer;
       this.characterFlashlight = character.flashlight;
-      // Only show the camera-local flashlight model; avoid a second floating imported prop.
       if(this.characterFlashlight) this.characterFlashlight.visible=false;
-
-      // Keep the guaranteed camera-local viewmodel instead of relying on the
-      // imported arm mesh, whose skinning/export origin has been unreliable.
-      this.ensureFallbackArmViewmodel();
-      this.hands.visible=true;
-      this.hands.renderOrder=2999;
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
-      // Stable first-person anchor: the animated hand can otherwise push the
-      // physical flashlight into the ceiling when the player looks upward.
+      // Use a skinned clone of the hazmat model's own arm/hand geometry.
+      // Keep the lightweight viewmodel only as a failure fallback.
+      const actualArmsInstalled=this.installActualArmViewmodel(character.model);
+      if(!actualArmsInstalled){
+        this.ensureFallbackArmViewmodel().visible=true;
+      }
+      this.hands.visible=true;
+      this.hands.renderOrder=2999;
+
+      // Keep the full model for the world avatar. Its separate flashlight
+      // remains hidden; the cloned first-person rig holds its own copy.
       if(this.characterFlashlight){
         this.characterFlashlight.parent?.remove(this.characterFlashlight);
         this.camera.add(this.characterFlashlight);
+        this.characterFlashlight.visible=false;
         this.characterFlashlight.position.set(.30,-.22,-.58);
         this.characterFlashlight.rotation.set(
           THREE.MathUtils.degToRad(-4),
@@ -217,13 +222,85 @@ export class Player {
       return true;
     }catch(error){
       this.characterLoadFailed = true;
-      // A failed/blocked character download must not leave the first-person
-      // view completely empty. Keep the lightweight fallback arms visible.
+      // If the model fails to load, preserve the simple fallback so gameplay
+      // still has visible arms and a flashlight.
       this.ensureFallbackArmViewmodel();
       this.hands.visible=true;
       console.error("[DeepSeeker] local hazmat avatar failed:",error);
       return false;
     }
+  }
+
+  installActualArmViewmodel(sourceModel){
+    let viewmodel=null;
+    try{
+      viewmodel=createFirstPersonArms(sourceModel);
+    }catch(error){
+      console.warn("[DeepSeeker] Could not build first-person arms from hazmat rig:",error);
+      return false;
+    }
+    if(!viewmodel) return false;
+
+    let visibleMeshCount=0;
+    viewmodel.traverse(obj=>{
+      if(obj.isMesh && obj.visible) visibleMeshCount++;
+    });
+    const extractedArmMeshCount=Number(viewmodel.userData.extractedArmMeshCount)||0;
+    if(extractedArmMeshCount===0 && visibleMeshCount===0){
+      console.warn("[DeepSeeker] No visible arm geometry was found; keeping fallback viewmodel.");
+      return false;
+    }
+
+    viewmodel.name="FirstPersonActualHazmatArms";
+    viewmodel.traverse(obj=>{
+      if(!obj.isMesh) return;
+      obj.frustumCulled=false;
+      obj.castShadow=false;
+      obj.receiveShadow=false;
+      obj.renderOrder=2000;
+      const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
+      for(const material of materials){
+        if(!material) continue;
+        // First-person sleeves should stay readable even when they overlap
+        // nearby scenery, like a conventional FPS viewmodel.
+        material.depthTest=false;
+        material.depthWrite=false;
+        material.needsUpdate=true;
+      }
+    });
+
+    // The character utility attaches a real flashlight to the rig's right-hand
+    // bone. Reveal that copy inside the cloned arm rig so the hand holds it.
+    const heldFlashlight=viewmodel.getObjectByName("HeldFlashlight");
+    if(heldFlashlight){
+      heldFlashlight.visible=true;
+      heldFlashlight.traverse(obj=>{
+        if(!obj.isMesh) return;
+        obj.visible=true;
+        obj.frustumCulled=false;
+        obj.renderOrder=2010;
+        const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
+        for(const material of materials){
+          if(!material) continue;
+          material.depthTest=false;
+          material.depthWrite=false;
+          material.needsUpdate=true;
+        }
+      });
+    }
+
+    this.actualArmFlashlightLens=viewmodel.getObjectByName("FlashlightLens") || null;
+    this.actualArmViewmodel=viewmodel;
+    this.hands.add(viewmodel);
+    this.hands.visible=true;
+    if(this.fallbackArmViewmodel) this.fallbackArmViewmodel.visible=false;
+
+    console.log("[DeepSeeker] using actual hazmat arms",{
+      extractedArmMeshCount,
+      visibleMeshCount,
+      flashlightFound:!!heldFlashlight
+    });
+    return true;
   }
 
   ensureFallbackArmViewmodel(){
@@ -407,9 +484,10 @@ export class Player {
 
     updateLens(this.viewmodelFlashlightLens);
     updateLens(this.characterFlashlightLens);
+    updateLens(this.actualArmFlashlightLens);
 
-    // Use the low-poly camera-local torch above, not the imported prop which
-    // previously floated away from the hand and made the silhouette confusing.
+    // The source model's separate flashlight is never used for first-person;
+    // the copy attached to the skinned right hand is the visible one.
     if(this.characterFlashlight) this.characterFlashlight.visible=false;
   }
 
