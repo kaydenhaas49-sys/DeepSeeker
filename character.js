@@ -443,23 +443,17 @@ function collectArmBoneIndices(source, armRoot){
   const bones=source.skeleton?.bones || [];
   const indices=new Set();
 
+  // Start with named arm/hand bones and all children of any named upper-arm bone.
   bones.forEach((bone,index)=>{
     if(isArmBoneName(bone.name)) indices.add(index);
   });
 
-  // Add each named upper-arm branch and all its descendants, even if the
-  // forearm/hand bones use custom names not covered by the name filter.
   const upperArms=[
-    findBoneByNameParts(armRoot,[
-      "mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"
-    ]),
-    findBoneByNameParts(armRoot,[
-      "mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"
-    ])
+    findBoneByNameParts(armRoot,["mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"]),
+    findBoneByNameParts(armRoot,["mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"])
   ];
   for(let i=0;i<upperArms.length;i++){
-    if(upperArms[i]) continue;
-    upperArms[i]=findArmBoneByHierarchy(armRoot,i===0?"left":"right");
+    if(!upperArms[i]) upperArms[i]=findArmBoneByHierarchy(armRoot,i===0?"left":"right");
   }
   for(const upper of upperArms){
     if(!upper) continue;
@@ -470,9 +464,9 @@ function collectArmBoneIndices(source, armRoot){
     });
   }
 
-  // Last-resort geometry-based detection for rigs with renamed arm bones:
-  // T-pose arms are the lateral bone chains high above the hips.
-  if(!indices.size && armRoot){
+  // Always check spatial bone positions too. Some rigs name the forearms but
+  // not the upper arms; previously one name match skipped shoulder discovery.
+  if(armRoot){
     armRoot.updateMatrixWorld(true);
     const inverseRoot=armRoot.matrixWorld.clone().invert();
     const centralBones=bones.filter(bone=>/(hips|pelvis|spine|torso|root)/i.test(bone.name));
@@ -480,15 +474,25 @@ function collectArmBoneIndices(source, armRoot){
       bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot).x
     );
     centerXs.sort((a,b)=>a-b);
-    const centerX=centerXs.length
-      ? centerXs[Math.floor(centerXs.length/2)]
-      : 0;
+    const centerX=centerXs.length ? centerXs[Math.floor(centerXs.length/2)] : 0;
 
+    // The asset is normalized to about 1.8 m tall. Include lateral bones
+    // above the hips, plus their descendants, so custom-named hands are kept.
+    const lateralBones=[];
     bones.forEach((bone,index)=>{
       const position=bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot);
-      if(position.y<.52 || position.y>1.72) return;
-      if(Math.abs(position.x-centerX)>.14) indices.add(index);
+      if(position.y>=.52 && position.y<=1.72 && Math.abs(position.x-centerX)>.14){
+        indices.add(index);
+        lateralBones.push(bone);
+      }
     });
+    for(const lateral of lateralBones){
+      lateral.traverse(obj=>{
+        if(!obj.isBone) return;
+        const index=bones.indexOf(obj);
+        if(index>=0) indices.add(index);
+      });
+    }
   }
 
   return indices;
@@ -531,8 +535,8 @@ function extractArmGeometry(source, armRoot){
     const maxWeight=Math.max(...weights);
 
     if(
-      (average>=.055 && strongVertices>=1) ||
-      maxWeight>=.22
+      (average>=.035 && strongVertices>=1) ||
+      maxWeight>=.12
     ){
       keptVertices.push(...vertices);
       keptMaterialIndices.push(materialForTriangle(tri));
