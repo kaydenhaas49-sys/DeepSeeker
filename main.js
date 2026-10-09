@@ -1191,7 +1191,7 @@ menuSet.add(menuDust);
 // The title screen uses a clone of the real Spider-Psionic rig loaded by the
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
-const MENU_SPIDER_SCALE=.06;
+const MENU_SPIDER_SCALE=.492;
 const MENU_DUCK_SCALE=.82;
 const MENU_SPIDER_CEILING_Y=8.98;
 // Put the duck on the foreground floor, centered in front of the title camera.
@@ -1279,7 +1279,11 @@ function applyArachnophobiaVisual(){
 
   if(!arachnophobiaMode && spiderAnimationClips.size){
     // Rebuild normal spider animation actions when switching back.
-    spiderMixer=new THREE.AnimationMixer(spiderOriginalModel);
+    const animationRoot=
+      spiderModel.getObjectByName("SpiderSource") ||
+      spiderModel.children[0] ||
+      spiderModel;
+    spiderMixer=new THREE.AnimationMixer(animationRoot);
     for(const [name,clip] of spiderAnimationClips){
       const action=spiderMixer.clipAction(clip);
       const oneShot=name.startsWith("die") || name.startsWith("attack");
@@ -4645,7 +4649,7 @@ const SPIDER_RADIUS=.68;
 const SPIDER_MIN_SPAWN_DISTANCE=13;
 const SPIDER_MAX_SPAWN_DISTANCE=21;
 const SPIDER_GROUND_OFFSET=.08;
-const SPIDER_TARGET_SPAN=8.2;
+const SPIDER_TARGET_SPAN=1.0;
 
 const SPIDER_PATH_CELL_SIZE=LOW_END_PERFORMANCE?1.8:1.35;
 const SPIDER_PATH_GRID_SIZE=LOW_END_PERFORMANCE?19:31;
@@ -4806,9 +4810,9 @@ function syncTutorialSpiderFromGameplayModel(force=false){
   tutorialSpiderActual.visible=false;
   tutorialSpiderActual.position.set(0,0,0);
   tutorialSpiderActual.rotation.set(0,0,0);
-  // The imported spider is normalized to 6.2 world units; keep the tutorial
-  // spider under 0.75 units across so it appears much smaller in the room.
-  tutorialSpiderActual.scale.setScalar(arachnophobiaMode ? MENU_DUCK_SCALE : 0.12);
+  // The imported rig is normalized to one world unit for both gameplay and
+  // tutorial, so the same mesh has the same proportions in both places.
+  tutorialSpiderActual.scale.setScalar(arachnophobiaMode ? MENU_DUCK_SCALE : 1.0);
 
   tutorialSpiderActual.updateMatrixWorld(true);
   if(!arachnophobiaMode){
@@ -6586,7 +6590,7 @@ function finishSpiderModel(model,animations,sourceName){
   }
 
   if(directClips.size){
-    spiderMixer=new THREE.AnimationMixer(spiderModel);
+    spiderMixer=new THREE.AnimationMixer(model);
 
     for(const [name,clip] of directClips){
       const action=spiderMixer.clipAction(clip);
