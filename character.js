@@ -615,7 +615,17 @@ export function createFirstPersonArms(model){
 
   // Recenter the extracted arm geometry after posing so the viewmodel
   // lands in the camera regardless of the GLB export origin.
-  const armBounds=new THREE.Box3().setFromObject(root);
+  // Ignore hidden torso/body meshes when framing the first-person arms.
+  // Box3.setFromObject() includes invisible meshes, which can pull the arm
+  // viewmodel off-screen when the source GLB is a single combined body mesh.
+  const armBounds=new THREE.Box3();
+  root.updateMatrixWorld(true);
+  root.traverse(obj=>{
+    if(!obj.isMesh || !obj.visible || !obj.geometry) return;
+    if(!obj.geometry.boundingBox) obj.geometry.computeBoundingBox();
+    if(!obj.geometry.boundingBox) return;
+    armBounds.union(obj.geometry.boundingBox.clone().applyMatrix4(obj.matrixWorld));
+  });
   if(!armBounds.isEmpty()){
     const armCenter=armBounds.getCenter(new THREE.Vector3());
     root.position.x-=armCenter.x;

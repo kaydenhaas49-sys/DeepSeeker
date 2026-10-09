@@ -181,9 +181,23 @@ export class Player {
 
       const firstPersonArms=createFirstPersonArms(character.model);
       firstPersonArms.scale.setScalar(1.02);
+      const extractedArmMeshCount=Number(firstPersonArms.userData?.extractedArmMeshCount)||0;
+
+      // Some GLB exports combine the suit into one mesh and expose no usable
+      // arm weights. In that case, use the built-in hazmat sleeves/gloves
+      // instead of leaving the player with no visible first-person arms.
+      if(extractedArmMeshCount===0){
+        firstPersonArms.visible=false;
+        this.ensureFallbackArmViewmodel();
+      }else if(this.fallbackArmViewmodel){
+        this.fallbackArmViewmodel.visible=false;
+      }
 
       // The visible prop belongs to the actual cloned right-hand bone.
-      const firstPersonFlashlight=attachFlashlight(firstPersonArms);
+      // A camera-mounted flashlight is already used when the GLB has no arm bones.
+      const firstPersonFlashlight=extractedArmMeshCount>0
+        ? attachFlashlight(firstPersonArms)
+        : null;
       if(firstPersonFlashlight){
         firstPersonFlashlight.visible=true;
         firstPersonFlashlight.renderOrder=2100;
@@ -228,9 +242,110 @@ export class Player {
       return true;
     }catch(error){
       this.characterLoadFailed = true;
+      // A failed/blocked character download must not leave the first-person
+      // view completely empty. Keep the lightweight fallback arms visible.
+      this.ensureFallbackArmViewmodel();
+      this.hands.visible=true;
       console.error("[DeepSeeker] local hazmat avatar failed:",error);
       return false;
     }
+  }
+
+  ensureFallbackArmViewmodel(){
+    if(this.fallbackArmViewmodel){
+      this.fallbackArmViewmodel.visible=true;
+      return this.fallbackArmViewmodel;
+    }
+
+    const root=new THREE.Group();
+    root.name="FallbackFirstPersonHazmatArms";
+
+    const suitMaterial=new THREE.MeshStandardMaterial({
+      color:0xaaa584,
+      roughness:.94,
+      metalness:0,
+      depthTest:false,
+      depthWrite:false
+    });
+    const gloveMaterial=new THREE.MeshStandardMaterial({
+      color:0x30372f,
+      roughness:.88,
+      metalness:.04,
+      depthTest:false,
+      depthWrite:false
+    });
+    const cuffMaterial=new THREE.MeshStandardMaterial({
+      color:0x44483a,
+      roughness:.86,
+      depthTest:false,
+      depthWrite:false
+    });
+    const safetyStripeMaterial=new THREE.MeshBasicMaterial({
+      color:0xb7ad63,
+      depthTest:false,
+      depthWrite:false
+    });
+
+    const addArm=(side,x,y,z,rotationZ)=>{
+      const arm=new THREE.Group();
+      arm.position.set(x,y,z);
+      arm.rotation.set(-.52,0,rotationZ);
+
+      const sleeve=new THREE.Mesh(
+        new THREE.CapsuleGeometry(.087,.34,3,8),
+        suitMaterial
+      );
+      sleeve.name=side+"HazmatSleeve";
+      arm.add(sleeve);
+
+      const cuff=new THREE.Mesh(
+        new THREE.CylinderGeometry(.091,.091,.055,10),
+        cuffMaterial
+      );
+      cuff.position.y=-.145;
+      arm.add(cuff);
+
+      const safetyBand=new THREE.Mesh(
+        new THREE.CylinderGeometry(.093,.093,.018,10),
+        safetyStripeMaterial
+      );
+      safetyBand.position.y=-.125;
+      arm.add(safetyBand);
+
+      const glove=new THREE.Mesh(
+        new THREE.SphereGeometry(.105,10,8),
+        gloveMaterial
+      );
+      glove.scale.set(.98,.82,1.12);
+      glove.position.set(0,-.225,-.085);
+      arm.add(glove);
+
+      const thumb=new THREE.Mesh(
+        new THREE.SphereGeometry(.047,8,6),
+        gloveMaterial
+      );
+      thumb.scale.set(.8,1.1,1.25);
+      thumb.position.set(side==="left" ? .075 : -.075,-.205,-.105);
+      arm.add(thumb);
+
+      root.add(arm);
+    };
+
+    addArm("left",-1,-.49,-.52,.34);
+    addArm("right",1,-.42,-.50,-.30);
+
+    root.traverse(obj=>{
+      if(!obj.isMesh) return;
+      obj.frustumCulled=false;
+      obj.renderOrder=2000;
+      obj.castShadow=false;
+      obj.receiveShadow=false;
+    });
+
+    this.fallbackArmViewmodel=root;
+    this.hands.add(root);
+    root.visible=true;
+    return root;
   }
 
   setFlashlightVisual(on){
