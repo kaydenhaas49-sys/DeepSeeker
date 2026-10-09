@@ -117,15 +117,15 @@ function makeLocalFirstPersonArms(group){
   const arms=[
     {
       side:-1,
-      shoulder:new THREE.Vector3(-.83,-.23,-.28),
-      elbow:new THREE.Vector3(-.61,-.42,-.59),
-      wrist:new THREE.Vector3(-.49,-.58,-.91)
+      shoulder:new THREE.Vector3(-.91,-.30,-.27),
+      elbow:new THREE.Vector3(-.78,-.18,-.56),
+      wrist:new THREE.Vector3(-.65,-.06,-.85)
     },
     {
       side:1,
-      shoulder:new THREE.Vector3(.83,-.23,-.28),
-      elbow:new THREE.Vector3(.60,-.41,-.60),
-      wrist:new THREE.Vector3(.50,-.57,-.91)
+      shoulder:new THREE.Vector3(.91,-.30,-.27),
+      elbow:new THREE.Vector3(.78,-.18,-.56),
+      wrist:new THREE.Vector3(.65,-.06,-.85)
     }
   ];
 
@@ -160,7 +160,7 @@ function makeLocalFirstPersonArms(group){
 
     if(side<0){
       // Relaxed left glove: a broad palm and four gently curled fingers.
-      const palm=new THREE.Vector3(-.505,-.625,-1.005);
+      const palm=new THREE.Vector3(-.65,-.145,-1.005);
       makeFirstPersonGloveSphere(
         group,palm,new THREE.Vector3(.083,.061,.096),glove,"LeftGlovePalm"
       );
@@ -213,7 +213,7 @@ function makeLocalFirstPersonArms(group){
       // Right glove is shaped around the flashlight instead of pointing all
       // four fingers straight forward. Fingers cross the barrel at staggered
       // depths; the thumb comes over it from the opposite side.
-      const palm=new THREE.Vector3(.502,-.592,-.99);
+      const palm=new THREE.Vector3(.65,-.112,-.99);
       makeFirstPersonGloveSphere(
         group,palm,new THREE.Vector3(.092,.071,.087),glove,"RightGlovePalm"
       );
@@ -224,9 +224,9 @@ function makeLocalFirstPersonArms(group){
 
       for(let finger=0;finger<4;finger++){
         const z=-.962-finger*.041;
-        const base=new THREE.Vector3(.548,-.544-finger*.009,z);
-        const joint=new THREE.Vector3(.481,-.565-finger*.008,z-.012);
-        const tip=new THREE.Vector3(.425,-.588-finger*.007,z-.022);
+        const base=new THREE.Vector3(.696,-.064-finger*.009,z);
+        const joint=new THREE.Vector3(.629,-.085-finger*.008,z-.012);
+        const tip=new THREE.Vector3(.573,-.108-finger*.007,z-.022);
         makeFirstPersonCapsuleSegment(
           group,base,joint,.0205,glove,"RightGripFinger"+finger+"A",2020
         );
@@ -239,9 +239,9 @@ function makeLocalFirstPersonArms(group){
         );
       }
 
-      const thumbBase=new THREE.Vector3(.528,-.526,-.956);
-      const thumbJoint=new THREE.Vector3(.471,-.529,-.998);
-      const thumbTip=new THREE.Vector3(.419,-.555,-1.045);
+      const thumbBase=new THREE.Vector3(.676,-.046,-.956);
+      const thumbJoint=new THREE.Vector3(.619,-.049,-.998);
+      const thumbTip=new THREE.Vector3(.567,-.075,-1.045);
       makeFirstPersonCapsuleSegment(
         group,thumbBase,thumbJoint,.026,glove,"RightGripThumbA",2020
       );
@@ -264,7 +264,7 @@ function makeLocalFirstPersonArms(group){
   // Local prop sits in the right glove. Its lens remains state-controlled.
   const flashlight=new THREE.Group();
   flashlight.name="LocalFirstPersonFlashlight";
-  flashlight.position.set(.415,-.585,-1.005);
+  flashlight.position.set(.563,-.105,-1.005);
   flashlight.rotation.set(THREE.MathUtils.degToRad(-2),0,THREE.MathUtils.degToRad(-2));
   group.add(flashlight);
 
