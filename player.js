@@ -1,5 +1,6 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { EYE, WALL_H } from "./world.js";
 import { createHazmatCharacter } from "./character.js";
 
@@ -14,7 +15,7 @@ const JUMP_SPEED = 3.2;
 const JUMP_GRAVITY = 20;
 
 
-function makeFirstPersonArmMesh(group, geometry, material, name, renderOrder=2000){
+function makeFirstPersonArmMesh(group,geometry,material,name,renderOrder=2000){
   const mesh=new THREE.Mesh(geometry,material);
   mesh.name=name;
   mesh.renderOrder=renderOrder;
@@ -25,251 +26,270 @@ function makeFirstPersonArmMesh(group, geometry, material, name, renderOrder=200
   return mesh;
 }
 
-function makeFirstPersonSegment(group,start,end,radiusStart,radiusEnd,material,name,renderOrder=2000){
-  const direction=end.clone().sub(start);
-  const length=direction.length();
-  if(length<0.001) return null;
-  const mesh=makeFirstPersonArmMesh(
-    group,
-    new THREE.CylinderGeometry(radiusEnd,radiusStart,length,20,1,false),
-    material,
-    name,
-    renderOrder
-  );
-  mesh.position.copy(start).add(end).multiplyScalar(.5);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
-  return mesh;
-}
-
 function makeFirstPersonCapsuleSegment(group,start,end,radius,material,name,renderOrder=2000){
   const direction=end.clone().sub(start);
   const length=direction.length();
   if(length<.001) return null;
-  const centerLength=Math.max(.001,length-2*radius);
-  const mesh=makeFirstPersonArmMesh(
-    group,
-    new THREE.CapsuleGeometry(radius,centerLength,4,14),
-    material,
-    name,
-    renderOrder
-  );
+  const geometry=new THREE.CapsuleGeometry(radius,Math.max(.001,length-2*radius),5,14);
+  const mesh=makeFirstPersonArmMesh(group,geometry,material,name,renderOrder);
   mesh.position.copy(start).add(end).multiplyScalar(.5);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
   return mesh;
 }
 
-function makeFirstPersonGloveSphere(group,position,scale,material,name,renderOrder=2000){
+function makeFirstPersonPalm(group,position,material,name,rotationZ=0){
   const mesh=makeFirstPersonArmMesh(
     group,
-    new THREE.SphereGeometry(1,20,14),
+    new RoundedBoxGeometry(.158,.126,.176,4,.043),
     material,
-    name,
-    renderOrder
+    name
   );
+  mesh.position.copy(position);
+  mesh.rotation.z=rotationZ;
+  return mesh;
+}
+
+function makeFirstPersonGloveDetail(group,position,scale,material,name){
+  const mesh=makeFirstPersonArmMesh(group,new THREE.SphereGeometry(1,16,12),material,name);
   mesh.position.copy(position);
   mesh.scale.set(scale.x,scale.y,scale.z);
   return mesh;
 }
 
-function makeFirstPersonArmBand(group,position,direction,radius,material,name){
+function makeSleeveBand(group,position,direction,radius,material,name){
   const mesh=makeFirstPersonArmMesh(
-    group,
-    new THREE.TorusGeometry(radius,.007,8,24),
-    material,
-    name
+    group,new THREE.TorusGeometry(radius,.007,8,24),material,name
   );
   mesh.position.copy(position);
   mesh.quaternion.setFromUnitVectors(
-    new THREE.Vector3(0,0,1),
-    direction.clone().normalize()
+    new THREE.Vector3(0,0,1),direction.clone().normalize()
   );
   return mesh;
 }
 
+function makeContinuousSleeve(group,points,material,name){
+  const curve=new THREE.CatmullRomCurve3(points,false,"catmullrom",.25);
+  const ringCount=40;
+  const radialCount=20;
+  const positions=new Float32Array((ringCount+1)*(radialCount+1)*3);
+  const uvs=new Float32Array((ringCount+1)*(radialCount+1)*2);
+  const indices=[];
+  const referenceUp=new THREE.Vector3(0,1,0);
+  const referenceSide=new THREE.Vector3(1,0,0);
+  const sideVector=new THREE.Vector3();
+  const normalVector=new THREE.Vector3();
+
+  const radiusAt=(t)=>{
+    const stops=[
+      [0,.178],[.16,.163],[.34,.145],[.50,.126],
+      [.67,.108],[.82,.093],[.94,.082],[1,.078]
+    ];
+    for(let i=1;i<stops.length;i++){
+      if(t<=stops[i][0]){
+        const [t0,r0]=stops[i-1];
+        const [t1,r1]=stops[i];
+        const p=(t-t0)/(t1-t0);
+        return THREE.MathUtils.lerp(r0,r1,p);
+      }
+    }
+    return stops[stops.length-1][1];
+  };
+
+  for(let ring=0;ring<=ringCount;ring++){
+    const t=ring/ringCount;
+    const center=curve.getPointAt(t);
+    const tangent=curve.getTangentAt(t).normalize();
+    const reference=Math.abs(tangent.dot(referenceUp))>.92 ? referenceSide : referenceUp;
+    sideVector.crossVectors(tangent,reference).normalize();
+    normalVector.crossVectors(sideVector,tangent).normalize();
+    const radius=radiusAt(t);
+
+    for(let segment=0;segment<=radialCount;segment++){
+      const angle=segment/radialCount*Math.PI*2;
+      const around=normalVector.clone().multiplyScalar(Math.cos(angle))
+        .addScaledVector(sideVector,Math.sin(angle));
+      const vertex=center.clone().addScaledVector(around,radius);
+      const offset=(ring*(radialCount+1)+segment);
+      positions[offset*3]=vertex.x;
+      positions[offset*3+1]=vertex.y;
+      positions[offset*3+2]=vertex.z;
+      uvs[offset*2]=segment/radialCount;
+      uvs[offset*2+1]=t;
+    }
+  }
+
+  for(let ring=0;ring<ringCount;ring++){
+    for(let segment=0;segment<radialCount;segment++){
+      const a=ring*(radialCount+1)+segment;
+      const b=a+radialCount+1;
+      const c=b+1;
+      const d=a+1;
+      indices.push(a,d,b,b,d,c);
+    }
+  }
+
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
+  geometry.setAttribute("uv",new THREE.BufferAttribute(uvs,2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+
+  const sleeve=makeFirstPersonArmMesh(group,geometry,material,name,2000);
+  sleeve.userData.sleeveCurve=curve;
+  sleeve.userData.radiusAt=radiusAt;
+  return sleeve;
+}
+
 function makeLocalFirstPersonArms(group){
-  // These meshes are children of the local camera only. They're deliberately
-  // separate from the full-body avatar and are never sent to multiplayer.
+  // All of this geometry is local to the camera and is never replicated.
+  // A single continuous tapered tube per sleeve gives the arms a clean silhouette.
   const suit=new THREE.MeshStandardMaterial({
-    color:0xb1aa82, roughness:.94, metalness:0,
+    color:0xb2aa82, roughness:.94, metalness:0,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const suitShade=new THREE.MeshStandardMaterial({
-    color:0x87805f, roughness:.96, metalness:0,
+    color:0x85805e, roughness:.96, metalness:0,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const seamMaterial=new THREE.MeshStandardMaterial({
-    color:0x5a5946, roughness:.94, metalness:0,
+    color:0x5b5944, roughness:.95, metalness:0,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const hazardBand=new THREE.MeshStandardMaterial({
-    color:0xd0c67b, roughness:.8, metalness:.02,
+    color:0xd3c878, roughness:.82, metalness:0,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const glove=new THREE.MeshStandardMaterial({
-    color:0x343a31, roughness:.91, metalness:0,
+    color:0x30372f, roughness:.9, metalness:0,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const gloveHighlight=new THREE.MeshStandardMaterial({
-    color:0x51594a, roughness:.93, metalness:0,
+    color:0x4b5547, roughness:.93, metalness:0,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
 
-  const arms=[
-    {
-      side:-1,
-      shoulder:new THREE.Vector3(-.91,-.30,-.27),
-      elbow:new THREE.Vector3(-.78,-.18,-.56),
-      wrist:new THREE.Vector3(-.65,-.06,-.85)
-    },
-    {
-      side:1,
-      shoulder:new THREE.Vector3(.91,-.30,-.27),
-      elbow:new THREE.Vector3(.78,-.18,-.56),
-      wrist:new THREE.Vector3(.65,-.06,-.85)
-    }
-  ];
-
-  for(const arm of arms){
-    const {side,shoulder,elbow,wrist}=arm;
-    const upperDirection=elbow.clone().sub(shoulder).normalize();
-    const forearmDirection=wrist.clone().sub(elbow).normalize();
-    const sideName=side<0?"Left":"Right";
-
-    // Tapered sleeves with rounded joints so there aren't visibly flat ends.
-    makeFirstPersonSegment(group,shoulder,elbow,.15,.118,suit,sideName+"HazmatUpperSleeve");
-    makeFirstPersonSegment(group,elbow,wrist,.12,.082,suit,sideName+"HazmatForearmSleeve");
-    makeFirstPersonGloveSphere(
-      group,elbow,new THREE.Vector3(.118,.12,.12),suitShade,sideName+"SleeveElbow"
+  const hands={};
+  for(const side of [-1,1]){
+    const name=side<0?"Left":"Right";
+    // Start outside the frame at the lower corner, then run forward and up.
+    // The points are almost collinear; curvature is only enough to avoid a
+    // bent-elbow / kinked-cylinder look.
+    const points=[
+      new THREE.Vector3(side*1.28,-1.02,-.43),
+      new THREE.Vector3(side*1.16,-.82,-.61),
+      new THREE.Vector3(side*1.02,-.59,-.82),
+      new THREE.Vector3(side*.875,-.355,-1.105)
+    ];
+    const sleeve=makeContinuousSleeve(group,points,suit,name+"ContinuousHazmatSleeve");
+    const curve=sleeve.userData.sleeveCurve;
+    const tangent=curve.getTangentAt(.88).normalize();
+    const cuffPosition=curve.getPointAt(.88);
+    // A narrow yellow band perpendicular to the arm axis, at the wrist end.
+    makeSleeveBand(
+      group,cuffPosition,tangent,.086,hazardBand,name+"WristReflectiveCuff"
     );
-    makeFirstPersonGloveSphere(
-      group,shoulder,new THREE.Vector3(.15,.15,.15),suit,sideName+"SleeveShoulder"
-    );
-
-    const elbowBandPosition=elbow.clone().lerp(wrist,.12);
-    makeFirstPersonArmBand(
-      group,elbowBandPosition,forearmDirection,.109,hazardBand,sideName+"ReflectiveSleeveBand"
-    );
-    makeFirstPersonArmBand(
-      group,wrist.clone().addScaledVector(forearmDirection,-.045),
-      forearmDirection,.085,hazardBand,sideName+"ReflectiveWristCuff"
-    );
-    makeFirstPersonArmBand(
-      group,shoulder.clone().lerp(elbow,.78),upperDirection,.119,
-      seamMaterial,sideName+"UpperSleeveSeam"
+    // One restrained seam around the upper forearm adds suit detail without
+    // turning the sleeve into a stack of disconnected pieces.
+    const seamPosition=curve.getPointAt(.60);
+    makeSleeveBand(
+      group,seamPosition,curve.getTangentAt(.60).normalize(),.112,
+      seamMaterial,name+"ForearmSeam"
     );
 
     if(side<0){
-      // Relaxed left glove: a broad palm and four gently curled fingers.
-      const palm=new THREE.Vector3(-.65,-.145,-1.005);
-      makeFirstPersonGloveSphere(
-        group,palm,new THREE.Vector3(.083,.061,.096),glove,"LeftGlovePalm"
-      );
-      makeFirstPersonGloveSphere(
-        group,palm.clone().add(new THREE.Vector3(0,.035,-.008)),
-        new THREE.Vector3(.056,.026,.055),gloveHighlight,"LeftGloveBackPanel"
+      // Relaxed left glove: a proper rounded palm joined to the cuff, with
+      // short curled fingers and a thumb angled toward the centre of screen.
+      const palm=new THREE.Vector3(-.875,-.392,-1.17);
+      makeFirstPersonPalm(group,palm,glove,"LeftGlovePalm",-.035);
+      makeFirstPersonGloveDetail(
+        group,palm.clone().add(new THREE.Vector3(0,.035,-.006)),
+        new THREE.Vector3(.083,.018,.075),gloveHighlight,"LeftGloveBackPanel"
       );
 
       for(let finger=0;finger<4;finger++){
-        const spread=(finger-1.5)*.034;
-        const base=new THREE.Vector3(palm.x+spread,palm.y+.004,palm.z-.045);
+        const spread=(finger-1.5)*.031;
+        const base=new THREE.Vector3(palm.x+spread,palm.y-.012,palm.z-.060);
         const joint=new THREE.Vector3(
-          palm.x+spread*.94,
-          palm.y-.027-Math.abs(finger-1.5)*.002,
-          palm.z-.083
+          palm.x+spread*.92,palm.y-.039-Math.abs(finger-1.5)*.002,palm.z-.101
         );
         const tip=new THREE.Vector3(
-          palm.x+spread*.78,
-          palm.y-.049-Math.abs(finger-1.5)*.003,
-          palm.z-.111-(finger===1||finger===2?.006:0)
+          palm.x+spread*.78,palm.y-.058-Math.abs(finger-1.5)*.002,palm.z-.126
         );
         makeFirstPersonCapsuleSegment(
-          group,base,joint,.019,glove,"LeftGloveFinger"+finger+"A"
+          group,base,joint,.0175,glove,"LeftGloveFinger"+finger+"A"
         );
         makeFirstPersonCapsuleSegment(
-          group,joint,tip,.0155,glove,"LeftGloveFinger"+finger+"B"
+          group,joint,tip,.0145,glove,"LeftGloveFinger"+finger+"B"
         );
-        makeFirstPersonGloveSphere(
-          group,joint,new THREE.Vector3(.018,.018,.018),gloveHighlight,
+        makeFirstPersonGloveDetail(
+          group,joint,new THREE.Vector3(.017,.017,.017),gloveHighlight,
           "LeftGloveKnuckle"+finger
         );
       }
 
-      const thumbBase=new THREE.Vector3(palm.x+.069,palm.y+.012,palm.z-.002);
-      const thumbJoint=new THREE.Vector3(palm.x+.105,palm.y-.012,palm.z-.039);
-      const thumbTip=new THREE.Vector3(palm.x+.074,palm.y-.044,palm.z-.076);
-      makeFirstPersonCapsuleSegment(group,thumbBase,thumbJoint,.024,glove,"LeftGloveThumbA");
-      makeFirstPersonCapsuleSegment(group,thumbJoint,thumbTip,.019,glove,"LeftGloveThumbB");
-      makeFirstPersonGloveSphere(
-        group,thumbJoint,new THREE.Vector3(.022,.022,.022),gloveHighlight,"LeftGloveThumbJoint"
+      const thumbBase=new THREE.Vector3(palm.x+.073,palm.y+.005,palm.z-.012);
+      const thumbJoint=new THREE.Vector3(palm.x+.097,palm.y-.024,palm.z-.052);
+      const thumbTip=new THREE.Vector3(palm.x+.066,palm.y-.049,palm.z-.083);
+      makeFirstPersonCapsuleSegment(
+        group,thumbBase,thumbJoint,.022,glove,"LeftGloveThumbA"
       );
-      // Fine stitched lines across the back panel distinguish glove from a blob.
-      makeFirstPersonSegment(
-        group,
-        palm.clone().add(new THREE.Vector3(-.035,.044,-.018)),
-        palm.clone().add(new THREE.Vector3(.035,.044,-.018)),
-        .003,.003,seamMaterial,"LeftGloveStitch"
+      makeFirstPersonCapsuleSegment(
+        group,thumbJoint,thumbTip,.018,glove,"LeftGloveThumbB"
       );
     }else{
-      // Right glove is shaped around the flashlight instead of pointing all
-      // four fingers straight forward. Fingers cross the barrel at staggered
-      // depths; the thumb comes over it from the opposite side.
-      const palm=new THREE.Vector3(.65,-.112,-.99);
-      makeFirstPersonGloveSphere(
-        group,palm,new THREE.Vector3(.092,.071,.087),glove,"RightGlovePalm"
-      );
-      makeFirstPersonGloveSphere(
-        group,palm.clone().add(new THREE.Vector3(.016,.036,-.004)),
-        new THREE.Vector3(.054,.026,.047),gloveHighlight,"RightGloveBackPanel"
+      // Right glove is built around the torch axis. The four segmented fingers
+      // travel from the palm toward the barrel; the thumb closes across it.
+      const palm=new THREE.Vector3(.885,-.397,-1.17);
+      makeFirstPersonPalm(group,palm,glove,"RightGlovePalm",.04);
+      makeFirstPersonGloveDetail(
+        group,palm.clone().add(new THREE.Vector3(.006,.035,-.006)),
+        new THREE.Vector3(.083,.018,.075),gloveHighlight,"RightGloveBackPanel"
       );
 
       for(let finger=0;finger<4;finger++){
-        const z=-.962-finger*.041;
-        const base=new THREE.Vector3(.696,-.064-finger*.009,z);
-        const joint=new THREE.Vector3(.629,-.085-finger*.008,z-.012);
-        const tip=new THREE.Vector3(.573,-.108-finger*.007,z-.022);
+        const z=-1.095-finger*.040;
+        const base=new THREE.Vector3(.951,-.337-finger*.006,z);
+        const joint=new THREE.Vector3(.885,-.369-finger*.006,z-.012);
+        const tip=new THREE.Vector3(.824,-.404-finger*.004,z-.022);
         makeFirstPersonCapsuleSegment(
-          group,base,joint,.0205,glove,"RightGripFinger"+finger+"A",2020
+          group,base,joint,.020,glove,"RightGripFinger"+finger+"A",2020
         );
         makeFirstPersonCapsuleSegment(
-          group,joint,tip,.0175,glove,"RightGripFinger"+finger+"B",2020
+          group,joint,tip,.017,glove,"RightGripFinger"+finger+"B",2020
         );
-        makeFirstPersonGloveSphere(
+        makeFirstPersonGloveDetail(
           group,joint,new THREE.Vector3(.020,.020,.020),gloveHighlight,
           "RightGripKnuckle"+finger,2020
         );
       }
 
-      const thumbBase=new THREE.Vector3(.676,-.046,-.956);
-      const thumbJoint=new THREE.Vector3(.619,-.049,-.998);
-      const thumbTip=new THREE.Vector3(.567,-.075,-1.045);
+      const thumbBase=new THREE.Vector3(.829,-.365,-1.10);
+      const thumbJoint=new THREE.Vector3(.784,-.405,-1.16);
+      const thumbTip=new THREE.Vector3(.809,-.43,-1.225);
       makeFirstPersonCapsuleSegment(
-        group,thumbBase,thumbJoint,.026,glove,"RightGripThumbA",2020
+        group,thumbBase,thumbJoint,.025,glove,"RightGripThumbA",2020
       );
       makeFirstPersonCapsuleSegment(
-        group,thumbJoint,thumbTip,.021,glove,"RightGripThumbB",2020
+        group,thumbJoint,thumbTip,.020,glove,"RightGripThumbB",2020
       );
-      makeFirstPersonGloveSphere(
+      makeFirstPersonGloveDetail(
         group,thumbJoint,new THREE.Vector3(.024,.024,.024),gloveHighlight,
         "RightGripThumbJoint",2020
-      );
-      makeFirstPersonSegment(
-        group,
-        palm.clone().add(new THREE.Vector3(.009,.046,-.018)),
-        palm.clone().add(new THREE.Vector3(.065,.041,-.018)),
-        .003,.003,seamMaterial,"RightGloveStitch",2000
       );
     }
   }
 
-  // Local prop sits in the right glove. Its lens remains state-controlled.
+  // Compact camera-local flashlight: the barrel is along -Z and sits inside
+  // the curled right glove. State changes only affect this local copy's lens.
   const flashlight=new THREE.Group();
   flashlight.name="LocalFirstPersonFlashlight";
-  flashlight.position.set(.563,-.105,-1.005);
+  flashlight.position.set(.785,-.405,-1.19);
   flashlight.rotation.set(THREE.MathUtils.degToRad(-2),0,THREE.MathUtils.degToRad(-2));
   group.add(flashlight);
 
   const metal=new THREE.MeshStandardMaterial({
-    color:0x252923, roughness:.55, metalness:.34,
+    color:0x252923, roughness:.52, metalness:.32,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false,
     emissive:0x000000, emissiveIntensity:.08
   });
