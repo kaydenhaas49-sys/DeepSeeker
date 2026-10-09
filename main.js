@@ -295,32 +295,37 @@ function createTutorialMascot(){
   tutorialMascotRoot=new THREE.Group();
   tutorialMascotRoot.name="BadgeyHologram";
   tutorialMascotRoot.visible=false;
-  tutorialMascotRoot.scale.setScalar(.58);
-  tutorialOpenRoomRoot.add(tutorialMascotRoot);
+  tutorialMascotRoot.scale.setScalar(.68);
+  // Keep Badgey outside the room's disposable geometry group. Restarting a
+  // tutorial clears that group; parenting the mascot there permanently detached
+  // it while tutorialMascotReady stayed true, so it could never be recreated.
+  scene.add(tutorialMascotRoot);
 
   const bodyMaterial=new THREE.MeshStandardMaterial({
-    color:0x42dff5,
+    color:0x73f1ff,
     roughness:.4,
     metalness:.12,
+    emissive:0x00dfff,
+    emissiveIntensity:2.0,
+    transparent:true,
+    opacity:.82,
+    depthWrite:false,
+    side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending,
+    toneMapped:false
+  });
+  const darkMaterial=new THREE.MeshStandardMaterial({
+    color:0x25a5c2,
+    roughness:.45,
+    metalness:.2,
     emissive:0x00c9ff,
     emissiveIntensity:1.25,
     transparent:true,
-    opacity:.62,
+    opacity:.72,
     depthWrite:false,
     side:THREE.DoubleSide,
-    blending:THREE.AdditiveBlending
-  });
-  const darkMaterial=new THREE.MeshStandardMaterial({
-    color:0x136b83,
-    roughness:.45,
-    metalness:.2,
-    emissive:0x00a4d4,
-    emissiveIntensity:.8,
-    transparent:true,
-    opacity:.5,
-    depthWrite:false,
-    side:THREE.DoubleSide,
-    blending:THREE.AdditiveBlending
+    blending:THREE.AdditiveBlending,
+    toneMapped:false
   });
   const eyeMaterial=new THREE.MeshBasicMaterial({
     color:0xeaffff,
@@ -632,9 +637,9 @@ function updateTutorialMascot(dt){
   // Keep the smaller hologram just ahead and to the player's right, at eye
   // height, so it is easy to spot without covering the center of the view.
   tutorialMascotPosition.copy(player.pos)
-    .addScaledVector(tutorialMascotForward,1.35)
-    .addScaledVector(tutorialMascotRight,.78);
-  tutorialMascotPosition.y=Math.max(1.55,player.pos.y+.12);
+    .addScaledVector(tutorialMascotForward,1.25)
+    .addScaledVector(tutorialMascotRight,.42);
+  tutorialMascotPosition.y=Math.max(1.62,player.pos.y+.10);
 
   tutorialMascotRoot.position.copy(tutorialMascotPosition);
   tutorialMascotRoot.lookAt(

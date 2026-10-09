@@ -229,83 +229,170 @@ export class Player {
       return this.fallbackArmViewmodel;
     }
 
+    // Fully volumetric, camera-local hazmat forearms and gloved hands. Standard
+    // materials keep the sleeves shaded in 3D instead of looking like flat UI.
     const root=new THREE.Group();
-    root.name="FallbackFirstPersonHazmatArms";
+    root.name="FirstPersonHazmatArms3D";
 
-    const suitMaterial=new THREE.MeshBasicMaterial({
-      color:0xc5bd91,
+    const suitMaterial=new THREE.MeshStandardMaterial({
+      color:0xb5ad92,
+      roughness:.88,
+      metalness:0,
+      emissive:0x17150d,
+      emissiveIntensity:.22,
       depthTest:false,
-      depthWrite:false,
-      toneMapped:false
+      depthWrite:false
     });
-    const gloveMaterial=new THREE.MeshBasicMaterial({
-      color:0x343a30,
+    const seamMaterial=new THREE.MeshStandardMaterial({
+      color:0x817b62,
+      roughness:.94,
+      metalness:0,
       depthTest:false,
-      depthWrite:false,
-      toneMapped:false
+      depthWrite:false
     });
-    const cuffMaterial=new THREE.MeshBasicMaterial({
-      color:0x646447,
+    const gloveMaterial=new THREE.MeshStandardMaterial({
+      color:0x252b25,
+      roughness:.76,
+      metalness:.025,
+      emissive:0x090b09,
+      emissiveIntensity:.2,
       depthTest:false,
-      depthWrite:false,
-      toneMapped:false
+      depthWrite:false
     });
-    const safetyStripeMaterial=new THREE.MeshBasicMaterial({
-      color:0xe1d47d,
+    const cuffMaterial=new THREE.MeshStandardMaterial({
+      color:0x424538,
+      roughness:.72,
+      metalness:.08,
       depthTest:false,
-      depthWrite:false,
-      toneMapped:false
+      depthWrite:false
     });
+    const stripeMaterial=new THREE.MeshStandardMaterial({
+      color:0xb7a957,
+      roughness:.66,
+      metalness:.04,
+      emissive:0x191607,
+      emissiveIntensity:.12,
+      depthTest:false,
+      depthWrite:false
+    });
+
+    const addSleeveBand=(arm,y,radius,material)=>{
+      const band=new THREE.Mesh(
+        new THREE.CylinderGeometry(radius,radius,.018,16,1,false),
+        material
+      );
+      band.position.y=y;
+      arm.add(band);
+    };
 
     const addArm=(side,x,y,z,rotationZ)=>{
       const arm=new THREE.Group();
       arm.position.set(x,y,z);
-      arm.rotation.set(-.28,0,rotationZ);
+      arm.rotation.set(-.34,0,rotationZ);
 
-      const sleeve=new THREE.Mesh(
-        new THREE.CapsuleGeometry(.078,.30,3,8),
+      // Shoulder/upper sleeve gives the silhouette some volume; the forearm
+      // overlaps it slightly so the joints don't look like separate sticks.
+      const upperSleeve=new THREE.Mesh(
+        new THREE.CapsuleGeometry(.105,.26,4,12),
         suitMaterial
       );
-      sleeve.name=side+"HazmatSleeve";
-      arm.add(sleeve);
+      upperSleeve.position.set(0,.13,.012);
+      arm.add(upperSleeve);
+
+      const forearm=new THREE.Mesh(
+        new THREE.CapsuleGeometry(.092,.31,4,12),
+        suitMaterial
+      );
+      forearm.position.set(0,-.095,-.018);
+      arm.add(forearm);
+
+      const elbowPatch=new THREE.Mesh(
+        new THREE.SphereGeometry(.102,14,10),
+        suitMaterial
+      );
+      elbowPatch.scale.set(1,1.06,.94);
+      elbowPatch.position.set(0,.25,.025);
+      arm.add(elbowPatch);
+
+      // Rounded seams and a raised yellow suit band catch light around the
+      // full arm circumference, reinforcing that this is a 3D model.
+      addSleeveBand(arm,.19,.105,stripeMaterial);
+      addSleeveBand(arm,.165,.107,seamMaterial);
+      addSleeveBand(arm,-.105,.094,seamMaterial);
 
       const cuff=new THREE.Mesh(
-        new THREE.CylinderGeometry(.082,.082,.045,10),
+        new THREE.CylinderGeometry(.095,.095,.075,16,1,false),
         cuffMaterial
       );
-      cuff.position.y=-.135;
+      cuff.position.set(0,-.245,-.025);
       arm.add(cuff);
 
-      const safetyBand=new THREE.Mesh(
-        new THREE.CylinderGeometry(.093,.093,.018,10),
-        safetyStripeMaterial
-      );
-      safetyBand.position.y=-.12;
-      arm.add(safetyBand);
+      addSleeveBand(arm,-.222,.096,stripeMaterial);
 
-      const glove=new THREE.Mesh(
-        new THREE.SphereGeometry(.092,12,9),
+      // Anatomical palm, four separate rounded fingers, and a thumb rather
+      // than a single flat blob.
+      const palm=new THREE.Mesh(
+        new THREE.SphereGeometry(1,16,12),
         gloveMaterial
       );
-      glove.scale.set(.98,.82,1.12);
-      glove.position.set(0,-.205,-.115);
-      arm.add(glove);
+      palm.scale.set(.091,.074,.105);
+      palm.position.set(0,-.315,-.10);
+      arm.add(palm);
+
+      for(let finger=0;finger<4;finger++){
+        const spread=(finger-1.5)*.039;
+        const length=[.074,.09,.086,.068][finger];
+        const digit=new THREE.Mesh(
+          new THREE.CapsuleGeometry(.018,length,3,8),
+          gloveMaterial
+        );
+        digit.position.set(spread,-.373,-.17-Math.max(0,1-Math.abs(finger-1.5))*.008);
+        digit.rotation.x=-.48;
+        digit.rotation.z=(finger-1.5)*-.055;
+        arm.add(digit);
+
+        const fingertip=new THREE.Mesh(
+          new THREE.SphereGeometry(.018,8,6),
+          gloveMaterial
+        );
+        fingertip.position.set(spread,-.414,-.195);
+        arm.add(fingertip);
+      }
 
       const thumb=new THREE.Mesh(
-        new THREE.SphereGeometry(.047,8,6),
+        new THREE.CapsuleGeometry(.025,.065,3,8),
         gloveMaterial
       );
-      thumb.scale.set(.8,1.1,1.25);
-      thumb.position.set(side==="left" ? .07 : -.07,-.19,-.13);
+      thumb.position.set(side==="left" ? .083 : -.083,-.326,-.112);
+      thumb.rotation.z=side==="left" ? -.72 : .72;
+      thumb.rotation.x=-.35;
       arm.add(thumb);
+
+      const thumbTip=new THREE.Mesh(
+        new THREE.SphereGeometry(.024,9,7),
+        gloveMaterial
+      );
+      thumbTip.position.set(side==="left" ? .105 : -.105,-.36,-.155);
+      arm.add(thumbTip);
+
+      // Two restrained fabric folds on the sleeve; low-poly and inexpensive.
+      for(const fold of [-.015,.045]){
+        const foldMesh=new THREE.Mesh(
+          new THREE.TorusGeometry(.088,.006,4,14),
+          seamMaterial
+        );
+        foldMesh.rotation.x=Math.PI/2;
+        foldMesh.position.set(0,fold,-.018);
+        foldMesh.scale.set(1,.9,1);
+        arm.add(foldMesh);
+      }
 
       root.add(arm);
     };
 
-    // Camera-local coordinates keep both forearms and gloves inside the view
-    // frustum; the previous x=±1 placement put them beyond the screen edges.
-    addArm("left",-.31,-.29,-.66,.38);
-    addArm("right",.31,-.29,-.66,-.38);
+    // Both elbows stay near the lower corners; wrists angle inward into frame.
+    addArm("left",-.285,-.145,-.69,.48);
+    addArm("right",.285,-.145,-.69,-.48);
 
     root.traverse(obj=>{
       if(!obj.isMesh) return;
