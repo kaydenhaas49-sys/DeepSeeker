@@ -1191,7 +1191,7 @@ menuSet.add(menuDust);
 // The title screen uses a clone of the real Spider-Psionic rig loaded by the
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
-const MENU_SPIDER_SCALE=.492;
+const MENU_SPIDER_SCALE=.06;
 const MENU_DUCK_SCALE=.82;
 const MENU_SPIDER_CEILING_Y=8.98;
 // Put the duck on the foreground floor, centered in front of the title camera.
@@ -1316,11 +1316,19 @@ function syncMenuSpiderFromGameplayModel(){
   // Do not clone the gameplay wrapper: it contains world-space placement
   // for the tutorial/gameplay entity. Clone only the authored model itself.
   const sourceModel=
+    spiderModel.getObjectByName("SpiderModelScaleRoot") ||
     spiderModel.getObjectByName("SpiderSource") ||
     spiderModel.children[0] ||
     spiderModel;
 
-  menuSpiderActual=SkeletonUtils.clone(sourceModel);
+  if(arachnophobiaMode){
+    menuSpiderActual=SkeletonUtils.clone(sourceModel);
+  }else{
+    // Keep the imported model's fitted scale beneath the menu's presentation
+    // scale, just as the tutorial clone does.
+    menuSpiderActual=new THREE.Group();
+    menuSpiderActual.add(SkeletonUtils.clone(sourceModel));
+  }
   menuSpiderActual.name="MenuSpiderActualModel";
   menuSpiderActual.visible=true;
 
@@ -4525,6 +4533,45 @@ spiderEntity.add(spiderRevealLight);
 
 scene.add(spiderEntity);
 
+// The regular Backrooms now uses the tutorial spider's controller and encounter
+// flow. Its procedural placeholder rig stays hidden; the imported SpiderSource
+// model and animations remain the visible enemy.
+const normalSpiderHunter=new SpiderHunter({
+  group:spiderEntity,
+  scene,
+  world,
+  player,
+  isBlocked:(x,z)=>isSpiderBlocked(x,z),
+  getOccluders:()=>world.root.children,
+  // Same body-radius hitbox as the tutorial spider; articulated legs stay visual-only.
+  getVisualHitboxDistance:(x,z)=>Math.max(
+    0,
+    Math.hypot(x-spiderEntity.position.x,z-spiderEntity.position.z)-1.1
+  ),
+  onStateChange:(mode)=>{
+    if(mode==="roam"){
+      // Match the tutorial: the spider remains frozen until the chase begins.
+      spiderBehaviorState="peek";
+      spiderVisibleToPlayer=true;
+      spiderRevealLight.visible=false;
+      spiderMixer?.stopAllAction();
+      spiderAnimationState="";
+      spiderWantedState="stalk";
+    }else if(mode==="hunt" || mode==="enrage"){
+      spiderBehaviorState="chase";
+      spiderRevealLight.visible=spiderVisibleToPlayer;
+      spiderRevealLight.intensity=4.2;
+      setSpiderAnimation("chase");
+    }else if(mode==="hidden"){
+      spiderBehaviorState="idle";
+      spiderMixer?.stopAllAction();
+      spiderAnimationState="";
+      spiderWantedState="idle";
+    }
+  }
+});
+normalSpiderHunter.visualRig.root.visible=false;
+
 const tutorialSpiderEntity=new THREE.Group();
 tutorialSpiderEntity.name="TutorialSignalStalkerEntity";
 tutorialSpiderEntity.visible=false;
@@ -4649,7 +4696,7 @@ const SPIDER_RADIUS=.68;
 const SPIDER_MIN_SPAWN_DISTANCE=13;
 const SPIDER_MAX_SPAWN_DISTANCE=21;
 const SPIDER_GROUND_OFFSET=.08;
-const SPIDER_TARGET_SPAN=1.0;
+const SPIDER_TARGET_SPAN=8.2;
 
 const SPIDER_PATH_CELL_SIZE=LOW_END_PERFORMANCE?1.8:1.35;
 const SPIDER_PATH_GRID_SIZE=LOW_END_PERFORMANCE?19:31;
@@ -4799,19 +4846,34 @@ function syncTutorialSpiderFromGameplayModel(force=false){
     tutorialSpiderEntity.remove(tutorialSpiderActual);
   }
 
-  const sourceModel=
-    sourceEntity.getObjectByName("SpiderSource") ||
-    sourceEntity.children[0] ||
-    sourceEntity;
-  tutorialSpiderActual=SkeletonUtils.clone(sourceModel);
+  const sourceModel=arachnophobiaMode
+    ? (
+        sourceEntity.getObjectByName("SpiderSource") ||
+        sourceEntity.children[0] ||
+        sourceEntity
+      )
+    : (
+        sourceEntity.getObjectByName("SpiderModelScaleRoot") ||
+        sourceEntity.getObjectByName("SpiderSource") ||
+        sourceEntity.children[0] ||
+        sourceEntity
+      );
+  if(arachnophobiaMode){
+    tutorialSpiderActual=SkeletonUtils.clone(sourceModel);
+  }else{
+    // Clone the scale wrapper too. It carries the tutorial-sized world scale
+    // outside the animated SpiderSource root, exactly as normal gameplay does.
+    tutorialSpiderActual=new THREE.Group();
+    tutorialSpiderActual.add(SkeletonUtils.clone(sourceModel));
+  }
   tutorialSpiderActual.name=arachnophobiaMode
     ? "TutorialHarmlessDuck"
     : "TutorialSpiderPsionic";
   tutorialSpiderActual.visible=false;
   tutorialSpiderActual.position.set(0,0,0);
   tutorialSpiderActual.rotation.set(0,0,0);
-  // The imported rig is normalized to one world unit for both gameplay and
-  // tutorial, so the same mesh has the same proportions in both places.
+  // Normal spider scale lives on the cloned SpiderModelScaleRoot child; keep
+  // this outer placement wrapper at 1 so the tutorial and Backrooms match.
   tutorialSpiderActual.scale.setScalar(arachnophobiaMode ? MENU_DUCK_SCALE : 1.0);
 
   tutorialSpiderActual.updateMatrixWorld(true);
@@ -5386,15 +5448,15 @@ function rotatePlayerTowardSpider(dt){
   player.pitch=Math.max(-Math.PI/2+.02,Math.min(Math.PI/2-.02,player.pitch));
 }
 
-function findSpiderSpawnPosition(){
+function findSpiderSpawnPosition(minDistance=SPIDER_MIN_SPAWN_DISTANCE,maxDistance=SPIDER_MAX_SPAWN_DISTANCE){
   const hidden=[];
   const visible=[];
 
   for(let i=0;i<40;i++){
     const angle=Math.random()*Math.PI*2;
     const distance=THREE.MathUtils.lerp(
-      SPIDER_MIN_SPAWN_DISTANCE,
-      SPIDER_MAX_SPAWN_DISTANCE,
+      minDistance,
+      maxDistance,
       Math.random()
     );
     const x=player.pos.x+Math.cos(angle)*distance;
@@ -5467,86 +5529,56 @@ function showSpiderScareMessage(message,duration=900){
   },duration);
 }
 
-function startSpiderPeek(){
+function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15){
   if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return false;
-  const spawn=findSpiderSpawnPosition();
+
+  const spawn=
+    findSpiderVisibleSpawnPosition(minDistance,maxDistance) ||
+    findSpiderSpawnPosition(minDistance,maxDistance);
   if(!spawn) return false;
+
+  const position=new THREE.Vector3(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
+  const lookTarget=new THREE.Vector3(player.pos.x,SPIDER_GROUND_OFFSET,player.pos.z);
 
   spiderActive=true;
   spiderBehaviorState="peek";
   spiderBehaviorTime=0;
   spiderScareRevealTimer=0;
   spiderStuckTime=0;
-  spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
-  spiderEntity.rotation.x=0;
-  spiderEntity.rotation.y=Math.atan2(
-    player.pos.x-spiderEntity.position.x,
-    player.pos.z-spiderEntity.position.z
-  );
-  spiderEntity.scale.setScalar(1);
+  spiderJumpscareTimer=0;
+  spiderCaughtFreezeTimer=0;
+  spiderVisibleToPlayer=true;
+  clearSpiderPath();
+
+  // This is the tutorial's exact opening: plant the model, face the player,
+  // keep it still, and let SpiderHunter trigger the chase when approached.
+  if(!normalSpiderHunter.prepareTutorial(position,lookTarget)){
+    spiderActive=false;
+    spiderEntity.visible=false;
+    return false;
+  }
+
+  normalSpiderHunter.visualRig.root.visible=false;
   spiderEntity.visible=true;
-  spiderVisibleToPlayer=false;
+  spiderEntity.scale.setScalar(1);
+  if(spiderModel) spiderModel.visible=true;
   spiderRevealLight.visible=false;
-  setSpiderAnimation("stalk");
+  spiderRevealLight.intensity=0;
+  // The tutorial spider stays still while waiting for the player.
+  pulse=Math.max(pulse,.22);
   return true;
+}
+
+function startSpiderPeek(){
+  return startTutorialStyleBackroomsSpider(11,18);
 }
 
 function startSpiderRush(){
-  if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return false;
-  const spawn=findSpiderVisibleSpawnPosition(10,16);
-  if(!spawn) return false;
-
-  spiderActive=true;
-  spiderBehaviorState="rush";
-  spiderBehaviorTime=0;
-  spiderScareRevealTimer=0;
-  spiderStuckTime=0;
-  spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
-  spiderEntity.rotation.x=0;
-  spiderEntity.rotation.y=Math.atan2(
-    player.pos.x-spiderEntity.position.x,
-    player.pos.z-spiderEntity.position.z
-  );
-  spiderEntity.scale.setScalar(1);
-  spiderEntity.visible=true;
-  spiderVisibleToPlayer=true;
-  spiderRevealLight.visible=true;
-  spiderRevealLight.intensity=4.2;
-  setSpiderAnimation("chase");
-  pulse=1;
-  audio.scare();
-  showSpiderScareMessage("RUN.",700);
-  return true;
+  return startTutorialStyleBackroomsSpider(9,14);
 }
 
 function startSpiderChase(){
-  if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return false;
-  const spawn=findSpiderSpawnPosition(9,15);
-  if(!spawn) return false;
-
-  spiderActive=true;
-  spiderBehaviorState="chase";
-  spiderBehaviorTime=0;
-  spiderStuckTime=0;
-  clearSpiderPath();
-  spiderChaseDuration=THREE.MathUtils.lerp(
-    SPIDER_CHASE_MIN_TIME,
-    SPIDER_CHASE_MAX_TIME,
-    Math.random()
-  );
-  spiderEntity.position.set(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
-  spiderEntity.rotation.x=0;
-  spiderEntity.rotation.y=Math.atan2(
-    player.pos.x-spiderEntity.position.x,
-    player.pos.z-spiderEntity.position.z
-  );
-  spiderEntity.scale.setScalar(1);
-  spiderEntity.visible=true;
-  spiderVisibleToPlayer=false;
-  spiderRevealLight.visible=false;
-  setSpiderAnimation("chase");
-  pulse=Math.max(pulse,.35);
-  return true;
+  return startTutorialStyleBackroomsSpider(9,15);
 }
 
 function spiderPathSegmentClear(ax,az,bx,bz){
@@ -6356,7 +6388,9 @@ function finishSpiderModel(model,animations,sourceName){
   // Normal Backrooms and tutorial use the same imported rig. Match the
   // tutorial's darker chitin finish in normal gameplay too, without changing
   // the model's authored proportions or skeleton.
-  applyTutorialSpiderMaterialPass(model);
+  // Match the tutorial spider exactly: preserve its authored colors/maps and
+  // apply only the tutorial's copied-material/shadow setup.
+  applyTutorialSpiderMaterialPass(model,{darken:false});
   fitSpiderModel(model);
 
   // Stop both rigs before replacing the current model tree.
@@ -6370,19 +6404,29 @@ function finishSpiderModel(model,animations,sourceName){
     spiderEntity.remove(spiderOriginalModel);
   }
 
+  // Keep the fitted world-space scale outside the animated model root. Some
+  // animation clips key the root scale; putting normalization on this wrapper
+  // prevents those clips from shrinking the normal Backrooms spider.
+  const modelScaleRoot=new THREE.Group();
+  modelScaleRoot.name="SpiderModelScaleRoot";
+  modelScaleRoot.scale.copy(model.scale);
+  model.scale.set(1,1,1);
+  model.updateMatrixWorld(true);
+  modelScaleRoot.add(model);
+  modelScaleRoot.updateMatrixWorld(true);
+
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
   visualRoot.visible=true;
-  visualRoot.add(model);
+  visualRoot.add(modelScaleRoot);
 
-  // Use one copy of the same imported rig used by the tutorial. The old
-  // overlapping duplicate made the silhouette look doubled and muddy.  model.updateMatrixWorld(true);
-  const placedBounds=new THREE.Box3().setFromObject(model);
+  // Keep one source rig, at the same scale used by the tutorial clone.
+  const placedBounds=new THREE.Box3().setFromObject(modelScaleRoot);
   const placedCenter=placedBounds.getCenter(new THREE.Vector3());
   const placedMinY=placedBounds.min.y;
   visualRoot.position.set(
     -placedCenter.x,
-    SPIDER_GROUND_OFFSET-placedMinY,
+    -placedMinY,
     -placedCenter.z
   );
 
@@ -7673,7 +7717,7 @@ function publishMultiplayerSpiderSnapshot(dt){
   multiplayer.broadcastWorldEvent("spider_snapshot","main-spider",{
     active:true,
     behavior:spiderBehaviorState,
-    animation:spiderWantedState||"chase",
+    animation:spiderBehaviorState==="peek" ? "static" : (spiderWantedState||"chase"),
     x:spiderEntity.position.x,
     y:spiderEntity.position.y,
     z:spiderEntity.position.z,
@@ -7723,7 +7767,13 @@ function applyRemoteSpiderSnapshot(dt){
   }
   spiderEntity.scale.setScalar(snapshot.scale);
   spiderEntity.visible=true;
-  if(spiderWantedState!==snapshot.animation || !spiderAnimationState){
+  if(snapshot.animation==="static"){
+    if(spiderAnimationState || spiderWantedState!=="stalk"){
+      spiderMixer?.stopAllAction();
+      spiderAnimationState="";
+      spiderWantedState="stalk";
+    }
+  }else if(spiderWantedState!==snapshot.animation || !spiderAnimationState){
     setSpiderAnimation(snapshot.animation);
   }
   spiderVisibleToPlayer=playerHasLineOfSightToSpider();
@@ -8140,250 +8190,63 @@ function animate(){
   }
 
   if(!tutorialOpenRoomActive){
+    if(multiplayer.isWorldAuthority() && !houseMode){
+      if(spiderActive){
+        const result=normalSpiderHunter.updateTutorial(dt,player);
+        normalSpiderHunter.visualRig.root.visible=false;
+        normalSpiderHunter.step(dt);
 
-    if(spiderJumpscareTimer<=0 && multiplayer.isWorldAuthority()){
-      groundSpiderEntity();
-    }
-  
-    spiderRevealLight.intensity=(!houseMode && spiderActive && spiderVisibleToPlayer)
-      ? (spiderJumpscareTimer>0 ? 5.0 : 4.2)
-      : 0;
-  
-    if(spiderActive && !houseMode && multiplayer.isWorldAuthority()){
-      if(spiderCaughtFreezeTimer>0){
-        player.movementFrozen=true;
-        player.pos.copy(spiderCaughtPlayerPosition);
-        player.vel.set(0,0,0);
-        player.keys.clear();
-        player.jumpY=0;
-        player.jumpVelocity=0;
-        spiderCaughtFreezeTimer=Math.max(0,spiderCaughtFreezeTimer-dt);
-        if(spiderCaughtFreezeTimer<=0){
-          player.movementFrozen=false;
-          resetPlayerAfterSpiderCatch();
+        if(result.triggered){
+          spiderBehaviorState="chase";
+          spiderVisibleToPlayer=true;
+          pulse=Math.max(pulse,.7);
+          audio.scare();
+          showSpiderScareMessage("IT MOVED. RUN.",900);
         }
-      }else if(spiderJumpscareTimer>0){
-        spiderJumpscareTimer=Math.max(0,spiderJumpscareTimer-dt);
-        spiderBehaviorTime+=dt;
-  
-        const jumpProgress=THREE.MathUtils.clamp(
-          1-spiderJumpscareTimer/SPIDER_POUNCE_DURATION,
-          0,
-          1
-        );
-        const horizontalProgress=jumpProgress*jumpProgress*(3-2*jumpProgress);
-  
-        spiderEntity.position.lerpVectors(
-          spiderPounceStart,
-          spiderPounceTarget,
-          horizontalProgress
-        );
-        spiderEntity.position.y=
-          SPIDER_GROUND_OFFSET+
-          Math.sin(jumpProgress*Math.PI)*SPIDER_POUNCE_HEIGHT;
-  
-        spiderEntity.scale.setScalar(1);
-        spiderEntity.rotation.y=Math.atan2(
-          player.pos.x-spiderEntity.position.x,
-          player.pos.z-spiderEntity.position.z
-        );
-        spiderEntity.rotation.x=Math.sin(jumpProgress*Math.PI)*.18;
-  
-        setSpiderAnimation("jump");
-  
-        if(spiderJumpscareTimer<=0){
-          const catchDistance=Math.hypot(
-            player.pos.x-spiderEntity.position.x,
-            player.pos.z-spiderEntity.position.z
-          );
-  
-          if(catchDistance<=2.5 || normalSpiderHitboxTouchesPlayer()){
-            startSpiderCatchFreeze();
-          }else{
-            finishSpiderJumpscare();
-          }
+
+        if(result.finished){
+          spiderActive=false;
+          spiderBehaviorState="idle";
+          spiderBehaviorTime=0;
+          spiderJumpscareTimer=0;
+          spiderCaughtFreezeTimer=0;
+          spiderRevealLight.visible=false;
+          spiderRevealLight.intensity=0;
+          normalSpiderHunter.hide();
+          spiderEntity.visible=false;
+          clearSpiderPath();
+          showSpiderScareMessage("IT STOPPED.",850);
+        }else{
+          spiderEntity.visible=true;
+          spiderBehaviorState=normalSpiderHunter.mode==="hunt" ? "chase" : "peek";
+          spiderVisibleToPlayer=playerHasLineOfSightToSpider();
+          if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
+          spiderRevealLight.visible=spiderVisibleToPlayer && normalSpiderHunter.mode==="hunt";
+          spiderRevealLight.intensity=spiderRevealLight.visible ? 4.2 : 0;
         }
       }else{
-        spiderBehaviorTime+=dt;
-  
-        if(spiderAutoLookTimer>0){
-          spiderAutoLookTimer=Math.max(0,spiderAutoLookTimer-dt);
-          rotatePlayerTowardSpider(dt);
-        }
-  
-        if(spiderBehaviorState==="peek"){
-          setSpiderAnimation("stalk");
-
-          const seen=playerHasLineOfSightToSpider();
-          if(seen){
-            spiderScareRevealTimer+=dt;
-            pulse=Math.max(pulse,.22);
-            if(spiderScareRevealTimer>=.45){
-              audio.scare();
-              pulse=.72;
-              showSpiderScareMessage("THERE.",650);
-              if(!startSpiderChase()){
-                spiderActive=false;
-                spiderEntity.visible=false;
-                spiderRevealLight.visible=false;
-                spiderBehaviorState="idle";
-              }
-            }
-          }else if(spiderBehaviorTime>=4.2){
-            spiderActive=false;
-            spiderEntity.visible=false;
-            spiderRevealLight.visible=false;
-            spiderBehaviorState="idle";
-            spiderBehaviorTime=0;
-            spiderScareRevealTimer=0;
-          }
-        }else if(spiderBehaviorState==="rush"){
-          setSpiderAnimation("chase");
-
-          const dx=player.pos.x-spiderEntity.position.x;
-          const dz=player.pos.z-spiderEntity.position.z;
-          const distance=Math.hypot(dx,dz);
-          const inv=1/Math.max(distance,.001);
-          const step=Math.min(SPIDER_RUSH_SPEED*dt,distance);
-
-          if(distance<=SPIDER_ATTACK_RANGE || normalSpiderHitboxTouchesPlayer()){
-            startSpiderJumpscare();
-          }else if(spiderBehaviorTime>=SPIDER_RUSH_DURATION){
-            if(!startSpiderChase()){
-              spiderActive=false;
-              spiderEntity.visible=false;
-              spiderRevealLight.visible=false;
-              spiderBehaviorState="idle";
-              clearSpiderPath();
-            }
-          }else if(!tryMoveSpiderGround(dx*inv*step,dz*inv*step)){
-            if(!startSpiderChase()){
-              spiderActive=false;
-              spiderEntity.visible=false;
-              spiderRevealLight.visible=false;
-              spiderBehaviorState="idle";
-              clearSpiderPath();
-            }
-          }else{
-            spiderEntity.rotation.y=Math.atan2(
-              player.pos.x-spiderEntity.position.x,
-              player.pos.z-spiderEntity.position.z
-            );
-          }
-        }else if(spiderBehaviorState==="runby"){
-          setSpiderAnimation("runby");
-  
-          const dx=spiderRunbyTarget.x-spiderEntity.position.x;
-          const dz=spiderRunbyTarget.z-spiderEntity.position.z;
-          const distance=Math.hypot(dx,dz);
-  
-          if(distance<=.55 || spiderBehaviorTime>=SPIDER_RUNBY_DURATION){
-            spiderActive=false;
-            spiderEntity.visible=false;
-            spiderRevealLight.visible=false;
-            spiderBehaviorState="idle";
-            spiderBehaviorTime=0;
-            clearSpiderPath();
-          }else{
-            const inv=1/Math.max(distance,.001);
-            const step=Math.min(SPIDER_RUNBY_SPEED*dt,distance);
-            if(!tryMoveSpiderGround(dx*inv*step,dz*inv*step)){
-              spiderActive=false;
-              spiderEntity.visible=false;
-              spiderRevealLight.visible=false;
-              spiderBehaviorState="idle";
-              clearSpiderPath();
-            }else{
-              spiderEntity.rotation.y=Math.atan2(
-                spiderRunbyTarget.x-spiderEntity.position.x,
-                spiderRunbyTarget.z-spiderEntity.position.z
-              );
-            }
-          }
-        }else if(spiderBehaviorState==="chase"){
-          setSpiderAnimation("chase");
-
-          const distance=moveSpiderTowardPlayer(dt);
-
-          spiderRevealLight.visible=true;
-          spiderRevealLight.intensity=4.2;
-
-          if(distance<=SPIDER_ATTACK_RANGE || normalSpiderHitboxTouchesPlayer()){
-            spiderBehaviorState="attack";
-            spiderBehaviorTime=0;
-            spiderAttackPlayed=false;
-            setSpiderAnimation("attack");
-          }else if(spiderBehaviorTime>=spiderChaseDuration){
-            spiderActive=false;
-            spiderEntity.visible=false;
-            spiderRevealLight.visible=false;
-            spiderBehaviorState="idle";
-            spiderBehaviorTime=0;
-            clearSpiderPath();
-          }
-        }else if(spiderBehaviorState==="attack"){
-          setSpiderAnimation("attack");
-  
-          const attackAction=
-            spiderActions.get(SPIDER_ANIMATION_ALIAS.attack) ||
-            spiderActions.get("attack1") ||
-            spiderActions.get("attack2");
-  
-          const attackDuration=Math.max(
-            .35,
-            Math.min(1.15,Number(attackAction?.getClip?.().duration)||.72)
-          );
-  
-          if(!spiderAttackPlayed){
-            spiderAttackPlayed=true;
-            pulse=1;
-          }
-  
-          // Stay locked to the attack position while the one-shot animation plays.
-          spiderEntity.rotation.y=Math.atan2(
-            player.pos.x-spiderEntity.position.x,
-            player.pos.z-spiderEntity.position.z
-          );
-  
-          if(spiderBehaviorTime>=attackDuration){
-            startSpiderJumpscare();
-          }
-        }
-  
-        spiderEntity.rotation.y=Math.atan2(
-          player.pos.x-spiderEntity.position.x,
-          player.pos.z-spiderEntity.position.z
-        );
-  
-        spiderEntity.visible=true;
+        normalSpiderHunter.hide();
+        spiderEntity.visible=false;
+        spiderRevealLight.visible=false;
+        spiderRevealLight.intensity=0;
+        spiderVisibleToPlayer=true;
+        spiderBehaviorState="idle";
+        spiderBehaviorTime=0;
+        spiderJumpscareTimer=0;
+        spiderCaughtFreezeTimer=0;
+        clearSpiderPath();
+        spiderEntity.rotation.x=0;
+        spiderEntity.scale.setScalar(1);
       }
-
-      // Apply the same wall-occlusion check after every encounter phase,
-      // including the pounce and freeze frames, so the spider cannot render
-      // through walls in an exceptional state.
-      if(spiderActive && spiderEntity.visible){
-        spiderVisibleToPlayer=playerHasLineOfSightToSpider();
-        if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
-        spiderRevealLight.visible=spiderVisibleToPlayer;
-      }
-    }else if(!spiderActive || houseMode || multiplayer.isWorldAuthority()){
-      spiderCaughtFreezeTimer=0;
-      player.movementFrozen=false;
+    }else if(spiderActive && !houseMode){
+      // Clients render the authority's snapshots; do not run a second local AI.
+      normalSpiderHunter.visualRig.root.visible=false;
+      normalSpiderHunter.step(dt);
+    }else{
+      normalSpiderHunter.hide();
       spiderEntity.visible=false;
       spiderRevealLight.visible=false;
-      spiderVisibleToPlayer=true;
-      if(spiderModel) spiderModel.visible=true;
-      spiderBehaviorState="idle";
-      spiderBehaviorTime=0;
-      spiderAutoLookTimer=0;
-      spiderAutoLookStarted=false;
-      spiderScareRevealTimer=0;
-      clearSpiderPath();
-      spiderEntity.rotation.x=0;
-      spiderEntity.position.y=SPIDER_GROUND_OFFSET;
-      spiderEntity.scale.setScalar(1);
     }
-  
   }
 
   publishMultiplayerSpiderSnapshot(dt);
