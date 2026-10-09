@@ -279,6 +279,8 @@ let tutorialMascotFlashlightLens=null;
 let tutorialMascotBlasterBeam=null;
 let tutorialMascotSpeechStage=-1;
 let tutorialMascotSpeechTimer=0;
+let tutorialMascotVoiceWaiter=null;
+let tutorialMascotPendingSpeechStage=-1;
 const tutorialMascotPosition=new THREE.Vector3();
 const tutorialMascotRight=new THREE.Vector3();
 const tutorialMascotForward=new THREE.Vector3();
@@ -292,8 +294,9 @@ tutorialMascotAimQuaternion.setFromUnitVectors(
 function createTutorialMascot(){
   if(tutorialMascotReady) return;
 
-  // Badgey is a tiny floating helper drone: soft rounded body, wide face,
-  // readable eyes and a friendly mouth. No weapon-like silhouette.
+  // Badgey is a tiny helper robot projected above the left arm: head, face,
+  // little body, arms, and feet. Keep the shape friendly and unmistakably
+  // character-like instead of an isolated glowing ball.
   tutorialMascotRoot=new THREE.Group();
   tutorialMascotRoot.name="BadgeyHologram";
   tutorialMascotRoot.visible=false;
@@ -301,26 +304,31 @@ function createTutorialMascot(){
   player.hands.add(tutorialMascotRoot);
 
   const holo=new THREE.MeshBasicMaterial({
-    color:0x55f1ff,transparent:true,opacity:.78,
+    color:0x5cefff,transparent:true,opacity:.80,
     depthTest:false,depthWrite:false,side:THREE.DoubleSide,
     blending:THREE.AdditiveBlending,toneMapped:false
   });
-  const outline=new THREE.MeshBasicMaterial({
-    color:0xb7fcff,transparent:true,opacity:.95,
+  const edge=new THREE.MeshBasicMaterial({
+    color:0xc4ffff,transparent:true,opacity:.96,
     depthTest:false,depthWrite:false,side:THREE.DoubleSide,
     blending:THREE.AdditiveBlending,toneMapped:false
   });
-  const visorMat=new THREE.MeshBasicMaterial({
-    color:0x043344,transparent:true,opacity:.94,
+  const visor=new THREE.MeshBasicMaterial({
+    color:0x043448,transparent:true,opacity:.96,
     depthTest:false,depthWrite:false,side:THREE.DoubleSide,
     blending:THREE.AdditiveBlending,toneMapped:false
   });
-  const eyeMat=new THREE.MeshBasicMaterial({
-    color:0xf0ffff,depthTest:false,depthWrite:false,
+  const eyes=new THREE.MeshBasicMaterial({
+    color:0xf2ffff,depthTest:false,depthWrite:false,
+    blending:THREE.AdditiveBlending,toneMapped:false
+  });
+  const softGlow=new THREE.MeshBasicMaterial({
+    color:0x27cde8,transparent:true,opacity:.65,
+    depthTest:false,depthWrite:false,side:THREE.DoubleSide,
     blending:THREE.AdditiveBlending,toneMapped:false
   });
 
-  const addPart=(name,geometry,material,position,scale,rotation)=>{
+  const part=(name,geometry,material,position,scale,rotation)=>{
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=name;
     mesh.position.set(position[0],position[1],position[2]);
@@ -332,86 +340,132 @@ function createTutorialMascot(){
     return mesh;
   };
 
-  // Rounded head and inset faceplate, facing the player.
-  addPart("BadgeyHead",new THREE.SphereGeometry(.083,16,12),holo,[0,.012,0],[1.12,.88,.62]);
-  addPart("BadgeyFaceplate",new THREE.SphereGeometry(.061,16,12),visorMat,[0,.014,.040],[1,.78,.22]);
-  addPart("BadgeyEyeLeft",new THREE.SphereGeometry(.011,10,8),eyeMat,[-.026,.022,.054],[1,1,.55]);
-  addPart("BadgeyEyeRight",new THREE.SphereGeometry(.011,10,8),eyeMat,[.026,.022,.054],[1,1,.55]);
+  // Head and broad visor.
+  part("BadgeyHead",new THREE.SphereGeometry(.065,16,12),holo,[0,.052,0],[1.18,.90,.68]);
+  part("BadgeyVisor",new THREE.SphereGeometry(.051,16,12),visor,[0,.054,.039],[1,.68,.28]);
+  part("BadgeyEyeLeft",new THREE.SphereGeometry(.009,10,8),eyes,[-.021,.061,.051],[1,1,.60]);
+  part("BadgeyEyeRight",new THREE.SphereGeometry(.009,10,8),eyes,[.021,.061,.051],[1,1,.60]);
 
-  tutorialMascotMouth=addPart(
-    "BadgeySmile",new THREE.TorusGeometry(.013,.0028,5,12,Math.PI),outline,
-    [0,-.014,.055],[1,1,.45],[0,0,Math.PI]
+  tutorialMascotMouth=part(
+    "BadgeySmile",new THREE.TorusGeometry(.012,.0027,5,14,Math.PI),edge,
+    [0,.034,.052],[1,1,.45],[0,0,Math.PI]
   );
 
-  // Tiny side fins and two floating hands make him look like a helper,
-  // not a detached glowing orb.
-  for(const side of [-1,1]){
-    addPart("BadgeyFin",new THREE.SphereGeometry(.020,10,8),holo,[side*.087,.004,0],[.72,1,.68]);
-    addPart("BadgeyHand",new THREE.SphereGeometry(.012,9,7),outline,[side*.105,-.036,.006],[1,.8,.8]);
-  }
-  addPart("BadgeyAntenna",new THREE.CylinderGeometry(.0035,.0045,.023,7),outline,[0,.094,0]);
-  addPart("BadgeyAntennaLight",new THREE.SphereGeometry(.009,9,7),outline,[0,.108,0],[1,1,.8]);
+  // Neck and torso make the head read as a small character rather than an orb.
+  part("BadgeyNeck",new THREE.CylinderGeometry(.014,.018,.020,10),edge,[0,-.010,0]);
+  part("BadgeyTorso",new THREE.CapsuleGeometry(.032,.050,4,10),holo,[0,-.055,0],[1,.86,.78]);
+  part("BadgeyChestLight",new THREE.SphereGeometry(.010,10,8),edge,[0,-.051,.027],[1,1,.45]);
+  part("BadgeyShoulderLeft",new THREE.SphereGeometry(.016,10,8),softGlow,[-.038,-.028,0]);
+  part("BadgeyShoulderRight",new THREE.SphereGeometry(.016,10,8),softGlow,[.038,-.028,0]);
 
-  // Thin projected ring makes the placement above the forearm easy to read.
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(.066,.003,5,20),outline);
+  for(const side of [-1,1]){
+    part(
+      "BadgeyArm",new THREE.CapsuleGeometry(.008,.031,3,8),holo,
+      [side*.064,-.040,0],[1,1,1],[0,0,side*Math.PI/2]
+    );
+    part("BadgeyHand",new THREE.SphereGeometry(.010,9,7),edge,[side*.085,-.061,.002],[1,.85,.8]);
+    part("BadgeyLeg",new THREE.CapsuleGeometry(.009,.023,3,8),holo,[side*.020,-.105,0]);
+    part("BadgeyFoot",new THREE.SphereGeometry(.013,9,7),edge,[side*.021,-.129,.005],[1,.65,1]);
+  }
+
+  // A tiny antenna and a pair of side fins give Badgey a recognizable outline.
+  part("BadgeyAntenna",new THREE.CylinderGeometry(.0025,.0035,.018,7),edge,[0,.122,0]);
+  part("BadgeyAntennaLight",new THREE.SphereGeometry(.007,9,7),edge,[0,.132,0]);
+  for(const side of [-1,1]){
+    part("BadgeyFin",new THREE.SphereGeometry(.016,10,8),holo,[side*.076,.049,0],[.72,1,.64]);
+  }
+
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.074,.0028,5,20),edge);
   ring.name="BadgeyProjectionRing";
   ring.rotation.x=Math.PI/2;
-  ring.position.set(0,-.061,0);
+  ring.position.set(0,-.145,0);
   ring.frustumCulled=false;
   ring.renderOrder=3009;
   tutorialMascotRoot.add(ring);
 
-  const glow=new THREE.PointLight(0x22eaff,.14,.38);
-  glow.position.set(0,.01,.02);
+  const glow=new THREE.PointLight(0x22eaff,.12,.32);
+  glow.position.set(0,.025,.02);
   tutorialMascotRoot.add(glow);
 
   tutorialMascotReady=true;
 }
 
-function speakTutorialMascot(stage){
+function speakTutorialMascot(stage,allowDefaultVoice=false){
   const lines={
-    1:"All right, let's start with WASD. Move around a little.",
-    2:"Give Space a tap to jump. Nice.",
-    3:"Press Control to crouch. There you go.",
-    4:"Hold Shift to run. Just try not to hit a wall.",
-    5:"Press F for your flashlight. Much better.",
-    6:"Press P to open your phone.",
-    7:"Have a look at the message, then close your phone when you're done.",
-    8:"Head toward that thing over there. I'll keep an eye out.",
-    9:"Okay, time to move! We can panic while we're running."
+    1:"Hey, let's start with WASD. Move around a bit.",
+    2:"Nice. Space makes you jump.",
+    3:"Control lets you crouch. Handy.",
+    4:"Hold Shift when you need to run.",
+    5:"Tap F for your flashlight. Better already.",
+    6:"Press P if you need your phone.",
+    7:"Check that message, then close your phone when you're done.",
+    8:"Let's head toward that object. I'll stay with you.",
+    9:"Time to go. We can panic while we're moving."
   };
-
-  if(tutorialMascotSpeechStage===stage) return;
-  tutorialMascotSpeechStage=stage;
-
   const text=lines[stage];
   if(!text || !("speechSynthesis" in window)) return;
 
+  const speech=window.speechSynthesis;
+  if(tutorialMascotSpeechStage===stage) return;
+  let voices=speech.getVoices();
+
+  // Some browsers populate their voice list asynchronously. Wait briefly for
+  // a better voice to arrive instead of immediately locking Badgey to eSpeak.
+  if(!voices.length && !allowDefaultVoice){
+    tutorialMascotPendingSpeechStage=stage;
+    if(!tutorialMascotVoiceWaiter && typeof speech.addEventListener==="function"){
+      tutorialMascotVoiceWaiter=()=>{
+        voices=speech.getVoices();
+        if(!voices.length) return;
+        speech.removeEventListener("voiceschanged",tutorialMascotVoiceWaiter);
+        tutorialMascotVoiceWaiter=null;
+        const pending=tutorialMascotPendingSpeechStage;
+        tutorialMascotPendingSpeechStage=-1;
+        if(pending===houseTutorialStage && tutorialMascotSpeechStage!==pending){
+          speakTutorialMascot(pending);
+        }
+      };
+      speech.addEventListener("voiceschanged",tutorialMascotVoiceWaiter);
+    }
+    window.setTimeout(()=>{
+      if(tutorialMascotPendingSpeechStage!==stage) return;
+      if(speech.getVoices().length) return;
+      if(tutorialMascotVoiceWaiter){
+        speech.removeEventListener("voiceschanged",tutorialMascotVoiceWaiter);
+        tutorialMascotVoiceWaiter=null;
+      }
+      tutorialMascotPendingSpeechStage=-1;
+      if(houseTutorialStage===stage) speakTutorialMascot(stage,true);
+    },1200);
+    return;
+  }
+
+  tutorialMascotSpeechStage=stage;
   try{
-    window.speechSynthesis.cancel();
+    speech.cancel();
     const utterance=new SpeechSynthesisUtterance(text);
     utterance.lang="en-CA";
-    // Prefer an available higher-quality English voice, avoiding the default
-    // if a more natural installed voice is available on the user's system.
-    const voices=window.speechSynthesis.getVoices();
     const english=voices.filter(voice=>/^en([_-]|$)/i.test(voice.lang||""));
     const qualityScore=voice=>{
       const name=voice.name||"";
       let score=0;
-      if(/natural|neural|online|premium/i.test(name)) score+=100;
-      if(/samantha|jenny|aria|ava|guy|daniel|google us english|microsoft/i.test(name)) score+=50;
-      if(/en[-_]CA/i.test(voice.lang||"")) score+=12;
-      if(/en[-_]US/i.test(voice.lang||"")) score+=10;
-      if(/espeak|festival|robot|compact/i.test(name)) score-=80;
-      if(voice.localService===false) score+=5;
+      if(/neural|natural|online|premium/i.test(name)) score+=160;
+      if(/aria|jenny|ava|samantha|daniel|guy|sonia|libby|james|google.*english|microsoft.*(natural|online)/i.test(name)) score+=80;
+      if(/en[-_]CA/i.test(voice.lang||"")) score+=20;
+      else if(/en[-_]US/i.test(voice.lang||"")) score+=12;
+      if(/espeak|festival|flite|robot|compact/i.test(name)) score-=140;
+      if(voice.localService===false) score+=8;
       return score;
     };
     english.sort((a,b)=>qualityScore(b)-qualityScore(a));
-    if(english[0]) utterance.voice=english[0];
-    utterance.rate=.94;
-    utterance.pitch=1.10;
-    utterance.volume=.68;
-    window.speechSynthesis.speak(utterance);
+    // Prefer a recognizable natural voice where available. If the only
+    // installed voice is robotic, leave voice unset so the browser can choose
+    // its best default instead of forcing that voice on every utterance.
+    if(english[0] && qualityScore(english[0])>-60) utterance.voice=english[0];
+    utterance.rate=.90;
+    utterance.pitch=1.02;
+    utterance.volume=.66;
+    speech.speak(utterance);
   }catch(error){
     console.debug("[DeepSeeker] Tutorial voice unavailable:",error);
   }
@@ -425,7 +479,6 @@ function updateTutorialMascot(dt){
 
   tutorialMascotTime+=dt;
   tutorialMascotSpeechTimer=Math.max(0,tutorialMascotSpeechTimer-dt);
-
   const shouldShow=
     gameStarted &&
     !houseMode &&
@@ -442,10 +495,9 @@ function updateTutorialMascot(dt){
   }
 
   tutorialMascotRoot.visible=true;
-  // Stay perched a little above the left-hand model geometry.
   tutorialMascotRoot.position.set(
     -.235,
-    -.30+Math.sin(tutorialMascotTime*2.0)*.006,
+    -.29+Math.sin(tutorialMascotTime*2.1)*.006,
     -.86
   );
 
@@ -454,17 +506,15 @@ function updateTutorialMascot(dt){
     (tutorialMascotSpeechStage===houseTutorialStage && tutorialMascotTime%2.8<.34);
   if(tutorialMascotMouth){
     tutorialMascotMouth.scale.y=talkActive
-      ? .8+Math.abs(Math.sin(tutorialMascotTime*10))*.3
+      ? .8+Math.abs(Math.sin(tutorialMascotTime*8))*.22
       : 1;
   }
-
   if(tutorialMascotSpeechStage!==houseTutorialStage){
     speakTutorialMascot(houseTutorialStage);
     tutorialMascotSpeechTimer=1.7;
   }
 
-  const pulse=.99+Math.sin(tutorialMascotTime*3.2)*.012;
-  tutorialMascotRoot.scale.setScalar(pulse);
+  tutorialMascotRoot.scale.setScalar(.99+Math.sin(tutorialMascotTime*3.0)*.01);
 }
 
 function clearTutorialOpenRoomGeometry(){

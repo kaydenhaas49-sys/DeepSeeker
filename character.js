@@ -442,58 +442,46 @@ function vertexArmWeight(skinnedMesh,vertexIndex,armBoneIndices){
 function collectArmBoneIndices(source, armRoot){
   const bones=source.skeleton?.bones || [];
   const indices=new Set();
-
-  // Start with named arm/hand bones and all children of any named upper-arm bone.
-  bones.forEach((bone,index)=>{
-    if(isArmBoneName(bone.name)) indices.add(index);
-  });
-
-  const upperArms=[
-    findBoneByNameParts(armRoot,["mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"]),
-    findBoneByNameParts(armRoot,["mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"])
-  ];
-  for(let i=0;i<upperArms.length;i++){
-    if(!upperArms[i]) upperArms[i]=findArmBoneByHierarchy(armRoot,i===0?"left":"right");
-  }
-  for(const upper of upperArms){
-    if(!upper) continue;
-    upper.traverse(obj=>{
+  const addBranch=(seed)=>{
+    if(!seed) return;
+    seed.traverse(obj=>{
       if(!obj.isBone) return;
       const index=bones.indexOf(obj);
       if(index>=0) indices.add(index);
     });
-  }
+  };
 
-  // Always check spatial bone positions too. Some rigs name the forearms but
-  // not the upper arms; previously one name match skipped shoulder discovery.
-  if(armRoot){
-    armRoot.updateMatrixWorld(true);
-    const inverseRoot=armRoot.matrixWorld.clone().invert();
-    const centralBones=bones.filter(bone=>/(hips|pelvis|spine|torso|root)/i.test(bone.name));
-    const centerXs=centralBones.map(bone=>
-      bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot).x
-    );
-    centerXs.sort((a,b)=>a-b);
-    const centerX=centerXs.length ? centerXs[Math.floor(centerXs.length/2)] : 0;
+  // Named upper-arm roots are the cleanest option: their child chains contain
+  // the forearms and hands without picking up chest/torso skin weights.
+  const namedUpper=[
+    findBoneByNameParts(armRoot,["mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"]),
+    findBoneByNameParts(armRoot,["mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"])
+  ];
+  for(const upper of namedUpper) addBranch(upper);
 
-    // The asset is normalized to about 1.8 m tall. Include lateral bones
-    // above the hips, plus their descendants, so custom-named hands are kept.
-    const lateralBones=[];
-    bones.forEach((bone,index)=>{
-      const position=bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot);
-      if(position.y>=.52 && position.y<=1.72 && Math.abs(position.x-centerX)>.14){
-        indices.add(index);
-        lateralBones.push(bone);
-      }
-    });
-    for(const lateral of lateralBones){
-      lateral.traverse(obj=>{
-        if(!obj.isBone) return;
-        const index=bones.indexOf(obj);
-        if(index>=0) indices.add(index);
-      });
+  // Some GLBs only name the wrists/forearms. If a named upper-arm branch is
+  // unavailable on a side, find that side's best lateral bone and walk upward
+  // only until the torso/root, then include that limb branch.
+  const centralName=/(hips|pelvis|spine|torso|chest|neck|head|armature|skeleton|^root$)/i;
+  for(let sideIndex=0;sideIndex<2;sideIndex++){
+    if(namedUpper[sideIndex]) continue;
+    const side=sideIndex===0?"left":"right";
+    let seed=findArmBoneByHierarchy(armRoot,side);
+    if(!seed) continue;
+    let limbRoot=seed;
+    let parent=limbRoot.parent;
+    while(parent?.isBone && !centralName.test(parent.name||"")){
+      limbRoot=parent;
+      parent=parent.parent;
     }
+    addBranch(limbRoot);
   }
+
+  // Keep any explicitly named arm/hand bones whose chains are not connected
+  // in the imported hierarchy.
+  bones.forEach((bone,index)=>{
+    if(isArmBoneName(bone.name)) indices.add(index);
+  });
 
   return indices;
 }
@@ -615,13 +603,15 @@ function applyFirstPersonArmPose(root){
     "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
   ]) || getBoneChild(rightUpper);
 
-  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(-.34,-.34,-.88).normalize());
-  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(.34,-.34,-.88).normalize());
+  // The cloned rig faces the camera after its 180-degree Y rotation. Mirror
+  // the slight side offsets so the two real arms extend forward in parallel.
+  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(.10,-.06,-.99).normalize());
+  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(-.10,-.06,-.99).normalize());
 
   root.updateMatrixWorld(true);
 
-  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(.04,-.12,-.99).normalize());
-  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(-.04,-.12,-.99).normalize());
+  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(.03,-.035,-.999).normalize());
+  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(-.03,-.035,-.999).normalize());
 
   root.updateMatrixWorld(true);
 }
@@ -732,9 +722,11 @@ export function createFirstPersonArms(model){
       );
       const namedLooseArm=meshNameLooksLikeArm(source) && !canWeightFilter;
       const spatialArm=isNearModelArmRegion(rawPoints);
+      // If usable skin weights exist, never mix in spatial torso triangles.
+      // The spatial crop is strictly a fallback for rigs with no usable arm weights.
       const keep=filterByArmWeights
-        ? (weightedArm || spatialArm || namedLooseArm)
-        : true;
+        ? (canWeightFilter ? weightedArm : (spatialArm || namedLooseArm))
+        : spatialArm;
       if(!keep) continue;
 
       for(let k=0;k<3;k++){
@@ -808,6 +800,26 @@ export function createFirstPersonArms(model){
 
   // The primary extraction already uses arm bone weights, explicit arm mesh
   // names, and a geometric T-pose fallback on the original model triangles.
+  // Require enough triangles to form real sleeve surfaces. A handful of
+  // skin-weight matches are fragments, not arms, so replace those with the
+  // original model's shoulder/arm silhouette rather than displaying fragments.
+  const MIN_ARM_TRIANGLES=160;
+  if(armTriangleCount<MIN_ARM_TRIANGLES){
+    for(const child of [...viewmodel.children]){
+      viewmodel.remove(child);
+      if(child.isMesh && child.geometry) child.geometry.dispose();
+    }
+    armBounds.makeEmpty();
+    armTriangleCount=0;
+    sourceArmMeshCount=0;
+    rig.updateMatrixWorld(true);
+    rig.traverse(obj=>{
+      if(!obj.isSkinnedMesh || !obj.geometry) return;
+      const cropped=buildBakedArmMesh(obj,false);
+      if(cropped) viewmodel.add(cropped);
+    });
+  }
+
   // Keep the actual model's scale/orientation but center its posed arm surfaces
   // on the lower part of the camera view, like a first-person model.
   viewmodel.quaternion.copy(rig.quaternion);
