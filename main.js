@@ -4515,7 +4515,7 @@ player.hands.visible=true;
 const spiderEntity=new THREE.Group();
 spiderEntity.name="SpiderEntity";
 spiderEntity.visible=false;
-const spiderRevealLight=new THREE.PointLight(0xff7a38,0,18,1.6);
+const spiderRevealLight=new THREE.PointLight(0xff160f,0,42,1.45);
 spiderRevealLight.position.set(0,1.2,0);
 spiderEntity.add(spiderRevealLight);
 
@@ -4852,6 +4852,13 @@ function tutorialSpiderHitboxDistance(worldX,worldZ){
 }
 
 function fitSpiderModel(model){
+  // Use the same neutral root orientation and origin as the tutorial clone.
+  // The gameplay instance keeps its full-size scale, but not the source
+  // wrapper's stray offset or rotation.
+  model.position.set(0,0,0);
+  model.rotation.set(0,0,0);
+  model.updateMatrixWorld(true);
+
   const rawBox=new THREE.Box3().setFromObject(model);
   const rawSize=rawBox.getSize(new THREE.Vector3());
   const maxDimension=Math.max(rawSize.x,rawSize.y,rawSize.z);
@@ -4860,9 +4867,8 @@ function fitSpiderModel(model){
     throw new Error("Spider model has invalid or empty bounds.");
   }
 
-  // This is intentionally the only transform applied to the imported model.
-  // Preserve the asset's authored position/rotation/scale ratios and only
-  // multiply its existing scale to reach the gameplay target size.
+  // Normalize scale after matching the tutorial's root transform. Keep the
+  // imported geometry, textures and skeleton intact.
   const scaleFactor=SPIDER_TARGET_SPAN/maxDimension;
   model.scale.multiplyScalar(scaleFactor);
   model.updateMatrixWorld(true);
@@ -4889,7 +4895,7 @@ function setSpiderAnimation(name){
 
   if(!action || !actualName || spiderAnimationState===actualName) return;
 
-  const timeScale=name==="runby" ? 1.8 : 1;
+  const timeScale=name==="runby" ? 1.8 : name==="chase" ? 1.12 : 1;
   const transitionActions=(actions)=>{
     for(const [key,item] of actions){
       if(key===actualName){
@@ -5501,7 +5507,7 @@ function startSpiderRush(){
   spiderEntity.visible=true;
   spiderVisibleToPlayer=true;
   spiderRevealLight.visible=true;
-  spiderRevealLight.intensity=4.5;
+  spiderRevealLight.intensity=4.2;
   setSpiderAnimation("chase");
   pulse=1;
   audio.scare();
@@ -6365,15 +6371,8 @@ function finishSpiderModel(model,animations,sourceName){
   visualRoot.visible=true;
   visualRoot.add(model);
 
-  // Intentional overlapping duplicate: recreates the layered two-spider look
-  // in normal Backrooms encounters. It lives under the same visibility root,
-  // so wall occlusion and arachnophobia-mode swapping apply to both together.
-  const spiderOverlapEcho=SkeletonUtils.clone(model);
-  spiderOverlapEcho.name="SpiderOverlapEcho";
-  spiderOverlapEcho.visible=true;
-  visualRoot.add(spiderOverlapEcho);
-
-  model.updateMatrixWorld(true);
+  // Use one copy of the same imported rig used by the tutorial. The old
+  // overlapping duplicate made the silhouette look doubled and muddy.  model.updateMatrixWorld(true);
   const placedBounds=new THREE.Box3().setFromObject(model);
   const placedCenter=placedBounds.getCenter(new THREE.Vector3());
   const placedMinY=placedBounds.min.y;
@@ -8143,7 +8142,7 @@ function animate(){
     }
   
     spiderRevealLight.intensity=(!houseMode && spiderActive && spiderVisibleToPlayer)
-      ? (spiderJumpscareTimer>0 ? 5.0 : 2.8)
+      ? (spiderJumpscareTimer>0 ? 5.0 : 4.2)
       : 0;
   
     if(spiderActive && !houseMode && multiplayer.isWorldAuthority()){
