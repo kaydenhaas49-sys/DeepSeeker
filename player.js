@@ -1,7 +1,7 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
-import { createHazmatCharacter, createFirstPersonArms } from "./character.js";
+import { createHazmatCharacter } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -12,6 +12,256 @@ const ACCEL = 12; // velocity smoothing (per second)
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const JUMP_SPEED = 3.2;
 const JUMP_GRAVITY = 20;
+
+
+function makeFirstPersonArmMesh(group, geometry, material, name, renderOrder=2000){
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.name=name;
+  mesh.renderOrder=renderOrder;
+  mesh.frustumCulled=false;
+  mesh.castShadow=false;
+  mesh.receiveShadow=false;
+  group.add(mesh);
+  return mesh;
+}
+
+function makeFirstPersonSegment(group,start,end,radiusStart,radiusEnd,material,name,renderOrder=2000){
+  const direction=end.clone().sub(start);
+  const length=direction.length();
+  if(length<0.001) return null;
+  const mesh=makeFirstPersonArmMesh(
+    group,
+    new THREE.CylinderGeometry(radiusEnd,radiusStart,length,12,1,false),
+    material,
+    name,
+    renderOrder
+  );
+  mesh.position.copy(start).add(end).multiplyScalar(.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
+  return mesh;
+}
+
+function makeFirstPersonGloveSphere(group,position,scale,material,name){
+  const mesh=makeFirstPersonArmMesh(
+    group,
+    new THREE.SphereGeometry(1,12,8),
+    material,
+    name
+  );
+  mesh.position.copy(position);
+  mesh.scale.set(scale.x,scale.y,scale.z);
+  return mesh;
+}
+
+function makeFirstPersonArmBand(group,position,direction,radius,material,name){
+  const mesh=makeFirstPersonArmMesh(
+    group,
+    new THREE.TorusGeometry(radius,.008,6,16),
+    material,
+    name
+  );
+  mesh.position.copy(position);
+  mesh.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0,0,1),
+    direction.clone().normalize()
+  );
+  return mesh;
+}
+
+function makeLocalFirstPersonArms(group){
+  // Camera-only meshes: these never enter the replicated player state or the
+  // world-space avatar, so other players can never see these viewmodel arms.
+  const suit=new THREE.MeshStandardMaterial({
+    color:0xaaa078, roughness:.92, metalness:0,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+  });
+  const suitShade=new THREE.MeshStandardMaterial({
+    color:0x89815d, roughness:.95, metalness:0,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+  });
+  const hazardBand=new THREE.MeshStandardMaterial({
+    color:0xc2bd78, roughness:.78, metalness:.02,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+  });
+  const glove=new THREE.MeshStandardMaterial({
+    color:0x292f2b, roughness:.88, metalness:.02,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+  });
+  const gloveSeam=new THREE.MeshStandardMaterial({
+    color:0x50574d, roughness:.95, metalness:0,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+  });
+  const arms=[
+    {
+      side:-1,
+      shoulder:new THREE.Vector3(-.78,-.25,-.30),
+      elbow:new THREE.Vector3(-.49,-.43,-.65),
+      wrist:new THREE.Vector3(-.28,-.59,-.99)
+    },
+    {
+      side:1,
+      shoulder:new THREE.Vector3(.78,-.25,-.30),
+      elbow:new THREE.Vector3(.49,-.42,-.63),
+      wrist:new THREE.Vector3(.29,-.58,-.96)
+    }
+  ];
+
+  for(const arm of arms){
+    const {side,shoulder,elbow,wrist}=arm;
+    const upperDirection=elbow.clone().sub(shoulder).normalize();
+    const forearmDirection=wrist.clone().sub(elbow).normalize();
+
+    makeFirstPersonSegment(group,shoulder,elbow,.125,.105,suit,"HazmatUpperSleeve");
+    makeFirstPersonSegment(group,elbow,wrist,.105,.076,suit,"HazmatForearmSleeve");
+    makeFirstPersonGloveSphere(
+      group,
+      elbow,
+      new THREE.Vector3(.105,.105,.105),
+      suitShade,
+      "HazmatElbowSeam"
+    );
+    makeFirstPersonArmBand(
+      group,
+      elbow.clone().lerp(wrist,.035),
+      forearmDirection,
+      .097,
+      hazardBand,
+      "HazmatElbowReflectiveBand"
+    );
+    makeFirstPersonArmBand(
+      group,
+      wrist.clone().addScaledVector(forearmDirection,-.045),
+      forearmDirection,
+      .079,
+      hazardBand,
+      "HazmatWristCuff"
+    );
+    makeFirstPersonArmBand(
+      group,
+      shoulder.clone().lerp(elbow,.78),
+      upperDirection,
+      .108,
+      suitShade,
+      "HazmatSleeveSeam"
+    );
+
+    const palm=wrist.clone().add(new THREE.Vector3(-side*.008,-.035,-.065));
+    makeFirstPersonGloveSphere(
+      group,
+      palm,
+      new THREE.Vector3(.079,.064,.108),
+      glove,
+      side<0?"LeftGlovePalm":"RightGlovePalm"
+    );
+
+    // Four rounded fingers point forward, with a separate thumb on the inside.
+    for(let finger=0;finger<4;finger++){
+      const offset=(finger-1.5)*.033;
+      const start=new THREE.Vector3(
+        palm.x+offset,
+        palm.y-.008+Math.abs(finger-1.5)*.003,
+        palm.z-.045
+      );
+      const end=new THREE.Vector3(
+        palm.x+offset*1.08,
+        palm.y-.014+Math.abs(finger-1.5)*.004,
+        palm.z-.145-(finger===1||finger===2?.012:0)
+      );
+      makeFirstPersonSegment(
+        group,start,end,.019,.014,glove,
+        (side<0?"Left":"Right")+"GloveFinger"+finger
+      );
+      makeFirstPersonGloveSphere(
+        group,end,
+        new THREE.Vector3(.014,.014,.016),
+        glove,
+        (side<0?"Left":"Right")+"GloveFingertip"+finger
+      );
+    }
+
+    const thumbStart=new THREE.Vector3(
+      palm.x-side*.052,
+      palm.y+.015,
+      palm.z-.012
+    );
+    const thumbEnd=new THREE.Vector3(
+      palm.x-side*.092,
+      palm.y+.035,
+      palm.z-.105
+    );
+    makeFirstPersonSegment(
+      group,thumbStart,thumbEnd,.027,.021,glove,
+      side<0?"LeftGloveThumb":"RightGloveThumb"
+    );
+    makeFirstPersonGloveSphere(
+      group,thumbEnd,
+      new THREE.Vector3(.021,.022,.022),
+      glove,
+      side<0?"LeftGloveThumbTip":"RightGloveThumbTip"
+    );
+  }
+
+  // A small flashlight sits in the right glove. Its lens is exposed so the
+  // game's battery/on-off state can change its glow without affecting remotes.
+  const flashlight=new THREE.Group();
+  flashlight.name="LocalFirstPersonFlashlight";
+  flashlight.position.set(.295,-.585,-1.015);
+  flashlight.rotation.set(THREE.MathUtils.degToRad(-2),0,THREE.MathUtils.degToRad(-2));
+  group.add(flashlight);
+
+  const metal=new THREE.MeshStandardMaterial({
+    color:0x252923, roughness:.55, metalness:.34,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false,
+    emissive:0x000000, emissiveIntensity:.08
+  });
+  const trim=new THREE.MeshStandardMaterial({
+    color:0x626451, roughness:.4, metalness:.55,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+  });
+  const lensMaterial=new THREE.MeshStandardMaterial({
+    color:0x514f40, emissive:0x514f40, emissiveIntensity:.08,
+    roughness:.28, metalness:.03,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+  });
+  const body=makeFirstPersonArmMesh(
+    flashlight,new THREE.CylinderGeometry(.043,.05,.36,12),
+    metal,"LocalFlashlightBody",2010
+  );
+  body.rotation.x=Math.PI/2;
+  const head=makeFirstPersonArmMesh(
+    flashlight,new THREE.CylinderGeometry(.067,.05,.105,12),
+    metal,"LocalFlashlightHead",2010
+  );
+  head.rotation.x=Math.PI/2;
+  head.position.z=-.225;
+  const bezel=makeFirstPersonArmMesh(
+    flashlight,new THREE.TorusGeometry(.067,.008,6,16),
+    trim,"LocalFlashlightBezel",2010
+  );
+  bezel.rotation.x=Math.PI/2;
+  bezel.position.z=-.281;
+  const lens=makeFirstPersonArmMesh(
+    flashlight,new THREE.CylinderGeometry(.052,.052,.012,12),
+    lensMaterial,"FlashlightLens",2011
+  );
+  lens.rotation.x=Math.PI/2;
+  lens.position.z=-.286;
+  const rear=makeFirstPersonArmMesh(
+    flashlight,new THREE.CylinderGeometry(.047,.047,.025,12),
+    trim,"LocalFlashlightRearCap",2010
+  );
+  rear.rotation.x=Math.PI/2;
+  rear.position.z=.19;
+
+  group.traverse(obj=>{
+    if(obj.isMesh){
+      obj.frustumCulled=false;
+      obj.castShadow=false;
+      obj.receiveShadow=false;
+    }
+  });
+  return lens;
+}
 
 export class Player {
   constructor(camera, domElement, world) {
@@ -147,8 +397,9 @@ export class Player {
     this.hands.renderOrder = 2999;
     this.camera.add(this.hands);
 
-    // First-person hands are built from the real skinned hazmat model once
-    // it loads. Never draw handmade placeholder arms over the actual rig.
+    // Real-time camera-local sleeves and gloves render immediately and never
+    // enter the full-body character model used by multiplayer.
+    this.proceduralArmFlashlightLens=makeLocalFirstPersonArms(this.hands);
 
     this.characterModel = null;
     this.characterMixer = null;
@@ -188,29 +439,11 @@ export class Player {
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
-      // Use the model's own skinned arm/hand geometry. No handmade arms are
-      // added if extraction fails; log the rig issue rather than hiding it.
-      const actualArmsInstalled=this.installActualArmViewmodel(character.model);
-      if(!actualArmsInstalled){
-        console.error("[DeepSeeker] Actual hazmat arm viewmodel could not be installed.");
-      }
+      // First-person arms are our separate camera-local hazmat viewmodel.
+      // Keep the asset's flashlight hidden with the non-rendered local avatar.
       this.hands.visible=true;
       this.hands.renderOrder=2999;
-
-      // Keep the full model for the world avatar. Its separate flashlight
-      // remains hidden; the cloned first-person rig holds its own copy.
-      if(this.characterFlashlight){
-        this.characterFlashlight.parent?.remove(this.characterFlashlight);
-        this.camera.add(this.characterFlashlight);
-        this.characterFlashlight.visible=false;
-        this.characterFlashlight.position.set(.30,-.22,-.58);
-        this.characterFlashlight.rotation.set(
-          THREE.MathUtils.degToRad(-4),
-          THREE.MathUtils.degToRad(-4),
-          THREE.MathUtils.degToRad(2)
-        );
-        this.characterFlashlight.renderOrder=1100;
-      }
+      if(this.characterFlashlight) this.characterFlashlight.visible=false;
 
       this.worldAvatar.add(character.model);
       this.characterLoaded = true;
@@ -228,86 +461,6 @@ export class Player {
     }
   }
 
-  installActualArmViewmodel(sourceModel){
-    let viewmodel=null;
-    try{
-      viewmodel=createFirstPersonArms(sourceModel);
-    }catch(error){
-      console.warn("[DeepSeeker] Could not build first-person arms from hazmat rig:",error);
-      return false;
-    }
-    if(!viewmodel) return false;
-
-    let visibleMeshCount=0;
-    viewmodel.traverse(obj=>{
-      if(obj.isMesh && obj.visible) visibleMeshCount++;
-    });
-    const extractedArmMeshCount=Number(viewmodel.userData.extractedArmMeshCount)||0;
-    // Mesh visibility is filtered by actual arm vertex weights or explicit
-    // arm-mesh names. A model may ship the arms as separate ordinary meshes
-    // rather than one combined skinned mesh, so either valid path is accepted.
-    const extractedArmTriangleCount=Number(viewmodel.userData.extractedArmTriangleCount)||0;
-    if(visibleMeshCount===0 || extractedArmTriangleCount===0){
-      console.error("[DeepSeeker] No real arm triangles were extracted from the hazmat rig.",{
-        extractedArmMeshCount,
-        extractedArmTriangleCount,
-        visibleMeshCount
-      });
-      return false;
-    }
-
-    viewmodel.name="FirstPersonActualHazmatArms";
-    viewmodel.traverse(obj=>{
-      if(!obj.isMesh) return;
-      obj.frustumCulled=false;
-      obj.castShadow=false;
-      obj.receiveShadow=false;
-      obj.renderOrder=2000;
-      const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
-      for(const material of materials){
-        if(!material) continue;
-        // First-person sleeves should stay readable even when they overlap
-        // nearby scenery, like a conventional FPS viewmodel.
-        material.depthTest=false;
-        material.depthWrite=false;
-        material.needsUpdate=true;
-      }
-    });
-
-    // The character utility attaches a real flashlight to the rig's right-hand
-    // bone. Reveal that copy inside the cloned arm rig so the hand holds it.
-    const heldFlashlight=viewmodel.getObjectByName("HeldFlashlight");
-    if(heldFlashlight){
-      heldFlashlight.visible=true;
-      heldFlashlight.traverse(obj=>{
-        if(!obj.isMesh) return;
-        obj.visible=true;
-        obj.frustumCulled=false;
-        obj.renderOrder=2010;
-        const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
-        for(const material of materials){
-          if(!material) continue;
-          material.depthTest=false;
-          material.depthWrite=false;
-          material.needsUpdate=true;
-        }
-      });
-    }
-
-    this.actualArmFlashlightLens=viewmodel.getObjectByName("FlashlightLens") || null;
-    this.actualArmViewmodel=viewmodel;
-    this.hands.add(viewmodel);
-    this.hands.visible=true;
-
-    console.log("[DeepSeeker] using actual hazmat arms",{
-      extractedArmMeshCount,
-      visibleMeshCount,
-      flashlightFound:!!heldFlashlight
-    });
-    return true;
-  }
-
-
   setFlashlightVisual(on){
     const updateLens=(lens)=>{
       if(!lens?.material) return;
@@ -316,10 +469,9 @@ export class Player {
     };
 
     updateLens(this.characterFlashlightLens);
-    updateLens(this.actualArmFlashlightLens);
+    updateLens(this.proceduralArmFlashlightLens);
 
-    // The source model's separate flashlight is never used for first-person;
-    // the copy attached to the skinned right hand is the visible one.
+    // The hidden world-space rig never supplies first-person rendering.
     if(this.characterFlashlight) this.characterFlashlight.visible=false;
   }
 
