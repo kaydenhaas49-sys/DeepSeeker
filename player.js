@@ -1,7 +1,7 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { EYE, WALL_H } from "./world.js";
-import { createHazmatCharacter, createFirstPersonArms, attachFlashlight } from "./character.js";
+import { createHazmatCharacter } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -141,8 +141,13 @@ export class Player {
     // the camera; multiplayer renders the same full-body model.
     this.hands = new THREE.Group();
     this.hands.name = "PlayerCharacterRoot";
-    this.hands.visible = false;
+    this.hands.visible = true;
+    this.hands.renderOrder = 2999;
     this.camera.add(this.hands);
+
+    // Create camera-local hazmat sleeves/gloves immediately. First-person
+    // visibility must not depend on the imported character's skinning data.
+    this.ensureFallbackArmViewmodel();
 
     this.characterModel = null;
     this.characterMixer = null;
@@ -179,44 +184,11 @@ export class Player {
       this.characterMixer = character.mixer;
       this.characterFlashlight = character.flashlight;
 
-      const firstPersonArms=createFirstPersonArms(character.model);
-      firstPersonArms.scale.setScalar(1.02);
-      const extractedArmMeshCount=Number(firstPersonArms.userData?.extractedArmMeshCount)||0;
-
-      // Some GLB exports combine the suit into one mesh and expose no usable
-      // arm weights. In that case, use the built-in hazmat sleeves/gloves
-      // instead of leaving the player with no visible first-person arms.
-      if(extractedArmMeshCount===0){
-        firstPersonArms.visible=false;
-        this.ensureFallbackArmViewmodel();
-      }else if(this.fallbackArmViewmodel){
-        this.fallbackArmViewmodel.visible=false;
-      }
-
-      // The visible prop belongs to the actual cloned right-hand bone.
-      // A camera-mounted flashlight is already used when the GLB has no arm bones.
-      const firstPersonFlashlight=extractedArmMeshCount>0
-        ? attachFlashlight(firstPersonArms)
-        : null;
-      if(firstPersonFlashlight){
-        firstPersonFlashlight.visible=true;
-        firstPersonFlashlight.renderOrder=2100;
-        firstPersonFlashlight.scale.setScalar(1.05);
-        firstPersonFlashlight.traverse(obj=>{
-          if(!obj.isMesh) return;
-          obj.renderOrder=2100;
-          obj.frustumCulled=false;
-          if(obj.material){
-            obj.material.depthTest=false;
-            obj.material.depthWrite=false;
-            obj.material.needsUpdate=true;
-          }
-        });
-      }
-
-      this.hands.add(firstPersonArms);
+      // Keep the guaranteed camera-local viewmodel instead of relying on the
+      // imported arm mesh, whose skinning/export origin has been unreliable.
+      this.ensureFallbackArmViewmodel();
       this.hands.visible=true;
-      this.hands.renderOrder=1999;
+      this.hands.renderOrder=2999;
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
@@ -260,64 +232,63 @@ export class Player {
     const root=new THREE.Group();
     root.name="FallbackFirstPersonHazmatArms";
 
-    const suitMaterial=new THREE.MeshStandardMaterial({
-      color:0xaaa584,
-      roughness:.94,
-      metalness:0,
+    const suitMaterial=new THREE.MeshBasicMaterial({
+      color:0xc5bd91,
       depthTest:false,
-      depthWrite:false
+      depthWrite:false,
+      toneMapped:false
     });
-    const gloveMaterial=new THREE.MeshStandardMaterial({
-      color:0x30372f,
-      roughness:.88,
-      metalness:.04,
+    const gloveMaterial=new THREE.MeshBasicMaterial({
+      color:0x343a30,
       depthTest:false,
-      depthWrite:false
+      depthWrite:false,
+      toneMapped:false
     });
-    const cuffMaterial=new THREE.MeshStandardMaterial({
-      color:0x44483a,
-      roughness:.86,
+    const cuffMaterial=new THREE.MeshBasicMaterial({
+      color:0x646447,
       depthTest:false,
-      depthWrite:false
+      depthWrite:false,
+      toneMapped:false
     });
     const safetyStripeMaterial=new THREE.MeshBasicMaterial({
-      color:0xb7ad63,
+      color:0xe1d47d,
       depthTest:false,
-      depthWrite:false
+      depthWrite:false,
+      toneMapped:false
     });
 
     const addArm=(side,x,y,z,rotationZ)=>{
       const arm=new THREE.Group();
       arm.position.set(x,y,z);
-      arm.rotation.set(-.52,0,rotationZ);
+      arm.rotation.set(-.28,0,rotationZ);
 
       const sleeve=new THREE.Mesh(
-        new THREE.CapsuleGeometry(.087,.34,3,8),
+        new THREE.CapsuleGeometry(.078,.30,3,8),
         suitMaterial
       );
       sleeve.name=side+"HazmatSleeve";
       arm.add(sleeve);
 
       const cuff=new THREE.Mesh(
-        new THREE.CylinderGeometry(.091,.091,.055,10),
+        new THREE.CylinderGeometry(.082,.082,.045,10),
         cuffMaterial
       );
-      cuff.position.y=-.145;
+      cuff.position.y=-.135;
       arm.add(cuff);
 
       const safetyBand=new THREE.Mesh(
         new THREE.CylinderGeometry(.093,.093,.018,10),
         safetyStripeMaterial
       );
-      safetyBand.position.y=-.125;
+      safetyBand.position.y=-.12;
       arm.add(safetyBand);
 
       const glove=new THREE.Mesh(
-        new THREE.SphereGeometry(.105,10,8),
+        new THREE.SphereGeometry(.092,12,9),
         gloveMaterial
       );
       glove.scale.set(.98,.82,1.12);
-      glove.position.set(0,-.225,-.085);
+      glove.position.set(0,-.205,-.115);
       arm.add(glove);
 
       const thumb=new THREE.Mesh(
@@ -325,19 +296,22 @@ export class Player {
         gloveMaterial
       );
       thumb.scale.set(.8,1.1,1.25);
-      thumb.position.set(side==="left" ? .075 : -.075,-.205,-.105);
+      thumb.position.set(side==="left" ? .07 : -.07,-.19,-.13);
       arm.add(thumb);
 
       root.add(arm);
     };
 
-    addArm("left",-1,-.49,-.52,.34);
-    addArm("right",1,-.42,-.50,-.30);
+    // Camera-local coordinates keep both forearms and gloves inside the view
+    // frustum; the previous x=±1 placement put them beyond the screen edges.
+    addArm("left",-.31,-.29,-.66,.38);
+    addArm("right",.31,-.29,-.66,-.38);
 
     root.traverse(obj=>{
       if(!obj.isMesh) return;
+      obj.visible=true;
       obj.frustumCulled=false;
-      obj.renderOrder=2000;
+      obj.renderOrder=3000;
       obj.castShadow=false;
       obj.receiveShadow=false;
     });
