@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { SignalStalkerRig } from "./signalStalker.js";
 
 /**
  * SpiderHunter
@@ -18,6 +19,7 @@ export class SpiderHunter {
     isBlocked = () => false,
     getOccluders = () => [],
     hasLineOfSight = null,
+    getVisualHitboxDistance = null,
     onStateChange = () => {},
   }) {
     this.group = group;
@@ -27,6 +29,7 @@ export class SpiderHunter {
     this.isBlocked = isBlocked;
     this.getOccluders = getOccluders;
     this.externalLineOfSight = hasLineOfSight;
+    this.getVisualHitboxDistance = getVisualHitboxDistance;
     this.onStateChange = onStateChange;
 
     this.mode = "hidden";
@@ -46,141 +49,20 @@ export class SpiderHunter {
     this.pathCell = 1.15;
     this.pathRadiusCells = 7;
     this.pathReplan = 0.30;
-    this.catchDistance = 1.1;
+    this.catchDistance = 0.90;
+    this.activationDistance = 7.5;
     this.sightRange = 24;
     this.sightFov = Math.PI * 0.82;
     this.hearSprintRange = 13;
     this.hearFlashlightRange = 9;
 
-    this.legMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0a0808,
-      roughness: 0.82,
-      metalness: 0.08,
-      flatShading: true,
-    });
-    this.bodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0x121010,
-      roughness: 0.72,
-      metalness: 0.12,
-      flatShading: true,
-    });
-    this.eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xff321e });
-    this.underMaterial = new THREE.MeshStandardMaterial({
-      color: 0x050404,
-      roughness: 0.95,
-      flatShading: true,
-    });
-
-    this.legs = [];
-    this.buildVisual();
-
+    this.visualRig = new SignalStalkerRig();
+    this.visualRig.root.visible = false;
+    this.group.add(this.visualRig.root);
     this.group.visible = false;
     this.group.userData.spiderHunter = this;
   }
 
-  buildVisual() {
-    const abdomen = new THREE.Mesh(
-      new THREE.SphereGeometry(0.72, 14, 9),
-      this.bodyMaterial
-    );
-    abdomen.name = "SpiderAbdomen";
-    abdomen.scale.set(1.18, 0.86, 1.34);
-    abdomen.position.set(0, 0.58, 0.20);
-    abdomen.castShadow = true;
-
-    const abdomenTop = new THREE.Mesh(
-      new THREE.SphereGeometry(0.46, 12, 8),
-      this.bodyMaterial
-    );
-    abdomenTop.name = "SpiderBackPlate";
-    abdomenTop.scale.set(1.05, 0.55, 1.28);
-    abdomenTop.position.set(0, 0.76, 0.15);
-    abdomenTop.castShadow = true;
-
-    const thorax = new THREE.Mesh(
-      new THREE.SphereGeometry(0.48, 12, 8),
-      this.bodyMaterial
-    );
-    thorax.name = "SpiderThorax";
-    thorax.scale.set(1.12, 0.72, 1.18);
-    thorax.position.set(0, 0.50, -0.53);
-    thorax.castShadow = true;
-
-    const underside = new THREE.Mesh(
-      new THREE.SphereGeometry(0.43, 12, 7),
-      this.underMaterial
-    );
-    underside.scale.set(1.06, 0.52, 1.14);
-    underside.position.set(0, 0.30, -0.12);
-
-    this.group.add(abdomen, abdomenTop, thorax, underside);
-
-    const eyePositions = [
-      [-0.16, 0.61, -0.96, 0.052],
-      [0.16, 0.61, -0.96, 0.052],
-      [-0.30, 0.55, -0.89, 0.034],
-      [0.30, 0.55, -0.89, 0.034],
-      [-0.40, 0.48, -0.79, 0.026],
-      [0.40, 0.48, -0.79, 0.026],
-      [-0.10, 0.44, -0.91, 0.022],
-      [0.10, 0.44, -0.91, 0.022],
-    ];
-    for (const [x, y, z, r] of eyePositions) {
-      const eye = new THREE.Mesh(
-        new THREE.SphereGeometry(r, 7, 5),
-        this.eyeMaterial
-      );
-      eye.position.set(x, y, z);
-      eye.userData.spiderEye = true;
-      this.group.add(eye);
-    }
-
-    const fangGeo = new THREE.ConeGeometry(0.065, 0.30, 7);
-    for (const x of [-0.14, 0.14]) {
-      const fang = new THREE.Mesh(fangGeo, this.underMaterial);
-      fang.position.set(x, 0.31, -0.96);
-      fang.rotation.x = Math.PI;
-      this.group.add(fang);
-    }
-
-    const hipRows = [-0.62, -0.23, 0.18, 0.58];
-    for (let row = 0; row < hipRows.length; row++) {
-      for (const side of [-1, 1]) {
-        const upper = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.060, 0.085, 1, 6),
-          this.legMaterial
-        );
-        const lower = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.047, 0.065, 1, 6),
-          this.legMaterial
-        );
-        const joint = new THREE.Mesh(
-          new THREE.SphereGeometry(0.082, 7, 5),
-          this.legMaterial
-        );
-
-        upper.castShadow = lower.castShadow = joint.castShadow = true;
-        this.group.add(upper, lower, joint);
-
-        const frontBias = row < 2 ? -0.10 : 0.12;
-        const footZ = hipRows[row] + frontBias;
-        const reach = 1.15 + (row === 0 ? 0.16 : row === 3 ? -0.02 : 0);
-
-        this.legs.push({
-          side,
-          row,
-          hipLocal: new THREE.Vector3(0.32 * side, 0.43, hipRows[row]),
-          footBase: new THREE.Vector3(reach * side, 0.045, footZ),
-          upper,
-          lower,
-          joint,
-          phase: (row * 1.72 + (side > 0 ? 0 : Math.PI)) % (Math.PI * 2),
-          foot: new THREE.Vector3(),
-          prevFoot: new THREE.Vector3(),
-        });
-      }
-    }
-  }
   setMode(mode) {
     if (this.mode === mode) return;
     this.mode = mode;
@@ -192,12 +74,27 @@ export class SpiderHunter {
   hide() {
     this.setMode("hidden");
     this.group.visible = false;
+    this.visualRig.root.visible = false;
     this.speed = 0;
     this.tutorialTime = 0;
     this.chaseStarted = false;
     this.position.y = 0.02;
     this.group.rotation.x = 0;
     this.group.rotation.z = 0;
+    this.visualRig.setFrozen(true);
+  }
+
+  distanceToHitbox(x, z) {
+    if (typeof this.getVisualHitboxDistance === "function") {
+      const distance = this.getVisualHitboxDistance(x, z);
+      if (Number.isFinite(distance)) return distance;
+    }
+    return this.visualRig.distanceToHitbox(x, z);
+  }
+
+  intersectsHitbox(x, z, padding = 0) {
+    return this.group.visible && this.mode !== "hidden" &&
+      this.distanceToHitbox(x, z) <= Math.max(0, padding);
   }
 
   prepareTutorial(position, lookAtPosition) {
@@ -209,9 +106,16 @@ export class SpiderHunter {
     this.tutorialTime = 0;
     this.tutorialStatic = true;
     this.chaseStarted = false;
+    this.visualRig.setFrozen(true);
     this.lastKnownTarget.copy(lookAtPosition);
-    this.faceToward(lookAtPosition, 1);
+    const dx = lookAtPosition.x - this.position.x;
+    const dz = lookAtPosition.z - this.position.z;
+    if (Math.hypot(dx, dz) > 0.001) {
+      this.facing = Math.atan2(dx, dz);
+      this.group.rotation.y = this.facing;
+    }
     this.setMode("roam");
+    this.visualRig.root.visible = true;
     this.group.visible = true;
     this.speed = 0;
     return true;
@@ -220,10 +124,12 @@ export class SpiderHunter {
   beginChase() {
     this.tutorialStatic = false;
     this.chaseStarted = true;
+    this.visualRig.setFrozen(false);
     this.tutorialTime = 0;
     this.path.length = 0;
     this.pathIndex = 0;
     this.setMode("hunt");
+    this.visualRig.root.visible = true;
     this.group.visible = true;
   }
 
@@ -235,16 +141,12 @@ export class SpiderHunter {
     this.tutorialTime += dt;
     const dx = target.pos.x - this.position.x;
     const dz = target.pos.z - this.position.z;
-    const distance = Math.hypot(dx, dz);
+    const distanceToSurface = this.distanceToHitbox(target.pos.x, target.pos.z);
 
     if (!this.chaseStarted) {
+      // Absolutely still until the player approaches the real creature shape.
       this.speed = 0;
-      this.faceToward(
-        new THREE.Vector3(target.pos.x, this.position.y, target.pos.z),
-        10
-      );
-      this.animateLegs(dt, 0);
-      if (distance <= 5.2) {
+      if (distanceToSurface <= this.activationDistance) {
         this.beginChase();
         return { triggered: true, finished: false };
       }
@@ -252,17 +154,17 @@ export class SpiderHunter {
     }
 
     const finished =
-      distance <= this.catchDistance || this.tutorialTime >= 3.25;
+      distanceToSurface <= this.catchDistance || this.tutorialTime >= 7.0;
     if (finished) {
       return { triggered: false, finished: true };
     }
 
     this.lastKnownTarget.set(target.pos.x, 0, target.pos.z);
 
-    const moved = this.tryDirectSteering(dt, target.pos.x, target.pos.z, 5.5);
+    const moved = this.tryDirectSteering(dt, target.pos.x, target.pos.z, 6.0);
     if (!moved) {
       this.updatePath(dt, target.pos.x, target.pos.z);
-      this.followPath(dt, 5.5);
+      this.followPath(dt, 6.0);
     }
 
     const remainingDx = target.pos.x - this.position.x;
@@ -275,7 +177,7 @@ export class SpiderHunter {
       );
     }
 
-    this.animateLegs(dt, 5.5);
+    this.animateLegs(dt, 6.0);
     return { triggered: false, finished: false };
   }
 
@@ -585,61 +487,13 @@ export class SpiderHunter {
   }
 
   animateLegs(dt, moveSpeed) {
-    const moving = moveSpeed > 0.15;
-    this.walkPhase += dt * (moving ? 5.6 + moveSpeed * 1.15 : 0.8);
-
-    const bodyBob = moving
-      ? Math.sin(this.walkPhase * 2) * 0.018
-      : Math.sin(this.walkPhase * 0.7) * 0.006;
-
-    this.group.position.y = 0.02 + bodyBob;
-    this.group.rotation.x = moving ? Math.sin(this.walkPhase * 0.5) * 0.035 : 0;
-    this.group.rotation.z = moving ? Math.sin(this.walkPhase) * 0.018 : 0;
-
-    for (let i = 0; i < this.legs.length; i++) {
-      const leg = this.legs[i];
-      const phase = this.walkPhase + leg.phase;
-      const stride = moving ? Math.sin(phase) * 0.11 : Math.sin(phase) * 0.015;
-      const lift = moving ? Math.max(0, Math.sin(phase)) * 0.08 : 0.015;
-
-      const footLocal = leg.footBase.clone();
-      footLocal.z += stride * (leg.row < 2 ? -1 : 1);
-      footLocal.x += Math.sin(phase * 0.5 + leg.row) * 0.025 * leg.side;
-      footLocal.y = 0.04 + lift;
-
-      leg.prevFoot.copy(leg.foot);
-      leg.foot.copy(footLocal);
-
-      const hip = leg.hipLocal.clone();
-      const knee = footLocal.clone();
-      const outward = Math.sign(footLocal.x || leg.side) * 0.13;
-      knee.x = (hip.x + footLocal.x) * 0.5 + outward;
-      knee.y = 0.28 + Math.sin(phase) * 0.035;
-      knee.z = (hip.z + footLocal.z) * 0.5;
-
-      this.placeLimb(leg.upper, hip, knee);
-      this.placeLimb(leg.lower, knee, footLocal);
-      leg.joint.position.copy(knee);
-    }
-  }
-
-  placeLimb(mesh, a, b) {
-    const delta = b.clone().sub(a);
-    const length = delta.length();
-    mesh.position.copy(a.clone().add(b).multiplyScalar(0.5));
-    mesh.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      delta.normalize()
-    );
-    mesh.scale.set(1, Math.max(0.001, length), 1);
+    this.visualRig.update(dt, moveSpeed, this.mode);
+    this.group.position.y = 0.02;
   }
 
   step(dt) {
     this._lastDt = dt;
-    this.group.updateMatrixWorld();
-    for (const leg of this.legs) {
-      leg.upper.updateMatrixWorld();
-      leg.lower.updateMatrixWorld();
-    }
+    this.visualRig.root.updateMatrixWorld(true);
+    this.group.updateMatrixWorld(true);
   }
 }

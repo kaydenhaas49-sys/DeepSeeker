@@ -1266,6 +1266,33 @@ let menuSpiderActual=null;
 let menuSpiderMixer=null;
 let menuSpiderLoadRequested=false;
 
+function stopSpiderOverlapAnimation(){
+  const echo=spiderOriginalModel?.getObjectByName("SpiderOverlapEcho");
+  if(spiderOverlapMixer){
+    spiderOverlapMixer.stopAllAction();
+    if(echo) spiderOverlapMixer.uncacheRoot(echo);
+  }
+  spiderOverlapMixer=null;
+  spiderOverlapActions.clear();
+}
+
+function rebuildSpiderOverlapAnimation(){
+  stopSpiderOverlapAnimation();
+  if(arachnophobiaMode || !spiderOriginalModel || !spiderAnimationClips.size) return;
+
+  const echo=spiderOriginalModel.getObjectByName("SpiderOverlapEcho");
+  if(!echo) return;
+
+  spiderOverlapMixer=new THREE.AnimationMixer(echo);
+  for(const [name,clip] of spiderAnimationClips){
+    const action=spiderOverlapMixer.clipAction(clip);
+    const oneShot=name.startsWith("die") || name.startsWith("attack");
+    action.setLoop(oneShot ? THREE.LoopOnce : THREE.LoopRepeat,oneShot ? 1 : Infinity);
+    if(oneShot) action.clampWhenFinished=true;
+    spiderOverlapActions.set(name,action);
+  }
+}
+
 function applyArachnophobiaVisual(){
   if(!spiderOriginalModel) return;
 
@@ -1274,7 +1301,9 @@ function applyArachnophobiaVisual(){
   }
 
   spiderActions.clear();
+  spiderMixer?.stopAllAction();
   spiderMixer=null;
+  stopSpiderOverlapAnimation();
   spiderAnimationState="";
 
   if(arachnophobiaMode){
@@ -1307,6 +1336,7 @@ function applyArachnophobiaVisual(){
       if(oneShot) action.clampWhenFinished=true;
       spiderActions.set(name,action);
     }
+    rebuildSpiderOverlapAnimation();
     setSpiderAnimation(spiderWantedState);
   }
 
@@ -1318,6 +1348,7 @@ function applyArachnophobiaVisual(){
     );
   }
 
+  syncTutorialSpiderFromGameplayModel(true);
   syncMenuSpiderFromGameplayModel();
 }
 
@@ -1483,7 +1514,9 @@ function updateMenuScene(t,dt){
   if(!menuSpiderActual){
     if(!menuSpiderLoadRequested){
       menuSpiderLoadRequested=true;
-      loadSpiderFromPack();
+      // Share the guarded loader with gameplay so the menu and game cannot
+      // start two concurrent imports of the same spider rig.
+      ensureSpiderLoading(true);
     }
   }else if(arachnophobiaMode){
     // In arachnophobia mode the spider is replaced by a harmless biscuit image.
@@ -4516,11 +4549,20 @@ spiderEntity.add(spiderRevealLight);
 
 scene.add(spiderEntity);
 
+const tutorialSpiderEntity=new THREE.Group();
+tutorialSpiderEntity.name="TutorialSignalStalkerEntity";
+tutorialSpiderEntity.visible=false;
+const tutorialSpiderRevealLight=new THREE.PointLight(0xff160f,0,42,1.45);
+tutorialSpiderRevealLight.position.set(0,1.3,0);
+tutorialSpiderEntity.add(tutorialSpiderRevealLight);
+scene.add(tutorialSpiderEntity);
+
 const spiderHunter=new SpiderHunter({
-  group:spiderEntity,
+  group:tutorialSpiderEntity,
   scene,
   world,
   player,
+  getVisualHitboxDistance:(x,z)=>tutorialSpiderHitboxDistance(x,z),
   isBlocked:(x,z)=>{
     if(tutorialOpenRoomActive){
       for(const box of tutorialOpenRoomCollisionBoxes){
@@ -4528,7 +4570,7 @@ const spiderHunter=new SpiderHunter({
         const nz=Math.max(box.minZ,Math.min(z,box.maxZ));
         const dx=x-nx;
         const dz=z-nz;
-        if(dx*dx+dz*dz<=0.68*0.68) return true;
+        if(dx*dx+dz*dz<=1.4*1.4) return true;
       }
       return false;
     }
@@ -4546,10 +4588,18 @@ const spiderHunter=new SpiderHunter({
   getOccluders:()=>tutorialOpenRoomActive ? tutorialOpenRoomOccluders : world.root.children,
   onStateChange:(mode)=>{
     if(mode==="hunt" && !arachnophobiaMode){
-      spiderRevealLight.intensity=4.2;
+      tutorialSpiderRevealLight.intensity=4.2;
     }
   }
 });
+
+// Keep the tutorial spider collision tight around its body. Its long legs
+// stay visual-only, so they do not block the player from too far away.
+player.extraCollisionTests.push((x,z)=>
+  tutorialOpenRoomActive &&
+  tutorialSpiderEntity.visible &&
+  spiderHunter.intersectsHitbox(x,z,0.75)
+);
 
 let spiderLoaded=false;
 let spiderLoadStarted=false;
@@ -4558,7 +4608,9 @@ let spiderRetryTimer=null;
 let spiderModel=null;
 let spiderModelHalfHeight=0;
 let spiderMixer=null;
+let spiderOverlapMixer=null;
 const spiderActions=new Map();
+const spiderOverlapActions=new Map();
 const spiderAnimationClips=new Map();
 let spiderAnimationState="";
 let spiderWantedState="idle";
@@ -4568,6 +4620,8 @@ let spiderAttackPlayed=false;
 let spiderActive=false;
 let spiderSpawnPending=false;
 let spiderJumpscareTimer=0;
+let spiderCaughtFreezeTimer=0;
+let spiderCaughtPlayerPosition=new THREE.Vector3();
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
 let spiderJumpscareScale=1;
@@ -4578,6 +4632,10 @@ let spiderAutoLookStarted=false;
 let spiderChaseDuration=5;
 let spiderOriginalModel=null;
 let funnyDuckModel=null;
+let tutorialSpiderActual=null;
+let tutorialSpiderMixer=null;
+let tutorialSpiderWalkAction=null;
+let tutorialSpiderUsesDuck=false;
 let spiderVisibleToPlayer=true;
 let spiderRunbyStart=new THREE.Vector3();
 let spiderRunbyTarget=new THREE.Vector3();
@@ -4596,7 +4654,9 @@ const SPIDER_RUNBY_DURATION=3.2;
 const SPIDER_POUNCE_DURATION=.58;
 const SPIDER_POUNCE_HEIGHT=1.15;
 const SPIDER_SPEED=2.65;
-const SPIDER_ATTACK_RANGE=1.6;
+const SPIDER_ATTACK_RANGE=2.5;
+const SPIDER_HITBOX_PADDING=0.85;
+const SPIDER_CAUGHT_FREEZE_TIME=1.35;
 const SPIDER_CHASE_MIN_TIME=5.0;
 const SPIDER_CHASE_MAX_TIME=8.0;
 const SPIDER_CHASE_SPEED=3.8;
@@ -4606,7 +4666,7 @@ const SPIDER_RADIUS=.68;
 const SPIDER_MIN_SPAWN_DISTANCE=13;
 const SPIDER_MAX_SPAWN_DISTANCE=21;
 const SPIDER_GROUND_OFFSET=.08;
-const SPIDER_TARGET_SPAN=6.2;
+const SPIDER_TARGET_SPAN=8.2;
 
 const SPIDER_PATH_CELL_SIZE=LOW_END_PERFORMANCE?1.8:1.35;
 const SPIDER_PATH_GRID_SIZE=LOW_END_PERFORMANCE?19:31;
@@ -4642,6 +4702,175 @@ const SPIDER_ANIMATION_ALIAS={
   death:"die1"
 };
 
+
+function stopTutorialSpiderAnimation(){
+  if(tutorialSpiderMixer){
+    tutorialSpiderMixer.stopAllAction();
+    if(tutorialSpiderActual){
+      tutorialSpiderMixer.uncacheRoot(tutorialSpiderActual);
+    }
+  }
+  tutorialSpiderMixer=null;
+  tutorialSpiderWalkAction=null;
+}
+
+function startTutorialSpiderAnimation(){
+  if(!tutorialSpiderActual || arachnophobiaMode || !spiderAnimationClips.size) return;
+
+  const walkClip=
+    spiderAnimationClips.get("walk") ||
+    spiderAnimationClips.get("idle1") ||
+    spiderAnimationClips.get("idle2");
+
+  if(!walkClip) return;
+  stopTutorialSpiderAnimation();
+  tutorialSpiderMixer=new THREE.AnimationMixer(tutorialSpiderActual);
+  tutorialSpiderWalkAction=tutorialSpiderMixer.clipAction(walkClip);
+  tutorialSpiderWalkAction.reset();
+  tutorialSpiderWalkAction.setLoop(THREE.LoopRepeat,Infinity);
+  tutorialSpiderWalkAction.setEffectiveTimeScale(1.12);
+  tutorialSpiderWalkAction.play();
+}
+
+function applyTutorialSpiderMaterialPass(model,{darken=true}={}){
+  const copiedMaterials=new Map();
+
+  const darkenMaterial=(original,meshName)=>{
+    if(!original) return original;
+    if(copiedMaterials.has(original)) return copiedMaterials.get(original);
+
+    // Preserve the downloaded model's maps while layering on a darker,
+    // subtly glossy chitin finish. No gameplay materials are shared or mutated.
+    const material=original.isMeshStandardMaterial
+      ? new THREE.MeshPhysicalMaterial().copy(original)
+      : original.clone();
+    const label=(String(meshName||"")+" "+String(original.name||"")).toLowerCase();
+    const eyeLike=/(eye|optic|pupil)/.test(label);
+    const furLike=/(hair|fur|bristle|seta)/.test(label);
+
+    if(darken && material.color){
+      const tint=eyeLike
+        ? new THREE.Color(0.42,0.16,0.17)
+        : furLike
+          ? new THREE.Color(0.36,0.27,0.24)
+          : new THREE.Color(0.48,0.36,0.33);
+      material.color.multiply(tint);
+    }
+    if(darken && typeof material.roughness==="number"){
+      material.roughness=THREE.MathUtils.clamp(
+        material.roughness*(eyeLike ? 0.7 : 0.82),
+        eyeLike ? 0.16 : 0.30,
+        0.78
+      );
+    }
+    if(darken && typeof material.metalness==="number"){
+      material.metalness=Math.min(material.metalness,0.045);
+    }
+    if(darken && "clearcoat" in material){
+      material.clearcoat=Math.max(Number(material.clearcoat)||0,eyeLike ? 0.38 : 0.22);
+      material.clearcoatRoughness=Math.min(
+        Number.isFinite(material.clearcoatRoughness) ? material.clearcoatRoughness : 0.4,
+        eyeLike ? 0.09 : 0.34
+      );
+    }
+    if(darken && material.emissive) material.emissive.multiplyScalar(0.16);
+    if(darken && typeof material.emissiveIntensity==="number"){
+      material.emissiveIntensity=Math.min(material.emissiveIntensity,0.16);
+    }
+    material.needsUpdate=true;
+    copiedMaterials.set(original,material);
+    return material;
+  };
+
+  model.traverse(node=>{
+    if(!node.isMesh || !node.material) return;
+    node.material=Array.isArray(node.material)
+      ? node.material.map(material=>darkenMaterial(material,node.name))
+      : darkenMaterial(node.material,node.name);
+    node.castShadow=true;
+    node.receiveShadow=true;
+  });
+}
+
+function syncTutorialSpiderFromGameplayModel(force=false){
+  // Clone whichever visual the main spider currently uses, so the tutorial
+  // respects the harmless duck toggle and never shares live bones/materials.
+  const sourceEntity=arachnophobiaMode
+    ? (funnyDuckModel || (funnyDuckModel=createFunnyDuckEntity()))
+    : spiderOriginalModel;
+  if(!sourceEntity) return false;
+
+  if(
+    tutorialSpiderActual &&
+    !force &&
+    tutorialSpiderUsesDuck===Boolean(arachnophobiaMode)
+  ){
+    const shouldShow=Boolean(houseTutorialSpiderPrepared && tutorialOpenRoomActive);
+    tutorialSpiderActual.visible=shouldShow;
+    spiderHunter.visualRig.root.visible=!shouldShow;
+    return true;
+  }
+
+  stopTutorialSpiderAnimation();
+  if(tutorialSpiderActual?.parent){
+    tutorialSpiderEntity.remove(tutorialSpiderActual);
+  }
+
+  const sourceModel=
+    sourceEntity.getObjectByName("SpiderSource") ||
+    sourceEntity.children[0] ||
+    sourceEntity;
+  tutorialSpiderActual=SkeletonUtils.clone(sourceModel);
+  tutorialSpiderActual.name=arachnophobiaMode
+    ? "TutorialHarmlessDuck"
+    : "TutorialSpiderPsionic";
+  tutorialSpiderActual.visible=false;
+  tutorialSpiderActual.position.set(0,0,0);
+  tutorialSpiderActual.rotation.set(0,0,0);
+  // The imported spider is normalized to 6.2 world units; keep the tutorial
+  // spider under 0.75 units across so it appears much smaller in the room.
+  tutorialSpiderActual.scale.setScalar(arachnophobiaMode ? MENU_DUCK_SCALE : 0.12);
+
+  tutorialSpiderActual.updateMatrixWorld(true);
+  if(!arachnophobiaMode){
+    // The original gameplay wrapper supplies centering and floor placement.
+    // Recreate those transforms locally on this independent tutorial clone.
+    const bounds=new THREE.Box3().setFromObject(tutorialSpiderActual);
+    if(Number.isFinite(bounds.min.y) && Number.isFinite(bounds.max.y)){
+      const center=bounds.getCenter(new THREE.Vector3());
+      tutorialSpiderActual.position.x-=center.x;
+      tutorialSpiderActual.position.y-=bounds.min.y;
+      tutorialSpiderActual.position.z-=center.z;
+    }
+    applyTutorialSpiderMaterialPass(tutorialSpiderActual,{darken:false});
+  }
+
+  tutorialSpiderActual.updateMatrixWorld(true);
+  tutorialSpiderEntity.add(tutorialSpiderActual);
+  tutorialSpiderUsesDuck=Boolean(arachnophobiaMode);
+
+  const shouldShow=Boolean(houseTutorialSpiderPrepared && tutorialOpenRoomActive);
+  tutorialSpiderActual.visible=shouldShow;
+  spiderHunter.visualRig.root.visible=!shouldShow;
+
+  if(shouldShow && houseTutorialSpiderState==="chase" && !arachnophobiaMode){
+    startTutorialSpiderAnimation();
+  }
+  return true;
+}
+
+function tutorialSpiderHitboxDistance(worldX,worldZ){
+  // The body is the collision target; long articulated legs are visual only.
+  // This avoids the oversized empty area inside the model's bounding box.
+  if(!tutorialSpiderActual || !tutorialSpiderActual.visible){
+    return spiderHunter.visualRig.distanceToHitbox(worldX,worldZ);
+  }
+
+  const bodyRadius=1.1;
+  const dx=worldX-tutorialSpiderEntity.position.x;
+  const dz=worldZ-tutorialSpiderEntity.position.z;
+  return Math.max(0,Math.hypot(dx,dz)-bodyRadius);
+}
 
 function fitSpiderModel(model){
   const rawBox=new THREE.Box3().setFromObject(model);
@@ -4682,17 +4911,21 @@ function setSpiderAnimation(name){
   if(!action || !actualName || spiderAnimationState===actualName) return;
 
   const timeScale=name==="runby" ? 1.8 : 1;
-  for(const [key,item] of spiderActions){
-    if(key===actualName){
-      item.reset();
-      item.setEffectiveTimeScale(timeScale);
-      item.fadeIn(.06);
-      item.play();
-    }else{
-      item.setEffectiveTimeScale(1);
-      item.fadeOut(.06);
+  const transitionActions=(actions)=>{
+    for(const [key,item] of actions){
+      if(key===actualName){
+        item.reset();
+        item.setEffectiveTimeScale(timeScale);
+        item.fadeIn(.06);
+        item.play();
+      }else{
+        item.setEffectiveTimeScale(1);
+        item.fadeOut(.06);
+      }
     }
-  }
+  };
+  transitionActions(spiderActions);
+  transitionActions(spiderOverlapActions);
   spiderAnimationState=actualName;
 }
 
@@ -4751,18 +4984,18 @@ const spiderSightRaycaster=new THREE.Raycaster();
 const spiderSightOrigin=new THREE.Vector3();
 const spiderSightTarget=new THREE.Vector3();
 
-function playerHasLineOfSightToSpider(){
-  const dx=spiderEntity.position.x-camera.position.x;
-  const dz=spiderEntity.position.z-camera.position.z;
+function playerHasLineOfSightToSpider(entity=spiderEntity){
+  const dx=entity.position.x-camera.position.x;
+  const dz=entity.position.z-camera.position.z;
   const distance=Math.hypot(dx,dz);
 
-  if(distance<.25) return false;
-
+  // Use the full 3D ray even when the spider is horizontally very close;
+  // the old shortcut could hide it incorrectly during a close-up catch.
   spiderSightOrigin.copy(camera.position);
   spiderSightTarget.set(
-    spiderEntity.position.x,
-    spiderEntity.position.y+.8,
-    spiderEntity.position.z
+    entity.position.x,
+    entity.position.y+.8,
+    entity.position.z
   );
 
   const direction=spiderSightTarget.clone().sub(spiderSightOrigin);
@@ -4771,11 +5004,13 @@ function playerHasLineOfSightToSpider(){
 
   direction.normalize();
   spiderSightRaycaster.set(spiderSightOrigin,direction);
-  spiderSightRaycaster.far=Math.min(140,Math.max(0,length-.15));
+  spiderSightRaycaster.far=Math.min(140,Math.max(0,length-.03));
 
+  // Raycast against actual wall meshes, not the whole scene root. This makes
+  // occlusion depend on Backrooms walls and tutorial room blockers explicitly.
   const occluders=tutorialOpenRoomActive
     ? tutorialOpenRoomOccluders
-    : world.root.children;
+    : (world.wallOccluders?.length ? world.wallOccluders : world.root.children);
   const hits=spiderSightRaycaster.intersectObjects(occluders,true);
   return hits.length===0;
 }
@@ -4805,7 +5040,7 @@ function houseTutorialSpiderSegmentClear(ax,az,bx,bz){
 
 function houseTutorialSpiderCanBeSeen(){
   if(!houseTutorialSpiderPrepared) return false;
-  return playerHasLineOfSightToSpider();
+  return playerHasLineOfSightToSpider(tutorialSpiderEntity);
 }
 
 function hideHouseTutorialSpider(){
@@ -4813,8 +5048,10 @@ function hideHouseTutorialSpider(){
   houseTutorialSpiderTime=0;
   houseTutorialSpiderStuckTime=0;
   houseTutorialSpiderPrepared=false;
+  if(tutorialSpiderActual) tutorialSpiderActual.visible=false;
+  stopTutorialSpiderAnimation();
   spiderHunter.hide();
-  spiderRevealLight.visible=false;
+  tutorialSpiderRevealLight.visible=false;
 }
 
 function resetHouseTutorial(){
@@ -4862,7 +5099,7 @@ function prepareHouseTutorialSpider(){
       const nz=Math.max(box.minZ,Math.min(candidate.z,box.maxZ));
       const dx=candidate.x-nx;
       const dz=candidate.z-nz;
-      if(dx*dx+dz*dz<=0.68*0.68){
+      if(dx*dx+dz*dz<=1.4*1.4){
         blocked=true;
         break;
       }
@@ -4889,15 +5126,22 @@ function prepareHouseTutorialSpider(){
   if(!spiderHunter.prepareTutorial(position,lookTarget)){
     return false;
   }
+  syncTutorialSpiderFromGameplayModel();
 
-  if(spiderModel) spiderModel.visible=false;
-  spiderEntity.visible=true;
-  spiderRevealLight.visible=true;
-  spiderRevealLight.intensity=1.1;
+  // Dedicated tutorial group prevents the old Backrooms mesh stacking here.
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  tutorialSpiderEntity.visible=true;
+  tutorialSpiderRevealLight.visible=true;
+  tutorialSpiderRevealLight.intensity=1.1;
   houseTutorialSpiderPrepared=true;
   houseTutorialSpiderState="static";
   houseTutorialSpiderTime=0;
   houseTutorialSpiderStuckTime=0;
+  if(tutorialSpiderActual){
+    tutorialSpiderActual.visible=true;
+    spiderHunter.visualRig.root.visible=false;
+  }
   return true;
 }
 
@@ -5030,10 +5274,16 @@ function startHouseTutorialSpiderChase(){
   houseTutorialSpiderTime=0;
   houseTutorialSpiderStuckTime=0;
   spiderHunter.beginChase();
-  if(spiderModel) spiderModel.visible=false;
-  spiderEntity.visible=true;
-  spiderRevealLight.visible=true;
-  spiderRevealLight.intensity=4.2;
+  if(tutorialSpiderActual){
+    tutorialSpiderActual.visible=true;
+    spiderHunter.visualRig.root.visible=false;
+    startTutorialSpiderAnimation();
+  }
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  tutorialSpiderEntity.visible=true;
+  tutorialSpiderRevealLight.visible=true;
+  tutorialSpiderRevealLight.intensity=4.2;
   pulse=.8;
 
   if(arachnophobiaMode){
@@ -5111,10 +5361,11 @@ function updateHouseTutorialSpider(dt){
     return;
   }
 
-  if(spiderModel) spiderModel.visible=false;
-  spiderEntity.visible=true;
-  spiderRevealLight.visible=houseTutorialSpiderState==="chase";
-  spiderRevealLight.intensity=houseTutorialSpiderState==="chase" ? 4.2 : 1.1;
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  tutorialSpiderEntity.visible=true;
+  tutorialSpiderRevealLight.visible=houseTutorialSpiderState==="chase";
+  tutorialSpiderRevealLight.intensity=houseTutorialSpiderState==="chase" ? 4.2 : 1.1;
 }
 
 function rotatePlayerTowardSpider(dt){
@@ -5516,7 +5767,7 @@ function moveSpiderTowardPlayer(dt){
   const dz=player.pos.z-spiderEntity.position.z;
   const distance=Math.hypot(dx,dz);
 
-  if(distance<=SPIDER_ATTACK_RANGE){
+  if(distance<=SPIDER_ATTACK_RANGE || normalSpiderHitboxTouchesPlayer()){
     return distance;
   }
 
@@ -5731,7 +5982,65 @@ function startSpiderJumpscare(){
   eventText.style.opacity="1";
 }
 
+function normalSpiderHitboxDistanceTo(worldX,worldZ){
+  if(!spiderModel){
+    return Math.max(
+      0,
+      Math.hypot(worldX-spiderEntity.position.x,worldZ-spiderEntity.position.z)-
+        SPIDER_TARGET_SPAN*.3
+    );
+  }
+
+  spiderEntity.updateMatrixWorld(true);
+  const bounds=new THREE.Box3().setFromObject(spiderModel);
+  if(
+    !Number.isFinite(bounds.min.x) ||
+    !Number.isFinite(bounds.max.x) ||
+    !Number.isFinite(bounds.min.z) ||
+    !Number.isFinite(bounds.max.z)
+  ){
+    return Math.max(
+      0,
+      Math.hypot(worldX-spiderEntity.position.x,worldZ-spiderEntity.position.z)-
+        SPIDER_TARGET_SPAN*.3
+    );
+  }
+
+  const closestX=THREE.MathUtils.clamp(worldX,bounds.min.x,bounds.max.x);
+  const closestZ=THREE.MathUtils.clamp(worldZ,bounds.min.z,bounds.max.z);
+  return Math.hypot(worldX-closestX,worldZ-closestZ);
+}
+
+function normalSpiderHitboxTouchesPlayer(){
+  return normalSpiderHitboxDistanceTo(player.pos.x,player.pos.z)<=SPIDER_HITBOX_PADDING;
+}
+
+function startSpiderCatchFreeze(){
+  spiderCaughtFreezeTimer=SPIDER_CAUGHT_FREEZE_TIME;
+  spiderCaughtPlayerPosition.copy(player.pos);
+  player.movementFrozen=true;
+  player.keys.clear();
+  player.vel.set(0,0,0);
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  spiderJumpscareTimer=0;
+  spiderBehaviorState="caught";
+  spiderBehaviorTime=0;
+  spiderEntity.position.y=SPIDER_GROUND_OFFSET;
+  spiderEntity.rotation.x=0;
+  spiderEntity.rotation.y=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
+  setSpiderAnimation("attack");
+  pulse=1;
+  eventText.textContent=arachnophobiaMode ? "CAUGHT. QUACK." : "IT GOT YOU.";
+  eventText.style.opacity="1";
+}
+
 function resetPlayerAfterSpiderCatch(){
+  player.movementFrozen=false;
+  spiderCaughtFreezeTimer=0;
   const teammate=multiplayer.getClosestBackroomsPlayerPosition(
     player.pos.x,
     player.pos.z
@@ -6055,15 +6364,35 @@ function finishSpiderModel(model,animations,sourceName){
     throw new Error("Spider model has zero or invalid bounds.");
   }
 
-  // Only scale the imported model. Do not alter its materials, geometry,
-  // skeleton, rotation, authored local transforms, or visibility beyond
-  // making the existing mesh objects visible.
+  // Normal Backrooms and tutorial use the same imported rig. Match the
+  // tutorial's darker chitin finish in normal gameplay too, without changing
+  // the model's authored proportions or skeleton.
+  applyTutorialSpiderMaterialPass(model);
   fitSpiderModel(model);
+
+  // Stop both rigs before replacing the current model tree.
+  spiderMixer?.stopAllAction();
+  spiderMixer=null;
+  stopSpiderOverlapAnimation();
+
+  // A menu/gameplay load race must not leave an older full-size rig attached
+  // underneath the replacement. Keep exactly one normal spider model in-scene.
+  if(spiderOriginalModel?.parent===spiderEntity){
+    spiderEntity.remove(spiderOriginalModel);
+  }
 
   const visualRoot=new THREE.Group();
   visualRoot.name="SpiderVisualRoot";
   visualRoot.visible=true;
   visualRoot.add(model);
+
+  // Intentional overlapping duplicate: recreates the layered two-spider look
+  // in normal Backrooms encounters. It lives under the same visibility root,
+  // so wall occlusion and arachnophobia-mode swapping apply to both together.
+  const spiderOverlapEcho=SkeletonUtils.clone(model);
+  spiderOverlapEcho.name="SpiderOverlapEcho";
+  spiderOverlapEcho.visible=true;
+  visualRoot.add(spiderOverlapEcho);
 
   model.updateMatrixWorld(true);
   const placedBounds=new THREE.Box3().setFromObject(model);
@@ -6301,8 +6630,10 @@ function finishSpiderModel(model,animations,sourceName){
       ])
     });
 
+    rebuildSpiderOverlapAnimation();
     setSpiderAnimation(spiderWantedState);
   }else{
+    stopSpiderOverlapAnimation();
     spiderWantedState="idle";
   }
 
@@ -6315,6 +6646,7 @@ function finishSpiderModel(model,animations,sourceName){
     halfHeight:spiderModelHalfHeight
   });
 
+  syncTutorialSpiderFromGameplayModel(true);
   syncMenuSpiderFromGameplayModel();
 
   spiderLoadStarted=false;
@@ -7671,13 +8003,14 @@ function animate(){
   flashlight.target.position.set(0,0,-activeFlashlightDistance);
   if(
     spiderMixer &&
-    (
-      spiderActive ||
-      houseTutorialSpiderState==="chase"
-    )
+    spiderActive
   ){
     spiderMixer.timeScale=1;
     spiderMixer.update(dt);
+    if(spiderOverlapMixer){
+      spiderOverlapMixer.timeScale=1;
+      spiderOverlapMixer.update(dt);
+    }
 
     // Kill a bad animation immediately instead of allowing one corrupted
     // bone transform to poison every rendered frame.
@@ -7709,6 +8042,9 @@ function animate(){
       console.warn("[DeepSeeker] disabling unstable spider animation frame");
       spiderMixer.stopAllAction();
       spiderMixer=null;
+      if(spiderOverlapMixer) spiderOverlapMixer.stopAllAction();
+      spiderOverlapMixer=null;
+      spiderOverlapActions.clear();
       spiderActions.clear();
       spiderAnimationClips.clear();
       spiderAnimationState="";
@@ -7727,7 +8063,19 @@ function animate(){
       : 0;
   
     if(spiderActive && !houseMode){
-      if(spiderJumpscareTimer>0){
+      if(spiderCaughtFreezeTimer>0){
+        player.movementFrozen=true;
+        player.pos.copy(spiderCaughtPlayerPosition);
+        player.vel.set(0,0,0);
+        player.keys.clear();
+        player.jumpY=0;
+        player.jumpVelocity=0;
+        spiderCaughtFreezeTimer=Math.max(0,spiderCaughtFreezeTimer-dt);
+        if(spiderCaughtFreezeTimer<=0){
+          player.movementFrozen=false;
+          resetPlayerAfterSpiderCatch();
+        }
+      }else if(spiderJumpscareTimer>0){
         spiderJumpscareTimer=Math.max(0,spiderJumpscareTimer-dt);
         spiderBehaviorTime+=dt;
   
@@ -7762,8 +8110,8 @@ function animate(){
             player.pos.z-spiderEntity.position.z
           );
   
-          if(catchDistance<=1.35){
-            resetPlayerAfterSpiderCatch();
+          if(catchDistance<=2.5 || normalSpiderHitboxTouchesPlayer()){
+            startSpiderCatchFreeze();
           }else{
             finishSpiderJumpscare();
           }
@@ -7811,7 +8159,7 @@ function animate(){
           const inv=1/Math.max(distance,.001);
           const step=Math.min(SPIDER_RUSH_SPEED*dt,distance);
 
-          if(distance<=SPIDER_ATTACK_RANGE){
+          if(distance<=SPIDER_ATTACK_RANGE || normalSpiderHitboxTouchesPlayer()){
             startSpiderJumpscare();
           }else if(spiderBehaviorTime>=SPIDER_RUSH_DURATION){
             if(!startSpiderChase()){
@@ -7873,7 +8221,7 @@ function animate(){
           spiderRevealLight.visible=true;
           spiderRevealLight.intensity=4.2;
 
-          if(distance<=SPIDER_ATTACK_RANGE){
+          if(distance<=SPIDER_ATTACK_RANGE || normalSpiderHitboxTouchesPlayer()){
             spiderBehaviorState="attack";
             spiderBehaviorTime=0;
             spiderAttackPlayed=false;
@@ -7920,15 +8268,20 @@ function animate(){
           player.pos.z-spiderEntity.position.z
         );
   
-        // The spider already has a world-space sight test; use it as the final
-        // render gate so the model and its reveal light cannot show through walls.
-        spiderVisibleToPlayer =
-          spiderJumpscareTimer>0 || playerHasLineOfSightToSpider();
-        if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
-        spiderRevealLight.visible=spiderVisibleToPlayer;
         spiderEntity.visible=true;
       }
+
+      // Apply the same wall-occlusion check after every encounter phase,
+      // including the pounce and freeze frames, so the spider cannot render
+      // through walls in an exceptional state.
+      if(spiderActive && spiderEntity.visible){
+        spiderVisibleToPlayer=playerHasLineOfSightToSpider();
+        if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
+        spiderRevealLight.visible=spiderVisibleToPlayer;
+      }
     }else{
+      spiderCaughtFreezeTimer=0;
+      player.movementFrozen=false;
       spiderEntity.visible=false;
       spiderRevealLight.visible=false;
       spiderVisibleToPlayer=true;
@@ -7949,8 +8302,20 @@ function animate(){
   // The normal spider system is Backrooms-only. The apartment gets one
   // deliberately scripted teaching encounter on top of it.
   if(houseMode || tutorialOpenRoomActive){
+    if(tutorialOpenRoomActive){
+      spiderEntity.visible=false;
+      spiderRevealLight.visible=false;
+    }
     updateHouseTutorialSpider(dt);
     spiderHunter.step(dt);
+    if(
+      tutorialSpiderMixer &&
+      tutorialSpiderActual?.visible &&
+      houseTutorialSpiderState==="chase" &&
+      !arachnophobiaMode
+    ){
+      tutorialSpiderMixer.update(dt);
+    }
   }
 
   if(eventCooldown>0) eventCooldown-=dt;

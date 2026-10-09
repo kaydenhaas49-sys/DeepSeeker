@@ -27,6 +27,7 @@ export class Player {
     this.keys = new Set();
     this.locked = false;
     this.inputEnabled = false;
+    this.movementFrozen = false;
     this.bobPhase = 0;
     this.bobOffset = 0;
     this.fov = 70;
@@ -38,6 +39,7 @@ export class Player {
     this.jumpY = 0;
     this.jumpVelocity = 0;
     this.extraCollisionBoxes = [];
+    this.extraCollisionTests = [];
     this.sliding = false;
     this.slideTimer = 0;
     this.slideDistance = 0;
@@ -69,6 +71,13 @@ export class Player {
         target?.closest?.('input, textarea, [contenteditable="true"]');
 
       if(typingTarget) return;
+      if(this.movementFrozen){
+        this.keys.clear();
+        if(e.code.startsWith("Arrow") || /^Key[WASD]$/.test(e.code) || e.code==="Space"){
+          e.preventDefault();
+        }
+        return;
+      }
 
       if (
         e.code.startsWith("Arrow") ||
@@ -113,7 +122,7 @@ export class Player {
       this.keys.delete(e.code);
     };
     this.onMouseMove = (e) => {
-      if (!this.locked) return;
+      if (!this.locked || this.movementFrozen) return;
       this.lastLookInputAt = performance.now();
       this.yaw -= e.movementX * MOUSE_SENS;
       this.pitch -= e.movementY * MOUSE_SENS;
@@ -266,7 +275,7 @@ export class Player {
   }
 
   get movementActive() {
-    return this.locked || this.inputEnabled;
+    return !this.movementFrozen && (this.locked || this.inputEnabled);
   }
 
   get isRunning() {
@@ -274,6 +283,15 @@ export class Player {
   }
 
   update(dt) {
+    if(this.movementFrozen){
+      this.keys.clear();
+      this.vel.set(0,0,0);
+      this.jumpY=0;
+      this.jumpVelocity=0;
+      this.sliding=false;
+      this.slideTimer=0;
+    }
+
     // Keyboard movement can continue when pointer lock is unavailable, but
     // main.js disables input while menus, phones, controls, or other overlays
     // are active.
@@ -456,6 +474,10 @@ export class Player {
       const dx = x - nx;
       const dz = z - nz;
       if (dx * dx + dz * dz < r * r) return true;
+    }
+
+    for (const test of this.extraCollisionTests) {
+      if (typeof test === "function" && test(x, z)) return true;
     }
 
     return false;
