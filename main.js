@@ -292,264 +292,123 @@ tutorialMascotAimQuaternion.setFromUnitVectors(
 function createTutorialMascot(){
   if(tutorialMascotReady) return;
 
+  // Badgey is a tiny face-shaped cyan hologram perched above the left sleeve.
+  // Keep the silhouette round and friendly: no barrel, muzzle, or gun grip.
   tutorialMascotRoot=new THREE.Group();
   tutorialMascotRoot.name="BadgeyHologram";
   tutorialMascotRoot.visible=false;
-  tutorialMascotRoot.scale.setScalar(.68);
-  // Keep Badgey outside the room's disposable geometry group. Restarting a
-  // tutorial clears that group; parenting the mascot there permanently detached
-  // it while tutorialMascotReady stayed true, so it could never be recreated.
-  scene.add(tutorialMascotRoot);
+  tutorialMascotRoot.position.set(-.235,-.125,-.585);
+  player.hands.add(tutorialMascotRoot);
 
-  const bodyMaterial=new THREE.MeshStandardMaterial({
-    color:0x73f1ff,
-    roughness:.4,
-    metalness:.12,
-    emissive:0x00dfff,
-    emissiveIntensity:2.0,
+  const holoMaterial=new THREE.MeshBasicMaterial({
+    color:0x55f1ff,
     transparent:true,
-    opacity:.82,
+    opacity:.72,
+    depthTest:false,
     depthWrite:false,
     side:THREE.DoubleSide,
     blending:THREE.AdditiveBlending,
     toneMapped:false
   });
-  const darkMaterial=new THREE.MeshStandardMaterial({
-    color:0x25a5c2,
-    roughness:.45,
-    metalness:.2,
-    emissive:0x00c9ff,
-    emissiveIntensity:1.25,
+  const outlineMaterial=new THREE.MeshBasicMaterial({
+    color:0xa7fbff,
     transparent:true,
-    opacity:.72,
+    opacity:.92,
+    depthTest:false,
     depthWrite:false,
     side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending,
+    toneMapped:false
+  });
+  const faceMaterial=new THREE.MeshBasicMaterial({
+    color:0x064c65,
+    transparent:true,
+    opacity:.82,
+    depthTest:false,
+    depthWrite:false,
     blending:THREE.AdditiveBlending,
     toneMapped:false
   });
   const eyeMaterial=new THREE.MeshBasicMaterial({
     color:0xeaffff,
     transparent:true,
-    opacity:.98,
-    depthWrite:false,
-    blending:THREE.AdditiveBlending,
-    toneMapped:false
-  });
-  const mouthMaterial=new THREE.MeshBasicMaterial({
-    color:0x0fe4ff,
-    transparent:true,
-    opacity:.9,
+    opacity:1,
+    depthTest:false,
     depthWrite:false,
     blending:THREE.AdditiveBlending,
     toneMapped:false
   });
 
-  const body=new THREE.Mesh(
-    new THREE.BoxGeometry(.88,.28,.34),
-    bodyMaterial
-  );
-  body.position.set(0,0,0);
-  body.userData.tutorialOwnedGeometry=true;
-  body.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(body);
+  const addHoloMesh=(geometry,material,position,scale,rotation)=>{
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.position.set(position[0],position[1],position[2]);
+    if(scale) mesh.scale.set(scale[0],scale[1],scale[2]);
+    if(rotation) mesh.rotation.set(rotation[0]||0,rotation[1]||0,rotation[2]||0);
+    mesh.frustumCulled=false;
+    mesh.renderOrder=3010;
+    tutorialMascotRoot.add(mesh);
+    return mesh;
+  };
 
-  const bodyOutline=new THREE.LineSegments(
-    new THREE.EdgesGeometry(body.geometry),
-    new THREE.LineBasicMaterial({
-      color:0x79f7ff,
-      transparent:true,
-      opacity:.88,
-      depthTest:false,
-      depthWrite:false,
-      blending:THREE.AdditiveBlending,
-      toneMapped:false
-    })
+  // Compact rounded head with a dark face and two bright eyes.
+  const head=addHoloMesh(
+    new THREE.SphereGeometry(.067,12,10),holoMaterial,[0,0,0],[1,.88,.64]
   );
-  bodyOutline.position.copy(body.position);
-  bodyOutline.userData.tutorialOwnedGeometry=true;
-  bodyOutline.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(bodyOutline);
-
-  const top=new THREE.Mesh(
-    new THREE.BoxGeometry(.42,.16,.30),
-    darkMaterial
+  head.name="BadgeyHoloHead";
+  addHoloMesh(
+    new THREE.SphereGeometry(.047,12,9),faceMaterial,[0,.001,.040],[1,.73,.22]
   );
-  top.position.set(-.12,.21,0);
-  top.userData.tutorialOwnedGeometry=true;
-  top.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(top);
-
-  const barrel=new THREE.Mesh(
-    new THREE.CylinderGeometry(.075,.10,.62,12),
-    darkMaterial
+  addHoloMesh(
+    new THREE.SphereGeometry(.010,8,6),eyeMaterial,[-.024,.009,.057],[1,1,.6]
   );
-  barrel.rotation.z=-Math.PI/2;
-  barrel.position.set(.67,0,0);
-  barrel.userData.tutorialOwnedGeometry=true;
-  barrel.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(barrel);
-
-  const muzzle=new THREE.Mesh(
-    new THREE.TorusGeometry(.092,.025,7,14),
-    bodyMaterial
+  addHoloMesh(
+    new THREE.SphereGeometry(.010,8,6),eyeMaterial,[.024,.009,.057],[1,1,.6]
   );
-  muzzle.rotation.y=Math.PI/2;
-  muzzle.position.set(.99,0,0);
-  muzzle.userData.tutorialOwnedGeometry=true;
-  muzzle.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(muzzle);
 
-  const grip=new THREE.Mesh(
-    new THREE.BoxGeometry(.23,.55,.25),
-    darkMaterial
+  tutorialMascotMouth=addHoloMesh(
+    new THREE.SphereGeometry(.008,8,6),outlineMaterial,[0,-.020,.057],[1.35,.28,.45]
   );
-  grip.rotation.z=-.17;
-  grip.position.set(-.14,-.34,0);
-  grip.userData.tutorialOwnedGeometry=true;
-  grip.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(grip);
+  tutorialMascotMouth.name="BadgeyHoloMouth";
 
-  for(const z of [-.075,.075]){
-    const eye=new THREE.Mesh(
-      new THREE.SphereGeometry(.045,9,7),
-      eyeMaterial
+  // Little antenna and side lights make Badgey unmistakably a hovering bot.
+  addHoloMesh(
+    new THREE.CylinderGeometry(.003,.004,.035,6),outlineMaterial,[0,.081,0]
+  );
+  addHoloMesh(
+    new THREE.SphereGeometry(.010,8,6),outlineMaterial,[0,.106,0],[1,1,.8]
+  );
+  for(const x of [-.060,.060]){
+    addHoloMesh(
+      new THREE.SphereGeometry(.008,8,6),outlineMaterial,[x,-.003,.003],[1,1,.75]
     );
-    eye.position.set(-.34,.045,z);
-    eye.userData.tutorialOwnedGeometry=true;
-    eye.userData.tutorialOwnedMaterial=true;
-    tutorialMascotRoot.add(eye);
   }
 
-  tutorialMascotMouth=new THREE.Mesh(
-    new THREE.BoxGeometry(.07,.15,.065),
-    mouthMaterial
-  );
-  tutorialMascotMouth.position.set(-.35,-.055,0);
-  tutorialMascotMouth.userData.tutorialOwnedGeometry=true;
-  tutorialMascotMouth.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(tutorialMascotMouth);
+  // A small projection ring sits beneath Badgey's body, right above the sleeve.
+  const ringMaterial=outlineMaterial.clone();
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.072,.0035,5,18),ringMaterial);
+  ring.name="BadgeyProjectionRing";
+  ring.rotation.x=Math.PI/2;
+  ring.position.set(0,-.070,0);
+  ring.frustumCulled=false;
+  ring.renderOrder=3009;
+  tutorialMascotRoot.add(ring);
+  const innerRing=new THREE.Mesh(new THREE.TorusGeometry(.052,.0025,4,16),ringMaterial.clone());
+  innerRing.rotation.x=Math.PI/2;
+  innerRing.position.set(0,-.066,0);
+  innerRing.renderOrder=3009;
+  innerRing.frustumCulled=false;
+  tutorialMascotRoot.add(innerRing);
 
-  // The handheld prop no longer lives on the first-person arm. Give the
-  // talking blaster its own compact head-mounted flashlight instead.
-  tutorialMascotFlashlight=new THREE.Group();
-  tutorialMascotFlashlight.name="BlasterHeadFlashlight";
-  tutorialMascotFlashlight.position.set(1.06,.02,0);
-  tutorialMascotFlashlight.rotation.y=-Math.PI/2;
+  const glow=new THREE.PointLight(0x22eaff,.12,.35);
+  glow.position.set(0,0,.02);
+  tutorialMascotRoot.add(glow);
 
-  const flashlightBodyMaterial=new THREE.MeshStandardMaterial({
-    color:0x171917,
-    roughness:.58,
-    metalness:.35
+  tutorialMascotRoot.traverse(obj=>{
+    if(obj.isMesh){
+      obj.frustumCulled=false;
+      obj.renderOrder=obj.name==="BadgeyProjectionRing" ? 3009 : 3010;
+    }
   });
-  const flashlightRingMaterial=new THREE.MeshStandardMaterial({
-    color:0x6a695d,
-    roughness:.35,
-    metalness:.72
-  });
-  const flashlightLensMaterial=new THREE.MeshStandardMaterial({
-    color:0x9afaff,
-    emissive:0x00eaff,
-    emissiveIntensity:3.2,
-    roughness:.24,
-    metalness:.03,
-    transparent:true,
-    opacity:.9,
-    depthWrite:false,
-    blending:THREE.AdditiveBlending
-  });
-
-  const flashlightBody=new THREE.Mesh(
-    new THREE.CylinderGeometry(.047,.058,.34,10),
-    flashlightBodyMaterial
-  );
-  flashlightBody.rotation.x=Math.PI/2;
-  flashlightBody.userData.tutorialOwnedGeometry=true;
-  flashlightBody.userData.tutorialOwnedMaterial=true;
-
-  const flashlightHead=new THREE.Mesh(
-    new THREE.CylinderGeometry(.075,.055,.10,10),
-    flashlightBodyMaterial
-  );
-  flashlightHead.rotation.x=Math.PI/2;
-  flashlightHead.position.z=-.205;
-  flashlightHead.userData.tutorialOwnedGeometry=true;
-  flashlightHead.userData.tutorialOwnedMaterial=false;
-
-  const flashlightRing=new THREE.Mesh(
-    new THREE.TorusGeometry(.076,.010,6,14),
-    flashlightRingMaterial
-  );
-  flashlightRing.rotation.x=Math.PI/2;
-  flashlightRing.position.z=-.258;
-  flashlightRing.userData.tutorialOwnedGeometry=true;
-  flashlightRing.userData.tutorialOwnedMaterial=true;
-
-  tutorialMascotFlashlightLens=new THREE.Mesh(
-    new THREE.CylinderGeometry(.057,.057,.018,12),
-    flashlightLensMaterial
-  );
-  tutorialMascotFlashlightLens.name="BlasterFlashlightLens";
-  tutorialMascotFlashlightLens.rotation.x=Math.PI/2;
-  tutorialMascotFlashlightLens.position.z=-.27;
-  tutorialMascotFlashlightLens.userData.tutorialOwnedGeometry=true;
-  tutorialMascotFlashlightLens.userData.tutorialOwnedMaterial=true;
-
-  tutorialMascotFlashlight.add(
-    flashlightBody,
-    flashlightHead,
-    flashlightRing,
-    tutorialMascotFlashlightLens
-  );
-  tutorialMascotRoot.add(tutorialMascotFlashlight);
-
-  const blasterBeam=new THREE.SpotLight(0x38eaff,5.5,9,Math.PI/5,.72,1.1);
-  blasterBeam.name="BlasterHeadBeam";
-  blasterBeam.position.set(1.02,.02,0);
-  blasterBeam.rotation.y=-Math.PI/2;
-  const blasterBeamTarget=new THREE.Object3D();
-  blasterBeamTarget.position.set(1.02,.02,1.8);
-  tutorialMascotRoot.add(blasterBeamTarget);
-  blasterBeam.target=blasterBeamTarget;
-  tutorialMascotRoot.add(blasterBeam);
-  tutorialMascotBlasterBeam=blasterBeam;
-
-  const light=new THREE.PointLight(0x29ddff,1.15,5.5,1.8);
-  light.position.set(.15,.12,.1);
-  tutorialMascotRoot.add(light);
-
-  // Tiny projection rings make Badgey read as a floating hologram.
-  const projectionRingMaterial=new THREE.MeshBasicMaterial({
-    color:0x43edff,
-    transparent:true,
-    opacity:.78,
-    depthWrite:false,
-    side:THREE.DoubleSide,
-    blending:THREE.AdditiveBlending,
-    toneMapped:false
-  });
-  const outerProjectionRing=new THREE.Mesh(
-    new THREE.TorusGeometry(.52,.016,5,24),
-    projectionRingMaterial
-  );
-  outerProjectionRing.name="BadgeyProjectionRing";
-  outerProjectionRing.rotation.x=Math.PI/2;
-  outerProjectionRing.position.y=-.39;
-  outerProjectionRing.userData.tutorialOwnedGeometry=true;
-  outerProjectionRing.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(outerProjectionRing);
-
-  const innerProjectionRing=new THREE.Mesh(
-    new THREE.TorusGeometry(.37,.009,4,20),
-    projectionRingMaterial.clone()
-  );
-  innerProjectionRing.name="BadgeyInnerProjectionRing";
-  innerProjectionRing.rotation.x=Math.PI/2;
-  innerProjectionRing.rotation.z=.2;
-  innerProjectionRing.position.y=-.37;
-  innerProjectionRing.userData.tutorialOwnedGeometry=true;
-  innerProjectionRing.userData.tutorialOwnedMaterial=true;
-  tutorialMascotRoot.add(innerProjectionRing);
-
   tutorialMascotReady=true;
 }
 
@@ -587,23 +446,10 @@ function speakTutorialMascot(stage){
 function updateTutorialMascot(dt){
   if(!tutorialMascotRoot || !tutorialMascotReady) return;
 
-  // Keep the old first-person arm flashlight completely hidden. The only
-  // visible physical flashlight is mounted on the blaster head now.
-  if(player.characterFlashlight){
-    player.characterFlashlight.visible=false;
-  }
-
-  const blasterLightOn=flashlightOn && houseTutorialStage>=5;
-  if(tutorialMascotFlashlight){
-    tutorialMascotFlashlight.visible=true;
-  }
-  if(tutorialMascotFlashlightLens?.material){
-    tutorialMascotFlashlightLens.material.emissiveIntensity=blasterLightOn ? 2.8 : .08;
-    tutorialMascotFlashlightLens.material.color.set(blasterLightOn ? 0xf4e8be : 0x514f44);
-  }
-  if(tutorialMascotBlasterBeam){
-    tutorialMascotBlasterBeam.intensity=blasterLightOn ? 14 : 0;
-  }
+  // The imported character torch stays hidden; the visible torch is held by
+  // the right-hand viewmodel and its lens follows the real battery state.
+  if(player.characterFlashlight) player.characterFlashlight.visible=false;
+  player.setFlashlightVisual(flashlightOn && battery>0);
 
   tutorialMascotTime+=dt;
   tutorialMascotSpeechTimer=Math.max(0,tutorialMascotSpeechTimer-dt);
@@ -624,33 +470,13 @@ function updateTutorialMascot(dt){
   }
 
   tutorialMascotRoot.visible=true;
-
-  camera.getWorldDirection(tutorialMascotForward);
-  tutorialMascotForward.y=0;
-  tutorialMascotForward.normalize();
-  tutorialMascotRight.set(
-    -tutorialMascotForward.z,
-    0,
-    tutorialMascotForward.x
+  // It is parented to the camera-local arm rig, so Badgey stays mounted above
+  // the left forearm instead of drifting into the room or covering the crosshair.
+  tutorialMascotRoot.position.set(
+    -.235,
+    -.125+Math.sin(tutorialMascotTime*3.2)*.008,
+    -.585
   );
-
-  // Keep the smaller hologram just ahead and to the player's right, at eye
-  // height, so it is easy to spot without covering the center of the view.
-  tutorialMascotPosition.copy(player.pos)
-    .addScaledVector(tutorialMascotForward,1.25)
-    .addScaledVector(tutorialMascotRight,.42);
-  tutorialMascotPosition.y=Math.max(1.62,player.pos.y+.10);
-
-  tutorialMascotRoot.position.copy(tutorialMascotPosition);
-  tutorialMascotRoot.lookAt(
-    camera.position.x,
-    camera.position.y-.22,
-    camera.position.z
-  );
-  tutorialMascotRoot.rotateY(Math.PI);
-
-  const bob=Math.sin(tutorialMascotTime*3.2)*.08;
-  tutorialMascotRoot.position.y+=bob;
 
   const talkActive=
     tutorialMascotSpeechTimer>0 ||
@@ -658,8 +484,8 @@ function updateTutorialMascot(dt){
 
   if(tutorialMascotMouth){
     tutorialMascotMouth.scale.y=talkActive
-      ? .72+Math.abs(Math.sin(tutorialMascotTime*15))*.8
-      : .38;
+      ? .28+Math.abs(Math.sin(tutorialMascotTime*15))*.55
+      : .28;
   }
 
   if(tutorialMascotSpeechStage!==houseTutorialStage){
@@ -667,7 +493,7 @@ function updateTutorialMascot(dt){
     tutorialMascotSpeechTimer=1.7;
   }
 
-  const pulse=.94+Math.sin(tutorialMascotTime*4.0)*.04;
+  const pulse=.98+Math.sin(tutorialMascotTime*4.0)*.02;
   tutorialMascotRoot.scale.setScalar(pulse);
 }
 

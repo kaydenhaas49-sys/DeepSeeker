@@ -54,6 +54,7 @@ export class Player {
     this.characterMixer = null;
     this.characterFlashlight = null;
     this.characterFlashlightLens = null;
+    this.viewmodelFlashlightLens = null;
     this.characterLoaded = false;
 
     camera.rotation.order = "YXZ";
@@ -183,6 +184,8 @@ export class Player {
       this.characterModel = character.model;
       this.characterMixer = character.mixer;
       this.characterFlashlight = character.flashlight;
+      // Only show the camera-local flashlight model; avoid a second floating imported prop.
+      if(this.characterFlashlight) this.characterFlashlight.visible=false;
 
       // Keep the guaranteed camera-local viewmodel instead of relying on the
       // imported arm mesh, whose skinning/export origin has been unreliable.
@@ -229,176 +232,161 @@ export class Player {
       return this.fallbackArmViewmodel;
     }
 
-    // Fully volumetric, camera-local hazmat forearms and gloved hands. Standard
-    // materials keep the sleeves shaded in 3D instead of looking like flat UI.
+    // Simple, camera-local hazmat viewmodel: both forearms extend forward
+    // in parallel instead of curling down into the middle of the screen.
     const root=new THREE.Group();
     root.name="FirstPersonHazmatArms3D";
 
-    const suitMaterial=new THREE.MeshStandardMaterial({
-      color:0xb5ad92,
-      roughness:.88,
-      metalness:0,
-      emissive:0x17150d,
-      emissiveIntensity:.22,
+    const material=(color,emissive,emissiveIntensity,roughness=.82,metalness=0)=>new THREE.MeshStandardMaterial({
+      color,
+      emissive,
+      emissiveIntensity,
+      roughness,
+      metalness,
       depthTest:false,
       depthWrite:false
     });
-    const seamMaterial=new THREE.MeshStandardMaterial({
-      color:0x817b62,
-      roughness:.94,
-      metalness:0,
-      depthTest:false,
-      depthWrite:false
-    });
-    const gloveMaterial=new THREE.MeshStandardMaterial({
-      color:0x252b25,
-      roughness:.76,
-      metalness:.025,
-      emissive:0x090b09,
-      emissiveIntensity:.2,
-      depthTest:false,
-      depthWrite:false
-    });
-    const cuffMaterial=new THREE.MeshStandardMaterial({
-      color:0x424538,
-      roughness:.72,
-      metalness:.08,
-      depthTest:false,
-      depthWrite:false
-    });
-    const stripeMaterial=new THREE.MeshStandardMaterial({
-      color:0xb7a957,
-      roughness:.66,
-      metalness:.04,
-      emissive:0x191607,
-      emissiveIntensity:.12,
+    const suitMaterial=material(0xc1b697,0x62563e,.55,.9);
+    const gloveMaterial=material(0x292e29,0x11150f,.55,.78,.02);
+    const cuffMaterial=material(0x42483c,0x1b2118,.45,.72,.06);
+    const seamMaterial=material(0x8b8066,0x30291b,.32,.9);
+    const flashlightMaterial=material(0x202522,0x070a08,.25,.48,.5);
+    const flashlightRingMaterial=material(0x6d7167,0x20231e,.25,.33,.72);
+    const lensMaterial=new THREE.MeshStandardMaterial({
+      color:0x514e40,
+      emissive:0x17160e,
+      emissiveIntensity:.08,
+      roughness:.24,
+      metalness:.05,
+      transparent:true,
+      opacity:.96,
       depthTest:false,
       depthWrite:false
     });
 
-    const addSleeveBand=(arm,y,radius,material)=>{
+    const addSleeveBand=(x,y,z,radius,materialRef)=>{
       const band=new THREE.Mesh(
-        new THREE.CylinderGeometry(radius,radius,.018,16,1,false),
-        material
+        new THREE.TorusGeometry(radius,.005,5,14),
+        materialRef
       );
-      band.position.y=y;
-      arm.add(band);
+      band.position.set(x,y,z);
+      band.renderOrder=2999;
+      root.add(band);
+      return band;
+    };
+    const addGloveMesh=(geometry,materialRef,position,rotation,scale,order=3002)=>{
+      const mesh=new THREE.Mesh(geometry,materialRef);
+      mesh.position.set(position[0],position[1],position[2]);
+      if(rotation) mesh.rotation.set(rotation[0]||0,rotation[1]||0,rotation[2]||0);
+      if(scale) mesh.scale.set(scale[0],scale[1],scale[2]);
+      mesh.renderOrder=order;
+      mesh.frustumCulled=false;
+      root.add(mesh);
+      return mesh;
     };
 
-    const addArm=(side,x,y,z,rotationZ)=>{
-      const arm=new THREE.Group();
-      arm.position.set(x,y,z);
-      arm.rotation.set(-.34,0,rotationZ);
-
-      // Shoulder/upper sleeve gives the silhouette some volume; the forearm
-      // overlaps it slightly so the joints don't look like separate sticks.
-      const upperSleeve=new THREE.Mesh(
-        new THREE.CapsuleGeometry(.105,.26,4,12),
+    const armX={left:-.235,right:.235};
+    for(const side of ["left","right"]){
+      const x=armX[side];
+      // Long, nearly straight sleeves; their cylinder axis is rotated into -Z.
+      const sleeve=new THREE.Mesh(
+        new THREE.CylinderGeometry(.078,.096,.49,16,1,false),
         suitMaterial
       );
-      upperSleeve.position.set(0,.13,.012);
-      arm.add(upperSleeve);
+      sleeve.position.set(x,-.285,-.575);
+      sleeve.rotation.x=-Math.PI/2;
+      sleeve.renderOrder=2998;
+      root.add(sleeve);
 
-      const forearm=new THREE.Mesh(
-        new THREE.CapsuleGeometry(.092,.31,4,12),
-        suitMaterial
+      // Two low-profile fabric seams and a dark wrist cuff, not armour plates.
+      addSleeveBand(x,-.285,-.43,.086,seamMaterial);
+      addSleeveBand(x,-.285,-.69,.078,seamMaterial);
+      const cuff=addGloveMesh(
+        new THREE.TorusGeometry(.079,.010,6,16),
+        cuffMaterial,[x,-.285,-.812],null,null,3000
       );
-      forearm.position.set(0,-.095,-.018);
-      arm.add(forearm);
+      cuff.rotation.x=0;
 
-      const elbowPatch=new THREE.Mesh(
-        new THREE.SphereGeometry(.102,14,10),
-        suitMaterial
+      // The wrist and palm line up with the forearm so the hand reaches out.
+      addGloveMesh(
+        new THREE.SphereGeometry(1,12,10),gloveMaterial,
+        [x,-.29,-.85],null,[.070,.050,.075],3001
       );
-      elbowPatch.scale.set(1,1.06,.94);
-      elbowPatch.position.set(0,.25,.025);
-      arm.add(elbowPatch);
 
-      // Rounded seams and a raised yellow suit band catch light around the
-      // full arm circumference, reinforcing that this is a 3D model.
-      addSleeveBand(arm,.19,.105,stripeMaterial);
-      addSleeveBand(arm,.165,.107,seamMaterial);
-      addSleeveBand(arm,-.105,.094,seamMaterial);
-
-      const cuff=new THREE.Mesh(
-        new THREE.CylinderGeometry(.095,.095,.075,16,1,false),
-        cuffMaterial
-      );
-      cuff.position.set(0,-.245,-.025);
-      arm.add(cuff);
-
-      addSleeveBand(arm,-.222,.096,stripeMaterial);
-
-      // Anatomical palm, four separate rounded fingers, and a thumb rather
-      // than a single flat blob.
-      const palm=new THREE.Mesh(
-        new THREE.SphereGeometry(1,16,12),
-        gloveMaterial
-      );
-      palm.scale.set(.091,.074,.105);
-      palm.position.set(0,-.315,-.10);
-      arm.add(palm);
-
-      for(let finger=0;finger<4;finger++){
-        const spread=(finger-1.5)*.039;
-        const length=[.074,.09,.086,.068][finger];
-        const digit=new THREE.Mesh(
-          new THREE.CapsuleGeometry(.018,length,3,8),
-          gloveMaterial
+      if(side==="left"){
+        // Open left hand: four fingers point forward, with a separate thumb.
+        for(let i=0;i<4;i++){
+          const fingerX=x+(i-1.5)*.031;
+          const fingerLength=[.040,.052,.049,.036][i];
+          addGloveMesh(
+            new THREE.CapsuleGeometry(.010,fingerLength,3,7),gloveMaterial,
+            [fingerX,-.30,-.918],[-Math.PI/2,0,(i-1.5)*-.035],null,3003
+          );
+        }
+        addGloveMesh(
+          new THREE.CapsuleGeometry(.012,.045,3,7),gloveMaterial,
+          [x+.066,-.295,-.885],[0,0,-.70],null,3003
         );
-        digit.position.set(spread,-.373,-.17-Math.max(0,1-Math.abs(finger-1.5))*.008);
-        digit.rotation.x=-.48;
-        digit.rotation.z=(finger-1.5)*-.055;
-        arm.add(digit);
-
-        const fingertip=new THREE.Mesh(
-          new THREE.SphereGeometry(.018,8,6),
-          gloveMaterial
-        );
-        fingertip.position.set(spread,-.414,-.195);
-        arm.add(fingertip);
       }
+    }
 
-      const thumb=new THREE.Mesh(
-        new THREE.CapsuleGeometry(.025,.065,3,8),
-        gloveMaterial
+    // The right hand visibly wraps around a real flashlight body. Its lens
+    // points down the same -Z direction as the player's view and beam.
+    const torchX=.235;
+    const torchY=-.265;
+    const torchBarrel=new THREE.Mesh(
+      new THREE.CylinderGeometry(.030,.037,.32,12,1,false),
+      flashlightMaterial
+    );
+    torchBarrel.position.set(torchX,torchY,-1.005);
+    torchBarrel.rotation.x=-Math.PI/2;
+    torchBarrel.renderOrder=3004;
+    root.add(torchBarrel);
+
+    const torchHead=new THREE.Mesh(
+      new THREE.CylinderGeometry(.050,.040,.085,12,1,false),
+      flashlightMaterial
+    );
+    torchHead.position.set(torchX,torchY,-1.205);
+    torchHead.rotation.x=-Math.PI/2;
+    torchHead.renderOrder=3004;
+    root.add(torchHead);
+
+    const torchRing=new THREE.Mesh(
+      new THREE.TorusGeometry(.047,.006,6,14),
+      flashlightRingMaterial
+    );
+    torchRing.position.set(torchX,torchY,-1.249);
+    torchRing.renderOrder=3005;
+    root.add(torchRing);
+
+    this.viewmodelFlashlightLens=new THREE.Mesh(
+      new THREE.CylinderGeometry(.037,.037,.010,12,1,false),
+      lensMaterial
+    );
+    this.viewmodelFlashlightLens.name="ViewmodelFlashlightLens";
+    this.viewmodelFlashlightLens.position.set(torchX,torchY,-1.253);
+    this.viewmodelFlashlightLens.rotation.x=-Math.PI/2;
+    this.viewmodelFlashlightLens.renderOrder=3006;
+    root.add(this.viewmodelFlashlightLens);
+
+    // Three rounded fingers cross the handle, making the grip read as a hand
+    // holding a torch rather than a separate floating object.
+    for(let i=0;i<3;i++){
+      addGloveMesh(
+        new THREE.CapsuleGeometry(.009,.045,3,7),gloveMaterial,
+        [torchX,-.292-i*.014,-.905],[0,0,-Math.PI/2],null,3007
       );
-      thumb.position.set(side==="left" ? .083 : -.083,-.326,-.112);
-      thumb.rotation.z=side==="left" ? -.72 : .72;
-      thumb.rotation.x=-.35;
-      arm.add(thumb);
-
-      const thumbTip=new THREE.Mesh(
-        new THREE.SphereGeometry(.024,9,7),
-        gloveMaterial
-      );
-      thumbTip.position.set(side==="left" ? .105 : -.105,-.36,-.155);
-      arm.add(thumbTip);
-
-      // Two restrained fabric folds on the sleeve; low-poly and inexpensive.
-      for(const fold of [-.015,.045]){
-        const foldMesh=new THREE.Mesh(
-          new THREE.TorusGeometry(.088,.006,4,14),
-          seamMaterial
-        );
-        foldMesh.rotation.x=Math.PI/2;
-        foldMesh.position.set(0,fold,-.018);
-        foldMesh.scale.set(1,.9,1);
-        arm.add(foldMesh);
-      }
-
-      root.add(arm);
-    };
-
-    // Both elbows stay near the lower corners; wrists angle inward into frame.
-    addArm("left",-.285,-.145,-.69,.48);
-    addArm("right",.285,-.145,-.69,-.48);
+    }
+    addGloveMesh(
+      new THREE.CapsuleGeometry(.012,.042,3,7),gloveMaterial,
+      [torchX-.055,-.267,-.905],[0,0,-.72],null,3007
+    );
 
     root.traverse(obj=>{
       if(!obj.isMesh) return;
       obj.visible=true;
       obj.frustumCulled=false;
-      obj.renderOrder=3000;
       obj.castShadow=false;
       obj.receiveShadow=false;
     });
@@ -406,19 +394,23 @@ export class Player {
     this.fallbackArmViewmodel=root;
     this.hands.add(root);
     root.visible=true;
+    this.setFlashlightVisual(false);
     return root;
   }
 
   setFlashlightVisual(on){
-    const lens=this.characterFlashlightLens;
-    if(!lens) return;
+    const updateLens=(lens)=>{
+      if(!lens?.material) return;
+      lens.material.emissiveIntensity=on ? 2.8 : .08;
+      lens.material.color.set(on ? 0xf4e8be : 0x514f40);
+    };
 
-    lens.material.emissiveIntensity=on ? 2.4 : 0.18;
-    lens.material.color.set(on ? 0xf1e5b7 : 0x555448);
+    updateLens(this.viewmodelFlashlightLens);
+    updateLens(this.characterFlashlightLens);
 
-    if(this.characterFlashlight){
-      this.characterFlashlight.visible=true;
-    }
+    // Use the low-poly camera-local torch above, not the imported prop which
+    // previously floated away from the hand and made the silhouette confusing.
+    if(this.characterFlashlight) this.characterFlashlight.visible=false;
   }
 
   attach() {
