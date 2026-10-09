@@ -657,19 +657,21 @@ export function createFirstPersonArms(model){
   // The source GLB is in a T-pose. Its arms sit near shoulder height and extend
   // sideways from the torso. Keep the crop wide enough to include sleeves,
   // cuffs and hands instead of only the outermost forearm triangles.
-  const torsoHalfWidth=Math.max(modelSize.x*.08,modelSize.y*.065);
-  const armBandMinY=modelBounds.min.y+modelSize.y*.45;
-  const armBandMaxY=modelBounds.min.y+modelSize.y*.84;
-  const armOutermostX=Math.max(modelSize.x*.055,modelSize.y*.045);
+  const torsoHalfWidth=Math.max(modelSize.x*.08,modelSize.y*.060);
+  const armBandMinY=modelBounds.min.y+modelSize.y*.39;
+  const armBandMaxY=modelBounds.min.y+modelSize.y*.89;
+  const armOutermostX=Math.max(modelSize.x*.045,modelSize.y*.035);
 
   const isNearModelArmRegion=(points)=>{
     const centerX=points.reduce((sum,point)=>sum+point.x/3,0);
     const centerY=points.reduce((sum,point)=>sum+point.y/3,0);
-    const outsideTorso=Math.abs(centerX-modelCenter.x)>torsoHalfWidth*.72;
+    const outsideTorso=Math.abs(centerX-modelCenter.x)>torsoHalfWidth*.52;
+    // Include border triangles touching the sleeve instead of cutting a
+    // hard line through shared shoulder/cuff surfaces.
     const outerVertexCount=points.filter(
       point=>Math.abs(point.x-modelCenter.x)>armOutermostX
     ).length;
-    return outsideTorso && outerVertexCount>=2 &&
+    return outsideTorso && outerVertexCount>=1 &&
       centerY>=armBandMinY && centerY<=armBandMaxY;
   };
 
@@ -743,15 +745,18 @@ export function createFirstPersonArms(model){
 
       const maximumWeight=Math.max(...armWeights);
       const averageWeight=(armWeights[0]+armWeights[1]+armWeights[2])/3;
-      const strongCount=armWeights.filter(weight=>weight>=.08).length;
-      // Require multiple vertices with arm influence; one weighted corner is
-      // not enough to classify a triangle as an arm surface.
-      const weightedArm=canWeightFilter && averageWeight>=.08 && strongCount>=2;
+      const strongCount=armWeights.filter(weight=>weight>=.06).length;
+      // Blend two independent signals: the broad sleeve/shoulder region and
+      // arm-bone skin weights. Spatial cropping keeps the torso out, while
+      // weights recover hand/cuff triangles near the crop boundary.
+      const weightedArm=canWeightFilter && (
+        (averageWeight>=.025 && strongCount>=1) || maximumWeight>=.08
+      );
       const namedLooseArm=meshNameLooksLikeArm(source) && !canWeightFilter;
       const spatialArm=isNearModelArmRegion(rawPoints);
       const keep=filterByArmWeights
-        ? (canWeightFilter ? weightedArm : (spatialArm || namedLooseArm))
-        : spatialArm;
+        ? (canWeightFilter ? (weightedArm || spatialArm) : (spatialArm || namedLooseArm))
+        : (spatialArm || (canWeightFilter && weightedArm));
       if(!keep) continue;
 
       for(const vertexIndex of triangle) bakedIndices.push(bakeVertex(vertexIndex));
