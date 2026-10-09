@@ -29,12 +29,14 @@ export class Multiplayer {
     this.onGameStart = onGameStart || (() => {});
     this.onSharedFall = onSharedFall || (() => {});
     this.onChat = onChat || (() => {});
+    this.onWorldEvent = onWorldEvent || (() => {});
 
     this.socket = null;
     this.room = this.getRoomName();
     this.server = this.getServerUrl();
     this.playerId = null;
     this.players = new Map();
+    this.roomPlayerOrder = [];
     this.sendTimer = 0;
     this.heartbeatTimer = 0;
     this.lastSent = null;
@@ -47,7 +49,8 @@ export class Multiplayer {
     this.lastSharedFallSequence = 0;
     this.worldEventSequence = 0;
     this.worldEvent = null;
-    this.lastRemoteWorldEventSequence = 0;
+    this.lastRemoteWorldEventSequence = 0; // Legacy diagnostic value.
+    this.lastRemoteWorldEventSequences = new Map();
     this.chatSequence = 0;
     this.chatMessage = "";
     this.chatSender = "";
@@ -63,6 +66,29 @@ export class Multiplayer {
       .toLowerCase()
       .replace(/[^a-z0-9_-]/g, "")
       .slice(0, 32) || "main";
+  }
+
+  getWorldAuthorityId(){
+    const connected=new Set([
+      ...(this.playerId ? [String(this.playerId)] : []),
+      ...Array.from(this.players.keys(),id=>String(id))
+    ].filter(Boolean));
+    // Preserve the room's join order so a newcomer can't take over spider
+    // simulation just because its generated ID sorts before the host's ID.
+    for(const id of this.roomPlayerOrder){
+      if(connected.has(String(id))) return String(id);
+    }
+    return connected.values().next().value||null;
+  }
+
+  isWorldAuthority(){
+    // Solo play and temporarily disconnected rooms still need local enemy AI.
+    // Once this socket has a room identity, elect exactly one multiplayer host.
+    if(!this.server || !this.playerId || !this.socket || this.socket.readyState!==WebSocket.OPEN){
+      return true;
+    }
+    const authority=this.getWorldAuthorityId();
+    return Boolean(authority && authority===String(this.playerId));
   }
 
   getServerUrl() {
@@ -195,20 +221,25 @@ export class Multiplayer {
     }
   }
 
-  checkRemoteWorldEvent(state) {
-    const sequence = Number(state?.worldEventSequence);
-    if (!Number.isFinite(sequence) || sequence <= this.lastRemoteWorldEventSequence) return;
-    this.lastRemoteWorldEventSequence = sequence;
+  checkRemoteWorldEvent(state, playerId) {
+    const sender=String(playerId||"");
+    const sequence=Number(state?.worldEventSequence);
+    if(!sender || !Number.isFinite(sequence) || sequence<=0) return;
+    const previous=this.lastRemoteWorldEventSequences.get(sender)||0;
+    if(sequence<=previous) return;
+    this.lastRemoteWorldEventSequences.set(sender,sequence);
+    this.lastRemoteWorldEventSequence=Math.max(this.lastRemoteWorldEventSequence,sequence);
 
-    let payload = state?.worldEventPayload;
-    if (typeof payload === "string") {
-      try { payload = JSON.parse(payload); } catch { payload = {}; }
+    let payload=state?.worldEventPayload;
+    if(typeof payload==="string"){
+      try{ payload=JSON.parse(payload); }catch{ payload={}; }
     }
     this.onWorldEvent({
-      type: this.sanitizeMessage(state?.worldEventType || ""),
-      id: this.sanitizeMessage(state?.worldEventId || ""),
-      payload: payload && typeof payload === "object" ? payload : {},
-      sequence
+      type:this.sanitizeMessage(state?.worldEventType||""),
+      id:this.sanitizeMessage(state?.worldEventId||""),
+      payload:payload && typeof payload==="object" ? payload : {},
+      sequence,
+      playerId:sender
     });
   }
 
@@ -234,22 +265,32 @@ export class Multiplayer {
     switch (data?.type) {
       case "welcome":
         this.playerId = data.id ?? null;
+        this.roomPlayerOrder=Array.from(new Set(
+          (data.players||[]).map(player=>String(player?.id||"")).filter(Boolean)
+        ));
+        if(this.playerId && !this.roomPlayerOrder.includes(String(this.playerId))){
+          this.roomPlayerOrder.push(String(this.playerId));
+        }
 
         for (const player of data.players || []) {
           if (!player?.id || player.id === this.playerId) continue;
           this.addOrUpdatePlayer(player);
           this.checkSharedFall(player.state);
-          this.checkRemoteWorldEvent(player.state);
+          this.checkRemoteWorldEvent(player.state,player.id);
         }
         this.updateCount();
         break;
 
       case "player_joined":
       case "player_updated":
+        if(data?.type==="player_joined" && data.player?.id){
+          const joinedId=String(data.player.id);
+          if(!this.roomPlayerOrder.includes(joinedId)) this.roomPlayerOrder.push(joinedId);
+        }
         if (data.player?.id && data.player.id !== this.playerId) {
           this.addOrUpdatePlayer(data.player);
           this.checkSharedFall(data.player.state);
-          this.checkRemoteWorldEvent(data.player.state);
+          this.checkRemoteWorldEvent(data.player.state,data.player.id);
           this.updateCount();
         }
         break;
@@ -281,12 +322,13 @@ export class Multiplayer {
         }
 
         this.checkSharedFall(nextState);
-        this.checkRemoteWorldEvent(nextState);
+        this.checkRemoteWorldEvent(nextState,data.id);
         break;
       }
 
       case "player_left": {
         if (!data.id) return;
+        this.roomPlayerOrder=this.roomPlayerOrder.filter(id=>id!==String(data.id));
         const remote = this.players.get(data.id);
         if (!remote) return;
 
@@ -331,7 +373,7 @@ export class Multiplayer {
       pitch: Number.isFinite(Number(state?.pitch)) ? Number(state.pitch) : 0,
       level: "backrooms",
       crouched: Boolean(state?.crouched),
-      flashlight: state?.flashlight !== false,
+      flashlight: Boolean(state?.flashlight),
       playerName: this.sanitizeName(state?.playerName || ""),
       fallSequence: Number.isFinite(fallSequence) ? fallSequence : 0,
       fallStartedAt: Number.isFinite(fallStartedAt) ? fallStartedAt : 0,
@@ -441,6 +483,8 @@ export class Multiplayer {
 
   addOrUpdatePlayer(player) {
     if (!player?.id || player.id === this.playerId) return;
+    const roomId=String(player.id);
+    if(!this.roomPlayerOrder.includes(roomId)) this.roomPlayerOrder.push(roomId);
 
     let remote = this.players.get(player.id);
 
@@ -456,6 +500,7 @@ export class Multiplayer {
         model: null,
         mixer: null,
         flashlight: null,
+        flashlightLens: null,
         remoteLight: createRemoteFlashlight(this.scene),
         target: this.normalizeState(player.state || {}),
         current: this.normalizeState(player.state || {}),
@@ -474,6 +519,7 @@ export class Multiplayer {
           remote.model = character.model;
           remote.mixer = character.mixer;
           remote.flashlight = character.flashlight;
+          remote.flashlightLens=character.flashlight?.getObjectByName?.("FlashlightLens")||null;
           remote.group.add(character.model);
         })
         .catch(error=>{
@@ -660,17 +706,31 @@ export class Multiplayer {
         }
       }
 
-      if(remote.remoteLight && remote.flashlight && (!MP_LOW_END || nearby)){
-        remote.flashlight.getWorldPosition(remote.remoteLight.origin);
+      if(remote.remoteLight && (!MP_LOW_END || nearby)){
+        // Keep the beam functional even if a rig lacks the expected hand bone.
+        if(remote.flashlight){
+          remote.flashlight.getWorldPosition(remote.remoteLight.origin);
+        }else{
+          remote.remoteLight.origin.set(
+            remote.current.x-Math.sin(remote.current.yaw)*.20,
+            1.28,
+            remote.current.z-Math.cos(remote.current.yaw)*.20
+          );
+        }
+        const beamEnabled=remote.current.flashlight && sameLevel && nearby;
         updateRemoteFlashlight(
           remote.remoteLight,
           remote.remoteLight.origin,
           remote.current.yaw,
           remote.current.pitch,
-          remote.current.flashlight && sameLevel && nearby
+          beamEnabled
         );
+        if(remote.flashlightLens?.material){
+          remote.flashlightLens.material.emissiveIntensity=beamEnabled?2.4:.08;
+          remote.flashlightLens.material.color.set(beamEnabled?0xf4e8be:0x514f40);
+        }
         if(remote.remoteLight.light.visible){
-          remote.remoteLight.light.intensity = 27 * flashlightFlicker(this.elapsedTime);
+          remote.remoteLight.light.intensity=27*flashlightFlicker(this.elapsedTime);
         }
       }
 

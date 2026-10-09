@@ -3096,6 +3096,25 @@ const multiplayer=new Multiplayer({
     startBackroomsFall(startedAt,false);
   },
   onWorldEvent:(event)=>{
+    if(event?.type==="spider_snapshot"){
+      if(event.playerId!==multiplayer.getWorldAuthorityId()) return;
+      const payload=event.payload||{};
+      const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
+      remoteSpiderSnapshot={
+        active:Boolean(payload.active),
+        x:finite(payload.x),
+        y:finite(payload.y,.08),
+        z:finite(payload.z),
+        rotationX:finite(payload.rotationX),
+        rotationY:finite(payload.rotationY),
+        scale:THREE.MathUtils.clamp(finite(payload.scale,1),.1,3),
+        behavior:String(payload.behavior||"idle").slice(0,24),
+        animation:String(payload.animation||"idle").slice(0,24),
+        jumpscareTimer:THREE.MathUtils.clamp(finite(payload.jumpscareTimer),0,2)
+      };
+      remoteSpiderSnapshotReceivedAt=performance.now();
+      return;
+    }
     if(event?.type==="computer_opened"){
       eventText.textContent="REMOTE TERMINAL ACTIVE · "+(event.id||"NODE");
       eventText.style.opacity="1";
@@ -4571,6 +4590,13 @@ let spiderBehaviorState="idle";
 let spiderBehaviorTime=0;
 let spiderAttackPlayed=false;
 let spiderActive=false;
+let spiderSyncElapsed=0;
+let spiderSyncAuthorityId=null;
+let spiderSyncNeedsInitial=true;
+let spiderSyncLastActive=false;
+let remoteSpiderSnapshot=null;
+let remoteSpiderSnapshotReceivedAt=0;
+let remoteSpiderPositionInitialized=false;
 let spiderSpawnPending=false;
 let spiderJumpscareTimer=0;
 let spiderCaughtFreezeTimer=0;
@@ -5432,7 +5458,7 @@ function showSpiderScareMessage(message,duration=900){
 }
 
 function startSpiderPeek(){
-  if(tutorialOpenRoomActive || houseMode) return false;
+  if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return false;
   const spawn=findSpiderSpawnPosition();
   if(!spawn) return false;
 
@@ -5456,7 +5482,7 @@ function startSpiderPeek(){
 }
 
 function startSpiderRush(){
-  if(tutorialOpenRoomActive || houseMode) return false;
+  if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return false;
   const spawn=findSpiderVisibleSpawnPosition(10,16);
   if(!spawn) return false;
 
@@ -5484,7 +5510,7 @@ function startSpiderRush(){
 }
 
 function startSpiderChase(){
-  if(tutorialOpenRoomActive || houseMode) return false;
+  if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return false;
   const spawn=findSpiderSpawnPosition(9,15);
   if(!spawn) return false;
 
@@ -7111,6 +7137,7 @@ function updateStoryProgress(){
 function toggleFlashlight(){
   flashlightOn=!flashlightOn;
   player.setFlashlightVisual(flashlightOn);
+  multiplayer.sendState(true);
 
   if(!houseMode && gameStarted && houseTutorialStage===5 && flashlightOn){
     setHouseTutorialStage(6);
@@ -7563,7 +7590,7 @@ document.addEventListener("keydown",e=>{
 });
 
 function triggerEvent(){
-  if(tutorialOpenRoomActive || houseMode) return;
+  if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return;
   eventCooldown=4.5;
 
   if(!spiderLoaded || spiderActive){
@@ -7600,6 +7627,108 @@ function triggerEvent(){
   setTimeout(()=>{
     objective.textContent=STORY[storyStage].objective;
   },1800);
+}
+
+function publishMultiplayerSpiderSnapshot(dt){
+  const authorityId=multiplayer.getWorldAuthorityId();
+  if(!multiplayer.isWorldAuthority() || !authorityId) return;
+
+  if(authorityId!==spiderSyncAuthorityId){
+    spiderSyncAuthorityId=authorityId;
+    spiderSyncNeedsInitial=true;
+    spiderSyncLastActive=false;
+    spiderSyncElapsed=0;
+  }
+
+  spiderSyncElapsed+=dt;
+  const active=Boolean(spiderActive && !houseMode && !tutorialOpenRoomActive && gameStarted);
+  if(!active){
+    if(spiderSyncLastActive || spiderSyncNeedsInitial){
+      multiplayer.broadcastWorldEvent("spider_snapshot","main-spider",{
+        active:false,
+        behavior:"idle",
+        animation:"idle",
+        x:spiderEntity.position.x,
+        y:SPIDER_GROUND_OFFSET,
+        z:spiderEntity.position.z,
+        rotationX:0,
+        rotationY:spiderEntity.rotation.y,
+        scale:1,
+        jumpscareTimer:0
+      });
+      spiderSyncLastActive=false;
+      spiderSyncNeedsInitial=false;
+      spiderSyncElapsed=0;
+    }
+    return;
+  }
+
+  if(spiderSyncElapsed<.10 && spiderSyncLastActive && !spiderSyncNeedsInitial) return;
+  spiderSyncElapsed=0;
+  spiderSyncLastActive=true;
+  spiderSyncNeedsInitial=false;
+  multiplayer.broadcastWorldEvent("spider_snapshot","main-spider",{
+    active:true,
+    behavior:spiderBehaviorState,
+    animation:spiderWantedState||"chase",
+    x:spiderEntity.position.x,
+    y:spiderEntity.position.y,
+    z:spiderEntity.position.z,
+    rotationX:spiderEntity.rotation.x,
+    rotationY:spiderEntity.rotation.y,
+    scale:spiderEntity.scale.x,
+    jumpscareTimer:spiderJumpscareTimer
+  });
+}
+
+function applyRemoteSpiderSnapshot(dt){
+  if(multiplayer.isWorldAuthority() || houseMode || tutorialOpenRoomActive) return;
+  const snapshot=remoteSpiderSnapshot;
+  const fresh=snapshot && performance.now()-remoteSpiderSnapshotReceivedAt<1200;
+  if(!fresh || !snapshot.active){
+    spiderActive=false;
+    spiderBehaviorState="idle";
+    spiderJumpscareTimer=0;
+    spiderCaughtFreezeTimer=0;
+    player.movementFrozen=false;
+    spiderEntity.visible=false;
+    spiderRevealLight.visible=false;
+    if(spiderModel) spiderModel.visible=true;
+    remoteSpiderPositionInitialized=false;
+    return;
+  }
+
+  spiderActive=true;
+  spiderBehaviorState=snapshot.behavior;
+  spiderJumpscareTimer=snapshot.jumpscareTimer;
+  spiderCaughtFreezeTimer=0;
+  player.movementFrozen=false;
+
+  if(!remoteSpiderPositionInitialized){
+    spiderEntity.position.set(snapshot.x,snapshot.y,snapshot.z);
+    spiderEntity.rotation.set(snapshot.rotationX,snapshot.rotationY,0);
+    remoteSpiderPositionInitialized=true;
+  }else{
+    const alpha=1-Math.exp(-20*Math.max(0,dt));
+    spiderEntity.position.lerp(new THREE.Vector3(snapshot.x,snapshot.y,snapshot.z),alpha);
+    const deltaYaw=THREE.MathUtils.euclideanModulo(
+      snapshot.rotationY-spiderEntity.rotation.y+Math.PI,
+      Math.PI*2
+    )-Math.PI;
+    spiderEntity.rotation.y+=deltaYaw*alpha;
+    spiderEntity.rotation.x=THREE.MathUtils.lerp(spiderEntity.rotation.x,snapshot.rotationX,alpha);
+  }
+  spiderEntity.scale.setScalar(snapshot.scale);
+  spiderEntity.visible=true;
+  if(spiderWantedState!==snapshot.animation || !spiderAnimationState){
+    setSpiderAnimation(snapshot.animation);
+  }
+  spiderVisibleToPlayer=playerHasLineOfSightToSpider();
+  if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
+  spiderRevealLight.visible=spiderVisibleToPlayer;
+  spiderRevealLight.intensity=spiderVisibleToPlayer
+    ? (spiderJumpscareTimer>0?5:4.2)
+    : 0;
 }
 
 function getDisplaySize(){
@@ -7879,11 +8008,13 @@ function animate(){
   }else{
     battery=Math.min(100,battery+dt*1.0);
   }
-  if(battery<=0){
+  if(battery<=0 && flashlightOn){
     flashlightOn=false;
     player.setFlashlightVisual(false);
+    multiplayer.sendState(true);
   }
 
+  applyRemoteSpiderSnapshot(dt);
   const flicker=flashlightFlicker(t);
   const lowBattery=Math.pow(THREE.MathUtils.clamp((35-battery)/35,0,1),1.15);
 
@@ -8007,7 +8138,7 @@ function animate(){
 
   if(!tutorialOpenRoomActive){
 
-    if(spiderJumpscareTimer<=0){
+    if(spiderJumpscareTimer<=0 && multiplayer.isWorldAuthority()){
       groundSpiderEntity();
     }
   
@@ -8015,7 +8146,7 @@ function animate(){
       ? (spiderJumpscareTimer>0 ? 5.0 : 2.8)
       : 0;
   
-    if(spiderActive && !houseMode){
+    if(spiderActive && !houseMode && multiplayer.isWorldAuthority()){
       if(spiderCaughtFreezeTimer>0){
         player.movementFrozen=true;
         player.pos.copy(spiderCaughtPlayerPosition);
@@ -8232,7 +8363,7 @@ function animate(){
         if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
         spiderRevealLight.visible=spiderVisibleToPlayer;
       }
-    }else{
+    }else if(!spiderActive || houseMode || multiplayer.isWorldAuthority()){
       spiderCaughtFreezeTimer=0;
       player.movementFrozen=false;
       spiderEntity.visible=false;
@@ -8251,6 +8382,8 @@ function animate(){
     }
   
   }
+
+  publishMultiplayerSpiderSnapshot(dt);
 
   // The normal spider system is Backrooms-only. The apartment gets one
   // deliberately scripted teaching encounter on top of it.
