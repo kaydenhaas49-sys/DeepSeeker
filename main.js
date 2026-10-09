@@ -2986,7 +2986,6 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
     player.jumpVelocity=0;
     player.keys.clear();
     setHouseTutorialStage(1);
-    showHouseIntroPhoneMessage();
   }
 
   player.lock();
