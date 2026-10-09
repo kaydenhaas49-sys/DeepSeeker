@@ -243,11 +243,13 @@ export class Player {
       if(obj.isMesh && obj.visible) visibleMeshCount++;
     });
     const extractedArmMeshCount=Number(viewmodel.userData.extractedArmMeshCount)||0;
-    // Only install a rig containing extracted skin-weighted arm vertices.
-    // A named mesh alone is not enough: many GLBs name the whole body
-    // "Armature", which would otherwise leave the old body/arms in view.
-    if(extractedArmMeshCount===0 || visibleMeshCount===0){
-      console.warn("[DeepSeeker] No extracted, visible skinned arm geometry was found.");
+    // Mesh visibility is filtered by actual arm vertex weights or explicit
+    // arm-mesh names. A model may ship the arms as separate ordinary meshes
+    // rather than one combined skinned mesh, so either valid path is accepted.
+    if(visibleMeshCount===0){
+      console.warn("[DeepSeeker] No visible arm mesh was found in the hazmat rig.",{
+        extractedArmMeshCount
+      });
       return false;
     }
 

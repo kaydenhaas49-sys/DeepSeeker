@@ -413,8 +413,8 @@ function isArmBoneName(name){
 
 function meshNameLooksLikeArm(mesh){
   const n=normalizeBoneName(mesh.name);
-  // Avoid treating an object called "Armature" as the entire arm mesh.
-  return /shoulder|sleeve|upperarm|lowerarm|forearm|elbow|wrist|hand|glove|cuff|leftarm|rightarm|armleft|armright|arm[lr]$/.test(n);
+  // Also accept an explicit mesh called "arms", but never the rig root "Armature".
+  return /shoulder|sleeve|upperarm|lowerarm|forearm|elbow|wrist|hand|glove|cuff|leftarm|rightarm|armleft|armright|arms?$/.test(n);
 }
 
 function attributeComponent(attribute,index,component){
@@ -439,26 +439,68 @@ function vertexArmWeight(skinnedMesh,vertexIndex,armBoneIndices){
   return total;
 }
 
+function collectArmBoneIndices(source, armRoot){
+  const bones=source.skeleton?.bones || [];
+  const indices=new Set();
+
+  bones.forEach((bone,index)=>{
+    if(isArmBoneName(bone.name)) indices.add(index);
+  });
+
+  // Add each named upper-arm branch and all its descendants, even if the
+  // forearm/hand bones use custom names not covered by the name filter.
+  const upperArms=[
+    findBoneByNameParts(armRoot,[
+      "mixamorigleftupperarm","leftupperarm","leftarm","upperarml","arml"
+    ]),
+    findBoneByNameParts(armRoot,[
+      "mixamorigrightupperarm","rightupperarm","rightarm","upperarmr","armr"
+    ])
+  ];
+  for(let i=0;i<upperArms.length;i++){
+    if(upperArms[i]) continue;
+    upperArms[i]=findArmBoneByHierarchy(armRoot,i===0?"left":"right");
+  }
+  for(const upper of upperArms){
+    if(!upper) continue;
+    upper.traverse(obj=>{
+      if(!obj.isBone) return;
+      const index=bones.indexOf(obj);
+      if(index>=0) indices.add(index);
+    });
+  }
+
+  // Last-resort geometry-based detection for rigs with renamed arm bones:
+  // T-pose arms are the lateral bone chains high above the hips.
+  if(!indices.size && armRoot){
+    armRoot.updateMatrixWorld(true);
+    const inverseRoot=armRoot.matrixWorld.clone().invert();
+    const centralBones=bones.filter(bone=>/(hips|pelvis|spine|torso|root)/i.test(bone.name));
+    const centerXs=centralBones.map(bone=>
+      bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot).x
+    );
+    centerXs.sort((a,b)=>a-b);
+    const centerX=centerXs.length
+      ? centerXs[Math.floor(centerXs.length/2)]
+      : 0;
+
+    bones.forEach((bone,index)=>{
+      const position=bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot);
+      if(position.y<.52 || position.y>1.72) return;
+      if(Math.abs(position.x-centerX)>.14) indices.add(index);
+    });
+  }
+
+  return indices;
+}
+
 function extractArmGeometry(source, armRoot){
   const geometry=source.geometry;
   const position=geometry.getAttribute("position");
   if(!position || !geometry.getAttribute("skinIndex") || !geometry.getAttribute("skinWeight")) return null;
 
-  const armBoneIndices=new Set();
   const bones=source.skeleton?.bones || [];
-  bones.forEach((bone,index)=>{ if(isArmBoneName(bone.name)) armBoneIndices.add(index); });
-
-  if(!armBoneIndices.size){
-    const leftUpper=findArmBoneByHierarchy(armRoot || source,"left");
-    const rightUpper=findArmBoneByHierarchy(armRoot || source,"right");
-    for(const rootBone of [leftUpper,rightUpper].filter(Boolean)){
-      rootBone.traverse(bone=>{
-        if(!bone.isBone) return;
-        const index=bones.indexOf(bone);
-        if(index>=0) armBoneIndices.add(index);
-      });
-    }
-  }
+  const armBoneIndices=collectArmBoneIndices(source,armRoot || source);
   if(!armBoneIndices.size) return null;
 
   const sourceIndex=geometry.index;
