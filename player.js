@@ -246,9 +246,12 @@ export class Player {
     // Mesh visibility is filtered by actual arm vertex weights or explicit
     // arm-mesh names. A model may ship the arms as separate ordinary meshes
     // rather than one combined skinned mesh, so either valid path is accepted.
-    if(visibleMeshCount===0){
-      console.warn("[DeepSeeker] No visible arm mesh was found in the hazmat rig.",{
-        extractedArmMeshCount
+    const extractedArmTriangleCount=Number(viewmodel.userData.extractedArmTriangleCount)||0;
+    if(visibleMeshCount===0 || extractedArmTriangleCount===0){
+      console.error("[DeepSeeker] No real arm triangles were extracted from the hazmat rig.",{
+        extractedArmMeshCount,
+        extractedArmTriangleCount,
+        visibleMeshCount
       });
       return false;
     }

@@ -292,55 +292,37 @@ tutorialMascotAimQuaternion.setFromUnitVectors(
 function createTutorialMascot(){
   if(tutorialMascotReady) return;
 
-  // Badgey is a tiny face-shaped cyan hologram perched above the left sleeve.
-  // Keep the silhouette round and friendly: no barrel, muzzle, or gun grip.
+  // Badgey is a tiny floating helper drone: soft rounded body, wide face,
+  // readable eyes and a friendly mouth. No weapon-like silhouette.
   tutorialMascotRoot=new THREE.Group();
   tutorialMascotRoot.name="BadgeyHologram";
   tutorialMascotRoot.visible=false;
-  tutorialMascotRoot.position.set(-.235,-.39,-.86);
+  tutorialMascotRoot.position.set(-.235,-.30,-.86);
   player.hands.add(tutorialMascotRoot);
 
-  const holoMaterial=new THREE.MeshBasicMaterial({
-    color:0x55f1ff,
-    transparent:true,
-    opacity:.72,
-    depthTest:false,
-    depthWrite:false,
-    side:THREE.DoubleSide,
-    blending:THREE.AdditiveBlending,
-    toneMapped:false
+  const holo=new THREE.MeshBasicMaterial({
+    color:0x55f1ff,transparent:true,opacity:.78,
+    depthTest:false,depthWrite:false,side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending,toneMapped:false
   });
-  const outlineMaterial=new THREE.MeshBasicMaterial({
-    color:0xa7fbff,
-    transparent:true,
-    opacity:.92,
-    depthTest:false,
-    depthWrite:false,
-    side:THREE.DoubleSide,
-    blending:THREE.AdditiveBlending,
-    toneMapped:false
+  const outline=new THREE.MeshBasicMaterial({
+    color:0xb7fcff,transparent:true,opacity:.95,
+    depthTest:false,depthWrite:false,side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending,toneMapped:false
   });
-  const faceMaterial=new THREE.MeshBasicMaterial({
-    color:0x064c65,
-    transparent:true,
-    opacity:.82,
-    depthTest:false,
-    depthWrite:false,
-    blending:THREE.AdditiveBlending,
-    toneMapped:false
+  const visorMat=new THREE.MeshBasicMaterial({
+    color:0x043344,transparent:true,opacity:.94,
+    depthTest:false,depthWrite:false,side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending,toneMapped:false
   });
-  const eyeMaterial=new THREE.MeshBasicMaterial({
-    color:0xeaffff,
-    transparent:true,
-    opacity:1,
-    depthTest:false,
-    depthWrite:false,
-    blending:THREE.AdditiveBlending,
-    toneMapped:false
+  const eyeMat=new THREE.MeshBasicMaterial({
+    color:0xf0ffff,depthTest:false,depthWrite:false,
+    blending:THREE.AdditiveBlending,toneMapped:false
   });
 
-  const addHoloMesh=(geometry,material,position,scale,rotation)=>{
+  const addPart=(name,geometry,material,position,scale,rotation)=>{
     const mesh=new THREE.Mesh(geometry,material);
+    mesh.name=name;
     mesh.position.set(position[0],position[1],position[2]);
     if(scale) mesh.scale.set(scale[0],scale[1],scale[2]);
     if(rotation) mesh.rotation.set(rotation[0]||0,rotation[1]||0,rotation[2]||0);
@@ -350,79 +332,53 @@ function createTutorialMascot(){
     return mesh;
   };
 
-  // Compact rounded head with a dark face and two bright eyes.
-  const head=addHoloMesh(
-    new THREE.SphereGeometry(.067,12,10),holoMaterial,[0,0,0],[1,.88,.64]
-  );
-  head.name="BadgeyHoloHead";
-  addHoloMesh(
-    new THREE.SphereGeometry(.047,12,9),faceMaterial,[0,.001,.040],[1,.73,.22]
-  );
-  addHoloMesh(
-    new THREE.SphereGeometry(.010,8,6),eyeMaterial,[-.024,.009,.057],[1,1,.6]
-  );
-  addHoloMesh(
-    new THREE.SphereGeometry(.010,8,6),eyeMaterial,[.024,.009,.057],[1,1,.6]
+  // Rounded head and inset faceplate, facing the player.
+  addPart("BadgeyHead",new THREE.SphereGeometry(.083,16,12),holo,[0,.012,0],[1.12,.88,.62]);
+  addPart("BadgeyFaceplate",new THREE.SphereGeometry(.061,16,12),visorMat,[0,.014,.040],[1,.78,.22]);
+  addPart("BadgeyEyeLeft",new THREE.SphereGeometry(.011,10,8),eyeMat,[-.026,.022,.054],[1,1,.55]);
+  addPart("BadgeyEyeRight",new THREE.SphereGeometry(.011,10,8),eyeMat,[.026,.022,.054],[1,1,.55]);
+
+  tutorialMascotMouth=addPart(
+    "BadgeySmile",new THREE.TorusGeometry(.013,.0028,5,12,Math.PI),outline,
+    [0,-.014,.055],[1,1,.45],[0,0,Math.PI]
   );
 
-  tutorialMascotMouth=addHoloMesh(
-    new THREE.SphereGeometry(.008,8,6),outlineMaterial,[0,-.020,.057],[1.35,.28,.45]
-  );
-  tutorialMascotMouth.name="BadgeyHoloMouth";
-
-  // Little antenna and side lights make Badgey unmistakably a hovering bot.
-  addHoloMesh(
-    new THREE.CylinderGeometry(.003,.004,.035,6),outlineMaterial,[0,.081,0]
-  );
-  addHoloMesh(
-    new THREE.SphereGeometry(.010,8,6),outlineMaterial,[0,.106,0],[1,1,.8]
-  );
-  for(const x of [-.060,.060]){
-    addHoloMesh(
-      new THREE.SphereGeometry(.008,8,6),outlineMaterial,[x,-.003,.003],[1,1,.75]
-    );
+  // Tiny side fins and two floating hands make him look like a helper,
+  // not a detached glowing orb.
+  for(const side of [-1,1]){
+    addPart("BadgeyFin",new THREE.SphereGeometry(.020,10,8),holo,[side*.087,.004,0],[.72,1,.68]);
+    addPart("BadgeyHand",new THREE.SphereGeometry(.012,9,7),outline,[side*.105,-.036,.006],[1,.8,.8]);
   }
+  addPart("BadgeyAntenna",new THREE.CylinderGeometry(.0035,.0045,.023,7),outline,[0,.094,0]);
+  addPart("BadgeyAntennaLight",new THREE.SphereGeometry(.009,9,7),outline,[0,.108,0],[1,1,.8]);
 
-  // A small projection ring sits beneath Badgey's body, right above the sleeve.
-  const ringMaterial=outlineMaterial.clone();
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(.072,.0035,5,18),ringMaterial);
+  // Thin projected ring makes the placement above the forearm easy to read.
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.066,.003,5,20),outline);
   ring.name="BadgeyProjectionRing";
   ring.rotation.x=Math.PI/2;
-  ring.position.set(0,-.070,0);
+  ring.position.set(0,-.061,0);
   ring.frustumCulled=false;
   ring.renderOrder=3009;
   tutorialMascotRoot.add(ring);
-  const innerRing=new THREE.Mesh(new THREE.TorusGeometry(.052,.0025,4,16),ringMaterial.clone());
-  innerRing.rotation.x=Math.PI/2;
-  innerRing.position.set(0,-.066,0);
-  innerRing.renderOrder=3009;
-  innerRing.frustumCulled=false;
-  tutorialMascotRoot.add(innerRing);
 
-  const glow=new THREE.PointLight(0x22eaff,.12,.35);
-  glow.position.set(0,0,.02);
+  const glow=new THREE.PointLight(0x22eaff,.14,.38);
+  glow.position.set(0,.01,.02);
   tutorialMascotRoot.add(glow);
 
-  tutorialMascotRoot.traverse(obj=>{
-    if(obj.isMesh){
-      obj.frustumCulled=false;
-      obj.renderOrder=obj.name==="BadgeyProjectionRing" ? 3009 : 3010;
-    }
-  });
   tutorialMascotReady=true;
 }
 
 function speakTutorialMascot(stage){
   const lines={
-    1:"JUST DO ITTT. W A S D. MOVE YOUR LITTLE HUMAN LEGS.",
-    2:"SPACE. JUMP. COME ON.",
-    3:"CTRL. CROUCH. GET DOWN THERE.",
-    4:"SHIFT. RUN FAST. I BELIEVE IN YOU. SORT OF.",
-    5:"F. FLASHLIGHT. THE DARKNESS IS NOT GOING TO FIX ITSELF.",
-    6:"P. PHONE. IT'S LITERALLY A PHONE.",
-    7:"READ THE MESSAGE. THEN CLOSE IT. I AM POINTING AT IT.",
-    8:"GO TOWARD THE THING. THIS IS DEFINITELY A GOOD IDEA.",
-    9:"RUN! RUN! RUN! WHY ARE YOU STILL READING THIS?"
+    1:"All right, let's start with WASD. Move around a little.",
+    2:"Give Space a tap to jump. Nice.",
+    3:"Press Control to crouch. There you go.",
+    4:"Hold Shift to run. Just try not to hit a wall.",
+    5:"Press F for your flashlight. Much better.",
+    6:"Press P to open your phone.",
+    7:"Have a look at the message, then close your phone when you're done.",
+    8:"Head toward that thing over there. I'll keep an eye out.",
+    9:"Okay, time to move! We can panic while we're running."
   };
 
   if(tutorialMascotSpeechStage===stage) return;
@@ -434,9 +390,27 @@ function speakTutorialMascot(stage){
   try{
     window.speechSynthesis.cancel();
     const utterance=new SpeechSynthesisUtterance(text);
-    utterance.rate=1.22;
-    utterance.pitch=1.08;
-    utterance.volume=.62;
+    utterance.lang="en-CA";
+    // Prefer an available higher-quality English voice, avoiding the default
+    // if a more natural installed voice is available on the user's system.
+    const voices=window.speechSynthesis.getVoices();
+    const english=voices.filter(voice=>/^en([_-]|$)/i.test(voice.lang||""));
+    const qualityScore=voice=>{
+      const name=voice.name||"";
+      let score=0;
+      if(/natural|neural|online|premium/i.test(name)) score+=100;
+      if(/samantha|jenny|aria|ava|guy|daniel|google us english|microsoft/i.test(name)) score+=50;
+      if(/en[-_]CA/i.test(voice.lang||"")) score+=12;
+      if(/en[-_]US/i.test(voice.lang||"")) score+=10;
+      if(/espeak|festival|robot|compact/i.test(name)) score-=80;
+      if(voice.localService===false) score+=5;
+      return score;
+    };
+    english.sort((a,b)=>qualityScore(b)-qualityScore(a));
+    if(english[0]) utterance.voice=english[0];
+    utterance.rate=.94;
+    utterance.pitch=1.10;
+    utterance.volume=.68;
     window.speechSynthesis.speak(utterance);
   }catch(error){
     console.debug("[DeepSeeker] Tutorial voice unavailable:",error);
@@ -446,8 +420,6 @@ function speakTutorialMascot(stage){
 function updateTutorialMascot(dt){
   if(!tutorialMascotRoot || !tutorialMascotReady) return;
 
-  // The imported character torch stays hidden; the visible torch is held by
-  // the right-hand viewmodel and its lens follows the real battery state.
   if(player.characterFlashlight) player.characterFlashlight.visible=false;
   player.setFlashlightVisual(flashlightOn && battery>0);
 
@@ -470,22 +442,20 @@ function updateTutorialMascot(dt){
   }
 
   tutorialMascotRoot.visible=true;
-  // It is parented to the camera-local arm rig, so Badgey stays mounted above
-  // the left forearm instead of drifting into the room or covering the crosshair.
+  // Stay perched a little above the left-hand model geometry.
   tutorialMascotRoot.position.set(
     -.235,
-    -.39+Math.sin(tutorialMascotTime*3.2)*.008,
+    -.30+Math.sin(tutorialMascotTime*2.0)*.006,
     -.86
   );
 
   const talkActive=
     tutorialMascotSpeechTimer>0 ||
-    (tutorialMascotSpeechStage===houseTutorialStage && tutorialMascotTime%2.6<.38);
-
+    (tutorialMascotSpeechStage===houseTutorialStage && tutorialMascotTime%2.8<.34);
   if(tutorialMascotMouth){
     tutorialMascotMouth.scale.y=talkActive
-      ? .28+Math.abs(Math.sin(tutorialMascotTime*15))*.55
-      : .28;
+      ? .8+Math.abs(Math.sin(tutorialMascotTime*10))*.3
+      : 1;
   }
 
   if(tutorialMascotSpeechStage!==houseTutorialStage){
@@ -493,7 +463,7 @@ function updateTutorialMascot(dt){
     tutorialMascotSpeechTimer=1.7;
   }
 
-  const pulse=.98+Math.sin(tutorialMascotTime*4.0)*.02;
+  const pulse=.99+Math.sin(tutorialMascotTime*3.2)*.012;
   tutorialMascotRoot.scale.setScalar(pulse);
 }
 

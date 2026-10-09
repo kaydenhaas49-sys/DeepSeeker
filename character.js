@@ -627,120 +627,243 @@ function applyFirstPersonArmPose(root){
 }
 
 export function createFirstPersonArms(model){
-  const root=cloneSkeleton(model);
-  cloneCharacterMaterials(root);
-  root.name="FirstPersonActualArms";
-  root.visible=true;
-
-  let extractedArmMeshCount=0;
-  root.traverse(obj=>{
-    if(!obj.isMesh) return;
-    if(obj.isSkinnedMesh){
-      const armGeometry=extractArmGeometry(obj,root);
-      if(armGeometry){
-        obj.geometry=armGeometry;
-        extractedArmMeshCount++;
-        obj.visible=true;
-      }else{
-        obj.visible=meshNameLooksLikeArm(obj);
-      }
-    }else{
-      obj.visible=meshNameLooksLikeArm(obj);
-    }
-  });
-
-  root.rotation.set(0,Math.PI,0);
-  applyFirstPersonArmPose(root);
-  root.updateMatrixWorld(true);
-
-  const leftHand=findBoneByNameParts(root,[
-    "mixamoriglefthand","lefthand","handl","wristl"
-  ]);
-  const rightHand=findBoneByNameParts(root,[
-    "mixamorigrighthand","righthand","handr","wristr"
-  ]);
-
-  // Recenter the extracted arm geometry after posing so the viewmodel
-  // lands in the camera regardless of the GLB export origin.
-  // Ignore hidden torso/body meshes when framing the first-person arms.
-  // Box3.setFromObject() includes invisible meshes, which can pull the arm
-  // viewmodel off-screen when the source GLB is a single combined body mesh.
-  // Measure the posed, skinned arm vertices in the cloned rig's local space.
-  // Do not use the unskinned geometry.boundingBox: this model's arms start in
-  // a T-pose, and a bind-pose AABB produces a bad camera offset after posing.
-  const armBounds=new THREE.Box3();
-  root.updateMatrixWorld(true);
-  // The skeleton palettes are updated explicitly because this pose happens
-  // before the renderer's first frame for this clone.
-  root.traverse(obj=>{
+  // Work from the real skinned hazmat model, pose its arms, and bake the
+  // deformed arm triangles into camera-local meshes. This avoids depending
+  // on the renderer's skin-palette update to keep a tiny extracted rig visible.
+  const rig=cloneSkeleton(model);
+  cloneCharacterMaterials(rig);
+  rig.name="FirstPersonArmExtractionRig";
+  rig.rotation.set(0,Math.PI,0);
+  applyFirstPersonArmPose(rig);
+  rig.updateMatrixWorld(true);
+  rig.traverse(obj=>{
     if(obj.isSkinnedMesh && obj.skeleton) obj.skeleton.update();
   });
-  const inverseRootWorld=root.matrixWorld.clone().invert();
-  const vertex=new THREE.Vector3();
-  root.traverse(obj=>{
-    if(!obj.isMesh || !obj.visible || !obj.geometry) return;
-    const position=obj.geometry.getAttribute("position");
-    if(!position) return;
-    for(let i=0;i<position.count;i++){
-      if(typeof obj.getVertexPosition==="function"){
-        obj.getVertexPosition(i,vertex);
-      }else{
-        vertex.fromBufferAttribute(position,i);
+  rig.updateMatrixWorld(true);
+
+  const inverseRigWorld=rig.matrixWorld.clone().invert();
+  const positionScratch=new THREE.Vector3();
+  const rawScratch=new THREE.Vector3();
+  const armMeshes=[];
+  const armBounds=new THREE.Box3();
+  let armTriangleCount=0;
+  let sourceArmMeshCount=0;
+
+  // Compute the unposed silhouette bounds. The fallback region test uses this
+  // to find the left and right arm areas even if the rig uses custom bone names.
+  const modelBounds=new THREE.Box3();
+  rig.traverse(obj=>{
+    if(!obj.isMesh || !obj.geometry) return;
+    if(obj.name==="HeldFlashlight" || obj.parent?.name==="HeldFlashlight") return;
+    const geometry=obj.geometry;
+    if(!geometry.boundingBox) geometry.computeBoundingBox();
+    if(geometry.boundingBox){
+      const toRigLocal=inverseRigWorld.clone().multiply(obj.matrixWorld);
+      modelBounds.union(geometry.boundingBox.clone().applyMatrix4(toRigLocal));
+    }
+  });
+  const modelSize=modelBounds.getSize(new THREE.Vector3());
+  const modelCenter=modelBounds.getCenter(new THREE.Vector3());
+  const torsoHalfWidth=Math.max(modelSize.y*.15,modelSize.x*.105);
+  const armBandMinY=modelBounds.min.y+modelSize.y*.50;
+  const armBandMaxY=modelBounds.min.y+modelSize.y*.93;
+  const armOutermostX=Math.max(modelSize.x*.14,modelSize.y*.16);
+
+  const isNearModelArmRegion=(points)=>{
+    const center=points.reduce((sum,point)=>sum+point.x/3,0);
+    const cy=points.reduce((sum,point)=>sum+point.y/3,0);
+    const anyOutside=points.some(point=>Math.abs(point.x-modelCenter.x)>torsoHalfWidth);
+    const outerEnough=points.some(point=>Math.abs(point.x-modelCenter.x)>armOutermostX);
+    return anyOutside && outerEnough && cy>=armBandMinY && cy<=armBandMaxY;
+  };
+
+  const triangleIndices=(geometry,triangle)=>{
+    const index=geometry.index;
+    const offset=triangle*3;
+    return index
+      ? [index.getX(offset),index.getX(offset+1),index.getX(offset+2)]
+      : [offset,offset+1,offset+2];
+  };
+  const triangleMaterialIndex=(geometry,triangle)=>{
+    const start=triangle*3;
+    for(const group of geometry.groups||[]){
+      if(start>=group.start && start<group.start+group.count) return group.materialIndex||0;
+    }
+    return 0;
+  };
+
+  const buildBakedArmMesh=(source,filterByArmWeights)=>{
+    const geometry=source.geometry;
+    const sourcePosition=geometry?.getAttribute("position");
+    if(!sourcePosition) return null;
+    const skinned=source.isSkinnedMesh && source.skeleton;
+    const armBoneIndices=skinned ? collectArmBoneIndices(source,rig) : new Set();
+    const skinIndex=geometry.getAttribute("skinIndex");
+    const skinWeight=geometry.getAttribute("skinWeight");
+    const canWeightFilter=skinned && skinIndex && skinWeight && armBoneIndices.size>0;
+    const uv=geometry.getAttribute("uv");
+    const uv2=geometry.getAttribute("uv2");
+    const color=geometry.getAttribute("color");
+    const positions=[],uvs=[],uvs2=[],colors=[],materialIndices=[];
+    const triCount=geometry.index
+      ? Math.floor(geometry.index.count/3)
+      : Math.floor(sourcePosition.count/3);
+    const localPoints=[new THREE.Vector3(),new THREE.Vector3(),new THREE.Vector3()];
+
+    for(let tri=0;tri<triCount;tri++){
+      const indices=triangleIndices(geometry,tri);
+      const rawPoints=[];
+      const armWeights=[];
+      for(let k=0;k<3;k++){
+        const vertexIndex=indices[k];
+        rawScratch.fromBufferAttribute(sourcePosition,vertexIndex);
+        rawPoints.push(rawScratch.clone().applyMatrix4(source.matrixWorld).applyMatrix4(inverseRigWorld));
+        armWeights.push(canWeightFilter ? vertexArmWeight(source,vertexIndex,armBoneIndices) : 0);
       }
-      vertex.applyMatrix4(obj.matrixWorld);
-      vertex.applyMatrix4(inverseRootWorld);
-      if(
-        Number.isFinite(vertex.x) &&
-        Number.isFinite(vertex.y) &&
-        Number.isFinite(vertex.z)
-      ){
-        armBounds.expandByPoint(vertex);
+
+      // Prefer real arm skin weights. If this GLB's arm weights are poorly
+      // named/painted, fall back to its actual T-pose shoulder/arm silhouette.
+      const maximumWeight=Math.max(...armWeights);
+      const averageWeight=(armWeights[0]+armWeights[1]+armWeights[2])/3;
+      const strongCount=armWeights.filter(weight=>weight>=.08).length;
+      const weightedArm=canWeightFilter && (
+        (averageWeight>=.035 && strongCount>=1) ||
+        maximumWeight>=.12
+      );
+      const namedLooseArm=meshNameLooksLikeArm(source) && !canWeightFilter;
+      const spatialArm=isNearModelArmRegion(rawPoints);
+      const keep=filterByArmWeights
+        ? (weightedArm || spatialArm || namedLooseArm)
+        : true;
+      if(!keep) continue;
+
+      for(let k=0;k<3;k++){
+        const vertexIndex=indices[k];
+        positionScratch.fromBufferAttribute(sourcePosition,vertexIndex);
+        if(skinned && typeof source.getVertexPosition==="function"){
+          source.getVertexPosition(vertexIndex,positionScratch);
+        }
+        positionScratch
+          .applyMatrix4(source.matrixWorld)
+          .applyMatrix4(inverseRigWorld);
+        positions.push(positionScratch.x,positionScratch.y,positionScratch.z);
+        if(uv) uvs.push(uv.getX(vertexIndex),uv.getY(vertexIndex));
+        if(uv2) uvs2.push(uv2.getX(vertexIndex),uv2.getY(vertexIndex));
+        if(color){
+          for(let component=0;component<color.itemSize;component++){
+            colors.push(attributeComponent(color,vertexIndex,component));
+          }
+        }
       }
+      materialIndices.push(triangleMaterialIndex(geometry,tri));
+    }
+
+    if(!materialIndices.length) return null;
+    const baked=new THREE.BufferGeometry();
+    baked.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+    if(uv) baked.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
+    if(uv2) baked.setAttribute("uv2",new THREE.Float32BufferAttribute(uvs2,2));
+    if(color) baked.setAttribute("color",new THREE.Float32BufferAttribute(colors,color.itemSize));
+
+    let runStart=0,runMaterial=materialIndices[0]??0;
+    for(let i=1;i<=materialIndices.length;i++){
+      const mat=materialIndices[i];
+      if(i<materialIndices.length && mat===runMaterial) continue;
+      const count=(i-runStart)*3;
+      if(count>0) baked.addGroup(runStart*3,count,runMaterial);
+      runStart=i;
+      runMaterial=mat??0;
+    }
+    baked.computeVertexNormals();
+    baked.computeBoundingBox();
+    baked.computeBoundingSphere();
+    const mesh=new THREE.Mesh(baked,source.material);
+    mesh.name="BakedHazmatArmSurface";
+    mesh.frustumCulled=false;
+    mesh.castShadow=false;
+    mesh.receiveShadow=false;
+    mesh.renderOrder=2000;
+    armBounds.union(baked.boundingBox.clone());
+    armTriangleCount+=materialIndices.length;
+    sourceArmMeshCount++;
+    return mesh;
+  };
+
+  const viewmodel=new THREE.Group();
+  viewmodel.name="FirstPersonActualHazmatArms";
+  rig.updateMatrixWorld(true);
+  rig.traverse(obj=>{
+    if(!obj.isMesh || !obj.geometry) return;
+    if(obj.name==="HeldFlashlight" || obj.parent?.name==="HeldFlashlight") return;
+    const meshName=normalizeBoneName(obj.name);
+    const explicitArmMesh=meshNameLooksLikeArm(obj);
+    const extracted=buildBakedArmMesh(obj,true);
+    if(extracted){
+      viewmodel.add(extracted);
+    }else if(explicitArmMesh && !obj.isSkinnedMesh){
+      const loose=buildBakedArmMesh(obj,false);
+      if(loose) viewmodel.add(loose);
     }
   });
 
+  // The primary extraction already uses arm bone weights, explicit arm mesh
+  // names, and a geometric T-pose fallback on the original model triangles.
+  // Keep the actual model's scale/orientation but center its posed arm surfaces
+  // on the lower part of the camera view, like a first-person model.
+  viewmodel.quaternion.copy(rig.quaternion);
+  viewmodel.scale.copy(rig.scale);
   if(!armBounds.isEmpty()){
-    const centerInRigSpace=armBounds.getCenter(new THREE.Vector3());
-    // Convert the rig-local center through the viewmodel's rotation/scale,
-    // then place that center directly in camera-local space.
-    centerInRigSpace.multiply(root.scale).applyQuaternion(root.quaternion);
-    root.position.set(
-      -centerInRigSpace.x,
-      -.47-centerInRigSpace.y,
-      -.88-centerInRigSpace.z
-    );
+    const center=armBounds.getCenter(new THREE.Vector3())
+      .multiply(viewmodel.scale)
+      .applyQuaternion(viewmodel.quaternion);
+    viewmodel.position.set(-center.x,-.40-center.y,-.84-center.z);
   }else{
-    root.position.set(0,-.47,-.88);
+    viewmodel.position.set(0,-.40,-.84);
   }
 
-  if(!leftHand || !rightHand){
-    console.warn("[DeepSeeker] First-person hand bones not found; centered the extracted arm viewmodel by bounds.");
+  // Re-parent the rig's own flashlight using its posed right-hand transform.
+  const sourceFlashlight=rig.getObjectByName("HeldFlashlight");
+  if(sourceFlashlight){
+    rig.updateMatrixWorld(true);
+    const relativeMatrix=inverseRigWorld.clone().multiply(sourceFlashlight.matrixWorld);
+    const held=sourceFlashlight.clone(true);
+    const pos=new THREE.Vector3(),rot=new THREE.Quaternion(),scale=new THREE.Vector3();
+    relativeMatrix.decompose(pos,rot,scale);
+    held.position.copy(pos);
+    held.quaternion.copy(rot);
+    held.scale.copy(scale);
+    held.visible=true;
+    held.name="HeldFlashlight";
+    held.traverse(obj=>{
+      if(!obj.isMesh) return;
+      obj.frustumCulled=false;
+      obj.renderOrder=2010;
+      obj.castShadow=false;
+      obj.receiveShadow=false;
+      const materials=Array.isArray(obj.material)?obj.material:[obj.material];
+      for(const mat of materials){
+        if(!mat) continue;
+        mat.depthTest=false;
+        mat.depthWrite=false;
+        mat.needsUpdate=true;
+      }
+    });
+    viewmodel.add(held);
   }
 
-  root.updateMatrixWorld(true);
-
-  root.traverse(obj=>{
-    if(!obj.isMesh) return;
-    obj.frustumCulled=false;
-    obj.renderOrder=2000;
-    obj.castShadow=false;
-    obj.receiveShadow=false;
-
-    const materials=Array.isArray(obj.material) ? obj.material : [obj.material];
-    for(const material of materials){
-      if(!material) continue;
-      material.depthTest=true;
-      material.depthWrite=false;
-      material.needsUpdate=true;
-    }
+  viewmodel.userData.extractedArmMeshCount=sourceArmMeshCount;
+  viewmodel.userData.extractedArmTriangleCount=armTriangleCount;
+  console.log("[DeepSeeker] baked real hazmat arm viewmodel",{
+    sourceArmMeshCount,
+    armTriangleCount,
+    armBounds:armBounds.isEmpty()?null:{
+      min:armBounds.min.toArray(),
+      max:armBounds.max.toArray()
+    },
+    scale:viewmodel.scale.toArray(),
+    position:viewmodel.position.toArray()
   });
-
-  root.userData.extractedArmMeshCount=extractedArmMeshCount;
-  console.log("[DeepSeeker] first-person arm viewmodel",{
-    extractedArmMeshCount,
-    position:root.position.toArray()
-  });
-  return root;
+  return viewmodel;
 }
 
 export function createRemoteFlashlight(scene){
