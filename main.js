@@ -3253,6 +3253,9 @@ const interaction=new InteractionSystem({
       computerSystem.open(target);
       return true;
     }
+    if(target.type==="stairwellDoor" && typeof target.toggle==="function"){
+      return target.toggle();
+    }
     return false;
   }
 });
@@ -8273,6 +8276,9 @@ function animate(){
   }else if(!tutorialOpenRoomActive){
     player.extraCollisionBoxes=[];
   }
+
+  // Animate stairwell doors and update their collider before player movement.
+  world.updateStairwellDoors(dt);
 
   player.inputEnabled=(
     gameStarted &&
