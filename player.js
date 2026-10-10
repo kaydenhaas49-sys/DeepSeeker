@@ -753,9 +753,15 @@ export class Player {
       }
     }
 
-    const currentEye = this.camera.position.y - this.bobOffset;
-    const eye = currentEye + (targetEye - currentEye) * (1 - Math.exp(-12 * dt));
-    this.camera.position.set(this.pos.x, eye + this.bobOffset + this.jumpY - this.landingKick, this.pos.z);
+    const stairFloorOffset=this.world.getStairwellFloorHeight?.(this.pos.x,this.pos.z)||0;
+    this.pos.y=EYE+stairFloorOffset;
+    const currentEye=this.camera.position.y-this.bobOffset-stairFloorOffset;
+    const eye=currentEye+(targetEye-currentEye)*(1-Math.exp(-12*dt));
+    this.camera.position.set(
+      this.pos.x,
+      eye+this.bobOffset+this.jumpY-this.landingKick+stairFloorOffset,
+      this.pos.z
+    );
     this.camera.rotation.set(this.pitch, this.yaw, 0);
 
     if(this.characterMixer) {
