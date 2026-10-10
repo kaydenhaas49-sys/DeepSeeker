@@ -754,7 +754,8 @@ export class Player {
     }
 
     const stairFloorOffset=this.world.getStairwellFloorHeight?.(this.pos.x,this.pos.z)||0;
-    this.pos.y=EYE+stairFloorOffset;
+    // Keep pos.y at its long-standing eye-height baseline: gameplay systems
+    // such as spider scare/look logic rely on it. The stairs affect only camera height.
     const currentEye=this.camera.position.y-this.bobOffset-stairFloorOffset;
     const eye=currentEye+(targetEye-currentEye)*(1-Math.exp(-12*dt));
     this.camera.position.set(
