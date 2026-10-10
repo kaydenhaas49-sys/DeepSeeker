@@ -1,23 +1,24 @@
-# Backrooms: Lost Signal — Rebuild
+# Backrooms: Lost Signal
 
-A clean restart of the game project.
+A browser-based Three.js liminal-horror game with procedural Backrooms rooms, a furnished-house tutorial, a first-person hazmat viewmodel, flashlight/battery mechanics, and multiplayer encounters.
 
-## Current foundation
+## Play
 
-- Godot 4.x
-- Large procedural outdoor world
-- Third-person controller
-- Forest, rocks, water and landmark prototype
-- No dependency on the old DeepSeeker code
-- World generation is intentionally separated from the player
-
-## Direction
-
-This is the foundation for a much larger exploration / automation game. The terrain prototype is deliberately replaceable so we can later move to Terrain3D or imported heightmaps without rewriting the gameplay systems.
+GitHub Pages: https://kaydenhaas49-sys.github.io/DeepSeeker/
 
 ## Controls
 
-WASD — move  
-Shift — sprint  
-Mouse — look  
-Esc — release mouse
+- **W A S D** — move
+- **Shift** — sprint
+- **Ctrl** — crouch
+- **Space** — jump
+- **F** — flashlight
+- **P** — phone
+- **N** — multiplayer map
+- **Tab** — controls
+
+## Active code
+
+The browser game starts from `index.html` and `main.js`. Its core systems are split across `player.js`, `world.js`, `character.js`, `spiderHunter.js`, and `multiplayer.js`.
+
+The root Godot files are a legacy prototype, and `assets/backrooms-horror-game-main/` is a separate vendored reference project; neither is the active browser-game entry point.

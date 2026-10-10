@@ -40,6 +40,16 @@ export class SpiderHunter {
     this.replanTimer = 0;
     this.lastSeenTime = -Infinity;
     this.lastKnownTarget = new THREE.Vector3();
+    // Reused ray/visibility scratch objects prevent a fresh group of vectors and
+    // a Raycaster from being allocated on every active-spider frame.
+    this.sightOrigin=new THREE.Vector3();
+    this.sightTarget=new THREE.Vector3();
+    this.sightDelta=new THREE.Vector3();
+    this.sightForward=new THREE.Vector3();
+    this.sightFlatDirection=new THREE.Vector3();
+    this.raycastDelta=new THREE.Vector3();
+    this.sightRaycaster=new THREE.Raycaster();
+    this.tutorialLookTarget=new THREE.Vector3();
     this.facing = 0;
     this.walkPhase = 0;
     this.speed = 0;
@@ -140,8 +150,6 @@ export class SpiderHunter {
     }
 
     this.tutorialTime += dt;
-    const dx = target.pos.x - this.position.x;
-    const dz = target.pos.z - this.position.z;
     const distanceToSurface = this.distanceToHitbox(target.pos.x, target.pos.z);
 
     if (!this.chaseStarted) {
@@ -172,10 +180,8 @@ export class SpiderHunter {
     const remainingDz = target.pos.z - this.position.z;
     const remainingDistance = Math.hypot(remainingDx, remainingDz);
     if (remainingDistance > 0.001) {
-      this.faceToward(
-        new THREE.Vector3(target.pos.x, this.position.y, target.pos.z),
-        9
-      );
+      this.tutorialLookTarget.set(target.pos.x,this.position.y,target.pos.z);
+      this.faceToward(this.tutorialLookTarget,9);
     }
 
     this.animateLegs(dt, 6.0);
@@ -242,27 +248,27 @@ export class SpiderHunter {
   }
 
   canSeeTarget(targetPosition, targetY = 1.5) {
-    const origin = new THREE.Vector3(
+    const origin=this.sightOrigin.set(
       this.position.x,
-      this.position.y + 0.62,
+      this.position.y+.62,
       this.position.z
     );
-    const target = new THREE.Vector3(
+    const target=this.sightTarget.set(
       targetPosition.x,
       targetY,
       targetPosition.z
     );
-    const delta = target.clone().sub(origin);
-    const distance = delta.length();
+    const delta=this.sightDelta.copy(target).sub(origin);
+    const distance=delta.length();
 
     if (distance > this.sightRange || distance < 0.05) return false;
 
-    const forward = new THREE.Vector3(
+    const forward=this.sightForward.set(
       Math.sin(this.facing),
       0,
       Math.cos(this.facing)
     );
-    const direction = delta.clone().setY(0).normalize();
+    const direction=this.sightFlatDirection.copy(delta).setY(0).normalize();
     if (distance > 2 && forward.dot(direction) < Math.cos(this.sightFov * 0.5)) {
       return false;
     }
@@ -273,14 +279,16 @@ export class SpiderHunter {
   }
 
   raycastLineOfSight(origin, target) {
-    const delta = target.clone().sub(origin);
-    const length = delta.length();
-    if (length < 0.05) return true;
+    const delta=this.raycastDelta.copy(target).sub(origin);
+    const length=delta.length();
+    if(length<.05) return true;
     delta.normalize();
 
-    const raycaster = new THREE.Raycaster(origin, delta, 0, Math.max(0, length - 0.12));
-    const occluders = this.getOccluders() || [];
-    return raycaster.intersectObjects(occluders, true).length === 0;
+    this.sightRaycaster.set(origin,delta);
+    this.sightRaycaster.near=0;
+    this.sightRaycaster.far=Math.max(0,length-.12);
+    const occluders=this.getOccluders()||[];
+    return this.sightRaycaster.intersectObjects(occluders,true).length===0;
   }
 
   updatePath(dt, targetX, targetZ) {
@@ -315,7 +323,8 @@ export class SpiderHunter {
       THREE.MathUtils.clamp(targetCellZ + this.pathRadiusCells, 0, cols - 1)
     ];
 
-    const open = [0];
+    const open=[0];
+    const openSet=new Set([0]);
     const came = new Map();
     const g = new Map([[0, 0]]);
     const f = new Map();
@@ -352,7 +361,8 @@ export class SpiderHunter {
         }
       }
 
-      const current = open.splice(best, 1)[0];
+      const current=open.splice(best,1)[0];
+      openSet.delete(current);
       const cx = current % cols;
       const cz = Math.floor(current / cols);
 
@@ -385,7 +395,10 @@ export class SpiderHunter {
             ni,
             tentative + Math.abs(nx - goal[0]) + Math.abs(nz - goal[1])
           );
-          if (!open.includes(ni)) open.push(ni);
+          if(!openSet.has(ni)){
+            open.push(ni);
+            openSet.add(ni);
+          }
         }
       }
     }

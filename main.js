@@ -1356,6 +1356,17 @@ function syncMenuSpiderFromGameplayModel(){
     0
   );
 
+  // SkeletonUtils.clone shares geometry and materials. Clone each menu material
+  // once before changing depth flags, or the title screen alters gameplay too.
+  const menuMaterialCopies=new Map();
+  const copyMenuMaterial=(material)=>{
+    if(!material) return material;
+    if(!menuMaterialCopies.has(material)){
+      menuMaterialCopies.set(material,material.clone());
+    }
+    return menuMaterialCopies.get(material);
+  };
+
   menuSpiderActual.traverse(node=>{
     if(!node.isMesh) return;
 
@@ -1365,6 +1376,9 @@ function syncMenuSpiderFromGameplayModel(){
     node.renderOrder=50;
 
     if(!node.material) return;
+    node.material=Array.isArray(node.material)
+      ? node.material.map(copyMenuMaterial)
+      : copyMenuMaterial(node.material);
 
     const materials=Array.isArray(node.material)
       ? node.material
@@ -1555,27 +1569,29 @@ const flashlight=new THREE.SpotLight(
   LOW_END_PERFORMANCE?.72:.68,
   1.35
 );
-const flashlightFill=new THREE.PointLight(
-  0xf0dfad,
-  .08,
-  5,
-  2
-);
-flashlightFill.castShadow=false;
-camera.add(flashlightFill);
 const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
 flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
 flashlight.shadow.bias=-0.0004;
 flashlight.shadow.normalBias=0.018;
 flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
-camera.add(flashlight);
-camera.add(flashlight.target);
 scene.add(camera);
 
-
-
 const player=new Player(camera,renderer.domElement,world);
+
+// Mount the actual light to the same camera-local torch as the visible prop.
+// This stops the beam from appearing to originate at the middle of the camera.
+function mountFlashlightOnHeldProp(mount){
+  if(!mount) return;
+  camera.remove(flashlight);
+  camera.remove(flashlight.target);
+  mount.add(flashlight);
+  mount.add(flashlight.target);
+  flashlight.position.set(0,0,0);
+  flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
+}
+mountFlashlightOnHeldProp(player.proceduralArmFlashlight);
+
 const audio=new HorrorAudio();
 
 player.onBreath=(intensity=.65)=>audio.breath(intensity);
@@ -4556,7 +4572,7 @@ const normalSpiderHunter=new SpiderHunter({
   getVisualHitboxDistance:(x,z)=>Math.max(
     0,
     Math.hypot(x-spiderEntity.position.x,z-spiderEntity.position.z)-
-      SPIDER_TARGET_SPAN*(1.1/8.2)
+      SPIDER_TARGET_SPAN*(1.1/SPIDER_BASE_TARGET_SPAN)
   ),
   onStateChange:(mode)=>{
     if(mode==="roam"){
@@ -4708,7 +4724,9 @@ const SPIDER_RADIUS=1.02;
 const SPIDER_MIN_SPAWN_DISTANCE=13;
 const SPIDER_MAX_SPAWN_DISTANCE=21;
 const SPIDER_GROUND_OFFSET=.08;
-const SPIDER_TARGET_SPAN=12.3;
+const SPIDER_BASE_TARGET_SPAN=8.2;
+const SPIDER_SCALE_MULTIPLIER=1.5;
+const SPIDER_TARGET_SPAN=SPIDER_BASE_TARGET_SPAN*SPIDER_SCALE_MULTIPLIER;
 
 const SPIDER_PATH_CELL_SIZE=LOW_END_PERFORMANCE?1.8:1.35;
 const SPIDER_PATH_GRID_SIZE=LOW_END_PERFORMANCE?19:31;
@@ -4885,10 +4903,10 @@ function syncTutorialSpiderFromGameplayModel(force=false){
   tutorialSpiderActual.visible=false;
   tutorialSpiderActual.position.set(0,0,0);
   tutorialSpiderActual.rotation.set(0,0,0);
-  // The tutorial keeps its previous 8.2-unit size. The shared source wrapper
-  // is 1.5x larger for normal Backrooms, so counter-scale only this clone.
+  // Keep the tutorial at its baseline size; regular Backrooms uses the
+  // explicit 1.5x multiplier without allowing animation clips to shrink it.
   tutorialSpiderActual.scale.setScalar(
-    arachnophobiaMode ? MENU_DUCK_SCALE : (8.2/SPIDER_TARGET_SPAN)
+    arachnophobiaMode ? MENU_DUCK_SCALE : (SPIDER_BASE_TARGET_SPAN/SPIDER_TARGET_SPAN)
   );
 
   tutorialSpiderActual.updateMatrixWorld(true);
@@ -5591,7 +5609,7 @@ function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15){
   if(spiderModel) spiderModel.visible=true;
   spiderRevealLight.visible=false;
   spiderRevealLight.intensity=0;
-  // The tutorial spider stays still while waiting for the player.
+  // Normal Backrooms bypasses the tutorial's frozen waiting stage and starts hunting immediately.
   pulse=Math.max(pulse,.22);
   return true;
 }
@@ -8142,9 +8160,7 @@ function animate(){
 
   flashlight.intensity=flashlightOn ? flashlightStrength : 0;
   flashlight.visible=flashlightOn && battery>0;
-  // The camera-local point fill created a concentrated white floor hotspot.
-  flashlightFill.intensity=0;
-  flashlightFill.visible=false;
+  // The beam now follows the hand-held torch rather than a camera-center fill.
   // Keep beam range and aim stable. Wall-hit occlusion was changing the
   // spotlight target dozens of times per second and could make surfaces snap
   // or flicker as the center ray crossed a wall edge.

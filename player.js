@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { EYE, WALL_H } from "./world.js";
-import { createHazmatCharacter } from "./character.js";
+import { createHazmatCharacter, createFirstPersonArms } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -142,9 +142,8 @@ function makeContinuousSleeve(group,points,material,name){
 }
 
 function makeLocalFirstPersonArms(group){
-  // A conventional first-person pose: upper sleeves emerge below the frame,
-  // elbows sit wide, and forearms angle inward toward hands in the lower third.
-  // Wrist and glove positions stay inside the camera frustum at the game's FOV.
+  // Keep the sleeves low and wide, then bring both hands inward and upward
+  // toward the lower center of the camera. Fingers extend along camera -Z.
   const suit=new THREE.MeshStandardMaterial({
     color:0xb2aa82, roughness:.94, metalness:0,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
@@ -172,10 +171,10 @@ function makeLocalFirstPersonArms(group){
   for(const side of [-1,1]){
     const name=side<0?"Left":"Right";
     const points=[
-      new THREE.Vector3(side*.92,-1.08,-.27),  // shoulder cropped below the viewport
-      new THREE.Vector3(side*.77,-.91,-.51),   // upper arm reaches forward
-      new THREE.Vector3(side*.59,-.77,-.75),   // elbow
-      new THREE.Vector3(side*.395,-.635,-1.00) // wrist and fingers point forward
+      new THREE.Vector3(side*.91,-1.04,-.24),  // shoulder starts below the viewport
+      new THREE.Vector3(side*.72,-.83,-.48),   // upper arm angles forward
+      new THREE.Vector3(side*.51,-.62,-.73),   // elbow stays outside the hand
+      new THREE.Vector3(side*.305,-.41,-.98)   // wrist ends higher and closer to center
     ];
 
     const sleeve=makeContinuousSleeve(group,points,suit,name+"ContinuousHazmatSleeve");
@@ -195,7 +194,7 @@ function makeLocalFirstPersonArms(group){
 
   // Left hand: rounded palm meets the sleeve with the fingers aimed ahead and
   // slightly down. The small inward-facing thumb avoids a splayed / claw pose.
-  const leftPalm=wristPositions.Left.clone().add(new THREE.Vector3(.014,-.005,-.085));
+  const leftPalm=wristPositions.Left.clone().add(new THREE.Vector3(.012,-.004,-.070));
   makeFirstPersonPalm(group,leftPalm,glove,"LeftGlovePalm",-.035);
   makeFirstPersonGloveDetail(
     group,leftPalm.clone().add(new THREE.Vector3(0,.039,-.006)),
@@ -226,7 +225,7 @@ function makeLocalFirstPersonArms(group){
 
   // Right glove is built relative to its wrist, so its palm, grip and flashlight
   // move together. Fingers curve over the torch barrel instead of floating near it.
-  const rightPalm=wristPositions.Right.clone().add(new THREE.Vector3(-.014,-.005,-.085));
+  const rightPalm=wristPositions.Right.clone().add(new THREE.Vector3(-.012,-.004,-.070));
   makeFirstPersonPalm(group,rightPalm,glove,"RightGlovePalm",.035);
   makeFirstPersonGloveDetail(
     group,rightPalm.clone().add(new THREE.Vector3(.006,.039,-.006)),
@@ -256,22 +255,23 @@ function makeLocalFirstPersonArms(group){
 
   const flashlight=new THREE.Group();
   flashlight.name="LocalFirstPersonFlashlight";
-  flashlight.position.copy(rightPalm).add(new THREE.Vector3(-.025,.012,.008));
-  // Aim slightly down and inward, toward the center of the player's view.
+  flashlight.position.copy(rightPalm).add(new THREE.Vector3(-.020,.010,.006));
+  // The prop and its spotlight share this exact transform: forward, slightly
+  // down, and just inward toward the center of the view.
   flashlight.rotation.set(
-    THREE.MathUtils.degToRad(-4),
-    THREE.MathUtils.degToRad(2),
-    THREE.MathUtils.degToRad(-4)
+    THREE.MathUtils.degToRad(-5),
+    THREE.MathUtils.degToRad(4),
+    0
   );
   group.add(flashlight);
 
   const metal=new THREE.MeshStandardMaterial({
-    color:0x20231f, roughness:.48, metalness:.34,
+    color:0x20231f, roughness:.64, metalness:.16,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false,
     emissive:0x000000, emissiveIntensity:.05
   });
   const trim=new THREE.MeshStandardMaterial({
-    color:0x777866, roughness:.38, metalness:.58,
+    color:0x67695e, roughness:.46, metalness:.32,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const gripMaterial=new THREE.MeshStandardMaterial({
@@ -284,38 +284,38 @@ function makeLocalFirstPersonArms(group){
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const body=makeFirstPersonArmMesh(
-    flashlight,new THREE.CylinderGeometry(.042,.047,.37,20),
+    flashlight,new THREE.CylinderGeometry(.032,.036,.30,20),
     metal,"LocalFlashlightBody",2010
   );
   body.rotation.x=Math.PI/2;
   const head=makeFirstPersonArmMesh(
-    flashlight,new THREE.CylinderGeometry(.055,.068,.09,24),
+    flashlight,new THREE.CylinderGeometry(.045,.054,.07,24),
     metal,"LocalFlashlightHead",2010
   );
   head.rotation.x=Math.PI/2;
-  head.position.z=-.208;
+  head.position.z=-.165;
   const bezel=makeFirstPersonArmMesh(
-    flashlight,new THREE.TorusGeometry(.067,.006,8,24),
+    flashlight,new THREE.TorusGeometry(.051,.0045,8,24),
     trim,"LocalFlashlightBezel",2010
   );
-  bezel.position.z=-.253;
+  bezel.position.z=-.203;
   const lens=makeFirstPersonArmMesh(
-    flashlight,new THREE.CylinderGeometry(.055,.055,.012,24),
+    flashlight,new THREE.CylinderGeometry(.044,.044,.009,24),
     lensMaterial,"FlashlightLens",2011
   );
   lens.rotation.x=Math.PI/2;
-  lens.position.z=-.258;
+  lens.position.z=-.208;
   const rear=makeFirstPersonArmMesh(
-    flashlight,new THREE.CylinderGeometry(.047,.047,.025,20),
+    flashlight,new THREE.CylinderGeometry(.033,.033,.018,20),
     trim,"LocalFlashlightRearCap",2010
   );
   rear.rotation.x=Math.PI/2;
-  rear.position.z=.19;
+  rear.position.z=.153;
 
   // Grip rings and a raised switch make the torch read as a held object.
-  for(const [index,z] of [.005,.055,.105].entries()){
+  for(const [index,z] of [.010,.055,.100].entries()){
     const rib=makeFirstPersonArmMesh(
-      flashlight,new THREE.TorusGeometry(.045,.0032,6,20),
+      flashlight,new THREE.TorusGeometry(.032,.0025,6,20),
       gripMaterial,"FlashlightGripRib"+index,2010
     );
     rib.position.z=z;
@@ -324,7 +324,7 @@ function makeLocalFirstPersonArms(group){
     flashlight,new RoundedBoxGeometry(.022,.009,.032,3,.003),
     trim,"FlashlightPowerSwitch",2010
   );
-  powerSwitch.position.set(.003,.046,.075);
+  powerSwitch.position.set(.003,.036,.064);
 
   group.traverse(obj=>{
     if(obj.isMesh){
@@ -333,7 +333,7 @@ function makeLocalFirstPersonArms(group){
       obj.receiveShadow=false;
     }
   });
-  return lens;
+  return {lens,flashlight};
 }
 export class Player {
   constructor(camera, domElement, world) {
@@ -462,14 +462,23 @@ export class Player {
     // First-person keeps the world-space body hidden to avoid clipping through
     // the camera; multiplayer renders the same full-body model.
     this.hands = new THREE.Group();
-    this.hands.name = "PlayerCharacterRoot";
+    this.hands.name = "PlayerFirstPersonHands";
     this.hands.visible = true;
     this.hands.renderOrder = 2999;
     this.camera.add(this.hands);
 
-    // Real-time camera-local sleeves and gloves render immediately and never
-    // enter the full-body character model used by multiplayer.
-    this.proceduralArmFlashlightLens=makeLocalFirstPersonArms(this.hands);
+    // Keep a lightweight fallback visible immediately. Once the hazmat GLB is
+    // ready, replace these tube arms with its actual skinned sleeves and gloves.
+    this.proceduralHands=new THREE.Group();
+    this.proceduralHands.name="ProceduralHandsFallback";
+    this.hands.add(this.proceduralHands);
+    const fallbackViewmodel=makeLocalFirstPersonArms(this.proceduralHands);
+    this.proceduralArmFlashlightLens=fallbackViewmodel.lens;
+    this.proceduralArmFlashlight=fallbackViewmodel.flashlight;
+    // The prop stays outside the fallback group so the real arm mesh can
+    // replace the hands without also hiding the flashlight or its beam.
+    this.hands.add(this.proceduralArmFlashlight);
+    this.firstPersonArmViewmodel=null;
 
     this.characterModel = null;
     this.characterMixer = null;
@@ -510,10 +519,30 @@ export class Player {
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
       // First-person arms are our separate camera-local hazmat viewmodel.
-      // Keep the asset's flashlight hidden with the non-rendered local avatar.
+      // The world avatar is intentionally hidden in first-person and in this
+      // local-only client path. Extract the authored skinned arms for the viewmodel.
       this.hands.visible=true;
       this.hands.renderOrder=2999;
       if(this.characterFlashlight) this.characterFlashlight.visible=false;
+
+      try{
+        const viewmodel=createFirstPersonArms(character.model);
+        const importedTorch=viewmodel.getObjectByName("HeldFlashlight");
+        const extractedCount=Number(viewmodel.userData.extractedArmMeshCount)||0;
+        if(importedTorch) importedTorch.visible=false; // use the fitted custom torch instead
+        if(extractedCount>0){
+          viewmodel.name="FirstPersonHazmatHands";
+          viewmodel.visible=true;
+          this.hands.add(viewmodel);
+          this.firstPersonArmViewmodel=viewmodel;
+          this.proceduralHands.visible=false;
+        }else{
+          console.warn("[DeepSeeker] real arm extraction returned no meshes; keeping fallback hands");
+        }
+      }catch(armError){
+        // The fallback stays visible if a particular character rig cannot be extracted.
+        console.warn("[DeepSeeker] real first-person arms unavailable; keeping fallback hands:",armError);
+      }
 
       this.worldAvatar.add(character.model);
       this.characterLoaded = true;
