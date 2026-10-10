@@ -453,11 +453,9 @@ export class World {
     if (!entry) return;
     this.root.remove(entry.group);
     // Detached children keep their .parent, so check live root membership.
-    this.wallOccluders=this.wallOccluders.filter(mesh=>{
-      let parent=mesh.parent;
-      while(parent&&parent!==this.root)parent=parent.parent;
-      return parent===this.root;
-    });
+    this.wallOccluders=this.wallOccluders.filter(mesh=>
+      mesh.parent && this.root.children.includes(mesh.parent)
+    );
     entry.group.traverse((o) => {
       if (o.isMesh && o.geometry !== this.floorGeo && o.geometry !== this.ceilGeo) {
         o.geometry.dispose();
@@ -486,11 +484,9 @@ export class World {
     this.fixtureLights=this.fixtureLights.filter(item=>
       item.light.parent && this.root.children.includes(item.light.parent)
     );
-    this.wallOccluders=this.wallOccluders.filter(mesh=>{
-      let parent=mesh.parent;
-      while(parent&&parent!==this.root)parent=parent.parent;
-      return parent===this.root;
-    });
+    this.wallOccluders=this.wallOccluders.filter(mesh=>
+      mesh.parent && this.root.children.includes(mesh.parent)
+    );
 
     const flickerTime=now*.003;
     for(const item of this.fixtureLights){
