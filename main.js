@@ -4448,8 +4448,30 @@ function prepareInitialStartupAssets(){
   }
 }
 
+function ensureInitialWorldRegion(){
+  if(!world || typeof world.spawnChunk!=="function" || !world.chunks) return false;
+
+  // Do not depend on the normal gameplay streamer to advance the boot screen:
+  // create one missing starting chunk directly on each loading tick.
+  for(const key of INITIAL_WORLD_CHUNK_KEYS){
+    if(world.chunks.has(key)) continue;
+    const [cx,cz]=key.split(",").map(Number);
+    try{
+      world.spawnChunk(cx,cz);
+      return true;
+    }catch(error){
+      initialStartupError="STARTING WORLD CHUNK "+key+" FAILED TO GENERATE.";
+      console.error("[DeepSeeker] Initial Backrooms chunk generation failed:",{key,error});
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function updateInitialLoadingScreen(){
   if(initialLandingShown) return;
+  if(!initialStartupError) ensureInitialWorldRegion();
 
   const saveReady=Boolean(window.__deepseekerSaveHydrationDone);
   if(saveReady && !initialHouseDecisionMade){
