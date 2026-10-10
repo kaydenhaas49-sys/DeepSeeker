@@ -8100,6 +8100,16 @@ function animate(){
     }
   }
   audio && audio.ctx && audio.ctx.state==="suspended" && audio.start();
+  audio.update(dt,{
+    playing:gameStarted,
+    threat:spiderActive&&!houseMode,
+    threatDistance:spiderActive&&!houseMode
+      ? Math.hypot(
+          player.pos.x-spiderEntity.position.x,
+          player.pos.z-spiderEntity.position.z
+        )
+      : Infinity
+  });
 
   if(flashlightOn && battery>0){
     battery=Math.max(0,battery-dt*.30);
