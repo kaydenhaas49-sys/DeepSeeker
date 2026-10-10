@@ -4888,6 +4888,107 @@ function startTutorialSpiderAnimation(){
   tutorialSpiderWalkAction.play();
 }
 
+const SPIDER_WALL_CLIP_LIMIT=48;
+const SPIDER_WALL_CLIP_HEIGHT=WALL_H+1.25;
+const spiderWallClipUniformSets=new Set();
+let spiderWallClipRefreshElapsed=1;
+
+function installSpiderWallClipMaterial(material){
+  if(!material || material._deepseekerSpiderWallClipInstalled) return;
+  material._deepseekerSpiderWallClipInstalled=true;
+  const state={
+    count:{value:0},
+    bounds:Array.from({length:SPIDER_WALL_CLIP_LIMIT},()=>new THREE.Vector4())
+  };
+  spiderWallClipUniformSets.add(state);
+
+  const previousOnBeforeCompile=material.onBeforeCompile;
+  material.onBeforeCompile=function(shader,renderer){
+    if(typeof previousOnBeforeCompile==="function") previousOnBeforeCompile.call(this,shader,renderer);
+    const worldPositionMarker="#include <worldpos_vertex>";
+    const opaqueFragmentMarker="#include <opaque_fragment>";
+    if(!shader.vertexShader.includes(worldPositionMarker) || !shader.fragmentShader.includes(opaqueFragmentMarker)){
+      console.warn("[DeepSeeker] Spider wall clipping skipped for an unsupported material shader.");
+      return;
+    }
+    shader.uniforms.uDeepseekerSpiderWallCount=state.count;
+    shader.uniforms.uDeepseekerSpiderWallBounds={value:state.bounds};
+    shader.vertexShader=shader.vertexShader.replace(
+      "#include <common>",
+      "#include <common>\nvarying vec3 vDeepseekerSpiderWorldPosition;"
+    );
+    shader.vertexShader=shader.vertexShader.replace(
+      worldPositionMarker,
+      worldPositionMarker+"\nvDeepseekerSpiderWorldPosition = worldPosition.xyz;"
+    );
+    shader.fragmentShader=shader.fragmentShader.replace(
+      "#include <common>",
+      "#include <common>\nvarying vec3 vDeepseekerSpiderWorldPosition;\n"+
+      "uniform int uDeepseekerSpiderWallCount;\n"+
+      "uniform vec4 uDeepseekerSpiderWallBounds["+SPIDER_WALL_CLIP_LIMIT+"];"
+    );
+    const clipFragment =
+      "\nfor(int deepseekerWallIndex=0; deepseekerWallIndex<"+SPIDER_WALL_CLIP_LIMIT+"; deepseekerWallIndex++){\n"+
+      "  if(deepseekerWallIndex>=uDeepseekerSpiderWallCount) break;\n"+
+      "  vec4 deepseekerWall=uDeepseekerSpiderWallBounds[deepseekerWallIndex];\n"+
+      "  bool deepseekerInsideWall =\n"+
+      "    vDeepseekerSpiderWorldPosition.x>=deepseekerWall.x &&\n"+
+      "    vDeepseekerSpiderWorldPosition.x<=deepseekerWall.y &&\n"+
+      "    vDeepseekerSpiderWorldPosition.z>=deepseekerWall.z &&\n"+
+      "    vDeepseekerSpiderWorldPosition.z<=deepseekerWall.w &&\n"+
+      "    vDeepseekerSpiderWorldPosition.y>=-0.08 &&\n"+
+      "    vDeepseekerSpiderWorldPosition.y<="+SPIDER_WALL_CLIP_HEIGHT.toFixed(3)+";\n"+
+      "  if(deepseekerInsideWall) discard;\n"+
+      "}\n";
+    shader.fragmentShader=shader.fragmentShader.replace(opaqueFragmentMarker,clipFragment+opaqueFragmentMarker);
+  };
+  const previousProgramCacheKey=material.customProgramCacheKey.bind(material);
+  material.customProgramCacheKey=()=>previousProgramCacheKey()+"|deepseeker-spider-wall-clip-v1";
+  material.needsUpdate=true;
+}
+
+function updateSpiderWallClipBounds(dt){
+  spiderWallClipRefreshElapsed+=Math.max(0,Math.min(Number(dt)||0,.25));
+  if(spiderWallClipRefreshElapsed<.12) return;
+  spiderWallClipRefreshElapsed=0;
+  let originX=0,originZ=0,wallBounds=[];
+  if(!gameStarted || arachnophobiaMode){
+    wallBounds=[];
+  }else if(tutorialOpenRoomActive && tutorialSpiderActual?.visible){
+    originX=tutorialSpiderEntity.position.x;
+    originZ=tutorialSpiderEntity.position.z;
+    wallBounds=tutorialOpenRoomCollisionBoxes;
+  }else if(!houseMode && spiderActive && spiderModel){
+    originX=spiderEntity.position.x;
+    originZ=spiderEntity.position.z;
+    wallBounds=world.getNearbyWallBounds(originX,originZ,SPIDER_TARGET_SPAN*.58+1);
+  }
+  const reach=SPIDER_TARGET_SPAN*.58+.5;
+  const nearby=[...wallBounds].filter(wall=>{
+    if(!wall || !Number.isFinite(wall.minX) || !Number.isFinite(wall.maxX) ||
+       !Number.isFinite(wall.minZ) || !Number.isFinite(wall.maxZ)) return false;
+    const nx=Math.max(wall.minX,Math.min(originX,wall.maxX));
+    const nz=Math.max(wall.minZ,Math.min(originZ,wall.maxZ));
+    const dx=originX-nx,dz=originZ-nz;
+    return dx*dx+dz*dz<=reach*reach;
+  });
+  nearby.sort((a,b)=>{
+    const ax=Math.max(a.minX,Math.min(originX,a.maxX));
+    const az=Math.max(a.minZ,Math.min(originZ,a.maxZ));
+    const bx=Math.max(b.minX,Math.min(originX,b.maxX));
+    const bz=Math.max(b.minZ,Math.min(originZ,b.maxZ));
+    return (originX-ax)**2+(originZ-az)**2-((originX-bx)**2+(originZ-bz)**2);
+  });
+  const count=Math.min(nearby.length,SPIDER_WALL_CLIP_LIMIT);
+  for(const state of spiderWallClipUniformSets){
+    state.count.value=count;
+    for(let index=0;index<count;index++){
+      const wall=nearby[index];
+      state.bounds[index].set(wall.minX-.035,wall.maxX+.035,wall.minZ-.035,wall.maxZ+.035);
+    }
+  }
+}
+
 function applyTutorialSpiderMaterialPass(model,{darken=true}={}){
   const copiedMaterials=new Map();
 
@@ -4934,6 +5035,7 @@ function applyTutorialSpiderMaterialPass(model,{darken=true}={}){
       material.emissiveIntensity=Math.min(material.emissiveIntensity,0.16);
     }
     material.needsUpdate=true;
+    installSpiderWallClipMaterial(material);
     copiedMaterials.set(original,material);
     return material;
   };
@@ -8532,6 +8634,8 @@ function animate(){
       lowEnd:LOW_END_PERFORMANCE
     });
   }
+
+  updateSpiderWallClipBounds(dt);
 
   renderer.render(scene,camera);
 }
