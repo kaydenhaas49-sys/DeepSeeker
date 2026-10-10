@@ -315,9 +315,9 @@ export class World {
     this.stairRailMaterial = new THREE.MeshStandardMaterial({
       color: 0x353a32, roughness: 0.82, metalness: 0.12,
     });
-    this.stairDoorMaterial=new THREE.MeshStandardMaterial({color:0x55594a,roughness:0.91,metalness:0.02});
-    this.stairDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0x292d27,roughness:0.82,metalness:0.16});
-    this.stairDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x777767,roughness:0.42,metalness:0.62});
+    this.stairDoorMaterial=new THREE.MeshStandardMaterial({color:0xaaa6b5,roughness:0.91,metalness:0.02});
+    this.stairDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0xd6d2d8,roughness:0.82,metalness:0.16});
+    this.stairDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x888898,roughness:0.42,metalness:0.62});
     this.stairwellDoors=[];
 
     // Ceiling fixtures use a tiny real-light budget. They only activate when
@@ -744,7 +744,7 @@ export class World {
     const collisionBounds={minX:centerX-halfWidth,maxX:centerX+halfWidth,minZ:doorZ-0.08,maxZ:doorZ+0.08};
     const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,face,doorWidth,toggle(){this.targetOpen=!this.targetOpen;return true;}};
     pivot.userData.interactable={type:"stairwellDoor",prompt:"Open the stairwell door",toggle:()=>state.toggle(),staircaseTestOnly:Boolean(staircase.testOnly)};
-    group.userData.stairwellDoorState=state;this.wallOccluders.push(panel);
+    group.userData.stairwellDoorState=state; // Keep the animated panel out of the spider's static wall-occluder list.
   }
 
   buildCeilingFixtures(group, cx, cz) {
