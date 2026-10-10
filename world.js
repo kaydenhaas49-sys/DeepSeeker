@@ -685,7 +685,18 @@ export class World {
     hole.moveTo(centerX-halfWidth,lowerY);hole.lineTo(centerX-halfWidth,upperY);
     hole.lineTo(centerX+halfWidth,upperY);hole.lineTo(centerX+halfWidth,lowerY);hole.lineTo(centerX-halfWidth,lowerY);
     shape.holes.push(hole);
-    const geometry=new THREE.ShapeGeometry(shape);geometry.rotateX(-Math.PI/2);geometry.computeVertexNormals();return geometry;
+    const geometry=new THREE.ShapeGeometry(shape);
+    // ShapeGeometry UVs are raw shape-space coordinates (-32..32), unlike the
+    // regular PlaneGeometry floor's 0..1 UVs. Normalize them before the carpet
+    // material applies its existing 16x repeat, so the pattern matches seams.
+    const uv=geometry.attributes.uv;
+    for(let i=0;i<uv.count;i++){
+      uv.setXY(i,(uv.getX(i)+mid)/CHUNK_SIZE,(uv.getY(i)+mid)/CHUNK_SIZE);
+    }
+    uv.needsUpdate=true;
+    geometry.rotateX(-Math.PI/2);
+    geometry.computeVertexNormals();
+    return geometry;
   }
 
   buildWallStaircase(group, staircase) {
