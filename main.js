@@ -4568,11 +4568,11 @@ const normalSpiderHunter=new SpiderHunter({
   visualRig:normalSpiderHiddenRig,
   isBlocked:(x,z)=>isSpiderBlocked(x,z),
   getOccluders:()=>world.wallOccluders,
-  // Same body-radius hitbox as the tutorial spider; articulated legs stay visual-only.
+  // Enlarged contact radius catches the body sooner; articulated legs stay visual-only.
   getVisualHitboxDistance:(x,z)=>Math.max(
     0,
     Math.hypot(x-spiderEntity.position.x,z-spiderEntity.position.z)-
-      SPIDER_TARGET_SPAN*(1.1/SPIDER_BASE_TARGET_SPAN)
+      SPIDER_TARGET_SPAN*(1.4/SPIDER_BASE_TARGET_SPAN)
   ),
   onStateChange:(mode)=>{
     if(mode==="roam"){

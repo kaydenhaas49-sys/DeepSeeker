@@ -84,7 +84,7 @@ export function generateChunk(cx, cz, seed) {
 
   // 1) Large architectural partitions — fewer, longer walls create
   // believable rooms and long Backrooms sightlines instead of a noisy maze.
-  const nSeg = 32 + Math.floor(rng() * 11); // 32–42 wall attempts
+  const nSeg = 22 + Math.floor(rng() * 7); // 22–28 wall attempts for more open sightlines
   for (let i = 0; i < nSeg; i++) {
     const horiz = rng() < 0.5;
     const len = 3 + Math.floor(rng() * 6); // 3–8 cells
@@ -95,22 +95,29 @@ export function generateChunk(cx, cz, seed) {
     tryAdd(lx, lz, len, horiz);
   }
 
-  // A ring side, optionally leaving a 1-cell doorway at `gapAt`.
-  const addRingSide = (x, z, len, horiz, gapAt) => {
+  // A ring side, optionally leaving a wider doorway at `gapAt`.
+  const addRingSide = (x, z, len, horiz, gapAt, gapWidth = 1) => {
     if (gapAt < 0) {
       tryAdd(x, z, len, horiz);
       return;
     }
-    gapAt = Math.min(Math.max(gapAt, 0), len - 1);
+    gapWidth = Math.min(Math.max(1, gapWidth), len);
+    gapAt = Math.min(Math.max(gapAt, 0), len - gapWidth);
     if (gapAt > 0) tryAdd(x, z, gapAt, horiz);
-    const rest = len - gapAt - 1;
-    if (rest > 0)
-      tryAdd(x + (horiz ? gapAt + 1 : 0), z + (horiz ? 0 : gapAt + 1), rest, horiz);
+    const rest = len - gapAt - gapWidth;
+    if (rest > 0) {
+      tryAdd(
+        x + (horiz ? gapAt + gapWidth : 0),
+        z + (horiz ? 0 : gapAt + gapWidth),
+        rest,
+        horiz
+      );
+    }
   };
 
   // Extra short partitions: these break up the big empty expanses and make
   // each chunk feel much more like a dense Backrooms floor plan.
-  const nShort = 12 + Math.floor(rng() * 8); // 12–19 extra attempts
+  const nShort = 5 + Math.floor(rng() * 5); // 5–9 extra attempts, with fewer tight pockets
   for (let i = 0; i < nShort; i++) {
     const horiz = rng() < 0.5;
     const len = 2 + Math.floor(rng() * 4); // 2–5 cells
@@ -120,17 +127,17 @@ export function generateChunk(cx, cz, seed) {
   }
 
   // 2) Larger side rooms / service spaces with a deliberate doorway.
-  if (rng() < 0.82) {
-    const w = 4 + Math.floor(rng() * 5); // 4–8 cells
-    const h = 4 + Math.floor(rng() * 5);
+  if (rng() < 0.72) {
+    const w = 5 + Math.floor(rng() * 4); // 5–8 cells
+    const h = 5 + Math.floor(rng() * 4); // 5–8 cells
     const x0 = 1 + Math.floor(rng() * (CHUNK_CELLS - w - 2));
     const z0 = 1 + Math.floor(rng() * (CHUNK_CELLS - h - 2));
     const side = Math.floor(rng() * 4); // 0 top, 1 bottom, 2 left, 3 right
-    const gap = (n) => Math.floor(rng() * Math.max(1, n));
-    addRingSide(x0, z0, w, true, side === 0 ? gap(w) : -1);
-    addRingSide(x0, z0 + h - 1, w, true, side === 1 ? gap(w) : -1);
-    addRingSide(x0, z0 + 1, h - 2, false, side === 2 ? gap(h - 2) : -1);
-    addRingSide(x0 + w - 1, z0 + 1, h - 2, false, side === 3 ? gap(h - 2) : -1);
+    const gap = (n) => Math.floor(rng() * Math.max(1, n - 1));
+    addRingSide(x0, z0, w, true, side === 0 ? gap(w) : -1, 2);
+    addRingSide(x0, z0 + h - 1, w, true, side === 1 ? gap(w) : -1, 2);
+    addRingSide(x0, z0 + 1, h - 2, false, side === 2 ? gap(h - 2) : -1, 2);
+    addRingSide(x0 + w - 1, z0 + 1, h - 2, false, side === 3 ? gap(h - 2) : -1, 2);
   }
 
   // 3) Main corridor spines: broad, long lanes with enough breathing room
@@ -138,7 +145,7 @@ export function generateChunk(cx, cz, seed) {
   if (rng() < 0.72) {
     const horiz = rng() < 0.5;
     const len = 9 + Math.floor(rng() * 8); // 9–16 cells
-    const lane = 2 + Math.floor(rng() * 2); // 2–3 cells wide
+    const lane = 3 + Math.floor(rng() * 2); // 3–4 cells wide for the larger spider
     const a = Math.floor(rng() * (CHUNK_CELLS - len));
     const b = Math.floor(rng() * (CHUNK_CELLS - lane - 2));
     if (horiz) {
@@ -152,7 +159,7 @@ export function generateChunk(cx, cz, seed) {
 
   // 4) One occasional "backroom" motif: a wide partial divider. It creates
   // a large room that still feels connected rather than becoming a dead-end box.
-  if (rng() < 0.68) {
+  if (rng() < 0.48) {
     const horiz = rng() < 0.5;
     const len = 6 + Math.floor(rng() * 6); // 6–11 cells
     const start = 2 + Math.floor(rng() * Math.max(1, CHUNK_CELLS - len - 4));
