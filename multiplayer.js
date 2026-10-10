@@ -17,6 +17,36 @@ const MP_LOW_END =
   })();
 const REMOTE_RENDER_DISTANCE = MP_LOW_END ? 38 : 60;
 
+function disposeRemoteCharacterInstance(model){
+  if(!model) return;
+  const disposedMaterials=new Set();
+
+  model.traverse(node=>{
+    if(!node.isMesh) return;
+
+    let ancestor=node;
+    let isHeldFlashlight=false;
+    while(ancestor && ancestor!==model){
+      if(ancestor.name==="HeldFlashlight"){
+        isHeldFlashlight=true;
+        break;
+      }
+      ancestor=ancestor.parent;
+    }
+
+    // The hazmat mesh geometry is shared with the cached source GLB; only the
+    // small procedural flashlight geometry belongs uniquely to this instance.
+    if(isHeldFlashlight) node.geometry?.dispose();
+
+    const materials=Array.isArray(node.material)?node.material:[node.material];
+    for(const material of materials){
+      if(!material || disposedMaterials.has(material)) continue;
+      disposedMaterials.add(material);
+      material.dispose();
+    }
+  });
+}
+
 export class Multiplayer {
   constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart, onSharedFall, onChat, onWorldEvent }) {
     this.scene = scene;
@@ -119,6 +149,22 @@ export class Multiplayer {
     return value;
   }
 
+  disposeRemotePlayer(remote){
+    if(!remote) return;
+    this.scene.remove(remote.group);
+    if(remote.mixer && remote.model){
+      remote.mixer.stopAllAction();
+      remote.mixer.uncacheRoot(remote.model);
+    }
+    disposeRemoteCharacterInstance(remote.model);
+    if(remote.nameplate){
+      remote.nameplate.texture.dispose();
+      remote.nameplate.material.dispose();
+      remote.nameplate=null;
+    }
+    disposeRemoteFlashlight(this.scene,remote.remoteLight);
+  }
+
   connect() {
     if (!this.server || this.closedManually) {
       this.setStatus("MULTIPLAYER OFFLINE");
@@ -153,12 +199,7 @@ export class Multiplayer {
       this.socket = null;
 
       for (const remote of this.players.values()) {
-        this.scene.remove(remote.group);
-        if(remote.nameplate){
-          remote.nameplate.texture.dispose();
-          remote.nameplate.material.dispose();
-        }
-        disposeRemoteFlashlight(this.scene, remote.remoteLight);
+        this.disposeRemotePlayer(remote);
       }
       this.players.clear();
       this.playerId = null;
@@ -332,8 +373,7 @@ export class Multiplayer {
         const remote = this.players.get(data.id);
         if (!remote) return;
 
-        this.scene.remove(remote.group);
-        disposeRemoteFlashlight(this.scene, remote.remoteLight);
+        this.disposeRemotePlayer(remote);
         this.players.delete(data.id);
         this.updateCount();
         break;
@@ -371,7 +411,7 @@ export class Multiplayer {
       z: Number.isFinite(z) ? z : 0,
       yaw: Number.isFinite(yaw) ? yaw : 0,
       pitch: Number.isFinite(Number(state?.pitch)) ? Number(state.pitch) : 0,
-      level: "backrooms",
+      level: state?.level==="house" || state?.level==="apartment" ? "house" : "backrooms",
       crouched: Boolean(state?.crouched),
       flashlight: Boolean(state?.flashlight),
       playerName: this.sanitizeName(state?.playerName || ""),
@@ -514,7 +554,11 @@ export class Multiplayer {
 
       createHazmatCharacter()
         .then(character=>{
-          if(!this.players.has(player.id)) return;
+          if(!this.players.has(player.id)){
+            disposeRemoteCharacterInstance(character.model);
+            character.mixer?.stopAllAction();
+            return;
+          }
 
           remote.model = character.model;
           remote.mixer = character.mixer;
@@ -605,7 +649,7 @@ export class Multiplayer {
       z: Number(this.player.pos.z.toFixed(3)),
       yaw: Number(this.player.yaw.toFixed(2)),
       pitch: Number(this.player.pitch.toFixed(2)),
-      level: "backrooms",
+      level: this.getLevel?.()==="house" || this.getLevel?.()==="apartment" ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
       flashlight: Boolean(this.getFlashlightOn()),
       playerName: this.getPlayerName(),
@@ -752,11 +796,7 @@ export class Multiplayer {
     }
 
     for (const remote of this.players.values()) {
-      this.scene.remove(remote.group);
-      if(remote.nameplate){
-        remote.nameplate.texture.dispose();
-        remote.nameplate.material.dispose();
-      }
+      this.disposeRemotePlayer(remote);
     }
     this.players.clear();
   }

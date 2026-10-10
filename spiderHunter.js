@@ -21,6 +21,7 @@ export class SpiderHunter {
     hasLineOfSight = null,
     getVisualHitboxDistance = null,
     onStateChange = () => {},
+    visualRig = null,
   }) {
     this.group = group;
     this.scene = scene;
@@ -56,7 +57,7 @@ export class SpiderHunter {
     this.hearSprintRange = 13;
     this.hearFlashlightRange = 9;
 
-    this.visualRig = new SignalStalkerRig();
+    this.visualRig = visualRig || new SignalStalkerRig();
     this.visualRig.root.visible = false;
     this.group.add(this.visualRig.root);
     this.group.visible = false;
@@ -203,6 +204,9 @@ export class SpiderHunter {
       } else {
         this.setMode("investigate");
       }
+    } else if (this.mode === "investigate" && time - this.lastSeenTime > 6.2) {
+      // A search is temporary; do not leave the enemy permanently in investigate.
+      this.setMode("roam");
     }
 
     if (hearsFlashlight && this.mode === "roam") {

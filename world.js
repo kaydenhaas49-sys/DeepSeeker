@@ -10,6 +10,10 @@ export const WALL_H = 9.0; // 9 m Backrooms ceiling
 export const WALL_T = 0.35; // wall thickness
 export const EYE = 1.6; // eye height
 
+// Seven-by-seven 64m chunks make a finite 448m x 448m floor.
+export const MAP_MIN_CHUNK = -3;
+export const MAP_MAX_CHUNK = 3;
+
 // ---------------------------------------------------------------------------
 // Seeded RNG
 // ---------------------------------------------------------------------------
@@ -262,11 +266,88 @@ export class World {
     this.fixtureLightToTarget = new THREE.Vector3();
     this.fixtureLightTarget = new THREE.Vector3();
 
+    // Permanent outer walls survive chunk streaming and block both players and AI.
+    this.boundaryWallBounds = [];
+    this.boundaryGroup = new THREE.Group();
+    this.boundaryGroup.name = "BackroomsMapBoundary";
+    this.boundaryMaterial = this.materials.wall.clone();
+    this.boundaryMaterial.color.multiplyScalar(0.78);
+    this.root.add(this.boundaryGroup);
+    this.buildMapBoundary();
+
     // Shared per-chunk geometry templates (never disposed per chunk).
     this.floorGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE);
     this.floorGeo.rotateX(-Math.PI / 2);
     this.ceilGeo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE);
     this.ceilGeo.rotateX(Math.PI / 2); // face down
+  }
+
+  // -- fixed map boundary ----------------------------------------------------
+
+  buildMapBoundary() {
+    const minX = MAP_MIN_CHUNK * CHUNK_SIZE;
+    const maxX = (MAP_MAX_CHUNK + 1) * CHUNK_SIZE;
+    const minZ = MAP_MIN_CHUNK * CHUNK_SIZE;
+    const maxZ = (MAP_MAX_CHUNK + 1) * CHUNK_SIZE;
+    const thickness = 1.2;
+    const height = WALL_H + 4.0;
+    const width = maxX - minX;
+    const depth = maxZ - minZ;
+    const midX = (minX + maxX) * 0.5;
+    const midZ = (minZ + maxZ) * 0.5;
+
+    const addWall = (name, geometry, x, z, bounds, horizontal) => {
+      if (horizontal) {
+        scaleFaceU(geometry, 4, (width + 2 * thickness) / CELL);
+        scaleFaceU(geometry, 5, (width + 2 * thickness) / CELL);
+        scaleFaceU(geometry, 0, thickness / CELL);
+        scaleFaceU(geometry, 1, thickness / CELL);
+      } else {
+        scaleFaceU(geometry, 0, (depth + 2 * thickness) / CELL);
+        scaleFaceU(geometry, 1, (depth + 2 * thickness) / CELL);
+        scaleFaceU(geometry, 4, thickness / CELL);
+        scaleFaceU(geometry, 5, thickness / CELL);
+      }
+      const mesh = new THREE.Mesh(geometry, this.boundaryMaterial);
+      mesh.name = name;
+      mesh.position.set(x, height * 0.5, z);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.fixtureLightOccluder = true;
+      this.boundaryGroup.add(mesh);
+      this.wallOccluders.push(mesh);
+      this.boundaryWallBounds.push(bounds);
+    };
+
+    // Overlap the corners so there are no gaps to slip through.
+    addWall(
+      "BoundaryNorth",
+      new THREE.BoxGeometry(width + 2 * thickness, height, thickness),
+      midX, minZ + thickness * 0.5,
+      { minX: minX - thickness, maxX: maxX + thickness, minZ, maxZ: minZ + thickness },
+      true
+    );
+    addWall(
+      "BoundarySouth",
+      new THREE.BoxGeometry(width + 2 * thickness, height, thickness),
+      midX, maxZ - thickness * 0.5,
+      { minX: minX - thickness, maxX: maxX + thickness, minZ: maxZ - thickness, maxZ },
+      true
+    );
+    addWall(
+      "BoundaryWest",
+      new THREE.BoxGeometry(thickness, height, depth + 2 * thickness),
+      minX + thickness * 0.5, midZ,
+      { minX, maxX: minX + thickness, minZ: minZ - thickness, maxZ: maxZ + thickness },
+      false
+    );
+    addWall(
+      "BoundaryEast",
+      new THREE.BoxGeometry(thickness, height, depth + 2 * thickness),
+      maxX - thickness * 0.5, midZ,
+      { minX: maxX - thickness, maxX, minZ: minZ - thickness, maxZ: maxZ + thickness },
+      false
+    );
   }
 
   // -- chunk lifecycle -------------------------------------------------------
@@ -298,14 +379,19 @@ export class World {
     const entry = this.chunks.get(key);
     if (!entry) return;
     this.root.remove(entry.group);
-    this.wallOccluders=this.wallOccluders.filter(mesh=>mesh.parent);
+    // Detached children keep their .parent, so check live root membership.
+    this.wallOccluders=this.wallOccluders.filter(mesh=>
+      mesh.parent && this.root.children.includes(mesh.parent)
+    );
     entry.group.traverse((o) => {
       if (o.isMesh && o.geometry !== this.floorGeo && o.geometry !== this.ceilGeo) {
         o.geometry.dispose();
       }
     });
 
-    this.fixtureLights = this.fixtureLights.filter(item => item.light.parent);
+    this.fixtureLights = this.fixtureLights.filter(item=>
+      item.light.parent && this.root.children.includes(item.light.parent)
+    );
     this.chunks.delete(key);
   }
 
@@ -330,8 +416,12 @@ export class World {
     const candidates=[];
     const active=[];
 
-    this.fixtureLights=this.fixtureLights.filter(item=>item.light.parent);
-    this.wallOccluders=this.wallOccluders.filter(mesh=>mesh.parent);
+    this.fixtureLights=this.fixtureLights.filter(item=>
+      item.light.parent && this.root.children.includes(item.light.parent)
+    );
+    this.wallOccluders=this.wallOccluders.filter(mesh=>
+      mesh.parent && this.root.children.includes(mesh.parent)
+    );
 
     if(hasView){
       camera.getWorldPosition(this.fixtureLightViewOrigin);
@@ -405,6 +495,10 @@ export class World {
       for (let dx = -R_GENERATE; dx <= R_GENERATE; dx++) {
         const cx = pcx + dx;
         const cz = pcz + dz;
+        if (
+          cx < MAP_MIN_CHUNK || cx > MAP_MAX_CHUNK ||
+          cz < MAP_MIN_CHUNK || cz > MAP_MAX_CHUNK
+        ) continue;
         if (!this.chunks.has(cellKey(cx, cz))) {
           missing.push([cx, cz, dx * dx + dz * dz]);
         }
@@ -447,12 +541,25 @@ export class World {
     const maxCz = Math.floor((pz + radius) / CHUNK_SIZE);
 
     this.wallQueryScratch.length = 0;
+    const query = {
+      minX: px - radius, maxX: px + radius,
+      minZ: pz - radius, maxZ: pz + radius
+    };
+    const overlaps = bounds =>
+      bounds.maxX >= query.minX && bounds.minX <= query.maxX &&
+      bounds.maxZ >= query.minZ && bounds.minZ <= query.maxZ;
+
+    for (const bounds of this.boundaryWallBounds) {
+      if (overlaps(bounds)) this.wallQueryScratch.push(bounds);
+    }
 
     for (let cx = minCx; cx <= maxCx; cx++) {
       for (let cz = minCz; cz <= maxCz; cz++) {
         const entry = this.chunks.get(cellKey(cx, cz));
         if (!entry) continue;
-        this.wallQueryScratch.push(...entry.wallBounds);
+        for (const bounds of entry.wallBounds) {
+          if (overlaps(bounds)) this.wallQueryScratch.push(bounds);
+        }
       }
     }
 
