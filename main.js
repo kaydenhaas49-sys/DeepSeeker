@@ -4961,11 +4961,12 @@ function updateSpiderWallClipBounds(dt){
     originX=tutorialSpiderEntity.position.x;
     originZ=tutorialSpiderEntity.position.z;
     wallBounds=tutorialOpenRoomCollisionBoxes;
-  }else if(!houseMode && spiderActive && spiderModel){
-    originX=spiderEntity.position.x;
-    originZ=spiderEntity.position.z;
-    wallBounds=world.getNearbyWallBounds(originX,originZ,SPIDER_TARGET_SPAN*.58+1);
   }
+  // The imported normal Backrooms rig spans several meters. Clipping its
+  // fragments against every procedural wall AABB can discard the entire model
+  // when overlapping/adjacent wall bounds cover the spider. Let real depth
+  // testing handle normal Backrooms occlusion; keep shader clipping for the
+  // tutorial's small, hand-authored collision boxes above.
   const reach=SPIDER_TARGET_SPAN*.58+.5;
   const nearby=[...wallBounds].filter(wall=>{
     if(!wall || !Number.isFinite(wall.minX) || !Number.isFinite(wall.maxX) ||
