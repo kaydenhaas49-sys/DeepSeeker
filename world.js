@@ -62,13 +62,9 @@ function getWallStaircaseCollisionBounds(stair) {
   const centerX=(stair.cx*CHUNK_CELLS+stair.localX)*CELL;
   const wallZ=(stair.cz*CHUNK_CELLS+stair.localZ)*CELL;
   const halfT=WALL_T*0.5,halfWidth=1.7;
-  const sideMinZ=Math.min(wallZ,wallZ+stair.face*STAIR_DEPTH);
-  const sideMaxZ=Math.max(wallZ,wallZ+stair.face*STAIR_DEPTH);
   return [
     {minX:centerX-7,maxX:centerX-halfWidth,minZ:wallZ-halfT,maxZ:wallZ+halfT},
     {minX:centerX+halfWidth,maxX:centerX+7,minZ:wallZ-halfT,maxZ:wallZ+halfT},
-    {minX:centerX-halfWidth-halfT,maxX:centerX-halfWidth+halfT,minZ:sideMinZ,maxZ:sideMaxZ},
-    {minX:centerX+halfWidth-halfT,maxX:centerX+halfWidth+halfT,minZ:sideMinZ,maxZ:sideMaxZ},
   ];
 }
 
@@ -713,14 +709,6 @@ export class World {
     addWall("StairwellWallLeft",panelWidth/CELL,centerX-panelOffset,wallZ);
     addWall("StairwellWallRight",panelWidth/CELL,centerX+panelOffset,wallZ);
     addBox("StairwellLintel",[halfWidth*2,WALL_H-doorTop,WALL_T],[centerX,(WALL_H+doorTop)*0.5,wallZ],this.materials.wall,true);
-
-    const sideGeo=wallGeometry(STAIR_DEPTH/CELL,false);sideGeo.scale(1,0.72,1);sideGeo.translate(0,-STAIR_DEPTH*0.5,0);
-    for(const side of [-1,1]){
-      const geometry=sideGeo.clone();geometry.translate(centerX+side*halfWidth,0,wallZ+face*STAIR_DEPTH*0.5);
-      const mesh=new THREE.Mesh(geometry,this.materials.wall);mesh.name=side<0?"StairwellInnerWallLeft":"StairwellInnerWallRight";
-      mesh.castShadow=false;mesh.receiveShadow=true;mesh.userData.fixtureLightOccluder=true;group.add(mesh);this.wallOccluders.push(mesh);
-    }
-    sideGeo.dispose();
 
     const geometries=[];
     for(let i=0;i<STAIR_COUNT;i++){
