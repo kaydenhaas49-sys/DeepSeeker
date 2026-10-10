@@ -15,7 +15,7 @@ import { InteractionSystem } from "./interaction.js";
 import { NavigationSystem } from "./navigation.js";
 import { ComputerSystem } from "./computer.js";
 import { SecurityCameraSystem } from "./securityCameras.js";
-import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode } from "./entityMode.js";
+import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js";
 
 let arachnophobiaMode=getArachnophobiaMode();
@@ -1608,6 +1608,8 @@ const HOUSE_TARGET_HEIGHT=3.0;
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
+// Retain the apartment in memory if a save slot actually uses this level.
+let initialHouseRequired=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
 let pendingHouseStart=false;
 let houseLoadFailed=false;
@@ -2908,7 +2910,7 @@ function shouldKeepHouseLoaded(){
 function updateHouseMemoryState(dt){
   if(!gameStarted) return;
 
-  if(shouldKeepHouseLoaded()){
+  if(shouldKeepHouseLoaded() || initialHouseRequired){
     houseUnloadTimer=0;
     return;
   }
@@ -2948,10 +2950,8 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   overlay.classList.add("hidden");
   audio.start();
 
-  // Character loading now happens after gameplay starts instead of holding
-  // the startup screen hostage.
-  player.ensureCharacterLoaded();
-
+  // Core player/spider assets are now readiness-gated before the menu or
+  // gameplay can start; no model download is kicked off from this path.
   pendingHouseStart=false;
   pendingSaveLoad=null;
   pendingNewGameSlot=null;
@@ -2971,8 +2971,7 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
 
   player.lock();
 
-  // Start the tutorial spider load immediately; stage 8 depends on it.
-  ensureSpiderLoading(true);
+  // The tutorial spider pack was required by the boot loading gate.
 
   // Creating a new slot immediately writes an initial checkpoint instead of
   // leaving the slot empty until the 20-second autosave.
@@ -4425,6 +4424,11 @@ let initialLandingShown=false;
 let initialLoadingTimer=null;
 let initialStartupPrepared=false;
 let initialStartupError="";
+let biscuitTextureReady=false;
+let initialHouseDecisionMade=false;
+const INITIAL_WORLD_CHUNK_KEYS=[-1,0,1].flatMap(cx=>
+  [-1,0,1].map(cz=>cx+","+cz)
+);
 
 function prepareInitialStartupAssets(){
   if(initialStartupPrepared) return true;
@@ -4447,13 +4451,41 @@ function prepareInitialStartupAssets(){
 function updateInitialLoadingScreen(){
   if(initialLandingShown) return;
 
-    const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
-  const decoderProgress=geometryDecoderReady ? 100 : 0;
-  const startupProgress=initialStartupPrepared ? 100 : 0;
+  const saveReady=Boolean(window.__deepseekerSaveHydrationDone);
+  if(saveReady && !initialHouseDecisionMade){
+    initialHouseDecisionMade=true;
+    const apartmentSaveExists=Array.from(
+      {length:SAVE_SLOT_COUNT},
+      (_,index)=>getSavedGame(index+1)
+    ).some(save=>Boolean(save) && getSavedLevel(save)==="apartment");
+    initialHouseRequired=apartmentSaveExists;
+    if(initialHouseRequired) ensureHouseLoading();
+  }
+
+  const saveProgress=saveReady?100:0;
+  const decoderProgress=geometryDecoderReady?100:0;
+  const startupProgress=initialStartupPrepared?100:0;
+  const characterReady=player.characterLoaded || player.characterLoadFailed;
+  const characterProgress=characterReady?100:0;
+  const spiderProgress=spiderLoaded?100:0;
+  const loadedWorldChunks=INITIAL_WORLD_CHUNK_KEYS.filter(key=>world.chunks.has(key)).length;
+  const worldProgress=loadedWorldChunks/INITIAL_WORLD_CHUNK_KEYS.length*100;
+  const houseProgress=!initialHouseDecisionMade
+    ? 0
+    : !initialHouseRequired
+      ? 100
+      : houseCollisionReady
+        ? 100
+        : Math.max(0,Math.min(99,Number(window.__deepseekerHouseLoadProgress)||0));
   const total=Math.max(0,Math.min(100,Math.round(
-    decoderProgress*.20 +
-    startupProgress*.35 +
-    saveProgress*.45
+    decoderProgress*.10 +
+    startupProgress*.06 +
+    saveProgress*.08 +
+    characterProgress*.22 +
+    spiderProgress*.22 +
+    worldProgress*.12 +
+    (biscuitTextureReady?100:0)*.10 +
+    houseProgress*.10
   )));
 
   const fill=document.getElementById("initialLoadFill");
@@ -4465,21 +4497,31 @@ function updateInitialLoadingScreen(){
   if(status){
     if(initialStartupError){
       status.textContent="STARTUP PREPARATION FAILED — RELOAD TO RETRY.";
-    }else if(
-      spiderLoaded &&
-      geometryDecoderReady &&
-      initialStartupPrepared &&
-      window.__deepseekerSaveHydrationDone
-    ){
-      status.textContent=player.characterLoaded
-        ? "WORLD + ENTITY PACK READY — STARTING MAIN MENU."
-        : "WORLD READY — PLAYER MODEL LOADING IN BACKGROUND.";
     }else if(!geometryDecoderReady){
       status.textContent="INITIALIZING GEOMETRY DECODERS…";
     }else if(!initialStartupPrepared){
       status.textContent="PREPARING FIRST-ROOM ASSETS…";
-    }else{
+    }else if(!saveReady){
       status.textContent="FINALIZING SAVE DATA…";
+    }else if(!biscuitTextureReady){
+      status.textContent="LOADING ARAchnOPHOBIA REPLACEMENT TEXTURE…";
+    }else if(!characterReady){
+      status.textContent="LOADING HAZMAT CHARACTER + FIRST-PERSON GEAR…";
+    }else if(!spiderLoaded){
+      status.textContent=spiderStartupFailed
+        ? "SPIDER PACK FAILED — RETRYING…"
+        : "LOADING SPIDER MODEL + ANIMATIONS…";
+    }else if(loadedWorldChunks<INITIAL_WORLD_CHUNK_KEYS.length){
+      status.textContent="GENERATING STARTING BACKROOMS REGION… "+
+        loadedWorldChunks+"/"+INITIAL_WORLD_CHUNK_KEYS.length+" CHUNKS READY.";
+    }else if(initialHouseRequired && !houseCollisionReady){
+      status.textContent=houseLoadFailed
+        ? "SAVED APARTMENT FAILED TO LOAD — RELOAD TO RETRY."
+        : "LOADING SAVED APARTMENT + BUILDING COLLISION…";
+    }else if(player.characterLoadFailed && !player.characterLoaded){
+      status.textContent="PLAYER MODEL UNAVAILABLE — FALLBACK HANDS READY.";
+    }else{
+      status.textContent="ALL REQUIRED GAME ASSETS READY — FINALIZING STARTUP.";
     }
   }
 
@@ -4488,13 +4530,23 @@ function updateInitialLoadingScreen(){
 
 function finishInitialLoading(){
   if(initialLandingShown) return;
+  updateInitialLoadingScreen();
+
+  const characterReady=player.characterLoaded || player.characterLoadFailed;
+  const worldReady=INITIAL_WORLD_CHUNK_KEYS.every(key=>world.chunks.has(key));
+  const houseReady=!initialHouseRequired || (houseLoaded && houseCollisionReady);
   if(
     initialStartupError ||
     !geometryDecoderReady ||
     !initialStartupPrepared ||
-    !window.__deepseekerSaveHydrationDone
+    !window.__deepseekerSaveHydrationDone ||
+    !biscuitTextureReady ||
+    !initialHouseDecisionMade ||
+    !characterReady ||
+    !spiderLoaded ||
+    !worldReady ||
+    !houseReady
   ){
-    updateInitialLoadingScreen();
     return;
   }
 
@@ -4502,6 +4554,16 @@ function finishInitialLoading(){
   if(initialLoadingTimer!==null){
     clearInterval(initialLoadingTimer);
     initialLoadingTimer=null;
+  }
+
+  // URL-based save continuation must also wait for all required assets.
+  if(initialParams.get("save")==="1"){
+    const save=pendingSaveLoad || getSavedGame(selectedSaveSlot);
+    pendingSaveLoad=null;
+    if(save){
+      startGame(save,selectedSaveSlot);
+      return;
+    }
   }
 
   showArachnophobiaWarning();
@@ -4517,11 +4579,20 @@ function beginInitialLoading(){
     window.__deepseekerSaveHydrationDone=true;
   });
 
-  // Everything needed by the playable experience starts together behind the
-  // loading screen. The animated spider is part of this gate so gameplay/menu
-  // never has to pop it in later.
+  // All core first-session dependencies begin behind the boot screen.
+  // The first nine procedural chunks are generated here before the menu exits.
   prepareInitialStartupAssets();
-  ensureSpiderLoading();
+  preloadBiscuitTexture().then(()=>{
+    biscuitTextureReady=true;
+  }).catch(error=>{
+    initialStartupError="Biscuit replacement texture failed to load.";
+    console.error("[DeepSeeker] Biscuit texture startup load failed:",error);
+  });
+  player.ensureCharacterLoaded().catch(error=>{
+    console.error("[DeepSeeker] Player model startup load failed:",error);
+  });
+  world.update(32,32);
+  ensureSpiderLoading(true);
 
   // Decoder warmup is already running; keep the same boot gate for it.
   void geometryDecoderPromise;
@@ -8449,11 +8520,8 @@ window.addEventListener("beforeunload",()=>{
   if(gameStarted) saveGame(undefined,{confirmOverwrite:false});
 });
 
-if(pendingSaveLoad){
-  const save=pendingSaveLoad;
-  pendingSaveLoad=null;
-  setTimeout(()=>startGame(save,selectedSaveSlot),0);
-}
+// URL-based save continuation is consumed by finishInitialLoading() only
+// after the selected save's assets and starting world region are ready.
 
 window.__deepseeker={
   player,
