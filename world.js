@@ -479,19 +479,8 @@ export class World {
     if(now-this.fixtureLightLastUpdate<interval) return;
     this.fixtureLightLastUpdate=now;
 
-    if(!this.fixtureLightCamera || !this.fixtureLightCamera.parent){
-      this.fixtureLightCamera=this.scene.getObjectByProperty("isCamera",true);
-    }
-
-    const camera=this.fixtureLightCamera;
-    const hasView=Boolean(camera);
-    const maxActive=1;
-    const maxDistance=32;
-    const maxDistanceSq=maxDistance*maxDistance;
-    const minViewDot=.05;
-    const candidates=[];
-    const active=[];
-
+    // Keep every fixture in currently streamed chunks active, not only the
+    // nearest light that happens to be inside the camera view.
     this.fixtureLights=this.fixtureLights.filter(item=>
       item.light.parent && this.root.children.includes(item.light.parent)
     );
@@ -499,46 +488,8 @@ export class World {
       mesh.parent && this.root.children.includes(mesh.parent)
     );
 
-    if(hasView){
-      camera.getWorldPosition(this.fixtureLightViewOrigin);
-      camera.getWorldDirection(this.fixtureLightDirection);
-      this.fixtureLightDirection.normalize();
-    }
-
-    for(const item of this.fixtureLights){
-      item.light.visible=false;
-
-      const dx=item.x-px;
-      const dz=item.z-pz;
-      const distanceSq=dx*dx+dz*dz;
-      if(distanceSq>maxDistanceSq) continue;
-
-      let priority=distanceSq*(item.cracked ? .78 : 1);
-
-      if(hasView){
-        item.light.getWorldPosition(this.fixtureLightTarget);
-        this.fixtureLightTargetDirection
-          .copy(this.fixtureLightTarget)
-          .sub(this.fixtureLightViewOrigin)
-          .normalize();
-
-        const viewDot=this.fixtureLightDirection.dot(this.fixtureLightTargetDirection);
-        if(viewDot<minViewDot) continue;
-
-        priority-=viewDot*5;
-      }
-
-      candidates.push({item,priority});
-    }
-
-    candidates.sort((a,b)=>a.priority-b.priority);
-
-    for(let i=0;i<Math.min(maxActive,candidates.length);i++){
-      active.push(candidates[i].item);
-    }
-
     const flickerTime=now*.003;
-    for(const item of active){
+    for(const item of this.fixtureLights){
       item.light.visible=true;
 
       const flicker=item.cracked
@@ -548,6 +499,7 @@ export class World {
       item.light.intensity=item.baseIntensity*flicker;
     }
   }
+
   update(px, pz) {
     this.updateFixtureLights(px,pz);
     const pcx = Math.floor(px / CHUNK_SIZE);
