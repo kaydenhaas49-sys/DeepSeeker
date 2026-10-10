@@ -4733,7 +4733,9 @@ const SPIDER_PATH_GRID_SIZE=LOW_END_PERFORMANCE?19:31;
 const SPIDER_PATH_REPATH_TIME=LOW_END_PERFORMANCE?1.05:.55;
 const SPIDER_PATH_WAYPOINT_REACH=LOW_END_PERFORMANCE?.9:.72;
 const SPIDER_PATH_TARGET_SHIFT=LOW_END_PERFORMANCE?3.6:2.4;
-const SPIDER_NORMAL_ENCOUNTER_MAX_TIME=18;
+const SPIDER_STALK_MIN_SPAWN_DISTANCE=18;
+const SPIDER_STALK_MAX_SPAWN_DISTANCE=34;
+const SPIDER_NORMAL_ENCOUNTER_MAX_TIME=72;
 
 const SPIDER_ANIMATION_RANGES={
   idle1:[164,213],
@@ -5078,6 +5080,7 @@ function tryMoveSpiderGround(dx,dz){
 const spiderSightRaycaster=new THREE.Raycaster();
 const spiderSightOrigin=new THREE.Vector3();
 const spiderSightTarget=new THREE.Vector3();
+const spiderSightDirection=new THREE.Vector3();
 
 function playerHasLineOfSightToSpider(entity=spiderEntity){
   // Use the full 3D ray even when the spider is horizontally very close;
@@ -5104,6 +5107,23 @@ function playerHasLineOfSightToSpider(entity=spiderEntity){
     : (world.wallOccluders?.length ? world.wallOccluders : world.root.children);
   const hits=spiderSightRaycaster.intersectObjects(occluders,true);
   return hits.length===0;
+}
+
+function isSpiderPointVisibleToPlayer(x,z){
+  camera.getWorldPosition(spiderSightOrigin);
+  camera.getWorldDirection(spiderSightDirection).normalize();
+  spiderSightTarget.set(x,SPIDER_GROUND_OFFSET+1.0,z);
+  const delta=spiderSightTarget.clone().sub(spiderSightOrigin);
+  const distance=delta.length();
+  if(distance<.1 || distance>SPIDER_STALK_MAX_SPAWN_DISTANCE+4)return false;
+  const minDot=Math.cos(THREE.MathUtils.degToRad((camera.fov||70)*.5+8));
+  const direction=delta.normalize();
+  if(spiderSightDirection.dot(direction)<minDot)return false;
+  spiderSightRaycaster.set(spiderSightOrigin,direction);
+  spiderSightRaycaster.near=0;
+  spiderSightRaycaster.far=Math.max(0,distance-.12);
+  const occluders=world.wallOccluders?.length?world.wallOccluders:world.root.children;
+  return spiderSightRaycaster.intersectObjects(occluders,true).length===0;
 }
 
 function isHouseTutorialSpiderBlocked(x,z){
@@ -5534,6 +5554,53 @@ function clearSpiderPath(){
   spiderPathRepathTimer=0;
   spiderPathTargetX=NaN;
   spiderPathTargetZ=NaN;
+}
+
+function findSpiderStalkSpawnPosition(
+  minDistance=SPIDER_STALK_MIN_SPAWN_DISTANCE,
+  maxDistance=SPIDER_STALK_MAX_SPAWN_DISTANCE
+){
+  for(let attempt=0;attempt<72;attempt++){
+    const angle=Math.random()*Math.PI*2;
+    const distance=Math.sqrt(minDistance*minDistance+
+      Math.random()*(maxDistance*maxDistance-minDistance*minDistance));
+    const x=player.pos.x+Math.cos(angle)*distance;
+    const z=player.pos.z+Math.sin(angle)*distance;
+    if(!isSpiderSpawnInsideMap(x,z)||isSpiderBlocked(x,z)||isSpiderPointVisibleToPlayer(x,z))continue;
+    return {x,z};
+  }
+  return null;
+}
+
+function startBackroomsStalker(){
+  if(!gameStarted||houseMode||tutorialOpenRoomActive||
+     !multiplayer.isWorldAuthority()||spiderActive)return false;
+  if(!spiderLoaded){ensureSpiderLoading();return false;}
+  const spawn=findSpiderStalkSpawnPosition();
+  if(!spawn)return false;
+
+  spiderActive=true;
+  spiderBehaviorTime=0;
+  spiderStuckTime=0;
+  spiderJumpscareTimer=0;
+  spiderCaughtFreezeTimer=0;
+  spiderVisibleToPlayer=false;
+  spiderEntity.scale.setScalar(1);
+  spiderEntity.position.y=SPIDER_GROUND_OFFSET;
+  spiderEntity.rotation.x=0;
+  spiderEntity.rotation.z=0;
+  spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
+  clearSpiderPath();
+  if(!normalSpiderHunter.startRoaming(new THREE.Vector3(spawn.x,SPIDER_GROUND_OFFSET,spawn.z))){
+    spiderActive=false;spiderEntity.visible=false;return false;
+  }
+  spiderEntity.visible=true;
+  if(spiderModel)spiderModel.visible=false;
+  spiderBehaviorState="peek";
+  spiderVisibleToPlayer=false;
+  setSpiderAnimation("stalk");
+  return true;
 }
 
 function findSpiderVisibleSpawnPosition(minDistance=7,maxDistance=11){
@@ -6150,13 +6217,12 @@ function resetPlayerAfterSpiderCatch(){
   spiderEntity.scale.setScalar(1);
   spiderEntity.position.y=SPIDER_GROUND_OFFSET;
   spiderEntity.rotation.x=0;
-  spiderEntity.visible=true;
-  if(!startSpiderChase()){
-    spiderActive=false;
-    spiderEntity.visible=false;
-    spiderRevealLight.visible=false;
-    spiderBehaviorState="idle";
-  }
+  normalSpiderHunter.hide();
+  spiderActive=false;
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  spiderBehaviorState="idle";
+  nextEvent=clock.elapsedTime+14+Math.random()*18;
   pulse=1;
   eventText.style.opacity="1";
 }
@@ -6962,7 +7028,14 @@ function ensureSpiderLoading(immediate=false){
 }
 
 
-player.onStep=({intensity})=>audio.step(intensity);
+player.onStep=({intensity,running,crouched})=>{
+  audio.step(intensity);
+  if(gameStarted&&spiderActive&&!houseMode&&!tutorialOpenRoomActive&&multiplayer.isWorldAuthority()){
+    normalSpiderHunter.hearNoise(player.pos.x,player.pos.z,{
+      time:clock.elapsedTime,intensity,running,crouched
+    });
+  }
+};
 
 const BACKROOMS_FALL_DURATION=1.8;
 let backroomsFallTimer=0;
@@ -7682,43 +7755,11 @@ document.addEventListener("keydown",e=>{
 });
 
 function triggerEvent(){
-  if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return;
+  if(!multiplayer.isWorldAuthority()||tutorialOpenRoomActive||houseMode||spiderActive)return;
   eventCooldown=4.5;
-
-  if(!spiderLoaded || spiderActive){
-    audio.scare();
-    return;
-  }
-
-  const roll=Math.random();
-  let started=false;
-
-  if(roll<.30){
-    started=startSpiderPeek();
-  }else if(roll<.63){
-    started=startSpiderRush();
-  }else{
-    started=startSpiderChase();
-  }
-
-  if(started && roll>=.30){
-    audio.scare();
-  }
-
-  if(!started){
-    audio.scare();
-    pulse=.55;
-    showSpiderScareMessage("DID YOU HEAR THAT?",900);
-  }
-
-  objective.textContent=
-    roll<.45
-      ? "Something moved nearby."
-      : "Something is following you.";
-
-  setTimeout(()=>{
-    objective.textContent=STORY[storyStage].objective;
-  },1800);
+  if(!spiderLoaded){ensureSpiderLoading();return;}
+  // Start from out of sight; a chase begins only after the spider detects a clue.
+  startBackroomsStalker();
 }
 
 function publishMultiplayerSpiderSnapshot(dt){
@@ -8262,7 +8303,8 @@ function animate(){
         }else{
           normalSpiderHunter.updateHunter(dt,t,player,{
             sprinting:player.isRunning,
-            flashlightOn
+            flashlightOn,
+            crouched:player.crouched
           });
           normalSpiderHunter.step(dt);
 
@@ -8270,8 +8312,7 @@ function animate(){
           if(normalSpiderHunter.distanceToHitbox(player.pos.x,player.pos.z)<=.06){
             startSpiderCatchFreeze();
           }else if(
-            spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME ||
-            (normalSpiderHunter.mode==="roam" && spiderBehaviorTime>=6)
+            spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
           ){
             spiderActive=false;
             spiderBehaviorState="idle";
@@ -8281,6 +8322,7 @@ function animate(){
             normalSpiderHunter.hide();
             spiderEntity.visible=false;
             clearSpiderPath();
+            nextEvent=clock.elapsedTime+24+Math.random()*28;
             showSpiderScareMessage("THE SIGNAL FADES.",850);
           }
         }
@@ -8289,8 +8331,11 @@ function animate(){
           normalSpiderHunter.visualRig.root.visible=false;
           spiderEntity.visible=true;
           spiderBehaviorState=
-            normalSpiderHunter.mode==="roam" ? "peek" :
+            normalSpiderHunter.mode==="roam" && normalSpiderHunter.speed<.15 ? "peek" :
             normalSpiderHunter.mode==="hidden" ? "idle" : "chase";
+          if(normalSpiderHunter.mode==="roam" || normalSpiderHunter.mode==="investigate"){
+            setSpiderAnimation(normalSpiderHunter.speed>.22 ? "chase" : "stalk");
+          }
           spiderVisibleToPlayer=playerHasLineOfSightToSpider(spiderEntity);
           if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
           spiderRevealLight.visible=
@@ -8353,7 +8398,8 @@ function animate(){
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
-  if(!houseMode && !tutorialOpenRoomActive && eventCooldown<=0 && t>nextEvent){
+  if(!houseMode && !tutorialOpenRoomActive && !spiderActive &&
+     eventCooldown<=0 && t>nextEvent){
     triggerEvent();
     nextEvent=t+28+Math.random()*35;
   }
