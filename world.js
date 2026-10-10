@@ -42,12 +42,12 @@ export function mulberry32(a) {
 
 const cellKey = (x, z) => x + "," + z;
 
-// Two fixed, rare stairwell sightings in opposite parts of the Backrooms.
-// Their footprints are reserved in procedural generation so random partitions
-// cannot spawn through the entrance, steps, or narrow side walls.
+// Two hidden Level RUN entrances plus a temporary spawn-area test stairwell.
+// Every entrance is paired with a protected route through procedural walls.
 const WALL_STAIRCASES = Object.freeze([
-  { cx: -1, cz: 1, localX: 8, localZ: 8, face: -1 },
-  { cx: 1, cz: -1, localX: 8, localZ: 8, face: 1 },
+  { cx: -1, cz: 1, localX: 8, localZ: 8, face: -1, testOnly: false },
+  { cx: 1, cz: -1, localX: 8, localZ: 8, face: 1, testOnly: false },
+  { cx: 0, cz: 0, localX: 8, localZ: 11, face: -1, testOnly: true },
 ]);
 
 function getWallStaircase(cx, cz) {
@@ -109,9 +109,25 @@ export function generateChunk(cx, cz, seed) {
   const spawnClear = cx === 0 && cz === 0;
   const staircase = getWallStaircase(cx, cz);
 
-  // Keep the spawn pocket and both stairwell footprints free of generated walls.
+  // Protect complete, wide walking routes from spawn to both hidden entrances.
+  // Coordinates here are absolute grid cells, so each chunk reserves its share
+  // of the same corridors; a random wall can't sever a route at a chunk seam.
   const inClear = (x, z) => {
     if (spawnClear && x >= 5 && x <= 10 && z >= 5 && z <= 10) return true;
+
+    const gx = cx * CHUNK_CELLS + x;
+    const gz = cz * CHUNK_CELLS + z;
+    const onGuaranteedRoute =
+      // Shared west/east corridor across the spawn row.
+      (gz >= 7 && gz <= 9 && gx >= -9 && gx <= 25) ||
+      // Route north from the shared corridor to the (-1, 1) stairwell.
+      (gx >= -9 && gx <= -7 && gz >= 8 && gz <= 24) ||
+      // Route south from the shared corridor to the (1, -1) stairwell.
+      (gx >= 23 && gx <= 25 && gz >= -8 && gz <= 8) ||
+      // Temporary test stairwell just north of the player spawn.
+      (gx >= 7 && gx <= 9 && gz >= 8 && gz <= 11);
+    if (onGuaranteedRoute) return true;
+
     if (!staircase) return false;
     const minZ = staircase.face < 0 ? staircase.localZ - 3 : staircase.localZ;
     const maxZ = staircase.face < 0 ? staircase.localZ : staircase.localZ + 3;
