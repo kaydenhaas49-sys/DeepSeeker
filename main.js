@@ -8061,7 +8061,10 @@ function applyRemoteSpiderSnapshot(dt){
     setSpiderAnimation(snapshot.animation);
   }
   spiderVisibleToPlayer=playerHasLineOfSightToSpider();
-  if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
+  // Let the renderer's depth buffer hide the model behind real walls. The
+  // binary raycast visibility test can falsely hide the entire normal spider
+  // when any nearby wall intersects the ray; tutorial rendering is separate.
+  if(spiderModel) spiderModel.visible=true;
   spiderRevealLight.visible=spiderVisibleToPlayer;
   spiderRevealLight.intensity=spiderVisibleToPlayer
     ? (spiderJumpscareTimer>0?5:4.2)
@@ -8538,7 +8541,9 @@ function animate(){
             setSpiderAnimation(normalSpiderHunter.speed>.22 ? "chase" : "stalk");
           }
           spiderVisibleToPlayer=playerHasLineOfSightToSpider(spiderEntity);
-          if(spiderModel) spiderModel.visible=spiderVisibleToPlayer;
+          // Keep the normal model renderable; wall depth testing handles real
+          // occlusion without making the whole spider vanish on a raycast hit.
+          if(spiderModel) spiderModel.visible=true;
           spiderRevealLight.visible=
             spiderVisibleToPlayer &&
             (normalSpiderHunter.mode==="hunt" || normalSpiderHunter.mode==="enrage");
