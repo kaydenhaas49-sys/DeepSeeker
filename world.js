@@ -41,6 +41,10 @@ export function mulberry32(a) {
 }
 
 const cellKey = (x, z) => x + "," + z;
+const STAIR_COUNT=14;
+const STAIR_STEP_DEPTH=0.42;
+const STAIR_STEP_RISE=0.22;
+const STAIR_DEPTH=STAIR_COUNT*STAIR_STEP_DEPTH;
 
 // Two hidden Level RUN entrances plus a temporary spawn-area test stairwell.
 // Every entrance is paired with a protected route through procedural walls.
@@ -55,42 +59,16 @@ function getWallStaircase(cx, cz) {
 }
 
 function getWallStaircaseCollisionBounds(stair) {
-  const centerX = (stair.cx * CHUNK_CELLS + stair.localX) * CELL;
-  const wallZ = (stair.cz * CHUNK_CELLS + stair.localZ) * CELL;
-  const halfT = WALL_T * 0.5;
-  const wallHalfWidth = 7;
-  const openingHalfWidth = 1.7;
-  const stairDepth = 6.2;
-  const sideMinZ = Math.min(wallZ, wallZ + stair.face * stairDepth);
-  const sideMaxZ = Math.max(wallZ, wallZ + stair.face * stairDepth);
-  const backZ = wallZ - stair.face * 0.23;
-
+  const centerX=(stair.cx*CHUNK_CELLS+stair.localX)*CELL;
+  const wallZ=(stair.cz*CHUNK_CELLS+stair.localZ)*CELL;
+  const halfT=WALL_T*0.5,halfWidth=1.7;
+  const sideMinZ=Math.min(wallZ,wallZ+stair.face*STAIR_DEPTH);
+  const sideMaxZ=Math.max(wallZ,wallZ+stair.face*STAIR_DEPTH);
   return [
-    // The main wall remains solid on both sides of the stair opening.
-    {
-      minX: centerX - wallHalfWidth, maxX: centerX - openingHalfWidth,
-      minZ: wallZ - halfT, maxZ: wallZ + halfT,
-    },
-    {
-      minX: centerX + openingHalfWidth, maxX: centerX + wallHalfWidth,
-      minZ: wallZ - halfT, maxZ: wallZ + halfT,
-    },
-    // Narrow retaining walls guide the player up the stairwell.
-    {
-      minX: centerX - openingHalfWidth - halfT,
-      maxX: centerX - openingHalfWidth + halfT,
-      minZ: sideMinZ, maxZ: sideMaxZ,
-    },
-    {
-      minX: centerX + openingHalfWidth - halfT,
-      maxX: centerX + openingHalfWidth + halfT,
-      minZ: sideMinZ, maxZ: sideMaxZ,
-    },
-    // This landing stays sealed until its later level link is implemented.
-    {
-      minX: centerX - openingHalfWidth, maxX: centerX + openingHalfWidth,
-      minZ: backZ - 0.06, maxZ: backZ + 0.06,
-    },
+    {minX:centerX-7,maxX:centerX-halfWidth,minZ:wallZ-halfT,maxZ:wallZ+halfT},
+    {minX:centerX+halfWidth,maxX:centerX+7,minZ:wallZ-halfT,maxZ:wallZ+halfT},
+    {minX:centerX-halfWidth-halfT,maxX:centerX-halfWidth+halfT,minZ:sideMinZ,maxZ:sideMaxZ},
+    {minX:centerX+halfWidth-halfT,maxX:centerX+halfWidth+halfT,minZ:sideMinZ,maxZ:sideMaxZ},
   ];
 }
 
@@ -341,6 +319,10 @@ export class World {
     this.stairRailMaterial = new THREE.MeshStandardMaterial({
       color: 0x353a32, roughness: 0.82, metalness: 0.12,
     });
+    this.stairDoorMaterial=new THREE.MeshStandardMaterial({color:0x55594a,roughness:0.91,metalness:0.02});
+    this.stairDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0x292d27,roughness:0.82,metalness:0.16});
+    this.stairDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x777767,roughness:0.42,metalness:0.62});
+    this.stairwellDoors=[];
 
     // Ceiling fixtures use a tiny real-light budget. They only activate when
     // the player's camera is actually looking toward them.
@@ -461,8 +443,11 @@ export class World {
     });
 
     const staircase = getWallStaircase(cx, cz);
-    if (staircase) wallBounds.push(...getWallStaircaseCollisionBounds(staircase));
-
+    if (staircase) {
+      wallBounds.push(...getWallStaircaseCollisionBounds(staircase));
+      const doorState=group.userData.stairwellDoorState;
+      if(doorState){wallBounds.push(doorState.collisionBounds);this.stairwellDoors.push(doorState);}
+    }
     this.root.add(group);
     this.chunks.set(cellKey(cx, cz), { data, group, wallBounds });
   }
@@ -472,9 +457,11 @@ export class World {
     if (!entry) return;
     this.root.remove(entry.group);
     // Detached children keep their .parent, so check live root membership.
-    this.wallOccluders=this.wallOccluders.filter(mesh=>
-      mesh.parent && this.root.children.includes(mesh.parent)
-    );
+    this.wallOccluders=this.wallOccluders.filter(mesh=>{
+      let parent=mesh.parent;
+      while(parent&&parent!==this.root)parent=parent.parent;
+      return parent===this.root;
+    });
     entry.group.traverse((o) => {
       if (o.isMesh && o.geometry !== this.floorGeo && o.geometry !== this.ceilGeo) {
         o.geometry.dispose();
@@ -483,6 +470,9 @@ export class World {
 
     this.fixtureLights = this.fixtureLights.filter(item=>
       item.light.parent && this.root.children.includes(item.light.parent)
+    );
+    this.stairwellDoors=this.stairwellDoors.filter(door=>
+      door.group?.parent && this.root.children.includes(door.group.parent)
     );
     this.chunks.delete(key);
   }
@@ -500,9 +490,11 @@ export class World {
     this.fixtureLights=this.fixtureLights.filter(item=>
       item.light.parent && this.root.children.includes(item.light.parent)
     );
-    this.wallOccluders=this.wallOccluders.filter(mesh=>
-      mesh.parent && this.root.children.includes(mesh.parent)
-    );
+    this.wallOccluders=this.wallOccluders.filter(mesh=>{
+      let parent=mesh.parent;
+      while(parent&&parent!==this.root)parent=parent.parent;
+      return parent===this.root;
+    });
 
     const flickerTime=now*.003;
     for(const item of this.fixtureLights){
@@ -576,6 +568,36 @@ export class World {
     return chunk ? chunk.data.cells.has(cellKey(ax, az)) : false;
   }
 
+  updateStairwellDoors(dt){
+    for(const door of this.stairwellDoors){
+      const target=door.targetOpen?1:0;
+      door.openProgress=THREE.MathUtils.damp(door.openProgress,target,7,dt);
+      if(Math.abs(door.openProgress-target)<0.006)door.openProgress=target;
+      door.group.rotation.y=-door.face*Math.PI*0.5*door.openProgress;
+      const interactable=door.group.userData.interactable;
+      if(interactable)interactable.prompt=door.targetOpen?"Close the stairwell door":"Open the stairwell door";
+      if(door.openProgress<0.82){
+        door.collisionBounds.minX=door.centerX-1.7;door.collisionBounds.maxX=door.centerX+1.7;
+        door.collisionBounds.minZ=door.wallZ-0.08;door.collisionBounds.maxZ=door.wallZ+0.08;
+      }else{
+        door.collisionBounds.minX=door.centerX-1.82;door.collisionBounds.maxX=door.centerX-1.58;
+        const openZ=door.wallZ+door.face*door.doorWidth;
+        door.collisionBounds.minZ=Math.min(door.wallZ,openZ);door.collisionBounds.maxZ=Math.max(door.wallZ,openZ);
+      }
+    }
+  }
+  getStairwellFloorHeight(x,z){
+    for(const door of this.stairwellDoors){
+      const stair=door.staircase,centerX=(stair.cx*CHUNK_CELLS+stair.localX)*CELL;
+      const wallZ=(stair.cz*CHUNK_CELLS+stair.localZ)*CELL;
+      if(Math.abs(x-centerX)>1.52)continue;
+      const progress=(z-wallZ)*stair.face;
+      if(progress< -0.12||progress>STAIR_DEPTH+0.10)continue;
+      const index=THREE.MathUtils.clamp(Math.floor((STAIR_DEPTH-progress)/STAIR_STEP_DEPTH),0,STAIR_COUNT-1);
+      return -index*STAIR_STEP_RISE;
+    }
+    return 0;
+  }
   // Return the actual axis-aligned wall rectangles near a world position.
   // Collision uses these real bounds instead of treating an entire 4m cell as solid.
   getNearbyWallBounds(px, pz, radius = 1.0) {
@@ -618,8 +640,11 @@ export class World {
     const oz = cz * CHUNK_SIZE;
     const mid = CHUNK_SIZE / 2;
 
-    const floor = new THREE.Mesh(this.floorGeo, this.materials.floor);
-    floor.position.set(ox + mid, 0, oz + mid);
+    const staircase=getWallStaircase(cx,cz);
+    const floorGeometry=staircase?this.createStairwellFloorGeometry(staircase):this.floorGeo;
+    const floor=new THREE.Mesh(floorGeometry,this.materials.floor);
+    floor.position.set(ox+mid,0,oz+mid);
+    floor.name=staircase?"BackroomsFloorWithStairwellOpening":"BackroomsFloor";
     group.add(floor);
 
     const ceiling = new THREE.Mesh(this.ceilGeo, this.materials.ceiling);
@@ -646,7 +671,6 @@ export class World {
       this.wallOccluders.push(wallMesh);
     }
 
-    const staircase = getWallStaircase(cx, cz);
     if (staircase) this.buildWallStaircase(group, staircase);
 
     this.buildCeilingFixtures(group, cx, cz);
@@ -654,128 +678,85 @@ export class World {
     return group;
   }
 
+  createStairwellFloorGeometry(staircase) {
+    const mid=CHUNK_SIZE*0.5,shape=new THREE.Shape();
+    shape.moveTo(-mid,-mid);shape.lineTo(mid,-mid);shape.lineTo(mid,mid);shape.lineTo(-mid,mid);shape.lineTo(-mid,-mid);
+    const centerX=staircase.localX*CELL-mid,halfWidth=1.92;
+    const outwardZ=staircase.localZ*CELL+staircase.face*(STAIR_DEPTH+0.05)-mid;
+    const innerZ=staircase.localZ*CELL-staircase.face*0.48-mid;
+    const minZ=Math.min(outwardZ,innerZ),maxZ=Math.max(outwardZ,innerZ);
+    const hole=new THREE.Path(),lowerY=-maxZ,upperY=-minZ;
+    hole.moveTo(centerX-halfWidth,lowerY);hole.lineTo(centerX-halfWidth,upperY);
+    hole.lineTo(centerX+halfWidth,upperY);hole.lineTo(centerX+halfWidth,lowerY);hole.lineTo(centerX-halfWidth,lowerY);
+    shape.holes.push(hole);
+    const geometry=new THREE.ShapeGeometry(shape);geometry.rotateX(-Math.PI/2);geometry.computeVertexNormals();return geometry;
+  }
+
   buildWallStaircase(group, staircase) {
-    const centerX = (staircase.cx * CHUNK_CELLS + staircase.localX) * CELL;
-    const wallZ = (staircase.cz * CHUNK_CELLS + staircase.localZ) * CELL;
-    const face = staircase.face;
-    const wallHalfWidth = 7;
-    const openingHalfWidth = 1.7;
-    const openingHeight = 3.75;
-    const stairWidth = 3.05;
-    const stairCount = 14;
-    const stepDepth = 0.42;
-    const stepRise = 0.22;
-    const stairDepth = stairCount * stepDepth;
-    const sideWallHeight = 4.25;
-
-    const addBox = (name, size, position, material, blocksSight = false) => {
-      const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
-      geometry.translate(position[0], position[1], position[2]);
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.name = name;
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
-      group.add(mesh);
-      if (blocksSight) {
-        mesh.userData.fixtureLightOccluder = true;
-        this.wallOccluders.push(mesh);
-      }
-      return mesh;
+    const centerX=(staircase.cx*CHUNK_CELLS+staircase.localX)*CELL;
+    const wallZ=(staircase.cz*CHUNK_CELLS+staircase.localZ)*CELL;
+    const face=staircase.face,halfWidth=1.7,stairWidth=3.05;
+    const stepDepth=STAIR_STEP_DEPTH,stepRise=STAIR_STEP_RISE;
+    const doorHeight=3.75,doorBottom=-(STAIR_COUNT-1)*stepRise,doorTop=doorBottom+doorHeight;
+    const doorWidth=halfWidth*2-0.16,doorZ=wallZ-face*0.22,hingeX=centerX-halfWidth+0.08;
+    const addBox=(name,size,pos,material,blocksSight=false,parent=group)=>{
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(size[0],size[1],size[2]),material);
+      mesh.name=name;mesh.position.set(pos[0],pos[1],pos[2]);mesh.castShadow=false;mesh.receiveShadow=true;parent.add(mesh);
+      if(blocksSight){mesh.userData.fixtureLightOccluder=true;this.wallOccluders.push(mesh);}return mesh;
     };
-
-    const addTexturedWall = (name, widthCells, x, z) => {
-      const geometry = wallGeometry(widthCells, true);
-      geometry.translate(x, 0, z);
-      const mesh = new THREE.Mesh(geometry, this.materials.wall);
-      mesh.name = name;
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
-      mesh.userData.fixtureLightOccluder = true;
-      group.add(mesh);
-      this.wallOccluders.push(mesh);
-      return mesh;
+    const addWall=(name,widthCells,x,z)=>{
+      const geometry=wallGeometry(widthCells,true);geometry.translate(x,0,z);
+      const mesh=new THREE.Mesh(geometry,this.materials.wall);mesh.name=name;mesh.castShadow=false;mesh.receiveShadow=true;
+      mesh.userData.fixtureLightOccluder=true;group.add(mesh);this.wallOccluders.push(mesh);
     };
+    const panelWidth=7-halfWidth,panelOffset=(7+halfWidth)*0.5;
+    addWall("StairwellWallLeft",panelWidth/CELL,centerX-panelOffset,wallZ);
+    addWall("StairwellWallRight",panelWidth/CELL,centerX+panelOffset,wallZ);
+    addBox("StairwellLintel",[halfWidth*2,WALL_H-doorTop,WALL_T],[centerX,(WALL_H+doorTop)*0.5,wallZ],this.materials.wall,true);
 
-    // Full-height wall panels leave one unmistakable stair-shaped opening.
-    const sidePanelWidth = wallHalfWidth - openingHalfWidth;
-    const sidePanelOffset = (wallHalfWidth + openingHalfWidth) * 0.5;
-    addTexturedWall("StairwellWallLeft", sidePanelWidth / CELL,
-      centerX - sidePanelOffset, wallZ);
-    addTexturedWall("StairwellWallRight", sidePanelWidth / CELL,
-      centerX + sidePanelOffset, wallZ);
-    addBox("StairwellLintel",
-      [openingHalfWidth * 2, WALL_H - openingHeight, WALL_T],
-      [centerX, (WALL_H + openingHeight) * 0.5, wallZ],
-      this.materials.wall, true);
-
-    // Side walls are deliberately low enough to read as a narrow stairwell,
-    // with a dark landing that makes the top disappear into the wall.
-    const sideWallGeometry = wallGeometry(stairDepth / CELL, false);
-    sideWallGeometry.scale(1, sideWallHeight / WALL_H, 1);
-    const sideCenterZ = wallZ + face * stairDepth * 0.5;
-    for (const side of [-1, 1]) {
-      const geometry = sideWallGeometry.clone();
-      geometry.translate(centerX + side * openingHalfWidth, 0, sideCenterZ);
-      const mesh = new THREE.Mesh(geometry, this.materials.wall);
-      mesh.name = side < 0 ? "StairwellInnerWallLeft" : "StairwellInnerWallRight";
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
-      mesh.userData.fixtureLightOccluder = true;
-      group.add(mesh);
-      this.wallOccluders.push(mesh);
+    const sideGeo=wallGeometry(STAIR_DEPTH/CELL,false);sideGeo.scale(1,0.72,1);sideGeo.translate(0,-STAIR_DEPTH*0.5,0);
+    for(const side of [-1,1]){
+      const geometry=sideGeo.clone();geometry.translate(centerX+side*halfWidth,0,wallZ+face*STAIR_DEPTH*0.5);
+      const mesh=new THREE.Mesh(geometry,this.materials.wall);mesh.name=side<0?"StairwellInnerWallLeft":"StairwellInnerWallRight";
+      mesh.castShadow=false;mesh.receiveShadow=true;mesh.userData.fixtureLightOccluder=true;group.add(mesh);this.wallOccluders.push(mesh);
     }
-    sideWallGeometry.dispose();
+    sideGeo.dispose();
 
-    addBox("StairwellDarkLanding",
-      [openingHalfWidth * 2 - 0.1, 4.7, 0.12],
-      [centerX, 2.35, wallZ - face * 0.23],
-      this.fixtureBlackMaterial, true);
+    const geometries=[];
+    for(let i=0;i<STAIR_COUNT;i++){
+      const geometry=new THREE.BoxGeometry(stairWidth,stepRise,stepDepth);
+      geometry.translate(centerX,-(i+0.5)*stepRise,wallZ+face*(STAIR_COUNT-i-0.5)*stepDepth);geometries.push(geometry);
+    }
+    const merged=mergeGeometries(geometries,false);for(const geometry of geometries)geometry.dispose();
+    if(merged){const steps=new THREE.Mesh(merged,this.stairStepMaterial);steps.name="DescendingStairTreads";steps.castShadow=false;steps.receiveShadow=true;group.add(steps);}
 
-    // Merge all treads into one mesh to keep this rare prop cheap to render.
-    const stepGeometries = [];
-    for (let i = 0; i < stairCount; i++) {
-      const geometry = new THREE.BoxGeometry(stairWidth, stepRise, stepDepth);
-      geometry.translate(
-        centerX,
-        (i + 0.5) * stepRise,
-        wallZ + face * (stairCount - i - 0.5) * stepDepth
-      );
-      stepGeometries.push(geometry);
+    const railTopY=0.55,railBottomY=doorBottom+0.35,dy=railTopY-railBottomY,railLength=Math.hypot(STAIR_DEPTH-0.25,dy);
+    for(const side of [-1,1]){
+      const rail=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,railLength,7),this.stairRailMaterial);
+      rail.name=side<0?"StairwellRailLeft":"StairwellRailRight";rail.position.set(centerX+side*1.36,(railTopY+railBottomY)*0.5,wallZ+face*STAIR_DEPTH*0.5);
+      rail.rotation.x=Math.atan2(face*STAIR_DEPTH,dy);rail.castShadow=false;rail.receiveShadow=false;group.add(rail);
     }
-    const mergedSteps = mergeGeometries(stepGeometries, false);
-    for (const geometry of stepGeometries) geometry.dispose();
-    if (mergedSteps) {
-      const steps = new THREE.Mesh(mergedSteps, this.stairStepMaterial);
-      steps.name = "HiddenWallStairFlight";
-      steps.castShadow = false;
-      steps.receiveShadow = true;
-      group.add(steps);
+    for(const side of [-1,1]){
+      addBox(side<0?"StairwellDoorFrameLeft":"StairwellDoorFrameRight",[0.12,doorHeight,0.34],
+        [centerX+side*(halfWidth-0.01),(doorBottom+doorTop)*0.5,doorZ],this.stairDoorTrimMaterial);
     }
-
-    // Worn rails climb toward the dark opening; no bright lights reveal them
-    // from across the room, so both entrances remain easy to miss.
-    const railStartY = 0.68;
-    const railEndY = stairCount * stepRise + 0.42;
-    const railLength = Math.hypot(stairDepth - 0.25, railEndY - railStartY);
-    for (const side of [-1, 1]) {
-      const rail = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.045, 0.045, railLength, 7),
-        this.stairRailMaterial
-      );
-      rail.name = side < 0 ? "StairwellRailLeft" : "StairwellRailRight";
-      rail.position.set(
-        centerX + side * 1.36,
-        (railStartY + railEndY) * 0.5,
-        wallZ + face * (stairDepth * 0.5)
-      );
-      rail.rotation.x = -face * Math.atan2(
-        railEndY - railStartY,
-        stairDepth - 0.25
-      );
-      rail.castShadow = false;
-      rail.receiveShadow = false;
-      group.add(rail);
+    addBox("StairwellDoorThreshold",[halfWidth*2,0.12,0.32],[centerX,doorBottom+0.06,doorZ],this.stairDoorTrimMaterial);
+    const pivot=new THREE.Group();pivot.name=staircase.testOnly?"SpawnTestStairwellDoor":"HiddenStairwellDoor";pivot.position.set(hingeX,doorBottom,doorZ);group.add(pivot);
+    const panel=addBox("StairwellDoorPanel",[doorWidth,doorHeight,0.13],[doorWidth*0.5,doorHeight*0.5,0],this.stairDoorMaterial,false,pivot);panel.castShadow=true;
+    for(const yf of [0.30,0.69]){
+      const inset=new THREE.Mesh(new THREE.BoxGeometry(doorWidth*0.68,doorHeight*0.20,0.035),this.stairDoorTrimMaterial);
+      inset.name="StairwellDoorInsetPanel";inset.position.set(doorWidth*0.49,doorHeight*yf,0.078);pivot.add(inset);
     }
+    addBox("StairwellDoorKickPlate",[doorWidth*0.82,0.22,0.04],[doorWidth*0.5,0.24,0.09],this.stairDoorMetalMaterial,false,pivot);
+    addBox("StairwellDoorLabelPlate",[0.48,0.19,0.035],[doorWidth*0.5,doorHeight*0.87,0.084],this.stairDoorTrimMaterial,false,pivot);
+    addBox("StairwellDoorHandleMount",[0.10,0.14,0.045],[doorWidth-0.22,doorHeight*0.51,0.095],this.stairDoorTrimMaterial,false,pivot);
+    const handle=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.09,10),this.stairDoorMetalMaterial);
+    handle.name="StairwellDoorHandle";handle.rotation.x=Math.PI*0.5;handle.position.set(doorWidth-0.22,doorHeight*0.51,0.15);pivot.add(handle);
+    for(const y of [0.28,doorHeight-0.28])addBox("StairwellDoorHinge",[0.06,0.16,0.19],[0.035,y,-0.02],this.stairDoorMetalMaterial,false,pivot);
+    const collisionBounds={minX:centerX-halfWidth,maxX:centerX+halfWidth,minZ:doorZ-0.08,maxZ:doorZ+0.08};
+    const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,face,doorWidth,toggle(){this.targetOpen=!this.targetOpen;return true;}};
+    pivot.userData.interactable={type:"stairwellDoor",prompt:"Open the stairwell door",toggle:()=>state.toggle(),staircaseTestOnly:Boolean(staircase.testOnly)};
+    group.userData.stairwellDoorState=state;this.wallOccluders.push(panel);
   }
 
   buildCeilingFixtures(group, cx, cz) {
@@ -907,7 +888,9 @@ export class World {
   // generator has no imported interactables/camera records or animated
   // atmosphere layer, so expose safe empty/no-op APIs for those callers.
   getInteractables() {
-    return [];
+    return this.stairwellDoors
+      .filter(door=>door.group?.parent && this.root.children.includes(door.group.parent))
+      .map(door=>door.group);
   }
 
   getSecurityCameras() {
