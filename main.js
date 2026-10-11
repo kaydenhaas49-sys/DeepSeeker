@@ -4993,7 +4993,7 @@ function updateSpiderWallClipBounds(dt){
   }
 }
 
-function applyTutorialSpiderMaterialPass(model,{darken=true}={}){
+function applyTutorialSpiderMaterialPass(model,{darken=true,wallClip=true}={}){
   const copiedMaterials=new Map();
 
   const darkenMaterial=(original,meshName)=>{
@@ -5039,7 +5039,7 @@ function applyTutorialSpiderMaterialPass(model,{darken=true}={}){
       material.emissiveIntensity=Math.min(material.emissiveIntensity,0.16);
     }
     material.needsUpdate=true;
-    installSpiderWallClipMaterial(material);
+    if(wallClip) installSpiderWallClipMaterial(material);
     copiedMaterials.set(original,material);
     return material;
   };
@@ -6700,7 +6700,10 @@ function finishSpiderModel(model,animations,sourceName){
   // the model's authored proportions or skeleton.
   // Match the tutorial spider exactly: preserve its authored colors/maps and
   // apply only the tutorial's copied-material/shadow setup.
-  applyTutorialSpiderMaterialPass(model,{darken:false});
+  // Do not install the procedural-wall fragment-discard shader on the
+  // normal imported rig. Its large animated bounds can be clipped away;
+  // ordinary depth testing handles Backrooms walls.
+  applyTutorialSpiderMaterialPass(model,{darken:false,wallClip:false});
   fitSpiderModel(model);
 
   // Stop both rigs before replacing the current model tree.
