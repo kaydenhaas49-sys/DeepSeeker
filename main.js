@@ -3293,6 +3293,13 @@ const interaction=new InteractionSystem({
       return true;
     }
     if(target.type==="stairwellDoor" && typeof target.toggle==="function"){
+      if(target.staircaseTestOnly){
+        // The spawn-area test door is a direct test entry: do not make the
+        // tester walk through a narrow threshold to trigger the level change.
+        target.toggle();
+        const testDoor=world.stairwellDoors.find(door=>door.staircase?.testOnly)||null;
+        return startLevelRun({code:makeLevelRunCode(),round:1},{entryDoor:testDoor});
+      }
       return target.toggle();
     }
     if(target.type==="levelRunSafe"){
