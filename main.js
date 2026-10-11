@@ -3354,7 +3354,8 @@ function isInsideLevelRun(x,z){
 function updateLevelRunHUD(){
   if(!levelRunActive) return;
   const role=isLocalLevelRunRunner()?"YOU ARE THE RUNNER":"RUNNER: "+getLevelRunRunnerName();
-  objective.textContent="LEVEL RUN · ROUND "+levelRunState.round+" · "+role+" · FIND THE CODE, UNLOCK THE SAFE";
+  const text="LEVEL RUN · ROUND "+levelRunState.round+" · "+role+" · FIND THE CODE, UNLOCK THE SAFE";
+  if(objective.textContent!==text) objective.textContent=text;
 }
 
 function drawLevelRunCodeScreen(){
@@ -3430,8 +3431,8 @@ function ensureLevelRunBuilt(){
   const screenMaterial=new THREE.MeshBasicMaterial({map:levelRunState.screenTexture,side:THREE.DoubleSide,toneMapped:false});
   const screen=new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.08),screenMaterial);
   screen.name="LevelRUN_RandomCodeDisplay";
-  screen.position.set(LEVEL_RUN_ORIGIN_X-30,2.52,LEVEL_RUN_ORIGIN_Z-28-.80);
-  screen.rotation.y=Math.PI;root.add(screen);
+  screen.position.set(LEVEL_RUN_ORIGIN_X-30,2.52,LEVEL_RUN_ORIGIN_Z-28+.80);
+  screen.rotation.y=0;root.add(screen);
 
   addBox("LevelRUN_SafeBody",2.6,2.3,1.45,LEVEL_RUN_ORIGIN_X+27,1.15,LEVEL_RUN_ORIGIN_Z+28,metalMat,{collider:true,occluder:true});
   const safePanel=new THREE.Mesh(new THREE.PlaneGeometry(.74,.74),
@@ -3443,19 +3444,25 @@ function ensureLevelRunBuilt(){
   root.add(safePanel);levelRunState.interactables.push(safePanel);
   addBox("LevelRUN_SafeWarningStripe",2.25,.13,.05,LEVEL_RUN_ORIGIN_X+27,2.27,LEVEL_RUN_ORIGIN_Z+28-.75,stripeMat);
 
-  addBox("LevelRUN_ReturnDoor",3.5,4.2,.44,LEVEL_RUN_ORIGIN_X+28,2.1,LEVEL_RUN_ORIGIN_Z-37.1,redMat,{occluder:true});
+  addBox("LevelRUN_ReturnDoor",3.5,4.2,.44,LEVEL_RUN_ORIGIN_X+28,2.1,LEVEL_RUN_ORIGIN_Z-34.4,redMat,{occluder:true});
   const exitPanel=new THREE.Mesh(new THREE.PlaneGeometry(2.1,2.8),
     new THREE.MeshStandardMaterial({color:0x251714,emissive:0x4b160e,emissiveIntensity:.45,side:THREE.DoubleSide}));
   exitPanel.name="LevelRUN_ReturnInteractable";
-  exitPanel.position.set(LEVEL_RUN_ORIGIN_X+28,2.1,LEVEL_RUN_ORIGIN_Z-36.82);
+  exitPanel.position.set(LEVEL_RUN_ORIGIN_X+28,2.1,LEVEL_RUN_ORIGIN_Z-34.12);
+  exitPanel.rotation.y=0;
   exitPanel.userData.interactable={type:"levelRunExit",prompt:"Return to the Backrooms"};
   root.add(exitPanel);levelRunState.interactables.push(exitPanel);
 
   for(const [x,z] of [[-20,-20],[20,-20],[-20,20],[20,20]]){
     addBox("LevelRUN_FluorescentTube",2.8,.10,.22,LEVEL_RUN_ORIGIN_X+x,5.82,LEVEL_RUN_ORIGIN_Z+z,
       new THREE.MeshStandardMaterial({color:0x9ba99e,emissive:0xa8e6c4,emissiveIntensity:.42,roughness:.45}));
+  }
+  // Keep only two real point lights in this side-level; the other fluorescents are emissive.
+  for(const [x,z] of [[-20,-20],[20,20]]){
     const light=new THREE.PointLight(0xb4e6ce,.85,24,1.5);
-    light.position.set(LEVEL_RUN_ORIGIN_X+x,5.45,LEVEL_RUN_ORIGIN_Z+z);light.castShadow=false;root.add(light);
+    light.position.set(LEVEL_RUN_ORIGIN_X+x,5.45,LEVEL_RUN_ORIGIN_Z+z);
+    light.castShadow=false;
+    root.add(light);
   }
   drawLevelRunCodeScreen();
 }
@@ -8731,7 +8738,7 @@ function animate(){
   }
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
-    if(!houseMode && storyRefreshElapsed>=(
+    if(!houseMode && !levelRunActive && storyRefreshElapsed>=(
     LOW_END_PERFORMANCE?.08:.02
   )){
     storyRefreshElapsed=0;
@@ -8745,7 +8752,7 @@ function animate(){
     }
   }
 
-  if(!houseMode){
+  if(!houseMode && !levelRunActive){
     if(!gameStarted){
       // Keep the title-screen camera centered on a known open section of
       // chunk 0,0 while the game remains on the menu.
@@ -9024,7 +9031,7 @@ function animate(){
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
-  if(!houseMode && !tutorialOpenRoomActive && !spiderActive &&
+  if(!houseMode && !levelRunActive && !tutorialOpenRoomActive && !spiderActive &&
      eventCooldown<=0 && t>nextEvent){
     triggerEvent();
     nextEvent=t+28+Math.random()*35;
