@@ -1608,6 +1608,17 @@ const HOUSE_TARGET_HEIGHT=3.0;
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
+let levelRunActive=false;
+const LEVEL_RUN_ORIGIN_X=96;
+const LEVEL_RUN_ORIGIN_Z=96;
+const levelRunState={
+  active:false,group:null,code:"0000",round:1,runnerId:null,
+  collisionBoxes:[],occluders:[],interactables:[],
+  keypad:null,keypadInput:null,keypadMessage:null,
+  screenContext:null,screenTexture:null,
+  returnPosition:new THREE.Vector3(32,EYE,32),
+  target:{pos:new THREE.Vector3(0,EYE,0),eyeY:EYE,crouched:false,flashlight:false}
+};
 // Retain the apartment in memory if a save slot actually uses this level.
 let initialHouseRequired=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
@@ -2734,8 +2745,8 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
     saveType:roomCode ? "MULTIPLAYER" : "SOLO",
     roomCode:roomCode || null,
     playerName,
-    x:Number(player.pos.x),
-    z:Number(player.pos.z),
+    x:Number(levelRunActive?levelRunState.returnPosition.x:player.pos.x),
+    z:Number(levelRunActive?levelRunState.returnPosition.z:player.pos.z),
     yaw:Number(player.yaw),
     pitch:Number(player.pitch),
     storyStage,
@@ -3051,6 +3062,10 @@ function resetForNewGame(slot=selectedSaveSlot,{skipConfirm=false}={}){
 
   // Reset the level state without relying on the previous run's state.
   houseMode=false;
+  levelRunActive=false;
+  levelRunState.active=false;
+  if(levelRunState.group)levelRunState.group.visible=false;
+  if(levelRunState.keypad)closeLevelRunKeypad(false);
   disableTutorialOpenRoom();
   world.root.visible=true;
   houseRoot.visible=false;
@@ -3122,6 +3137,30 @@ const multiplayer=new Multiplayer({
     startBackroomsFall(startedAt,false);
   },
   onWorldEvent:(event)=>{
+    if(event?.type==="level_run_enter"){
+      if(!levelRunActive && !houseMode && !tutorialOpenRoomActive) {
+        startLevelRun(event.payload||{},{broadcast:false});
+      }
+      return;
+    }
+    if(event?.type==="level_run_round_state"){
+      applyLevelRunRoundState(event.payload||{});
+      return;
+    }
+    if(event?.type==="level_run_safe_opened"){
+      const payload=event.payload||{};
+      if(
+        multiplayer.isWorldAuthority() &&
+        levelRunActive &&
+        String(event.playerId||"")===String(levelRunState.runnerId||"") &&
+        Number(payload.round)===levelRunState.round
+      ) advanceLevelRunRound();
+      return;
+    }
+    if(event?.type==="level_run_exit"){
+      if(levelRunActive) leaveLevelRun(false);
+      return;
+    }
     if(event?.type==="spider_snapshot"){
       if(event.playerId!==multiplayer.getWorldAuthorityId()) return;
       const payload=event.payload||{};
@@ -3215,7 +3254,7 @@ const multiplayer=new Multiplayer({
 
 const navigation=new NavigationSystem({
   player,
-  getLevelName:()=>houseMode ? "APARTMENT" : "BACKROOMS"
+  getLevelName:()=>levelRunActive ? "LEVEL RUN" : houseMode ? "APARTMENT" : "BACKROOMS"
 });
 
 const securityCameras=new SecurityCameraSystem({
@@ -3246,7 +3285,7 @@ const computerSystem=new ComputerSystem({
 const interaction=new InteractionSystem({
   camera,
   domElement:renderer.domElement,
-  getCandidates:()=>world.getInteractables(),
+  getCandidates:()=>levelRunActive ? levelRunState.interactables : world.getInteractables(),
   onInteract:(target)=>{
     if(!gameStarted || houseMode) return false;
     if(target.type==="computer"){
@@ -3256,9 +3295,365 @@ const interaction=new InteractionSystem({
     if(target.type==="stairwellDoor" && typeof target.toggle==="function"){
       return target.toggle();
     }
+    if(target.type==="levelRunSafe"){
+      openLevelRunSafe();
+      return true;
+    }
+    if(target.type==="levelRunExit"){
+      leaveLevelRun(true);
+      return true;
+    }
     return false;
   }
 });
+
+
+function getLevelRunLocalId(){return String(multiplayer.playerId||"solo");}
+
+function getLevelRunParticipantIds(){
+  const localId=getLevelRunLocalId(),ids=[];
+  const add=id=>{
+    const value=String(id||"");
+    if(!value||ids.includes(value)) return;
+    if(value===localId){ids.push(value);return;}
+    const remote=multiplayer.players.get(value);
+    if(remote && remote.current?.level!=="house" && remote.target?.level!=="house") ids.push(value);
+  };
+  for(const id of (multiplayer.roomPlayerOrder||[])) add(id);
+  if(localId!=="solo") add(localId);
+  for(const id of multiplayer.players.keys()) add(id);
+  return ids.length?ids:["solo"];
+}
+
+function getLevelRunRunnerName(id=levelRunState.runnerId){
+  const value=String(id||"");
+  if(value===getLevelRunLocalId()||value==="solo") return "YOU";
+  const remote=multiplayer.players.get(value);
+  return remote?.name?String(remote.name).slice(0,20):"PLAYER";
+}
+
+function isLocalLevelRunRunner(){
+  return String(levelRunState.runnerId||"")===getLevelRunLocalId() ||
+    (levelRunState.runnerId==="solo"&&getLevelRunParticipantIds().length===1);
+}
+
+function makeLevelRunCode(){return String(Math.floor(1000+Math.random()*9000));}
+
+function getLevelRunSpawnFor(id){
+  const ids=getLevelRunParticipantIds();
+  const index=Math.max(0,ids.indexOf(String(id||"")));
+  return {x:LEVEL_RUN_ORIGIN_X-30+Math.min(index,8)*3.1,z:LEVEL_RUN_ORIGIN_Z-24};
+}
+
+function isInsideLevelRun(x,z){
+  return Number.isFinite(x)&&Number.isFinite(z)&&
+    x>=LEVEL_RUN_ORIGIN_X-37&&x<=LEVEL_RUN_ORIGIN_X+37&&
+    z>=LEVEL_RUN_ORIGIN_Z-37&&z<=LEVEL_RUN_ORIGIN_Z+37;
+}
+
+function updateLevelRunHUD(){
+  if(!levelRunActive) return;
+  const role=isLocalLevelRunRunner()?"YOU ARE THE RUNNER":"RUNNER: "+getLevelRunRunnerName();
+  objective.textContent="LEVEL RUN · ROUND "+levelRunState.round+" · "+role+" · FIND THE CODE, UNLOCK THE SAFE";
+}
+
+function drawLevelRunCodeScreen(){
+  const ctx=levelRunState.screenContext;
+  if(!ctx) return;
+  const canvas=ctx.canvas;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#08120e";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle="#3b9873";ctx.lineWidth=5;ctx.strokeRect(12,12,canvas.width-24,canvas.height-24);
+  ctx.textAlign="center";ctx.fillStyle="#70e2ac";ctx.font="bold 25px monospace";
+  ctx.fillText("SECURE CACHE",canvas.width/2,55);
+  ctx.fillStyle="#9cb8a8";ctx.font="18px monospace";ctx.fillText("CURRENT ACCESS CODE",canvas.width/2,100);
+  ctx.fillStyle="#d4ffdf";ctx.font="bold 68px monospace";ctx.fillText(levelRunState.code,canvas.width/2,180);
+  ctx.fillStyle="#67917b";ctx.font="14px monospace";ctx.fillText("CODE RESETS WHEN ROLES ROTATE",canvas.width/2,224);
+  if(levelRunState.screenTexture) levelRunState.screenTexture.needsUpdate=true;
+}
+
+function ensureLevelRunBuilt(){
+  if(levelRunState.group) return;
+  const root=new THREE.Group();root.name="LevelRUN_IndustrialMaze";root.visible=false;scene.add(root);
+  levelRunState.group=root;
+  levelRunState.collisionBoxes.length=0;levelRunState.occluders.length=0;levelRunState.interactables.length=0;
+
+  const floorMat=new THREE.MeshStandardMaterial({color:0x242a26,roughness:.96,metalness:.12});
+  const ceilingMat=new THREE.MeshStandardMaterial({color:0x151a18,roughness:.9,metalness:.18});
+  const wallMat=new THREE.MeshStandardMaterial({color:0x424943,roughness:.94,metalness:.04});
+  const stripeMat=new THREE.MeshStandardMaterial({color:0x777047,roughness:.88,metalness:.08});
+  const propMat=new THREE.MeshStandardMaterial({color:0x313b35,roughness:.64,metalness:.42});
+  const metalMat=new THREE.MeshStandardMaterial({color:0x59645b,roughness:.42,metalness:.72});
+  const redMat=new THREE.MeshStandardMaterial({color:0x411b18,roughness:.48,metalness:.45,emissive:0x210605});
+
+  const screenCanvas=document.createElement("canvas");screenCanvas.width=512;screenCanvas.height=256;
+  levelRunState.screenContext=screenCanvas.getContext("2d");
+  levelRunState.screenTexture=new THREE.CanvasTexture(screenCanvas);
+  levelRunState.screenTexture.colorSpace=THREE.SRGBColorSpace;
+
+  const addBox=(name,w,h,d,x,y,z,material,{collider=false,occluder=false}={})=>{
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+    mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;root.add(mesh);
+    if(collider) levelRunState.collisionBoxes.push({minX:x-w*.5,maxX:x+w*.5,minZ:z-d*.5,maxZ:z+d*.5});
+    if(occluder) levelRunState.occluders.push(mesh);
+    return mesh;
+  };
+  addBox("LevelRUN_Floor",76,.24,76,LEVEL_RUN_ORIGIN_X,-.12,LEVEL_RUN_ORIGIN_Z,floorMat);
+  addBox("LevelRUN_Ceiling",76,.20,76,LEVEL_RUN_ORIGIN_X,6.2,LEVEL_RUN_ORIGIN_Z,ceilingMat);
+
+  const wallSegment=(axis,coordinate,start,end)=>{
+    if(end<=start) return;
+    const thickness=.78,height=5.9;
+    const x=axis==="x"?LEVEL_RUN_ORIGIN_X+coordinate:LEVEL_RUN_ORIGIN_X+(start+end)*.5;
+    const z=axis==="x"?LEVEL_RUN_ORIGIN_Z+(start+end)*.5:LEVEL_RUN_ORIGIN_Z+coordinate;
+    const w=axis==="x"?thickness:end-start,d=axis==="x"?end-start:thickness;
+    addBox("LevelRUN_MazeWall",w,height,d,x,height*.5,z,wallMat,{collider:true,occluder:true});
+  };
+
+  wallSegment("x",-38,-38,38);wallSegment("x",38,-38,38);
+  wallSegment("z",-38,-38,38);wallSegment("z",38,-38,38);
+  const maze=[
+    ["x",-16,-36,-11],["x",-16,-7,12],["x",-16,17,36],
+    ["z",-16,-36,-23],["z",-16,-18,-4],["z",-16,1,15],["z",-16,20,36],
+    ["x",1,-36,-20],["x",1,-16,4],["x",1,8,20],["x",1,24,36],
+    ["z",4,-36,-19],["z",4,-15,-3],["z",4,2,17],["z",4,21,36],
+    ["x",18,-36,-21],["x",18,-17,2],["x",18,6,17],["x",18,22,36],
+    ["z",21,-36,-24],["z",21,-20,-8],["z",21,-3,13],["z",21,17,36]
+  ];
+  for(const [axis,coordinate,start,end] of maze) wallSegment(axis,coordinate,start,end);
+
+  for(const offset of [-33,-1,31]){
+    addBox("LevelRUN_WornFloorStripe",.12,.012,67,LEVEL_RUN_ORIGIN_X+offset,.008,LEVEL_RUN_ORIGIN_Z,stripeMat);
+  }
+
+  addBox("LevelRUN_CodeStation",2.4,2.35,1.5,LEVEL_RUN_ORIGIN_X-30,1.175,LEVEL_RUN_ORIGIN_Z-28,propMat,{collider:true,occluder:true});
+  const screenMaterial=new THREE.MeshBasicMaterial({map:levelRunState.screenTexture,side:THREE.DoubleSide,toneMapped:false});
+  const screen=new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.08),screenMaterial);
+  screen.name="LevelRUN_RandomCodeDisplay";
+  screen.position.set(LEVEL_RUN_ORIGIN_X-30,2.52,LEVEL_RUN_ORIGIN_Z-28-.80);
+  screen.rotation.y=Math.PI;root.add(screen);
+
+  addBox("LevelRUN_SafeBody",2.6,2.3,1.45,LEVEL_RUN_ORIGIN_X+27,1.15,LEVEL_RUN_ORIGIN_Z+28,metalMat,{collider:true,occluder:true});
+  const safePanel=new THREE.Mesh(new THREE.PlaneGeometry(.74,.74),
+    new THREE.MeshStandardMaterial({color:0x18231d,emissive:0x153c2b,emissiveIntensity:.55,side:THREE.DoubleSide}));
+  safePanel.name="LevelRUN_SafeKeypad";
+  safePanel.position.set(LEVEL_RUN_ORIGIN_X+27,1.42,LEVEL_RUN_ORIGIN_Z+28-.76);
+  safePanel.rotation.y=Math.PI;
+  safePanel.userData.interactable={type:"levelRunSafe",prompt:"Enter the safe code"};
+  root.add(safePanel);levelRunState.interactables.push(safePanel);
+  addBox("LevelRUN_SafeWarningStripe",2.25,.13,.05,LEVEL_RUN_ORIGIN_X+27,2.27,LEVEL_RUN_ORIGIN_Z+28-.75,stripeMat);
+
+  addBox("LevelRUN_ReturnDoor",3.5,4.2,.44,LEVEL_RUN_ORIGIN_X+28,2.1,LEVEL_RUN_ORIGIN_Z-37.1,redMat,{occluder:true});
+  const exitPanel=new THREE.Mesh(new THREE.PlaneGeometry(2.1,2.8),
+    new THREE.MeshStandardMaterial({color:0x251714,emissive:0x4b160e,emissiveIntensity:.45,side:THREE.DoubleSide}));
+  exitPanel.name="LevelRUN_ReturnInteractable";
+  exitPanel.position.set(LEVEL_RUN_ORIGIN_X+28,2.1,LEVEL_RUN_ORIGIN_Z-36.82);
+  exitPanel.userData.interactable={type:"levelRunExit",prompt:"Return to the Backrooms"};
+  root.add(exitPanel);levelRunState.interactables.push(exitPanel);
+
+  for(const [x,z] of [[-20,-20],[20,-20],[-20,20],[20,20]]){
+    addBox("LevelRUN_FluorescentTube",2.8,.10,.22,LEVEL_RUN_ORIGIN_X+x,5.82,LEVEL_RUN_ORIGIN_Z+z,
+      new THREE.MeshStandardMaterial({color:0x9ba99e,emissive:0xa8e6c4,emissiveIntensity:.42,roughness:.45}));
+    const light=new THREE.PointLight(0xb4e6ce,.85,24,1.5);
+    light.position.set(LEVEL_RUN_ORIGIN_X+x,5.45,LEVEL_RUN_ORIGIN_Z+z);light.castShadow=false;root.add(light);
+  }
+  drawLevelRunCodeScreen();
+}
+
+function ensureLevelRunKeypad(){
+  if(levelRunState.keypad) return;
+  const panel=document.createElement("div");
+  panel.id="levelRunKeypad";
+  panel.style.cssText=[
+    "position:fixed","inset:0","z-index:60","display:none",
+    "align-items:center","justify-content:center","padding:20px",
+    "box-sizing:border-box","background:rgba(0,0,0,.76)","backdrop-filter:blur(5px)",
+    "color:#d7e6d9","font-family:ui-monospace,SFMono-Regular,Menlo,monospace"
+  ].join(";");
+  panel.innerHTML=
+    '<form id="levelRunKeypadForm" style="width:min(420px,100%);padding:28px;box-sizing:border-box;background:linear-gradient(180deg,#1c2420,#080d0b);border:1px solid #54735f;box-shadow:0 25px 100px #000">'+
+      '<div style="font-size:10px;letter-spacing:4px;color:#90b7a0">LEVEL RUN / SECURE CACHE</div>'+
+      '<h2 style="margin:14px 0 8px;font-size:22px;letter-spacing:2px">SAFE ACCESS</h2>'+
+      '<p id="levelRunKeypadMessage" style="font-size:12px;line-height:1.6;color:#a6b7ad">ENTER THE FOUR-DIGIT CODE.</p>'+
+      '<input id="levelRunKeypadInput" type="text" inputmode="numeric" autocomplete="off" maxlength="4" pattern="[0-9]{4}" placeholder="0000" aria-label="Four digit safe code" required style="display:block;width:100%;box-sizing:border-box;margin:20px 0 14px;padding:14px;background:#050907;border:1px solid #557866;color:#dcffe8;font:24px monospace;letter-spacing:10px;text-align:center;outline:none">'+
+      '<div style="display:flex;gap:10px"><button type="submit" style="flex:1;padding:12px;background:#244735;border:1px solid #72a287;color:#e5fff0;font:12px monospace;letter-spacing:2px;cursor:pointer">UNLOCK</button><button id="levelRunKeypadCancel" type="button" style="padding:12px 16px;background:#171d19;border:1px solid #3d4c42;color:#bdc9c0;font:12px monospace;cursor:pointer">CLOSE</button></div>'+
+    '</form>';
+  document.body.appendChild(panel);
+  levelRunState.keypad=panel;
+  levelRunState.keypadInput=panel.querySelector("#levelRunKeypadInput");
+  levelRunState.keypadMessage=panel.querySelector("#levelRunKeypadMessage");
+  panel.querySelector("#levelRunKeypadCancel").addEventListener("click",()=>closeLevelRunKeypad(true));
+  panel.addEventListener("pointerdown",event=>{if(event.target===panel)closeLevelRunKeypad(true);});
+  panel.querySelector("#levelRunKeypadForm").addEventListener("submit",event=>{
+    event.preventDefault();
+    if(!levelRunActive)return closeLevelRunKeypad(false);
+    if(!isLocalLevelRunRunner()){
+      levelRunState.keypadMessage.textContent="YOU ARE THE DECOY THIS ROUND. WAIT FOR THE ROLE SWITCH.";
+      return;
+    }
+    if(levelRunState.keypadInput.value.trim()!==levelRunState.code){
+      levelRunState.keypadMessage.textContent="ACCESS DENIED. THE LOCK RESETS AFTER A ROLE SWITCH.";
+      levelRunState.keypadInput.value="";levelRunState.keypadInput.focus();return;
+    }
+    const payload={runnerId:getLevelRunLocalId(),round:levelRunState.round};
+    closeLevelRunKeypad(true);
+    if(multiplayer.isWorldAuthority()) advanceLevelRunRound();
+    else multiplayer.broadcastWorldEvent("level_run_safe_opened","level-run",payload);
+  });
+}
+
+function openLevelRunSafe(){
+  if(!levelRunActive)return;
+  ensureLevelRunKeypad();
+  levelRunState.keypadMessage.textContent=isLocalLevelRunRunner()
+    ?"ENTER THE FOUR-DIGIT CODE SHOWN ON THE GREEN TERMINAL."
+    :"YOU ARE THE DECOY THIS ROUND. WAIT FOR THE ROLE SWITCH.";
+  levelRunState.keypadInput.value="";
+  levelRunState.keypad.classList.add("open");
+  levelRunState.keypad.style.display="flex";
+  player.keys.clear();player.vel.set(0,0,0);
+  document.exitPointerLock?.();
+  levelRunState.keypadInput.focus();
+}
+
+function closeLevelRunKeypad(restoreFocus=true){
+  if(!levelRunState.keypad)return;
+  levelRunState.keypad.classList.remove("open");
+  levelRunState.keypad.style.display="none";
+  if(restoreFocus&&gameStarted&&levelRunActive)player.lock();
+}
+
+function getLevelRunHunterTargetInfo(){
+  if(!levelRunActive||isLocalLevelRunRunner()){
+    return {target:player,sprinting:Boolean(player.isRunning),flashlightOn:Boolean(flashlightOn),crouched:Boolean(player.crouched)};
+  }
+  const runnerId=String(levelRunState.runnerId||"");
+  const remote=multiplayer.players.get(runnerId);
+  let current=remote?.current||remote?.target||{};
+  let x=Number(current.x),z=Number(current.z);
+  if(!isInsideLevelRun(x,z)){current=remote?.target||{};x=Number(current.x);z=Number(current.z);}
+  if(!remote||!isInsideLevelRun(x,z)){const spawn=getLevelRunSpawnFor(runnerId);x=spawn.x;z=spawn.z;current={};}
+  levelRunState.target.pos.set(x,EYE,z);
+  levelRunState.target.eyeY=current.crouched?1.1:EYE;
+  levelRunState.target.crouched=Boolean(current.crouched);
+  levelRunState.target.flashlight=Boolean(current.flashlight);
+  return {target:levelRunState.target,sprinting:false,flashlightOn:levelRunState.target.flashlight,crouched:levelRunState.target.crouched};
+}
+
+function resetLevelRunSpider(){
+  if(!levelRunActive)return;
+  spiderActive=true;
+  if(!multiplayer.isWorldAuthority()){
+    spiderEntity.visible=true;if(spiderModel)spiderModel.visible=!arachnophobiaMode;return;
+  }
+  if(!spiderLoaded||!spiderModel){ensureSpiderLoading();spiderEntity.visible=false;return;}
+  normalSpiderHunter.hide();
+  spiderEntity.scale.setScalar(1);spiderEntity.rotation.x=0;spiderEntity.rotation.z=0;spiderEntity.position.y=SPIDER_GROUND_OFFSET;
+  const target=getLevelRunHunterTargetInfo().target.pos;
+  let spawn=null;
+  for(let attempt=0;attempt<96;attempt++){
+    const angle=Math.random()*Math.PI*2,distance=8+Math.random()*11;
+    const x=target.x+Math.cos(angle)*distance,z=target.z+Math.sin(angle)*distance;
+    if(!isInsideLevelRun(x,z)||isSpiderBlocked(x,z))continue;
+    spawn={x,z};break;
+  }
+  if(!spawn){
+    for(let x=-34;x<=34&&!spawn;x+=3)for(let z=-34;z<=34;z+=3){
+      const candidateX=LEVEL_RUN_ORIGIN_X+x,candidateZ=LEVEL_RUN_ORIGIN_Z+z;
+      if(Math.hypot(target.x-candidateX,target.z-candidateZ)>=8&&!isSpiderBlocked(candidateX,candidateZ)){spawn={x:candidateX,z:candidateZ};break;}
+    }
+  }
+  if(!spawn){spiderActive=false;spiderEntity.visible=false;return;}
+  normalSpiderHunter.startRoaming(new THREE.Vector3(spawn.x,SPIDER_GROUND_OFFSET,spawn.z));
+  normalSpiderHunter.lastKnownTarget.set(target.x,0,target.z);
+  normalSpiderHunter.lastSeenTime=clock.elapsedTime;
+  normalSpiderHunter.setMode("hunt");
+  normalSpiderHunter.visualRig.root.visible=false;spiderEntity.visible=true;
+  if(spiderModel)spiderModel.visible=!arachnophobiaMode;
+  spiderRevealLight.visible=false;spiderRevealLight.intensity=0;spiderBehaviorState="chase";spiderBehaviorTime=0;
+  clearSpiderPath();setSpiderAnimation("chase");
+}
+
+function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
+  if(levelRunActive||houseMode||tutorialOpenRoomActive)return false;
+  ensureLevelRunBuilt();
+  const participants=getLevelRunParticipantIds(),localId=getLevelRunLocalId();
+  const runnerId=String(payload.runnerId||participants[Math.floor(Math.random()*participants.length)]||localId);
+  const code=String(payload.code||makeLevelRunCode());
+  levelRunState.active=true;levelRunActive=true;levelRunState.runnerId=runnerId;
+  levelRunState.code=/^[0-9]{4}$/.test(code)?code:makeLevelRunCode();
+  levelRunState.round=Math.max(1,Math.floor(Number(payload.round)||1));
+  if(Number.isFinite(Number(payload.returnX))&&Number.isFinite(Number(payload.returnZ))){
+    levelRunState.returnPosition.set(Number(payload.returnX),EYE,Number(payload.returnZ));
+  }else if(entryDoor){
+    levelRunState.returnPosition.set(entryDoor.centerX,EYE,entryDoor.wallZ+entryDoor.face*7.2);
+  }else levelRunState.returnPosition.set(player.pos.x,EYE,player.pos.z);
+
+  world.root.visible=false;houseRoot.visible=false;levelRunState.group.visible=true;
+  player.ignoreWorldCollision=true;player.extraCollisionBoxes=levelRunState.collisionBoxes;
+  const spawn=getLevelRunSpawnFor(localId);player.pos.set(spawn.x,EYE,spawn.z);
+  player.vel.set(0,0,0);player.keys.clear();player.jumpY=0;player.jumpVelocity=0;
+  player.yaw=0;player.pitch=0;player.crouched=false;player.sliding=false;player.slideTimer=0;
+  spiderActive=false;normalSpiderHunter.hide();spiderEntity.visible=false;spiderRevealLight.visible=false;
+  drawLevelRunCodeScreen();resetLevelRunSpider();updateLevelRunHUD();
+  if(broadcast)multiplayer.broadcastWorldEvent("level_run_enter","level-run",{
+    runnerId:levelRunState.runnerId,code:levelRunState.code,round:levelRunState.round,
+    returnX:levelRunState.returnPosition.x,returnZ:levelRunState.returnPosition.z
+  });
+  showSpiderScareMessage("LEVEL RUN · FIND THE CODE, UNLOCK THE SAFE. THE RUNNER CHANGES EACH ROUND.",2200);
+  return true;
+}
+
+function checkLevelRunEntrance(){
+  if(!gameStarted||houseMode||tutorialOpenRoomActive||levelRunActive||gameEnded)return;
+  const door=world.stairwellDoors.find(candidate=>{
+    if(!candidate||candidate.staircase?.testOnly||candidate.openProgress<.82)return false;
+    const progress=(player.pos.z-candidate.wallZ)*candidate.face;
+    return Math.abs(player.pos.x-candidate.centerX)<1.42&&progress>=-.06&&progress<=1.0;
+  });
+  if(!door)return;
+  startLevelRun({
+    runnerId:null,code:makeLevelRunCode(),round:1,
+    returnX:door.centerX,returnZ:door.wallZ+door.face*7.2
+  },{entryDoor:door});
+}
+
+function applyLevelRunRoundState(payload={}){
+  if(!levelRunActive)return;
+  levelRunState.runnerId=String(payload.runnerId||levelRunState.runnerId||getLevelRunLocalId());
+  levelRunState.round=Math.max(levelRunState.round+1,Math.floor(Number(payload.round)||1));
+  const code=String(payload.code||makeLevelRunCode());
+  levelRunState.code=/^[0-9]{4}$/.test(code)?code:makeLevelRunCode();
+  drawLevelRunCodeScreen();updateLevelRunHUD();
+  if(multiplayer.isWorldAuthority())resetLevelRunSpider();
+  else{spiderActive=true;spiderEntity.visible=true;}
+}
+
+function advanceLevelRunRound(){
+  if(!levelRunActive||!multiplayer.isWorldAuthority())return;
+  const ids=getLevelRunParticipantIds(),current=String(levelRunState.runnerId||getLevelRunLocalId());
+  const currentIndex=ids.indexOf(current);
+  const nextRunner=ids.length>1?ids[((currentIndex<0?0:currentIndex)+1)%ids.length]:current;
+  const payload={runnerId:nextRunner,code:makeLevelRunCode(),round:levelRunState.round+1};
+  applyLevelRunRoundState(payload);
+  multiplayer.broadcastWorldEvent("level_run_round_state","level-run",payload);
+  showSpiderScareMessage("RUNNER SWITCHED · ROUND "+payload.round,1300);
+}
+
+function leaveLevelRun(broadcast=true){
+  if(!levelRunActive)return;
+  if(levelRunState.keypad)closeLevelRunKeypad(false);
+  levelRunActive=false;levelRunState.active=false;
+  if(levelRunState.group)levelRunState.group.visible=false;
+  world.root.visible=true;houseRoot.visible=false;player.ignoreWorldCollision=false;player.extraCollisionBoxes=[];
+  player.pos.copy(levelRunState.returnPosition);player.vel.set(0,0,0);player.keys.clear();
+  player.jumpY=0;player.jumpVelocity=0;player.yaw=0;player.pitch=0;
+  spiderActive=false;normalSpiderHunter.hide();spiderEntity.visible=false;spiderRevealLight.visible=false;
+  levelRunState.runnerId=null;clearSpiderPath();
+  objective.textContent="Find a way deeper. Stay in the light.";
+  if(broadcast)multiplayer.broadcastWorldEvent("level_run_exit","level-run",{});
+  showSpiderScareMessage("BACKROOMS RESTORED.",1500);
+}
 
 function toggleArachnophobia(){
   arachnophobiaMode=setArachnophobiaMode(!arachnophobiaMode);
@@ -4663,12 +5058,12 @@ const normalSpiderHunter=new SpiderHunter({
   player,
   visualRig:normalSpiderHiddenRig,
   isBlocked:(x,z)=>isSpiderBlocked(x,z),
-  getOccluders:()=>world.wallOccluders,
+  getOccluders:()=>levelRunActive ? levelRunState.occluders : world.wallOccluders,
   // Enlarged contact radius catches the body sooner; articulated legs stay visual-only.
   getVisualHitboxDistance:(x,z)=>Math.max(
     0,
     Math.hypot(x-spiderEntity.position.x,z-spiderEntity.position.z)-
-      SPIDER_TARGET_SPAN*(1.4/SPIDER_BASE_TARGET_SPAN)
+      SPIDER_TARGET_SPAN*(2.0/SPIDER_BASE_TARGET_SPAN)
   ),
   onStateChange:(mode)=>{
     if(mode==="roam"){
@@ -4809,7 +5204,7 @@ const SPIDER_POUNCE_DURATION=.58;
 const SPIDER_POUNCE_HEIGHT=1.15;
 const SPIDER_SPEED=2.65;
 const SPIDER_ATTACK_RANGE=2.5;
-const SPIDER_HITBOX_PADDING=0.85;
+const SPIDER_HITBOX_PADDING=1.10;
 const SPIDER_CAUGHT_FREEZE_TIME=1.35;
 const SPIDER_CHASE_MIN_TIME=5.0;
 const SPIDER_CHASE_MAX_TIME=8.0;
@@ -5239,7 +5634,14 @@ function isSpiderSpawnInsideMap(x,z,padding=SPIDER_RADIUS+.5){
 }
 
 function isSpiderBlocked(x,z){
-  const walls=world.getNearbyWallBounds(x,z,SPIDER_RADIUS+.22);
+  const walls=levelRunActive
+    ? levelRunState.collisionBoxes.filter(wall=>
+        wall.maxX>=x-SPIDER_RADIUS-.22 &&
+        wall.minX<=x+SPIDER_RADIUS+.22 &&
+        wall.maxZ>=z-SPIDER_RADIUS-.22 &&
+        wall.minZ<=z+SPIDER_RADIUS+.22
+      )
+    : world.getNearbyWallBounds(x,z,SPIDER_RADIUS+.22);
   for(const wall of walls){
     const nx=Math.max(wall.minX,Math.min(x,wall.maxX));
     const nz=Math.max(wall.minZ,Math.min(z,wall.maxZ));
@@ -5303,7 +5705,9 @@ function playerHasLineOfSightToSpider(entity=spiderEntity){
   // occlusion depend on Backrooms walls and tutorial room blockers explicitly.
   const occluders=tutorialOpenRoomActive
     ? tutorialOpenRoomOccluders
-    : (world.wallOccluders?.length ? world.wallOccluders : world.root.children);
+    : levelRunActive
+      ? levelRunState.occluders
+      : (world.wallOccluders?.length ? world.wallOccluders : world.root.children);
   const hits=spiderSightRaycaster.intersectObjects(occluders,true);
   return hits.length===0;
 }
@@ -7844,7 +8248,7 @@ document.addEventListener("pointerlockchange",()=>{
     return;
   }
 
-  if(!controlsOpen && !phoneOpen && !chatOpen){
+  if(!controlsOpen && !phoneOpen && !chatOpen && !levelRunState.keypad?.classList.contains("open")){
     if(locked){
       overlay.classList.add("hidden");
     }else if(gameStarted){
@@ -7898,6 +8302,10 @@ document.addEventListener("keydown",e=>{
   }
 
   if(adminOverlay?.classList.contains("open")) return;
+  if(levelRunState.keypad?.classList.contains("open")){
+    if(e.code==="Escape"){e.preventDefault();closeLevelRunKeypad(true);}
+    return;
+  }
   if(gameEnded) return;
 
   if(securityCameras.active){
@@ -8280,7 +8688,7 @@ function animate(){
     if(houseDoorCollisionDirty || houseCollisionRefreshTimer<=0 || movedEnough){
       updateHouseDoorCollisions();
     }
-  }else if(!tutorialOpenRoomActive){
+  }else if(!tutorialOpenRoomActive && !levelRunActive){
     player.extraCollisionBoxes=[];
   }
 
@@ -8293,11 +8701,14 @@ function animate(){
     !phoneOpen &&
     !controlsOpen &&
     !chatOpen &&
+    !levelRunState.keypad?.classList.contains("open") &&
     !securityCameras.active &&
     !adminOverlay.classList.contains("open") &&
     !computerSystem.openState
   );
   player.update(dt);
+  if(!levelRunActive) checkLevelRunEntrance();
+  if(levelRunActive) updateLevelRunHUD();
   updateTutorialOpenRoomLights();
   updateAdminFly(dt);
   updateAdminProjectiles(dt);
@@ -8509,18 +8920,23 @@ function animate(){
             resetPlayerAfterSpiderCatch();
           }
         }else{
-          normalSpiderHunter.updateHunter(dt,t,player,{
-            sprinting:player.isRunning,
-            flashlightOn,
-            crouched:player.crouched
+          const huntInfo=levelRunActive
+            ? getLevelRunHunterTargetInfo()
+            : {target:player,sprinting:player.isRunning,flashlightOn,crouched:player.crouched};
+          normalSpiderHunter.updateHunter(dt,t,huntInfo.target,{
+            sprinting:huntInfo.sprinting,
+            flashlightOn:huntInfo.flashlightOn,
+            crouched:huntInfo.crouched
           });
           normalSpiderHunter.step(dt);
 
-          // Use the scaled body hitbox; the long legs remain visual-only.
-          if(normalSpiderHunter.distanceToHitbox(player.pos.x,player.pos.z)<=.06){
-            startSpiderCatchFreeze();
+          const caughtX=huntInfo.target.pos.x;
+          const caughtZ=huntInfo.target.pos.z;
+          if(normalSpiderHunter.distanceToHitbox(caughtX,caughtZ)<=.06){
+            if(levelRunActive) advanceLevelRunRound();
+            else startSpiderCatchFreeze();
           }else if(
-            spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
+            !levelRunActive && spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
           ){
             spiderActive=false;
             spiderBehaviorState="idle";

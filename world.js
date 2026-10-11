@@ -567,7 +567,9 @@ export class World {
       if(Math.abs(door.openProgress-target)<0.006)door.openProgress=target;
       door.group.rotation.y=-door.face*Math.PI*0.5*door.openProgress;
       const interactable=door.group.userData.interactable;
-      if(interactable)interactable.prompt=door.targetOpen?"Close the stairwell door":"Open the stairwell door";
+      if(interactable)interactable.prompt=door.targetOpen
+        ?(door.staircase?.testOnly?"Close test stairwell":"Descend to Level RUN")
+        :(door.staircase?.testOnly?"Open test stairwell":"Open Level RUN stairs");
       if(door.openProgress<0.82){
         door.collisionBounds.minX=door.centerX-1.7;door.collisionBounds.maxX=door.centerX+1.7;
         door.collisionBounds.minZ=door.wallZ-0.08;door.collisionBounds.maxZ=door.wallZ+0.08;
@@ -750,7 +752,12 @@ export class World {
     for(const y of [0.28,doorHeight-0.28])addBox("StairwellDoorHinge",[0.06,0.16,0.19],[0.035,y,-0.02],this.stairDoorMetalMaterial,false,pivot);
     const collisionBounds={minX:centerX-halfWidth,maxX:centerX+halfWidth,minZ:doorZ-0.08,maxZ:doorZ+0.08};
     const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,face,doorWidth,toggle(){this.targetOpen=!this.targetOpen;return true;}};
-    pivot.userData.interactable={type:"stairwellDoor",prompt:"Open the stairwell door",toggle:()=>state.toggle(),staircaseTestOnly:Boolean(staircase.testOnly)};
+    pivot.userData.interactable={
+    type:"stairwellDoor",
+    prompt:staircase.testOnly?"Open test stairwell":"Open Level RUN stairs",
+    toggle:()=>state.toggle(),
+    staircaseTestOnly:Boolean(staircase.testOnly)
+  };
     group.userData.stairwellDoorState=state; // Keep the animated panel out of the spider's static wall-occluder list.
   }
 

@@ -11,6 +11,14 @@ export const LEVELS = [
     depth: 0
   },
   {
+    id: "level-run",
+    name: "LEVEL RUN",
+    type: "setpiece",
+    profile: "industrial-run",
+    description: "A hostile service maze: find the randomized four-digit code, open the safe, and survive as the hunted runner role rotates.",
+    depth: 0.5
+  },
+  {
     id: "level-1",
     name: "LEVEL 1 · SERVICE",
     type: "procedural",
