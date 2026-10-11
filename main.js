@@ -1616,6 +1616,7 @@ const levelRunState={
   collisionBoxes:[],occluders:[],interactables:[],
   keypad:null,keypadInput:null,keypadMessage:null,
   screenContext:null,screenTexture:null,
+  previousSceneBackground:null,previousFogColor:null,previousFogNear:null,previousFogFar:null,
   returnPosition:new THREE.Vector3(32,EYE,32),
   target:{pos:new THREE.Vector3(0,EYE,0),eyeY:EYE,crouched:false,flashlight:false}
 };
@@ -3349,12 +3350,19 @@ function makeLevelRunCode(){return String(Math.floor(1000+Math.random()*9000));}
 function getLevelRunSpawnFor(id){
   const ids=getLevelRunParticipantIds();
   const index=Math.max(0,ids.indexOf(String(id||"")));
-  return {x:LEVEL_RUN_ORIGIN_X-30+Math.min(index,8)*3.1,z:LEVEL_RUN_ORIGIN_Z-24};
+  const lane=index%5;
+  const row=Math.floor(index/5);
+  return {
+    x:LEVEL_RUN_ORIGIN_X-6+lane*3,
+    z:LEVEL_RUN_ORIGIN_Z-31+row*3.4
+  };
 }
 
 function isInsideLevelRun(x,z){
+  // LEVEL RUN is a long, straight corridor; keep the hunter and remote targets
+  // inside its walls rather than allowing them to spawn in the old maze area.
   return Number.isFinite(x)&&Number.isFinite(z)&&
-    x>=LEVEL_RUN_ORIGIN_X-37&&x<=LEVEL_RUN_ORIGIN_X+37&&
+    x>=LEVEL_RUN_ORIGIN_X-8.15&&x<=LEVEL_RUN_ORIGIN_X+8.15&&
     z>=LEVEL_RUN_ORIGIN_Z-37&&z<=LEVEL_RUN_ORIGIN_Z+37;
 }
 
@@ -3386,13 +3394,27 @@ function ensureLevelRunBuilt(){
   levelRunState.group=root;
   levelRunState.collisionBoxes.length=0;levelRunState.occluders.length=0;levelRunState.interactables.length=0;
 
-  const floorMat=new THREE.MeshStandardMaterial({color:0x242a26,roughness:.96,metalness:.12});
-  const ceilingMat=new THREE.MeshStandardMaterial({color:0x151a18,roughness:.9,metalness:.18});
-  const wallMat=new THREE.MeshStandardMaterial({color:0x424943,roughness:.94,metalness:.04});
-  const stripeMat=new THREE.MeshStandardMaterial({color:0x777047,roughness:.88,metalness:.08});
+  const floorMat=new THREE.MeshStandardMaterial({
+    color:0x3b080b,roughness:.92,metalness:.10,
+    emissive:0x4a0306,emissiveIntensity:.48
+  });
+  const ceilingMat=new THREE.MeshStandardMaterial({
+    color:0x190407,roughness:.9,metalness:.08,
+    emissive:0x090001,emissiveIntensity:.45
+  });
+  const wallMat=new THREE.MeshStandardMaterial({
+    color:0x351014,roughness:.9,metalness:.08,
+    emissive:0x180205,emissiveIntensity:.42
+  });
+  const stripeMat=new THREE.MeshStandardMaterial({
+    color:0xb51a22,roughness:.62,metalness:.08,
+    emissive:0x6d0008,emissiveIntensity:.75
+  });
   const propMat=new THREE.MeshStandardMaterial({color:0x313b35,roughness:.64,metalness:.42});
   const metalMat=new THREE.MeshStandardMaterial({color:0x59645b,roughness:.42,metalness:.72});
-  const redMat=new THREE.MeshStandardMaterial({color:0x411b18,roughness:.48,metalness:.45,emissive:0x210605});
+  const redMat=new THREE.MeshStandardMaterial({
+    color:0x411012,roughness:.48,metalness:.45,emissive:0x390006
+  });
 
   const screenCanvas=document.createElement("canvas");screenCanvas.width=512;screenCanvas.height=256;
   levelRunState.screenContext=screenCanvas.getContext("2d");
@@ -3406,8 +3428,9 @@ function ensureLevelRunBuilt(){
     if(occluder) levelRunState.occluders.push(mesh);
     return mesh;
   };
-  addBox("LevelRUN_Floor",76,.24,76,LEVEL_RUN_ORIGIN_X,-.12,LEVEL_RUN_ORIGIN_Z,floorMat);
-  addBox("LevelRUN_Ceiling",76,.20,76,LEVEL_RUN_ORIGIN_X,6.2,LEVEL_RUN_ORIGIN_Z,ceilingMat);
+  // A single 76m-long hallway. No interior partitions, turns, or maze branches.
+  addBox("LevelRUN_Floor",20,.24,76,LEVEL_RUN_ORIGIN_X,-.12,LEVEL_RUN_ORIGIN_Z,floorMat);
+  addBox("LevelRUN_Ceiling",20,.20,76,LEVEL_RUN_ORIGIN_X,6.2,LEVEL_RUN_ORIGIN_Z,ceilingMat);
 
   const wallSegment=(axis,coordinate,start,end)=>{
     if(end<=start) return;
@@ -3415,59 +3438,67 @@ function ensureLevelRunBuilt(){
     const x=axis==="x"?LEVEL_RUN_ORIGIN_X+coordinate:LEVEL_RUN_ORIGIN_X+(start+end)*.5;
     const z=axis==="x"?LEVEL_RUN_ORIGIN_Z+(start+end)*.5:LEVEL_RUN_ORIGIN_Z+coordinate;
     const w=axis==="x"?thickness:end-start,d=axis==="x"?end-start:thickness;
-    addBox("LevelRUN_MazeWall",w,height,d,x,height*.5,z,wallMat,{collider:true,occluder:true});
+    addBox("LevelRUN_CorridorWall",w,height,d,x,height*.5,z,wallMat,{collider:true,occluder:true});
   };
+  // Two continuous side walls and two end walls.
+  wallSegment("x",-9.5,-38,38);
+  wallSegment("x",9.5,-38,38);
+  wallSegment("z",-38,-9.5,9.5);
+  wallSegment("z",38,-9.5,9.5);
 
-  wallSegment("x",-38,-38,38);wallSegment("x",38,-38,38);
-  wallSegment("z",-38,-38,38);wallSegment("z",38,-38,38);
-  const maze=[
-    ["x",-16,-36,-11],["x",-16,-7,12],["x",-16,17,36],
-    ["z",-16,-36,-23],["z",-16,-18,-4],["z",-16,1,15],["z",-16,20,36],
-    ["x",1,-36,-20],["x",1,-16,4],["x",1,8,20],["x",1,24,36],
-    ["z",4,-36,-19],["z",4,-15,-3],["z",4,2,17],["z",4,21,36],
-    ["x",18,-36,-21],["x",18,-17,2],["x",18,6,17],["x",18,22,36],
-    ["z",21,-36,-24],["z",21,-20,-8],["z",21,-3,13],["z",21,17,36]
-  ];
-  for(const [axis,coordinate,start,end] of maze) wallSegment(axis,coordinate,start,end);
-
-  for(const offset of [-33,-1,31]){
-    addBox("LevelRUN_WornFloorStripe",.12,.012,67,LEVEL_RUN_ORIGIN_X+offset,.008,LEVEL_RUN_ORIGIN_Z,stripeMat);
+  // Red lane markings run the length of the corridor.
+  for(const offset of [-6,0,6]){
+    addBox("LevelRUN_RedFloorStripe",.14,.016,68,
+      LEVEL_RUN_ORIGIN_X+offset,.012,LEVEL_RUN_ORIGIN_Z,stripeMat);
   }
 
-  addBox("LevelRUN_CodeStation",2.4,2.35,1.5,LEVEL_RUN_ORIGIN_X-30,1.175,LEVEL_RUN_ORIGIN_Z-28,propMat,{collider:true,occluder:true});
+  // Code terminal at the entry end; the safe sits straight ahead at the far end.
+  const codeStationZ=LEVEL_RUN_ORIGIN_Z-23;
+  addBox("LevelRUN_CodeStation",2.4,2.35,1.5,
+    LEVEL_RUN_ORIGIN_X,1.175,codeStationZ,propMat,{collider:true,occluder:true});
   const screenMaterial=new THREE.MeshBasicMaterial({map:levelRunState.screenTexture,side:THREE.DoubleSide,toneMapped:false});
   const screen=new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.08),screenMaterial);
   screen.name="LevelRUN_RandomCodeDisplay";
-  screen.position.set(LEVEL_RUN_ORIGIN_X-30,2.52,LEVEL_RUN_ORIGIN_Z-28+.80);
-  screen.rotation.y=0;root.add(screen);
+  screen.position.set(LEVEL_RUN_ORIGIN_X,2.52,codeStationZ-.80);
+  screen.rotation.y=Math.PI;
+  root.add(screen);
 
-  addBox("LevelRUN_SafeBody",2.6,2.3,1.45,LEVEL_RUN_ORIGIN_X+27,1.15,LEVEL_RUN_ORIGIN_Z+28,metalMat,{collider:true,occluder:true});
+  const safeZ=LEVEL_RUN_ORIGIN_Z+28;
+  addBox("LevelRUN_SafeBody",2.6,2.3,1.45,
+    LEVEL_RUN_ORIGIN_X,1.15,safeZ,metalMat,{collider:true,occluder:true});
   const safePanel=new THREE.Mesh(new THREE.PlaneGeometry(.74,.74),
     new THREE.MeshStandardMaterial({color:0x18231d,emissive:0x153c2b,emissiveIntensity:.55,side:THREE.DoubleSide}));
   safePanel.name="LevelRUN_SafeKeypad";
-  safePanel.position.set(LEVEL_RUN_ORIGIN_X+27,1.42,LEVEL_RUN_ORIGIN_Z+28-.76);
+  safePanel.position.set(LEVEL_RUN_ORIGIN_X,1.42,safeZ-.76);
   safePanel.rotation.y=Math.PI;
   safePanel.userData.interactable={type:"levelRunSafe",prompt:"Enter the safe code"};
   root.add(safePanel);levelRunState.interactables.push(safePanel);
-  addBox("LevelRUN_SafeWarningStripe",2.25,.13,.05,LEVEL_RUN_ORIGIN_X+27,2.27,LEVEL_RUN_ORIGIN_Z+28-.75,stripeMat);
+  addBox("LevelRUN_SafeWarningStripe",2.25,.13,.05,
+    LEVEL_RUN_ORIGIN_X,2.27,safeZ-.75,stripeMat);
 
-  addBox("LevelRUN_ReturnDoor",3.5,4.2,.44,LEVEL_RUN_ORIGIN_X+28,2.1,LEVEL_RUN_ORIGIN_Z-34.4,redMat,{occluder:true});
+  // The emergency return panel is at the same end as the player spawn.
+  addBox("LevelRUN_ReturnDoor",3.5,4.2,.44,
+    LEVEL_RUN_ORIGIN_X,2.1,LEVEL_RUN_ORIGIN_Z-35.2,redMat,{occluder:true});
   const exitPanel=new THREE.Mesh(new THREE.PlaneGeometry(2.1,2.8),
-    new THREE.MeshStandardMaterial({color:0x251714,emissive:0x4b160e,emissiveIntensity:.45,side:THREE.DoubleSide}));
+    new THREE.MeshStandardMaterial({color:0x251014,emissive:0x7c0711,emissiveIntensity:.75,side:THREE.DoubleSide}));
   exitPanel.name="LevelRUN_ReturnInteractable";
-  exitPanel.position.set(LEVEL_RUN_ORIGIN_X+28,2.1,LEVEL_RUN_ORIGIN_Z-34.12);
+  exitPanel.position.set(LEVEL_RUN_ORIGIN_X,2.1,LEVEL_RUN_ORIGIN_Z-34.92);
   exitPanel.rotation.y=0;
   exitPanel.userData.interactable={type:"levelRunExit",prompt:"Return to the Backrooms"};
   root.add(exitPanel);levelRunState.interactables.push(exitPanel);
 
-  for(const [x,z] of [[-20,-20],[20,-20],[-20,20],[20,20]]){
-    addBox("LevelRUN_FluorescentTube",2.8,.10,.22,LEVEL_RUN_ORIGIN_X+x,5.82,LEVEL_RUN_ORIGIN_Z+z,
-      new THREE.MeshStandardMaterial({color:0x9ba99e,emissive:0xa8e6c4,emissiveIntensity:.42,roughness:.45}));
+  // Red fixtures add both visible glow and real red light. Emissive floor/walls
+  // keep the whole corridor red between fixtures without adding shadow cost.
+  const tubeMaterial=new THREE.MeshStandardMaterial({
+    color:0xff7777,emissive:0xff0808,emissiveIntensity:1.85,roughness:.38
+  });
+  for(const offset of [-25,-9,9,25]){
+    addBox("LevelRUN_RedFluorescentTube",10,.10,.24,
+      LEVEL_RUN_ORIGIN_X,5.82,LEVEL_RUN_ORIGIN_Z+offset,tubeMaterial);
   }
-  // Keep only two real point lights in this side-level; the other fluorescents are emissive.
-  for(const [x,z] of [[-20,-20],[20,20]]){
-    const light=new THREE.PointLight(0xb4e6ce,.85,24,1.5);
-    light.position.set(LEVEL_RUN_ORIGIN_X+x,5.45,LEVEL_RUN_ORIGIN_Z+z);
+  for(const offset of [-24,0,24]){
+    const light=new THREE.PointLight(0xff1018,2.15,35,1.45);
+    light.position.set(LEVEL_RUN_ORIGIN_X,5.25,LEVEL_RUN_ORIGIN_Z+offset);
     light.castShadow=false;
     root.add(light);
   }
@@ -3574,7 +3605,9 @@ function resetLevelRunSpider(){
   if(!spawn){
     for(let x=-34;x<=34&&!spawn;x+=3)for(let z=-34;z<=34;z+=3){
       const candidateX=LEVEL_RUN_ORIGIN_X+x,candidateZ=LEVEL_RUN_ORIGIN_Z+z;
-      if(Math.hypot(target.x-candidateX,target.z-candidateZ)>=8&&!isSpiderBlocked(candidateX,candidateZ)){spawn={x:candidateX,z:candidateZ};break;}
+      if(isInsideLevelRun(candidateX,candidateZ)&&
+        Math.hypot(target.x-candidateX,target.z-candidateZ)>=8&&
+        !isSpiderBlocked(candidateX,candidateZ)){spawn={x:candidateX,z:candidateZ};break;}
     }
   }
   if(!spawn){spiderActive=false;spiderEntity.visible=false;return;}
@@ -3595,6 +3628,17 @@ function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
   const runnerId=String(payload.runnerId||participants[Math.floor(Math.random()*participants.length)]||localId);
   const code=String(payload.code||makeLevelRunCode());
   levelRunState.active=true;levelRunActive=true;levelRunState.runnerId=runnerId;
+  levelRunState.previousSceneBackground=scene.background?.clone?.()??scene.background??null;
+  levelRunState.previousFogColor=scene.fog?.color?.clone?.()??null;
+  levelRunState.previousFogNear=scene.fog?.near??null;
+  levelRunState.previousFogFar=scene.fog?.far??null;
+  if(scene.background?.isColor)scene.background.set(0x170004);
+  else scene.background=new THREE.Color(0x170004);
+  if(scene.fog){
+    scene.fog.color.set(0x260006);
+    scene.fog.near=8;
+    scene.fog.far=58;
+  }
   levelRunState.code=/^[0-9]{4}$/.test(code)?code:makeLevelRunCode();
   levelRunState.round=Math.max(1,Math.floor(Number(payload.round)||1));
   if(Number.isFinite(Number(payload.returnX))&&Number.isFinite(Number(payload.returnZ))){
@@ -3657,6 +3701,20 @@ function advanceLevelRunRound(){
 function leaveLevelRun(broadcast=true){
   if(!levelRunActive)return;
   if(levelRunState.keypad)closeLevelRunKeypad(false);
+  if(levelRunState.previousSceneBackground?.isColor&&scene.background?.isColor){
+    scene.background.copy(levelRunState.previousSceneBackground);
+  }else{
+    scene.background=levelRunState.previousSceneBackground;
+  }
+  if(scene.fog&&levelRunState.previousFogColor){
+    scene.fog.color.copy(levelRunState.previousFogColor);
+    scene.fog.near=levelRunState.previousFogNear;
+    scene.fog.far=levelRunState.previousFogFar;
+  }
+  levelRunState.previousSceneBackground=null;
+  levelRunState.previousFogColor=null;
+  levelRunState.previousFogNear=null;
+  levelRunState.previousFogFar=null;
   levelRunActive=false;levelRunState.active=false;
   if(levelRunState.group)levelRunState.group.visible=false;
   world.root.visible=true;houseRoot.visible=false;player.ignoreWorldCollision=false;player.extraCollisionBoxes=[];
