@@ -3614,7 +3614,7 @@ function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
 function checkLevelRunEntrance(){
   if(!gameStarted||houseMode||tutorialOpenRoomActive||levelRunActive||gameEnded)return;
   const door=world.stairwellDoors.find(candidate=>{
-    if(!candidate||candidate.staircase?.testOnly||candidate.openProgress<.82)return false;
+    if(!candidate||candidate.openProgress<.82)return false;
     const progress=(player.pos.z-candidate.wallZ)*candidate.face;
     return Math.abs(player.pos.x-candidate.centerX)<1.42&&progress>=-.06&&progress<=1.0;
   });
