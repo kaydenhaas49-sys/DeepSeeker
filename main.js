@@ -7487,7 +7487,6 @@ function finishSpiderModel(model,animations,sourceName){
 }
 
 async function loadSpiderFromPack(){
-  const preferredSpiderUrl="./assets/animated_spider.glb";
   const packUrl="./assets/Spider-Psionic.zip";
   let objectUrls=[];
 
@@ -7534,41 +7533,7 @@ async function loadSpiderFromPack(){
   };
 
   try{
-    // Prefer the standalone glTF asset. It avoids the FBX skinning path that
-    // caused deformed limbs/poses in browsers while keeping the ZIP as a
-    // compatibility fallback for deployments missing the new asset.
-    try{
-      await new Promise((resolve,reject)=>{
-        const preferredLoader=new GLTFLoader();
-        preferredLoader.setDRACOLoader(dracoLoader);
-        preferredLoader.setMeshoptDecoder(MeshoptDecoder);
-        preferredLoader.load(
-          preferredSpiderUrl,
-          gltf=>{
-            try{
-              finishSpiderModel(
-                gltf.scene,
-                gltf.animations||[],
-                preferredSpiderUrl
-              );
-              console.log("[DeepSeeker] using standalone animated spider GLB");
-              resolve();
-            }catch(error){
-              reject(error);
-            }
-          },
-          undefined,
-          reject
-        );
-      });
-      return;
-    }catch(preferredError){
-      console.warn(
-        "[DeepSeeker] Standalone animated spider GLB failed; using Spider-Psionic fallback:",
-        preferredError
-      );
-    }
-
+    // Load the bundled Spider-Psionic ZIP directly; the standalone GLB has been removed.
     const extracted=await extractSpiderPack(packUrl);
     const packManager=new THREE.LoadingManager();
     const resourceUrls=new Map();
