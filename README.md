@@ -4,7 +4,7 @@ A browser-based Three.js liminal-horror game.
 
 ## Play
 
-GitHub Pages demo: https://kaydenhaas49-sys.github.io/DeepSeeker/
+Self-hosted game: https://lostsignal.lnxhosting.ca
 
 ## Active implementation
 
@@ -42,4 +42,4 @@ Then open http://localhost:8000. This starts the static web server only; multipl
 
 ## Assets and licensing
 
-Keep the individual `THIRD_PARTY_LICENSE_*.txt` files with the assets they cover. The GitHub Pages workflow in `.github/workflows/pages.yml` prepares the spider fallback assets for the hosted build.
+Keep the individual `THIRD_PARTY_LICENSE_*.txt` files with the assets they cover. The spider loader prefers `assets/animated_spider.glb` and falls back to `assets/Spider-Psionic.zip` if the standalone model cannot load.
