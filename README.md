@@ -1,10 +1,23 @@
 # Backrooms: Lost Signal
 
-A browser-based Three.js liminal-horror game with procedural Backrooms rooms, a furnished-house tutorial, a first-person hazmat viewmodel, flashlight/battery mechanics, and multiplayer encounters.
+A browser-based Three.js liminal-horror game.
 
 ## Play
 
-GitHub Pages: https://kaydenhaas49-sys.github.io/DeepSeeker/
+GitHub Pages demo: https://kaydenhaas49-sys.github.io/DeepSeeker/
+
+## Active implementation
+
+The active game is the browser version, starting at `index.html` and `main.js`. Core systems are split across modules including:
+
+- `world.js` — environment and world logic
+- `player.js` — first-person movement and controls
+- `character.js` — player character and flashlight model
+- `spiderHunter.js` and `signalStalker.js` — enemy behavior
+- `multiplayer.js` — real-time multiplayer client
+- `audio.js` and `textures.js` — audio and visual systems
+
+The old Godot prototype and unrelated reference-project files are not part of the active game.
 
 ## Controls
 
@@ -17,8 +30,16 @@ GitHub Pages: https://kaydenhaas49-sys.github.io/DeepSeeker/
 - **N** — multiplayer map
 - **Tab** — controls
 
-## Active code
+## Run locally
 
-The browser game starts from `index.html` and `main.js`. Its core systems are split across `player.js`, `world.js`, `character.js`, `spiderHunter.js`, and `multiplayer.js`.
+Because the game uses ES modules and fetches assets, serve the repository over HTTP instead of opening `index.html` directly. One simple option is:
 
-The root Godot files are a legacy prototype, and `assets/backrooms-horror-game-main/` is a separate vendored reference project; neither is the active browser-game entry point.
+```bash
+python -m http.server 8000
+```
+
+Then open http://localhost:8000. This starts the static web server only; multiplayer remains dependent on its configured backend.
+
+## Assets and licensing
+
+Keep the individual `THIRD_PARTY_LICENSE_*.txt` files with the assets they cover. The GitHub Pages workflow in `.github/workflows/pages.yml` prepares the spider fallback assets for the hosted build.
