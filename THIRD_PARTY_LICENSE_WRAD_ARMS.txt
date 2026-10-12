@@ -1,9 +1,0 @@
-WRAD ARMS
-Source: https://github.com/wwwriks/wrad-arms
-Asset: arms.glb
-Creator: wwwriks / WRAD
-License: CC0 1.0 Universal
-
-The WRAD ARMS asset is used as DeepSeeker's first-person forearms/hands
-viewmodel. The project README states the asset is CC0 and requires no
-attribution.
