@@ -46,11 +46,11 @@ const STAIR_STEP_DEPTH=0.42;
 const STAIR_STEP_RISE=0.22;
 const STAIR_DEPTH=STAIR_COUNT*STAIR_STEP_DEPTH;
 
-// The two concealed exits sit near opposite outer edges of the playable map.
-// Their stair runs point toward the permanent north/south boundary walls.
+// Concealed stairwells are integrated into the INNER FACE of the permanent
+// north and south boundary walls. The stairs descend inward from each opening.
 const WALL_STAIRCASES = Object.freeze([
-  { cx: -2, cz: -3, localX: 12, localZ: 2, face: -1 },
-  { cx: 1, cz: 3, localX: 4, localZ: 14, face: 1 },
+  { cx: -2, cz: -3, localX: 12, localZ: 0, face: 1, boundarySide: "north" },
+  { cx: 1, cz: 3, localX: 4, localZ: 16, face: -1, boundarySide: "south" },
 ]);
 
 function getWallStaircase(cx, cz) {
@@ -58,6 +58,8 @@ function getWallStaircase(cx, cz) {
 }
 
 function getWallStaircaseCollisionBounds(stair) {
+  // Boundary-wall stairwells use the segmented perimeter wall colliders instead.
+  if (stair.boundarySide) return [];
   const centerX=(stair.cx*CHUNK_CELLS+stair.localX)*CELL;
   const wallZ=(stair.cz*CHUNK_CELLS+stair.localZ)*CELL;
   const halfT=WALL_T*0.5,halfWidth=1.7;
@@ -361,14 +363,15 @@ export class World {
     const midZ = (minZ + maxZ) * 0.5;
 
     const addWall = (name, geometry, x, z, bounds, horizontal) => {
+      const length = horizontal ? geometry.parameters.width : geometry.parameters.depth;
       if (horizontal) {
-        scaleFaceU(geometry, 4, (width + 2 * thickness) / CELL);
-        scaleFaceU(geometry, 5, (width + 2 * thickness) / CELL);
+        scaleFaceU(geometry, 4, length / CELL);
+        scaleFaceU(geometry, 5, length / CELL);
         scaleFaceU(geometry, 0, thickness / CELL);
         scaleFaceU(geometry, 1, thickness / CELL);
       } else {
-        scaleFaceU(geometry, 0, (depth + 2 * thickness) / CELL);
-        scaleFaceU(geometry, 1, (depth + 2 * thickness) / CELL);
+        scaleFaceU(geometry, 0, length / CELL);
+        scaleFaceU(geometry, 1, length / CELL);
         scaleFaceU(geometry, 4, thickness / CELL);
         scaleFaceU(geometry, 5, thickness / CELL);
       }
@@ -383,21 +386,83 @@ export class World {
       this.boundaryWallBounds.push(bounds);
     };
 
-    // Overlap the corners so there are no gaps to slip through.
-    addWall(
-      "BoundaryNorth",
-      new THREE.BoxGeometry(width + 2 * thickness, height, thickness),
-      midX, minZ + thickness * 0.5,
-      { minX: minX - thickness, maxX: maxX + thickness, minZ, maxZ: minZ + thickness },
-      true
-    );
-    addWall(
-      "BoundarySouth",
-      new THREE.BoxGeometry(width + 2 * thickness, height, thickness),
-      midX, maxZ - thickness * 0.5,
-      { minX: minX - thickness, maxX: maxX + thickness, minZ: maxZ - thickness, maxZ },
-      true
-    );
+    const addHorizontalWallWithExit = (name, z, wallMinZ, wallMaxZ, staircase) => {
+      const wallMinX = minX - thickness;
+      const wallMaxX = maxX + thickness;
+      const centerX = (staircase.cx * CHUNK_CELLS + staircase.localX) * CELL;
+      const halfOpening = 1.9;
+      const openingLeft = centerX - halfOpening;
+      const openingRight = centerX + halfOpening;
+      const segment = (segmentName, x1, x2) => {
+        if (x2 <= x1) throw new Error("Invalid perimeter exit wall segment: " + segmentName);
+        addWall(
+          segmentName,
+          new THREE.BoxGeometry(x2 - x1, height, thickness),
+          (x1 + x2) * 0.5,
+          z,
+          { minX: x1, maxX: x2, minZ: wallMinZ, maxZ: wallMaxZ },
+          true
+        );
+      };
+
+      // Leave a real doorway through the permanent perimeter wall.
+      // The 2D colliders intentionally omit this gap; the animated door itself
+      // supplies collision while closed.
+      segment(name + "West", wallMinX, openingLeft);
+      segment(name + "East", openingRight, wallMaxX);
+
+      // The stairwell door sits below floor level, so only the upper lintel
+      // spans this opening. It is visual-only for ground-plane collision.
+      const doorBottom = -(STAIR_COUNT - 1) * STAIR_STEP_RISE;
+      const doorTop = doorBottom + 3.75;
+      const lintel = new THREE.Mesh(
+        new THREE.BoxGeometry(halfOpening * 2, height - doorTop, thickness),
+        this.boundaryMaterial
+      );
+      lintel.name = name + "ExitLintel";
+      lintel.position.set(centerX, (height + doorTop) * 0.5, z);
+      lintel.castShadow = false;
+      lintel.receiveShadow = false;
+      lintel.userData.fixtureLightOccluder = true;
+      this.boundaryGroup.add(lintel);
+      this.wallOccluders.push(lintel);
+    };
+
+    // The corners overlap as before, while the north/south walls have real
+    // openings exactly where the two inner-face stairwell structures are built.
+    const northExit = WALL_STAIRCASES.find(stair => stair.boundarySide === "north");
+    if (northExit) {
+      addHorizontalWallWithExit(
+        "BoundaryNorth", minZ + thickness * 0.5,
+        minZ, minZ + thickness, northExit
+      );
+    } else {
+      addWall(
+        "BoundaryNorth",
+        new THREE.BoxGeometry(width + 2 * thickness, height, thickness),
+        midX, minZ + thickness * 0.5,
+        { minX: minX - thickness, maxX: maxX + thickness, minZ, maxZ: minZ + thickness },
+        true
+      );
+    }
+
+    const southExit = WALL_STAIRCASES.find(stair => stair.boundarySide === "south");
+    if (southExit) {
+      addHorizontalWallWithExit(
+        "BoundarySouth", maxZ - thickness * 0.5,
+        maxZ - thickness, maxZ, southExit
+      );
+    } else {
+      addWall(
+        "BoundarySouth",
+        new THREE.BoxGeometry(width + 2 * thickness, height, thickness),
+        midX, maxZ - thickness * 0.5,
+        { minX: minX - thickness, maxX: maxX + thickness, minZ: maxZ - thickness, maxZ },
+        true
+      );
+    }
+
+    // West and east boundaries stay completely solid.
     addWall(
       "BoundaryWest",
       new THREE.BoxGeometry(thickness, height, depth + 2 * thickness),
@@ -567,10 +632,10 @@ export class World {
       if(interactable)interactable.prompt=door.targetOpen?"Enter exit door":"Open exit door";
       if(door.openProgress<0.82){
         door.collisionBounds.minX=door.centerX-1.7;door.collisionBounds.maxX=door.centerX+1.7;
-        door.collisionBounds.minZ=door.wallZ-0.08;door.collisionBounds.maxZ=door.wallZ+0.08;
+        door.collisionBounds.minZ=door.doorZ-0.08;door.collisionBounds.maxZ=door.doorZ+0.08;
       }else{
         door.collisionBounds.minX=door.centerX-1.82;door.collisionBounds.maxX=door.centerX-1.58;
-        const openZ=door.wallZ+door.face*door.doorWidth;
+        const openZ=door.doorZ+door.face*door.doorWidth;
         door.collisionBounds.minZ=Math.min(door.wallZ,openZ);door.collisionBounds.maxZ=Math.max(door.wallZ,openZ);
       }
     }
@@ -698,7 +763,12 @@ export class World {
     const face=staircase.face,halfWidth=1.7,stairWidth=3.05;
     const stepDepth=STAIR_STEP_DEPTH,stepRise=STAIR_STEP_RISE;
     const doorHeight=3.75,doorBottom=-(STAIR_COUNT-1)*stepRise,doorTop=doorBottom+doorHeight;
-    const doorWidth=halfWidth*2-0.16,doorZ=wallZ-face*0.22,hingeX=centerX-halfWidth+0.08;
+    const doorWidth=halfWidth*2-0.16;
+    // Perimeter door panels are centered inside the thickness of the outer wall.
+    const doorZ=staircase.boundarySide
+      ? wallZ+face*0.6
+      : wallZ-face*0.22;
+    const hingeX=centerX-halfWidth+0.08;
     const addBox=(name,size,pos,material,blocksSight=false,parent=group)=>{
       const mesh=new THREE.Mesh(new THREE.BoxGeometry(size[0],size[1],size[2]),material);
       mesh.name=name;mesh.position.set(pos[0],pos[1],pos[2]);mesh.castShadow=false;mesh.receiveShadow=true;parent.add(mesh);
@@ -709,10 +779,12 @@ export class World {
       const mesh=new THREE.Mesh(geometry,this.materials.wall);mesh.name=name;mesh.castShadow=false;mesh.receiveShadow=true;
       mesh.userData.fixtureLightOccluder=true;group.add(mesh);this.wallOccluders.push(mesh);
     };
-    const panelWidth=7-halfWidth,panelOffset=(7+halfWidth)*0.5;
-    addWall("StairwellWallLeft",panelWidth/CELL,centerX-panelOffset,wallZ);
-    addWall("StairwellWallRight",panelWidth/CELL,centerX+panelOffset,wallZ);
-    addBox("StairwellLintel",[halfWidth*2,WALL_H-doorTop,WALL_T],[centerX,(WALL_H+doorTop)*0.5,wallZ],this.materials.wall,true);
+    if(!staircase.boundarySide){
+      const panelWidth=7-halfWidth,panelOffset=(7+halfWidth)*0.5;
+      addWall("StairwellWallLeft",panelWidth/CELL,centerX-panelOffset,wallZ);
+      addWall("StairwellWallRight",panelWidth/CELL,centerX+panelOffset,wallZ);
+      addBox("StairwellLintel",[halfWidth*2,WALL_H-doorTop,WALL_T],[centerX,(WALL_H+doorTop)*0.5,wallZ],this.materials.wall,true);
+    }
 
     const geometries=[];
     for(let i=0;i<STAIR_COUNT;i++){
@@ -746,7 +818,7 @@ export class World {
     handle.name="StairwellDoorHandle";handle.rotation.x=Math.PI*0.5;handle.position.set(doorWidth-0.22,doorHeight*0.51,0.15);pivot.add(handle);
     for(const y of [0.28,doorHeight-0.28])addBox("StairwellDoorHinge",[0.06,0.16,0.19],[0.035,y,-0.02],this.stairDoorMetalMaterial,false,pivot);
     const collisionBounds={minX:centerX-halfWidth,maxX:centerX+halfWidth,minZ:doorZ-0.08,maxZ:doorZ+0.08};
-    const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,face,doorWidth,toggle(){this.targetOpen=!this.targetOpen;return true;}};
+    const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,doorZ,face,doorWidth,toggle(){this.targetOpen=!this.targetOpen;return true;}};
     pivot.userData.interactable={
     type:"stairwellDoor",
     prompt:"Open exit door",
