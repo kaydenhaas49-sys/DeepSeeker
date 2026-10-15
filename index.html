@@ -51,11 +51,7 @@ box-shadow:none}
 #loadingScreen::before{content:"";position:absolute;inset:0;pointer-events:none;
 background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent);transform:translateX(-100%);animation:bootSweep 4.5s linear infinite}
 #loadingScreen>*{position:relative;z-index:1}
-.loadCorner{position:absolute!important;font-size:8px;letter-spacing:2.5px;color:#6e6c5e;text-transform:uppercase}
-.loadCorner.tl{top:18px;left:20px}.loadCorner.tr{top:18px;right:20px}
-.loadCorner.bl{bottom:18px;left:20px}.loadCorner.br{bottom:18px;right:20px}
-.loadBrand{text-align:left;padding-top:20px}.loadBrandEyebrow{font-size:9px;letter-spacing:4px;color:#8e8b79;margin-bottom:15px}
-.loadBrand h1{margin:0;font-size:clamp(34px,7vw,72px);letter-spacing:clamp(7px,1.6vw,16px);font-weight:500;line-height:.94;color:#ece5bd;text-shadow:0 0 24px rgba(227,207,131,.10)}
+.loadBrand{text-align:left;padding-top:20px}.loadBrand h1{margin:0;font-size:clamp(34px,7vw,72px);letter-spacing:clamp(7px,1.6vw,16px);font-weight:500;line-height:.94;color:#ece5bd;text-shadow:0 0 24px rgba(227,207,131,.10)}
 .loadBrandSub{margin-top:14px;font-size:10px;letter-spacing:4px;color:#9d987f}.loadBrandRule{width:100%;height:1px;margin-top:26px;background:linear-gradient(90deg,rgba(216,201,138,.52),rgba(216,201,138,.08),transparent)}
 #initialLoadPanel{width:min(680px,100%);margin:0 auto;padding:22px 0 18px;border-top:1px solid rgba(229,218,170,.09);border-bottom:1px solid rgba(229,218,170,.09)}
 #initialLoadTop{display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-size:9px;letter-spacing:2.6px;color:#aaa58d}
@@ -64,11 +60,10 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 #initialLoadFill{width:0%;height:100%;background:linear-gradient(90deg,#7b704a,#b8aa73,#e0d39b);box-shadow:0 0 24px rgba(216,201,138,.22);transition:width .16s linear}
 #initialLoadTrack::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0 19px,rgba(255,255,255,.055) 19px 20px)}
 #initialLoadStatus{min-height:14px;margin-top:13px;font-size:9px;letter-spacing:2px;color:#817d6c;text-align:left;text-transform:uppercase}
-.loadTips{display:flex;justify-content:space-between;gap:20px;margin-top:15px;font-size:8px;letter-spacing:1.8px;color:#67665a;text-transform:uppercase}
 #overlay .prompt{margin:0;font-size:10px;letter-spacing:3px;color:#b8b198;text-transform:uppercase}
 .loadStatusPulse{display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:#cfc38f;box-shadow:0 0 10px rgba(216,201,138,.45);animation:loadDot 1.1s ease-in-out infinite}
 @keyframes bootSweep{to{transform:translateX(100%)}}@keyframes loadDot{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
-@media(max-width:650px){#loadingScreen{width:100%;height:100%;min-height:100%;padding:30px 22px}.loadTips{flex-direction:column;gap:6px}.loadCorner{display:none}}
+@media(max-width:650px){#loadingScreen{width:100%;height:100%;min-height:100%;padding:30px 22px}}
 
 #overlay .controls{font-size:11px;letter-spacing:2px;color:#a69e7c;line-height:1.9}
 #arachnophobiaWarning{
@@ -97,12 +92,6 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
   background:linear-gradient(145deg,rgba(18,20,16,.94),rgba(6,8,6,.97));
   box-shadow:0 30px 110px rgba(0,0,0,.72),inset 0 1px rgba(255,255,255,.035);
 }
-.arachWarningEyebrow{
-  font-size:9px;
-  letter-spacing:4px;
-  color:#8f8a74;
-  margin-bottom:14px;
-}
 .arachWarningTitle{
   margin:0;
   font-size:clamp(25px,5vw,44px);
@@ -110,12 +99,6 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
   font-weight:500;
   color:#eee6c5;
   text-shadow:0 0 24px rgba(216,201,138,.08);
-}
-.arachWarningRule{
-  width:100%;
-  height:1px;
-  margin:22px 0 24px;
-  background:linear-gradient(90deg,transparent,rgba(216,201,138,.42),transparent);
 }
 .arachWarningText{
   margin:0 auto;
@@ -126,19 +109,6 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
   color:#aaa58f;
 }
 .arachWarningText strong{color:#ddd4b0;font-weight:500}
-.arachWarningMode{
-  margin-top:24px;
-  padding:14px;
-  border:1px solid rgba(229,218,170,.10);
-  border-radius:6px;
-  background:rgba(255,255,255,.025);
-}
-.arachWarningModeLabel{
-  font-size:8px;
-  letter-spacing:2.4px;
-  color:#777465;
-  margin-bottom:7px;
-}
 #arachnophobiaModeButton{
   width:min(430px,100%);
   padding:13px 16px;
@@ -157,25 +127,9 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
   border-color:rgba(216,201,138,.48);
   transform:translateY(-1px);
 }
-#arachnophobiaModeStatus{
-  min-height:14px;
-  margin-top:9px;
-  font-size:8px;
-  letter-spacing:1.5px;
-  color:#817c68;
-}
 .arachWarningContinue{
   width:min(430px,100%);
   margin-top:12px;
-}
-.arachWarningFineprint{
-  margin:18px auto 0;
-  max-width:500px;
-  font-size:8px;
-  line-height:1.6;
-  letter-spacing:1.2px;
-  color:#5f5d51;
-  text-transform:uppercase;
 }
 
 #homeScreen,#lobbyScreen{width:min(620px,calc(100vw - 40px));display:flex;flex-direction:column;align-items:center;gap:12px;padding:28px 24px 24px;box-sizing:border-box;border:1px solid rgba(236,225,176,.12);border-radius:22px;background:linear-gradient(145deg,rgba(20,22,18,.72),rgba(7,9,7,.84));box-shadow:0 28px 100px rgba(0,0,0,.58),inset 0 1px rgba(255,255,255,.06),inset 0 -30px 70px rgba(0,0,0,.18);backdrop-filter:blur(10px)}
@@ -417,41 +371,28 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
 
 <div id="overlay">
   <div id="loadingScreen">
-    <span class="loadCorner tl">DS-01 // SECURE BOOT</span>
-    <span class="loadCorner tr">LOCAL BUILD // 2026</span>
-    <span class="loadCorner bl">NO SIGNAL DETECTED</span>
-    <span class="loadCorner br">DO NOT CLOSE THE WINDOW</span>
     <div class="loadBrand">
-      <div class="loadBrandEyebrow">DEEPSEEKER // FIELD ENTRY SYSTEM</div>
       <h1>BACKROOMS</h1>
-      <div class="loadBrandSub">LOST SIGNAL · WORLD INITIALIZATION</div>
+      <div class="loadBrandSub">LOST SIGNAL</div>
       <div class="loadBrandRule"></div>
     </div>
     <div id="initialLoadPanel">
       <div id="initialLoadTop"><span>INITIALIZING WORLD</span><span id="initialLoadPercent">0%</span></div>
       <div id="initialLoadTrack"><div id="initialLoadFill"></div></div>
       <div id="initialLoadStatus"><span class="loadStatusPulse"></span>PREPARING WORLD…</div>
-      <div class="loadTips"><span>GETTING THINGS READY</span><span>JUST A MOMENT</span></div>
     </div>
     <p class="prompt" id="prompt">LOADING WORLD… 0%</p>
   </div>
 
   <div id="arachnophobiaWarning" class="hidden" aria-hidden="true">
     <div class="arachWarningCard">
-      <div class="arachWarningEyebrow">DEEPSEEKER // CONTENT WARNING</div>
       <h2 class="arachWarningTitle">ARACHNOPHOBIA WARNING</h2>
-      <div class="arachWarningRule"></div>
       <p class="arachWarningText">
         <strong>This game has a giant spider and sudden scares.</strong>
-        Turn on Arachnophobia Mode to swap it for a rubber duck.
+        Turn on Arachnophobia Mode to replace it with a rubber duck.
       </p>
-      <div class="arachWarningMode">
-        <div class="arachWarningModeLabel">SPIDER MODE</div>
-        <button id="arachnophobiaModeButton" type="button">ARACHNOPHOBIA MODE: OFF</button>
-        <div id="arachnophobiaModeStatus">SPIDER ON</div>
-      </div>
-      <button id="arachnophobiaContinueButton" class="menuButton arachWarningContinue" type="button">CONTINUE TO MAIN MENU</button>
-      <div class="arachWarningFineprint">You can change this later.</div>
+      <button id="arachnophobiaModeButton" type="button">ARACHNOPHOBIA MODE: OFF</button>
+      <button id="arachnophobiaContinueButton" class="menuButton arachWarningContinue" type="button">CONTINUE</button>
     </div>
   </div>
 

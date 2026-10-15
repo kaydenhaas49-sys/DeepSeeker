@@ -66,7 +66,6 @@ const homeScreen=document.getElementById("homeScreen");
 const lobbyScreen=document.getElementById("lobbyScreen");
 const arachnophobiaWarning=document.getElementById("arachnophobiaWarning");
 const arachnophobiaModeButton=document.getElementById("arachnophobiaModeButton");
-const arachnophobiaModeStatus=document.getElementById("arachnophobiaModeStatus");
 const arachnophobiaContinueButton=document.getElementById("arachnophobiaContinueButton");
 const prompt=document.getElementById("prompt");
 const newGameButton=document.getElementById("newGameButton");
@@ -3745,14 +3744,8 @@ function updateArachnophobiaWarningUI(){
   if(!arachnophobiaModeButton) return;
 
   arachnophobiaModeButton.textContent=arachnophobiaMode
-    ? "ARACHNOPHOBIA MODE: ON · RUBBER DUCK"
-    : "ARACHNOPHOBIA MODE: OFF · SPIDER";
-
-  if(arachnophobiaModeStatus){
-    arachnophobiaModeStatus.textContent=arachnophobiaMode
-      ? "SPIDER REPLACED WITH RUBBER DUCK"
-      : "SPIDER ENTITY ENABLED";
-  }
+    ? "ARACHNOPHOBIA MODE: ON"
+    : "ARACHNOPHOBIA MODE: OFF";
 }
 
 function showArachnophobiaWarning(){
