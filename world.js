@@ -737,7 +737,9 @@ export class World {
     shape.moveTo(-mid,-mid);shape.lineTo(mid,-mid);shape.lineTo(mid,mid);shape.lineTo(-mid,mid);shape.lineTo(-mid,-mid);
     const centerX=staircase.localX*CELL-mid,halfWidth=1.92;
     const outwardZ=staircase.localZ*CELL+staircase.face*(STAIR_DEPTH+0.05)-mid;
-    const innerZ=staircase.localZ*CELL-staircase.face*0.48-mid;
+    // For perimeter exits, stop the cut at the chunk edge instead of extending
+    // the hole outside the floor mesh; the physical outer wall has its own gap.
+    const innerZ=staircase.localZ*CELL-(staircase.boundarySide?0:staircase.face*0.48)-mid;
     const minZ=Math.min(outwardZ,innerZ),maxZ=Math.max(outwardZ,innerZ);
     const hole=new THREE.Path(),lowerY=-maxZ,upperY=-minZ;
     hole.moveTo(centerX-halfWidth,lowerY);hole.lineTo(centerX-halfWidth,upperY);
