@@ -13,7 +13,6 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 @keyframes grain{0%{transform:translate3d(0,0,0)}25%{transform:translate3d(2%,-1%,0)}50%{transform:translate3d(-1%,2%,0)}75%{transform:translate3d(1%,1%,0)}100%{transform:translate3d(-2%,-2%,0)}}
 #hud{position:fixed;inset:0;pointer-events:none;z-index:5;color:#eee}
 #hudTop{position:absolute;left:18px;top:16px;display:flex;flex-direction:column;gap:7px;text-shadow:0 2px 10px #000}
-#hudTitle{font-size:12px;letter-spacing:3px;color:#b8b48c}
 #objective{font-size:13px;color:#e4dfbc;opacity:.9;max-width:360px}
 #multiplayerStatus{font-size:10px;letter-spacing:2px;color:#8d8b76;opacity:.8}
 #hudRight{position:absolute;right:18px;bottom:18px;width:180px}
@@ -168,10 +167,8 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 #phone.open{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
 #phoneScreen{position:absolute;inset:7px;border-radius:22px;overflow:hidden;background:linear-gradient(180deg,#11130f 0%,#080907 100%);color:#dedbbf}
 #phoneNotch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:24px;border-radius:0 0 15px 15px;background:#050505;z-index:2}
-#phoneStatus{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:10px;letter-spacing:1px;color:#aaa995}
 #phoneApp{padding:22px 20px}
-#phoneHomeScreen{padding:22px 18px;height:calc(100% - 34px);box-sizing:border-box}
-#phoneHomeHeader{font-size:11px;letter-spacing:2px;color:#888a7c;margin:5px 2px 22px}
+#phoneHomeScreen{padding:22px 18px;height:100%;box-sizing:border-box}
 #phoneApps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 12px}
 .phoneIcon{appearance:none;border:0;background:none;color:#d8d7c7;display:flex;flex-direction:column;align-items:center;gap:7px;font:inherit;cursor:pointer}
 .phoneIconBubble{width:58px;height:58px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(145deg,#aaa272,#54533e);box-shadow:0 6px 18px #0008,0 0 0 1px #ffffff12;font-size:20px;font-weight:700;color:#13140f}
@@ -188,7 +185,6 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 #phoneCard{border:1px solid #ffffff15;border-radius:14px;padding:15px;background:#ffffff06}
 #phoneCardTitle{font-size:11px;letter-spacing:2px;color:#aaa477;margin-bottom:8px}
 #phoneCardText{font-size:13px;line-height:1.55;color:#c6c5b6}
-#phoneSignal{margin-top:18px;font-size:9px;letter-spacing:2px;color:#67695b}
 #phoneSaveSlots{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
 #phoneSaveStatus{grid-column:1/-1;font-size:8px;letter-spacing:1.2px;color:#817d6c;text-align:center;min-height:12px}
 .phoneSaveSlot{padding:9px 6px;border:1px solid #ffffff14;border-radius:9px;background:#ffffff06;color:#aaa477;font:inherit;font-size:10px;letter-spacing:1px;cursor:pointer}
@@ -268,7 +264,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
 <div id="phone" aria-hidden="true">
   <div id="phoneScreen">
     <div id="phoneNotch"></div>
-    <div id="phoneStatus"><span>9:41</span><span>NO SIGNAL&nbsp;&nbsp;▮▮▮</span></div>
     <button id="adminIcon" type="button" aria-label="Open Admin">A</button>
     <div id="adminOverlay" class="adminOverlay" aria-hidden="true">
       <div id="adminAuthCard" class="adminCard">
@@ -290,7 +285,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
       </div>
     </div>
     <div id="phoneHomeScreen">
-      <div id="phoneHomeHeader">WEDNESDAY · 9:41</div>
       <div id="phoneApps">
         <button class="phoneIcon" id="deepseekerIcon" type="button" aria-label="Open DEEPSEEKER">
           <span class="phoneIconBubble">D</span>
@@ -313,7 +307,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
         <button class="phoneSaveSlot" data-slot="3" type="button">SAVE 3</button>
       </div>
       <div id="phoneStory"></div>
-      <div id="phoneSignal">GPS UNAVAILABLE · NETWORK UNAVAILABLE</div>
       <button id="phoneHome" type="button" aria-label="Return to phone home"></button>
     </div>
   </div>
@@ -331,7 +324,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
 
 <div id="hud">
   <div id="hudTop">
-    <div id="hudTitle">BACKROOMS: LOST SIGNAL • LIMINAL HORROR</div>
     <div id="objective">Find a way deeper. Stay in the light.</div>
     <div id="multiplayerStatus">MULTIPLAYER · OFFLINE</div>
   </div>
@@ -348,7 +340,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
 <div id="controlsPanel" class="hidden">
   <div id="controlsBox">
     <h2>CONTROLS</h2>
-    <p>You are alone. The halls keep changing. Listen carefully.</p>
     <div class="grid">
       <div class="row"><span class="key">W A S D</span><span class="action">Move</span></div>
       <div class="row"><span class="key">SHIFT</span><span class="action">Sprint</span></div>
@@ -416,7 +407,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
     <div class="lobbyCard">
       <div class="lobbyHeader">
         <div>
-          <div class="lobbyHeaderLabel">ROOM</div>
           <div class="lobbyHeaderValue">BACKROOMS: LOST SIGNAL</div>
           <div class="usernameRow" style="width:min(340px,54vw);margin-top:8px">
             <input id="lobbyUsernameInput" class="usernameInput" maxlength="20" autocomplete="nickname" placeholder="USERNAME">
@@ -458,6 +448,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
   }
 }
 </script>
-<script type="module" src="./main.js?v=20261015-naturaltext2"></script>
+<script type="module" src="./main.js?v=20261015-naturaltext3"></script>
 </body>
 </html>

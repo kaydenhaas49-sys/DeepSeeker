@@ -2191,14 +2191,6 @@ function installMainMenuRedesign(){
   font-weight:600;
   letter-spacing:clamp(4px,.58vw,9px);
 }
-.menuLogoSub{
-  margin-top:12px;
-  padding-left:2px;
-  font-size:8px;
-  letter-spacing:3px;
-  color:#8d8979;
-}
-
 /* Save slots replace the old field terminal on the right side. */
 .menuSlotBar{
   position:absolute;
@@ -2603,7 +2595,6 @@ function installMainMenuRedesign(){
   logo.className="menuLogo";
   logo.innerHTML=`
     <div class="menuLogoMain"><span>BACKROOMS</span><strong>LOST SIGNAL</strong></div>
-    <div class="menuLogoSub">LIMINAL HORROR // SIGNAL NODE 01</div>
   `;
 
   const nav=document.createElement("nav");
