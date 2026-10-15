@@ -371,6 +371,7 @@ export class Player {
     this.onLand = null;
     this.onSlide = null;
     this.ignoreWorldCollision = false;
+    this.adminFlyMode = false;
 
     this.characterModel = null;
     this.characterMixer = null;
@@ -635,7 +636,7 @@ export class Player {
           (k.has("KeyA") || k.has("ArrowLeft") ? 1 : 0)
       : 0;
     const running = active && this.isRunning && !this.sliding;
-    let speed = this.crouched ? CROUCH_SPEED : running ? RUN_SPEED : WALK_SPEED;
+    let speed = this.adminFlyMode ? 14 : this.crouched ? CROUCH_SPEED : running ? RUN_SPEED : WALK_SPEED;
 
     const fx = -Math.sin(this.yaw);
     const fz = -Math.cos(this.yaw);
@@ -733,23 +734,32 @@ export class Player {
       if(this.onBreath) this.onBreath(Math.min(1,(48-this.stamina)/30));
     }
 
-    this.jumpVelocity -= JUMP_GRAVITY * dt;
-    this.jumpY += this.jumpVelocity * dt;
+    if(this.adminFlyMode){
+      // Free flight is relative to the camera pitch instead of being a vertical-only elevator.
+      // Space/Control still give direct altitude control, while W/S follow where the view points.
+      const vertical=(k.has("Space")?1:0)-((k.has("ControlLeft")||k.has("ControlRight"))?1:0);
+      const forwardLift=f*Math.sin(this.pitch);
+      this.jumpY=THREE.MathUtils.clamp(this.jumpY+(vertical+forwardLift)*speed*dt,0,120);
+      this.jumpVelocity=0;
+    }else{
+      this.jumpVelocity -= JUMP_GRAVITY * dt;
+      this.jumpY += this.jumpVelocity * dt;
 
-    // Keep the camera safely below the ceiling even if the map ceiling changes.
-    const ceilingClearance = 0.15;
-    const maxJumpY = Math.max(0, WALL_H - ceilingClearance - targetEye - this.bobOffset);
-    if(this.jumpY > maxJumpY){
-      this.jumpY = maxJumpY;
-      if(this.jumpVelocity > 0) this.jumpVelocity = 0;
-    }
+      // Keep the camera safely below the ceiling even if the map ceiling changes.
+      const ceilingClearance = 0.15;
+      const maxJumpY = Math.max(0, WALL_H - ceilingClearance - targetEye - this.bobOffset);
+      if(this.jumpY > maxJumpY){
+        this.jumpY = maxJumpY;
+        if(this.jumpVelocity > 0) this.jumpVelocity = 0;
+      }
 
-    if(this.jumpY <= 0){
-      this.jumpY = 0;
-      this.jumpVelocity = 0;
-      if(wasAirborne){
-        this.landingKick=.08;
-        if(this.onLand) this.onLand(Math.min(1,Math.max(.25,hSpeed/RUN_SPEED)));
+      if(this.jumpY <= 0){
+        this.jumpY = 0;
+        this.jumpVelocity = 0;
+        if(wasAirborne){
+          this.landingKick=.08;
+          if(this.onLand) this.onLand(Math.min(1,Math.max(.25,hSpeed/RUN_SPEED)));
+        }
       }
     }
 

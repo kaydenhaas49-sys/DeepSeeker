@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-victory1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js";
+import { Player } from "./player.js?v=20261015-admin2";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -145,6 +145,7 @@ const adminCloseButton=document.getElementById("adminCloseButton");
 const adminAdminCloseButton=document.getElementById("adminAdminCloseButton");
 const adminLockButton=document.getElementById("adminLockButton");
 const adminFlyButton=document.getElementById("adminFlyButton");
+const adminTeleportExitButton=document.getElementById("adminTeleportExitButton");
 const adminWaterGunButton=document.getElementById("adminWaterGunButton");
 const adminWaterRpgButton=document.getElementById("adminWaterRpgButton");
 const adminClearWaterButton=document.getElementById("adminClearWaterButton");
@@ -8138,13 +8139,33 @@ function closeAdminAccess(){
   adminOverlay.setAttribute("aria-hidden","true");
   adminPasswordInput.value="";
 }
+function setAdminFlyEnabled(enabled){
+  if(enabled && (!adminUnlocked || !gameStarted || houseMode || gameEnded)){
+    adminFlyEnabled=false;
+    player.adminFlyMode=false;
+    player.ignoreWorldCollision=Boolean(houseMode);
+    adminFlyButton.textContent="FLY: OFF";
+    setAdminStatus(houseMode ? "FLY IS ONLY AVAILABLE IN THE BACKROOMS" : "START A GAME FIRST");
+    return false;
+  }
+  adminFlyEnabled=Boolean(enabled);
+  player.adminFlyMode=adminFlyEnabled;
+  player.ignoreWorldCollision=adminFlyEnabled || houseMode;
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  adminFlyButton.textContent="FLY: "+(adminFlyEnabled ? "ON" : "OFF");
+  adminFlyButton.classList.toggle("active",adminFlyEnabled);
+  setAdminStatus(adminFlyEnabled
+    ? "FLIGHT ON · WASD TO FLY · SPACE UP · CTRL DOWN"
+    : "FLIGHT OFF");
+  return true;
+}
 function lockAdminAccess(){
   adminUnlocked=false;
-  adminFlyEnabled=false;
+  setAdminFlyEnabled(false);
   adminTool=null;
   player.jumpY=0;
   player.jumpVelocity=0;
-  adminFlyButton.textContent="FLY: OFF";
   adminWaterGunButton.classList.remove("active");
   adminWaterRpgButton.classList.remove("active");
   adminAuthCard.style.display="block";
@@ -8191,15 +8212,66 @@ function updateAdminProjectiles(dt){
     }
   }
 }
-function updateAdminFly(dt){
-  if(!adminFlyEnabled || !gameStarted || houseMode) return;
-  const rise=player.keys.has("Space") ? 1 : ((player.keys.has("ControlLeft") || player.keys.has("ControlRight")) ? -1 : 0);
-  if(rise!==0){
-    const amount=7*dt*rise;
-    player.jumpY=THREE.MathUtils.clamp(player.jumpY+amount,0,20);
-    player.jumpVelocity=0;
-    camera.position.y+=amount;
+function updateAdminFly(){
+  if(adminFlyEnabled && (!gameStarted || houseMode || gameEnded)){
+    setAdminFlyEnabled(false);
+    return;
   }
+  const active=Boolean(adminFlyEnabled && gameStarted && !houseMode && !gameEnded);
+  player.adminFlyMode=active;
+  player.ignoreWorldCollision=active || houseMode;
+  if(active) player.jumpVelocity=0;
+}
+
+function teleportAdminToExit(){
+  if(!adminUnlocked) return;
+  if(!gameStarted || gameEnded){
+    setAdminStatus("START A GAME BEFORE TELEPORTING");
+    return;
+  }
+  if(houseMode) setHouseMode(false,{announceFall:false});
+  setAdminFlyEnabled(false);
+
+  // The first concealed exit is stable and has a protected approach corridor.
+  const target={cx:-1,cz:1};
+  const chunkKey=target.cx+","+target.cz;
+  if(!world.chunks.has(chunkKey)) world.spawnChunk(target.cx,target.cz);
+  const door=world.stairwellDoors.find(item=>
+    item.staircase?.cx===target.cx && item.staircase?.cz===target.cz
+  );
+  if(!door){
+    setAdminStatus("EXIT CHUNK NOT READY — TRY AGAIN");
+    return;
+  }
+
+  door.targetOpen=true;
+  player.pos.set(door.centerX,EYE,door.wallZ-door.face*3.6);
+  player.yaw=door.face>0?Math.PI:0;
+  player.pitch=0;
+  player.vel.set(0,0,0);
+  player.keys.clear();
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  player.crouched=false;
+  player.sliding=false;
+  player.slideTimer=0;
+  player.ignoreWorldCollision=false;
+
+  spiderSpawnPending=false;
+  spiderActive=false;
+  spiderJumpscareTimer=0;
+  normalSpiderHunter.hide();
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
+  world.root.visible=true;
+  world.update(player.pos.x,player.pos.z);
+
+  closeAdminAccess();
+  if(phoneOpen) togglePhone();
+  eventText.textContent="ADMIN TELEPORT · EXIT DOOR AHEAD";
+  eventText.style.opacity="1";
+  setTimeout(()=>{eventText.style.opacity="0";},2200);
 }
 
 function togglePhone(){
@@ -8351,10 +8423,9 @@ adminPasswordInput.addEventListener("keydown",e=>{ if(e.code==="Enter"){ e.preve
 adminLockButton.addEventListener("click",lockAdminAccess);
 adminFlyButton.addEventListener("click",()=>{
   if(!adminUnlocked) return;
-  adminFlyEnabled=!adminFlyEnabled;
-  adminFlyButton.textContent="FLY: "+(adminFlyEnabled ? "ON" : "OFF");
-  adminPanelStatus.textContent=adminFlyEnabled ? "FLY ENABLED" : "FLY DISABLED";
+  setAdminFlyEnabled(!adminFlyEnabled);
 });
+adminTeleportExitButton.addEventListener("click",teleportAdminToExit);
 adminWaterGunButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterGun"); });
 adminWaterRpgButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterRpg"); });
 adminClearWaterButton.addEventListener("click",()=>{ if(adminUnlocked){ clearAdminProjectiles(); adminPanelStatus.textContent="WATER CLEARED"; } });

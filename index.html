@@ -273,6 +273,9 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 .adminButton{padding:9px 7px;border:1px solid #ffffff14;border-radius:8px;background:#ffffff06;color:#bdb38c;font:inherit;font-size:8px;letter-spacing:1px;cursor:pointer}
 .adminButton:hover{background:#ffffff10;border-color:#d8c98a44}
 .adminButton.active{background:rgba(216,201,138,.12);border-color:rgba(216,201,138,.45);color:#e9e1be}
+.adminButton.adminPrimary{border-color:rgba(141,188,143,.32);background:rgba(90,145,98,.09);color:#d2e6c8}
+.adminButton.adminPrimary:hover{background:rgba(90,145,98,.18);border-color:rgba(141,188,143,.6)}
+.adminButton.adminCloseWide{width:100%;margin-top:9px}
 .adminStatus{min-height:14px;margin-top:9px;font-size:8px;line-height:1.4;letter-spacing:1px;color:#777767;text-align:center}
 .adminHint{margin-top:9px;font-size:8px;line-height:1.45;color:#69695f}
 .adminPanel{display:none}
@@ -323,12 +326,13 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
       </div>
       <div id="adminPanelCard" class="adminCard adminPanel">
         <div class="adminTitle">ADMIN</div>
-        <div class="adminSub">FUN COMMANDS · LOCAL ONLY</div>
-        <div class="adminRow"><button id="adminFlyButton" class="adminButton" type="button">FLY: OFF</button><button id="adminWaterGunButton" class="adminButton" type="button">WATER GUN</button></div>
-        <div class="adminRow"><button id="adminWaterRpgButton" class="adminButton" type="button">WATER RPG</button><button id="adminClearWaterButton" class="adminButton" type="button">CLEAR WATER</button></div>
-        <div class="adminRow"><button id="adminLockButton" class="adminButton" type="button">LOCK ADMIN</button><button id="adminAdminCloseButton" class="adminButton" type="button">CLOSE</button></div>
+        <div class="adminSub">TEST TOOLS · LOCAL ONLY</div>
+        <div class="adminRow"><button id="adminFlyButton" class="adminButton" type="button">FLY: OFF</button><button id="adminTeleportExitButton" class="adminButton adminPrimary" type="button">TELEPORT TO EXIT</button></div>
+        <div class="adminRow"><button id="adminWaterGunButton" class="adminButton" type="button">WATER GUN</button><button id="adminWaterRpgButton" class="adminButton" type="button">WATER RPG</button></div>
+        <div class="adminRow"><button id="adminClearWaterButton" class="adminButton" type="button">CLEAR WATER</button><button id="adminLockButton" class="adminButton" type="button">LOCK ADMIN</button></div>
+        <button id="adminAdminCloseButton" class="adminButton adminCloseWide" type="button">CLOSE</button>
         <div id="adminPanelStatus" class="adminStatus"></div>
-        <div class="adminHint">FLY: SPACE = UP · CTRL = DOWN · WATER TOOLS FIRE WITH LEFT CLICK.</div>
+        <div class="adminHint">FLY: WASD FOLLOWS YOUR VIEW · SPACE = UP · CTRL = DOWN · NOCLIP ON.</div>
       </div>
     </div>
     <div id="phoneHomeScreen">
@@ -513,6 +517,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
   }
 }
 </script>
-<script type="module" src="./main.js?v=20261015-victory1"></script>
+<script type="module" src="./main.js?v=20261015-admin2"></script>
 </body>
 </html>
