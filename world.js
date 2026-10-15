@@ -349,13 +349,6 @@ export class World {
     const signTexture=new THREE.CanvasTexture(signCanvas);
     signTexture.colorSpace=THREE.SRGBColorSpace;
     this.roomDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.88,metalness:0.02,side:THREE.DoubleSide});
-    this.ventDuctPanelMaterial=new THREE.MeshStandardMaterial({color:0x666b60,roughness:0.78,metalness:0.46});
-    this.ventDuctDarkMaterial=new THREE.MeshStandardMaterial({color:0x252a25,roughness:0.91,metalness:0.18});
-    this.ventDuctTrimMaterial=new THREE.MeshStandardMaterial({color:0x979b87,roughness:0.68,metalness:0.55});
-    this.ventDuctLampMaterial=new THREE.MeshStandardMaterial({color:0x9ce18a,emissive:0x46ff3d,emissiveIntensity:1.05,roughness:0.38});
-    this.ventDuctWarningMaterial=new THREE.MeshStandardMaterial({color:0x9c4b35,emissive:0x8b2413,emissiveIntensity:0.85,roughness:0.42});
-    this.ventDuctFloorMaterial=new THREE.MeshStandardMaterial({color:0x42483f,roughness:0.88,metalness:0.42});
-    this.ventDuctSlotMaterial=new THREE.MeshStandardMaterial({color:0x171b17,roughness:0.95,metalness:0.12});
     this.breakerRoomLightMaterial=new THREE.MeshStandardMaterial({color:0xe0d9b9,emissive:0xe7e0c1,emissiveIntensity:1.4,roughness:0.4});
     this.roomDoors=[];
     this.breakerSwitches=[];
@@ -370,10 +363,6 @@ export class World {
     this.breakerRoomGroup=null;
     this.breakerRoomBounds=[];
     this.maintenanceRoomGroup=null;
-    this.ventilationMazeGroup=null;
-    this.ventilationMazeBounds=[];
-    this.ventilationCrawlBounds=null;
-    this.ventilationExitPanel=null;
 
     const breakerCanvas=document.createElement("canvas");
     breakerCanvas.width=512;breakerCanvas.height=192;
@@ -400,17 +389,6 @@ export class World {
       const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
       this.breakerMathLabelMaterials.push(new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false}));
     }
-    const ductStencilCanvas=document.createElement("canvas");ductStencilCanvas.width=256;ductStencilCanvas.height=128;
-    const ductStencilCtx=ductStencilCanvas.getContext("2d");
-    ductStencilCtx.fillStyle="#30372d";ductStencilCtx.fillRect(0,0,256,128);
-    ductStencilCtx.fillStyle="#c4c0a7";ductStencilCtx.fillRect(8,8,240,112);
-    ductStencilCtx.fillStyle="#30372d";ductStencilCtx.fillRect(13,13,230,102);
-    ductStencilCtx.fillStyle="#d6d0b8";ductStencilCtx.textAlign="center";ductStencilCtx.textBaseline="middle";
-    ductStencilCtx.font="bold 28px monospace";ductStencilCtx.fillText("AIR RETURN",128,49);
-    ductStencilCtx.font="bold 15px monospace";ductStencilCtx.fillText("SERVICE ONLY",128,83);
-    const ductStencilTexture=new THREE.CanvasTexture(ductStencilCanvas);ductStencilTexture.colorSpace=THREE.SRGBColorSpace;
-    this.ventDuctStencilMaterial=new THREE.MeshBasicMaterial({map:ductStencilTexture,side:THREE.DoubleSide,toneMapped:false});
-
     // Ceiling fixtures use a tiny real-light budget. They only activate when
     // the player's camera is actually looking toward them.
     this.fixtureLights = [];
@@ -545,9 +523,6 @@ export class World {
     this.buildBreakerControlRoom(centerX,backZ);
     if(this.maintenancePuzzleType==="breakers")this.boundaryWallBounds.push(...this.breakerRoomBounds);
 
-    this.ventilationMazeGroup=new THREE.Group();this.ventilationMazeGroup.name="VentilationCrawlMaze";
-    this.ventilationMazeGroup.visible=false;room.add(this.ventilationMazeGroup);
-    this.buildVentilationMaze(this.maintenancePuzzleSeed);
   }
 
   buildBreakerControlRoom(centerX,backZ){
@@ -578,7 +553,7 @@ export class World {
     addBox("BreakerRoomCeiling",roomWidth,.10,depth-.15,centerX,3.82,midZ,this.materials.ceiling);
     for(let rib=0;rib<5;rib++){
       const z=partitionZ-2.2-rib*((depth-4.4)/4);
-      addBox("BreakerRoomCeilingCrossbrace",roomWidth-.35,.10,.12,centerX,3.68,z,this.ventDuctTrimMaterial);
+      addBox("BreakerRoomCeilingCrossbrace",roomWidth-.35,.10,.12,centerX,3.68,z,this.roomDoorMetalMaterial);
       addBox("BreakerRoomFluorescentStrip",3.8,.06,.18,centerX,3.59,z+.72,this.breakerRoomLightMaterial);
     }
     const boardZ=backZ+.24;
@@ -610,150 +585,6 @@ export class World {
     }
   }
 
-  buildVentilationMaze(seed=1){
-    if(!this.ventilationMazeGroup||!this.maintenanceRoomGroup)return;
-    for(const bound of this.ventilationMazeBounds){
-      const index=this.boundaryWallBounds.indexOf(bound);
-      if(index>=0)this.boundaryWallBounds.splice(index,1);
-    }
-    this.ventilationMazeBounds=[];
-    this.ventilationMazeGroup.traverse(object=>{if(object.isMesh&&object.geometry)object.geometry.dispose();});
-    this.ventilationMazeGroup.clear();this.ventilationExitPanel=null;
-
-    const roomDepth=this.maintenanceRoomDepth,frontZ=this.maintenanceRoomFrontZ,centerX=this.maintenanceRoomCenterX;
-    const cols=7,rows=11,cellW=4.4,cellD=4.25,wallT=.18,ductHeight=1.62;
-    const gridWidth=cols*cellW,gridDepth=rows*cellD,gridLeft=centerX-gridWidth*.5;
-    const gridFrontZ=frontZ-(roomDepth-gridDepth)*.5,gridRearZ=gridFrontZ-gridDepth;
-    const entryCol=Math.floor(cols*.5),exitCol=entryCol,gap=2.0;
-    const cellIndex=(row,col)=>row*cols+col,edgeKey=(a,b)=>a<b?a+"-"+b:b+"-"+a;
-    const rng=mulberry32(((Number(seed)>>>0)||1)^0x71ea91c3),openEdges=new Set(),visited=new Set([cellIndex(0,entryCol)]);
-    const stack=[cellIndex(0,entryCol)];
-    const neighbors=id=>{
-      const row=Math.floor(id/cols),col=id%cols,out=[];
-      if(row>0)out.push(cellIndex(row-1,col));
-      if(col<cols-1)out.push(cellIndex(row,col+1));
-      if(row<rows-1)out.push(cellIndex(row+1,col));
-      if(col>0)out.push(cellIndex(row,col-1));
-      return out;
-    };
-    while(stack.length){
-      const current=stack[stack.length-1],choices=neighbors(current).filter(next=>!visited.has(next));
-      if(!choices.length){stack.pop();continue;}
-      const next=choices[Math.floor(rng()*choices.length)];
-      openEdges.add(edgeKey(current,next));visited.add(next);stack.push(next);
-    }
-    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
-      const id=cellIndex(row,col);
-      if(col<cols-1&&rng()<.075)openEdges.add(edgeKey(id,id+1));
-      if(row<rows-1&&rng()<.075)openEdges.add(edgeKey(id,id+cols));
-    }
-    const group=this.ventilationMazeGroup,bounds=this.ventilationMazeBounds;
-    const addPanel=(name,sx,sy,sz,x,y,z,material=this.ventDuctPanelMaterial)=>{
-      const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
-      mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;
-      mesh.userData.fixtureLightOccluder=true;group.add(mesh);return mesh;
-    };
-    const addInstances=(name,geometry,material,positions)=>{
-      if(!positions.length){geometry.dispose();return null;}
-      const mesh=new THREE.InstancedMesh(geometry,material,positions.length);
-      mesh.name=name;mesh.castShadow=false;mesh.receiveShadow=true;
-      const dummy=new THREE.Object3D();
-      positions.forEach((spec,index)=>{
-        dummy.position.set(spec.x,spec.y,spec.z);
-        dummy.rotation.set(spec.rx||0,spec.ry||0,spec.rz||0);
-        dummy.scale.set(spec.sx||1,spec.sy||1,spec.sz||1);
-        dummy.updateMatrix();mesh.setMatrixAt(index,dummy.matrix);
-      });
-      mesh.instanceMatrix.needsUpdate=true;group.add(mesh);return mesh;
-    };
-    const floorPanels=[],ceilPanels=[],ceilRibs=[],ceilSlots=[],sideRails=[],floorSeams=[],floorGrates=[],warningLamps=[],rivets=[];
-    const xCenter=col=>gridLeft+(col+.5)*cellW,zCenter=row=>gridFrontZ-(row+.5)*cellD;
-    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
-      const x=xCenter(col),z=zCenter(row),cell=row*cols+col;
-      floorPanels.push({x,y:.025,z});ceilPanels.push({x,y:ductHeight-.02,z});ceilRibs.push({x,y:ductHeight-.12,z});
-      for(const side of [-1,1]){
-        sideRails.push({x:x+side*1.76,y:.24,z},{x:x+side*1.76,y:.43,z});
-        floorSeams.push({x,y:.072,z:z+side*(cellD*.5-.30)});
-      }
-      floorGrates.push({x:x+(cell%2===0?-.72:.72),y:.071,z:z+.75});
-      for(const slotX of [-.58,0,.58])ceilSlots.push({x:x+slotX,y:ductHeight-.10,z});
-      for(const sx of [-1,1])for(const sz of [-1,1])rivets.push({x:x+sx*(cellW*.5-.23),y:.063,z:z+sz*(cellD*.5-.23)});
-      if(cell%9===4)warningLamps.push({x:x+1.62,y:.73,z:z+.12});
-    }
-    addInstances("VentDuctFloorPanels",new THREE.BoxGeometry(cellW-.12,.05,cellD-.12),this.ventDuctFloorMaterial,floorPanels);
-    addInstances("VentDuctCeilingPanels",new THREE.BoxGeometry(cellW-.035,.10,cellD-.035),this.ventDuctDarkMaterial,ceilPanels);
-    addInstances("VentDuctCeilingCrossRibs",new THREE.BoxGeometry(cellW-.20,.055,.075),this.ventDuctTrimMaterial,ceilRibs);
-    addInstances("VentDuctCeilingSlots",new THREE.BoxGeometry(.11,.025,cellD-.60),this.ventDuctSlotMaterial,ceilSlots);
-    addInstances("VentDuctSideConduits",new THREE.BoxGeometry(.075,.065,cellD-.62),this.ventDuctTrimMaterial,sideRails);
-    addInstances("VentDuctFloorSeams",new THREE.BoxGeometry(cellW-.42,.027,.055),this.ventDuctTrimMaterial,floorSeams);
-    addInstances("VentDuctDrainGrates",new THREE.BoxGeometry(.92,.018,.12),this.ventDuctSlotMaterial,floorGrates);
-    addInstances("VentDuctWarningLamps",new THREE.BoxGeometry(.20,.065,.07),this.ventDuctWarningMaterial,warningLamps);
-    addInstances("VentDuctFloorRivets",new THREE.CylinderGeometry(.035,.035,.025,8),this.ventDuctTrimMaterial,rivets);
-
-    for(let row=0;row<rows;row+=3)for(const side of [-1,1]){
-      const col=side<0?0:cols-1,x=gridLeft+(side<0?.22:cols*cellW-.22),z=zCenter(row),right=side>0;
-      const backing=addPanel("VentDuctStencilBacking",.035,.49,.95,x,.96,z+.25,this.ventDuctPanelMaterial);
-      backing.userData.fixtureLightOccluder=false;
-      const decal=new THREE.Mesh(new THREE.PlaneGeometry(.86,.42),this.ventDuctStencilMaterial);
-      decal.name="VentDuctInspectionStencil";decal.position.set(x+(right?-.021:.021),.96,z+.25);
-      decal.rotation.y=right?-Math.PI*.5:Math.PI*.5;decal.castShadow=false;group.add(decal);
-      for(const y of [.705,1.215]){
-        const rim=addPanel("VentDuctStencilRim",.035,.035,.99,x,y,z+.25,this.ventDuctTrimMaterial);
-        rim.userData.fixtureLightOccluder=false;
-      }
-    }
-    const addWall=(name,sx,sz,x,z)=>{
-      if(sx<.08||sz<.08)return;
-      addPanel(name,sx,ductHeight,sz,x,ductHeight*.5,z);
-      bounds.push({minX:x-sx*.5,maxX:x+sx*.5,minZ:z-sz*.5,maxZ:z+sz*.5});
-    };
-    const addXWallOpening=(name,z,startX,length,openingCenter,openingWidth)=>{
-      if(!openingWidth){addWall(name,length,wallT,startX+length*.5,z);return;}
-      const leftEnd=openingCenter-openingWidth*.5,rightStart=openingCenter+openingWidth*.5;
-      addWall(name+"L",leftEnd-startX,wallT,(startX+leftEnd)*.5,z);
-      addWall(name+"R",startX+length-rightStart,wallT,(rightStart+startX+length)*.5,z);
-    };
-    const addZWallOpening=(name,x,startZ,length,openingCenter,openingWidth)=>{
-      if(!openingWidth){addWall(name,wallT,length,x,startZ+length*.5);return;}
-      const nearEnd=openingCenter-openingWidth*.5,farStart=openingCenter+openingWidth*.5;
-      addWall(name+"A",wallT,nearEnd-startZ,x,(startZ+nearEnd)*.5);
-      addWall(name+"B",wallT,startZ+length-farStart,x,(farStart+startZ+length)*.5);
-    };
-    for(let col=0;col<cols;col++){
-      const startX=gridLeft+col*cellW,cx=xCenter(col);
-      addXWallOpening("VentDuctFrontWall",gridFrontZ,startX,cellW,cx,col===entryCol?gap:0);
-      addXWallOpening("VentDuctRearWall",gridRearZ,startX,cellW,cx,col===exitCol?gap:0);
-    }
-    for(let row=0;row<rows;row++){const z=zCenter(row);addWall("VentDuctLeftWall",wallT,cellD,gridLeft,z);addWall("VentDuctRightWall",wallT,cellD,gridLeft+gridWidth,z);}
-    for(let row=0;row<rows;row++)for(let col=0;col<cols-1;col++){
-      const open=openEdges.has(edgeKey(cellIndex(row,col),cellIndex(row,col+1)));
-      addZWallOpening("VentDuctDividerVertical",gridLeft+(col+1)*cellW,gridFrontZ-(row+1)*cellD,cellD,zCenter(row),open?gap:0);
-    }
-    for(let row=0;row<rows-1;row++){
-      const z=gridFrontZ-(row+1)*cellD;
-      for(let col=0;col<cols;col++){
-        const open=openEdges.has(edgeKey(cellIndex(row,col),cellIndex(row+1,col)));
-        addXWallOpening("VentDuctDividerHorizontal",z,gridLeft+col*cellW,cellW,xCenter(col),open?gap:0);
-      }
-    }
-    const outletX=centerX+1.52,outletZ=gridRearZ+.42;
-    const valve=addPanel("VentilationOutletValve",.82,.72,.14,outletX,.92,outletZ,this.ventDuctTrimMaterial);
-    valve.userData.interactable={type:"ventilationExit",prompt:"Reset ventilation outlet"};
-    this.ventilationExitPanel=valve;
-    const lamp=new THREE.Mesh(new THREE.SphereGeometry(.085,10,8),this.ventDuctLampMaterial);
-    lamp.position.set(.18,.17,.09);valve.add(lamp);
-    const lever=new THREE.Mesh(new THREE.BoxGeometry(.07,.30,.06),this.roomDoorMetalMaterial);
-    lever.position.set(-.18,-.05,.10);lever.rotation.z=-.42;valve.add(lever);
-    const pipe=addPanel("VentilationOutletPipe",.22,.18,1.05,outletX,.45,outletZ-.82,this.ventDuctPanelMaterial);
-    pipe.userData.fixtureLightOccluder=false;
-    for(const x of [-.28,.28])for(const y of [-.24,.24]){
-      const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.025,8),this.ventDuctDarkMaterial);
-      bolt.position.set(x,y,.085);valve.add(bolt);
-    }
-    this.ventilationCrawlBounds={minX:gridLeft+wallT*.5,maxX:gridLeft+gridWidth-wallT*.5,minZ:gridRearZ+wallT*.5,maxZ:gridFrontZ-wallT*.5};
-    this.ventilationMazeGroup.visible=this.maintenancePuzzleType==="ventilation";
-    if(this.maintenancePuzzleType==="ventilation")this.boundaryWallBounds.push(...bounds);
-  }
 
   buildRoomDoor(parent,centerX,frontZ,options={},boundsTarget=null){
     const doorWidth=ROOM_DOOR_WIDTH,doorHeight=options.doorHeight||ROOM_DOOR_HEIGHT;
@@ -896,11 +727,11 @@ export class World {
     }
   }
 
-  setMaintenancePuzzleType(type,seed=1){
-    const nextType=type==="ventilation"?"ventilation":"breakers",nextSeed=(Number(seed)>>>0);
-    const changed=nextType!==this.maintenancePuzzleType||nextSeed!==this.maintenancePuzzleSeed;
-    this.maintenancePuzzleType=nextType;this.maintenancePuzzleSeed=nextSeed;
-    this.breakerProgress=0;this.breakerFailTimer=0;
+  setMaintenancePuzzleType(_type,seed=1){
+    this.maintenancePuzzleType="breakers";
+    this.maintenancePuzzleSeed=(Number(seed)>>>0);
+    this.breakerProgress=0;
+    this.breakerFailTimer=0;
     for(const door of this.roomDoors){
       if(!door)continue;
       door.targetOpen=false;door.openProgress=0;
@@ -908,23 +739,17 @@ export class World {
       if(door.closedCollisionBounds)Object.assign(door.collisionBounds,door.closedCollisionBounds);
     }
     if(this.maintenanceDoor)this.maintenanceDoor.unlocked=false;
-    if(changed)this.buildVentilationMaze(nextSeed);
-    else if(this.ventilationMazeGroup)this.ventilationMazeGroup.visible=nextType==="ventilation";
     for(const bound of this.breakerRoomBounds){
       const index=this.boundaryWallBounds.indexOf(bound);
       if(index>=0)this.boundaryWallBounds.splice(index,1);
     }
-    if(nextType==="breakers")this.boundaryWallBounds.push(...this.breakerRoomBounds);
-    if(this.breakerRoomGroup)this.breakerRoomGroup.visible=nextType==="breakers";
+    this.boundaryWallBounds.push(...this.breakerRoomBounds);
+    if(this.breakerRoomGroup)this.breakerRoomGroup.visible=true;
     for(const item of this.breakerSwitches){
       if(!item?.group)continue;
-      item.group.visible=nextType==="breakers";item.active=false;
+      item.group.visible=true;item.active=false;
       item.handle.rotation.z=.42;item.lamp.material=this.breakerLampOffMaterial;
     }
-  }
-  isVentilationCrawlArea(x,z){
-    const b=this.ventilationCrawlBounds;
-    return Boolean(this.maintenancePuzzleType==="ventilation"&&b&&x>=b.minX&&x<=b.maxX&&z>=b.minZ&&z<=b.maxZ);
   }
 
   restoreMaintenancePuzzleState(state={}){
@@ -1141,9 +966,7 @@ export class World {
       }
       if(door.interactable){
         door.interactable.prompt=door.requiresPower&&!door.unlocked
-          ?(door===this.maintenanceDoor&&this.maintenancePuzzleType==="ventilation"
-            ?"Find ventilation outlet":this.maintenancePuzzleType==="breakers"
-              ?"Solve the breaker equations":"Door has no power")
+          ?"Solve the breaker equations"
           :door===this.breakerRoomDoor
             ?(door.targetOpen?"Close breaker room":"Enter breaker room")
             :(door.targetOpen?"Close door":"Open door");
@@ -1364,7 +1187,6 @@ export class World {
       ...(this.maintenancePuzzleType==="breakers"
         ?this.breakerSwitches.filter(item=>item.group?.parent&&item.group.visible).map(item=>item.group)
         :[]),
-      ...(this.maintenancePuzzleType==="ventilation"&&this.ventilationExitPanel?[this.ventilationExitPanel]:[])
     ];
   }
 

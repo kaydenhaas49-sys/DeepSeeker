@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-mathbreaker-ductdetail2";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-breakeronly1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261015-mathbreaker-ductdetail2";
+import { Player } from "./player.js?v=20261015-breakeronly1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -2483,7 +2483,6 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
     maintenancePuzzleSeed:world.maintenancePuzzleSeed,
     maintenanceDoorUnlocked:Boolean(world.maintenanceDoor?.unlocked),
     maintenanceBreakerProgress:world.breakerProgress,
-    maintenanceVentRotations:null
   };
 
   const stored=persistSaveSlot(targetSlot,data);
@@ -2684,11 +2683,11 @@ function ensureHouseLoading(){
 }
 
 
-const MAINTENANCE_PUZZLE_TYPES=["breakers","ventilation"];
+const MAINTENANCE_PUZZLE_TYPES=["breakers"];
 const MAINTENANCE_PUZZLE_LAST_KEY="deepseeker-last-maintenance-puzzle";
 
 function applyMaintenancePuzzleConfiguration(type,seed,state={}){
-  const puzzleType=type==="ventilation"?"ventilation":"breakers";
+  const puzzleType="breakers";
   const parsedSeed=Number.isFinite(Number(seed))?(Number(seed)>>>0):1;
   world.setMaintenancePuzzleType(puzzleType,parsedSeed);
   world.restoreMaintenancePuzzleState({
@@ -2911,7 +2910,7 @@ const multiplayer=new Multiplayer({
     if(event?.type==="maintenance_puzzle_select"){
       if(event.playerId!==multiplayer.getWorldAuthorityId())return;
       const payload=event.payload||{};
-      const type=payload.type==="ventilation"?"ventilation":"breakers";
+      const type="breakers";
       const changed=type!==world.maintenancePuzzleType||(Number(payload.seed)>>>0)!==world.maintenancePuzzleSeed;
       applyMaintenancePuzzleConfiguration(type,payload.seed,payload);
       if(changed&&gameStarted&&!houseMode)saveGame(undefined,{confirmOverwrite:false});
@@ -2924,7 +2923,7 @@ const multiplayer=new Multiplayer({
     }
     if(event?.type==="maintenance_puzzle_solved"){
       if(String(event.playerId||"")===String(multiplayer.playerId||""))return;
-      world.completeMaintenancePuzzle(event.payload?.type||world.maintenancePuzzleType);
+      world.completeMaintenancePuzzle("breakers");
       return;
     }
     if(event?.type==="maintenance_door_toggle"){
@@ -3097,9 +3096,7 @@ const interaction=new InteractionSystem({
       const door=target.doorState;
       if(!door)return false;
       if(door.requiresPower&&!door.unlocked){
-        const message=door===world.maintenanceDoor&&world.maintenancePuzzleType==="ventilation"
-          ?"AIRFLOW BLOCKED. CRAWL THROUGH THE DUCTS TO THE OUTLET VALVE."
-          :"NO POWER. ENTER THE BREAKER ROOM AND SOLVE THE EQUATIONS.";
+        const message="NO POWER. ENTER THE BREAKER ROOM AND SOLVE THE EQUATIONS.";
         eventText.textContent=message;eventText.style.opacity="1";
         setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2600);
         return true;
@@ -3115,20 +3112,6 @@ const interaction=new InteractionSystem({
         :(door.targetOpen?"THE DOOR OPENS.":"THE DOOR CLOSES.");
       eventText.textContent=message;eventText.style.opacity="1";
       setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},1600);
-      return true;
-    }
-    if(target.type==="ventilationExit"){
-      if(world.maintenancePuzzleType!=="ventilation")return false;
-      const completed=world.completeMaintenancePuzzle("ventilation");
-      if(completed){
-        const message="AIRFLOW RESTORED. MAINTENANCE DOOR UNLOCKED.";
-        eventText.textContent=message;eventText.style.opacity="1";
-        setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2600);
-        if(multiplayer?.socket?.readyState===WebSocket.OPEN){
-          multiplayer.broadcastWorldEvent("maintenance_puzzle_solved","maintenance-puzzle",{type:"ventilation"});
-        }
-        saveGame(undefined,{confirmOverwrite:false});
-      }
       return true;
     }
     if(target.type==="roomBreaker"){
