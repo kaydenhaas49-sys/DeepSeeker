@@ -763,14 +763,13 @@ export class Player {
       }
     }
 
-    const stairFloorOffset=this.world.getStairwellFloorHeight?.(this.pos.x,this.pos.z)||0;
     // Keep pos.y at its long-standing eye-height baseline: gameplay systems
-    // such as spider scare/look logic rely on it. The stairs affect only camera height.
-    const currentEye=this.camera.position.y-this.bobOffset-stairFloorOffset;
+    // such as spider scare/look logic rely on it.
+    const currentEye=this.camera.position.y-this.bobOffset;
     const eye=currentEye+(targetEye-currentEye)*(1-Math.exp(-12*dt));
     this.camera.position.set(
       this.pos.x,
-      eye+this.bobOffset+this.jumpY-this.landingKick+stairFloorOffset,
+      eye+this.bobOffset+this.jumpY-this.landingKick,
       this.pos.z
     );
     this.camera.rotation.set(this.pitch, this.yaw, 0);

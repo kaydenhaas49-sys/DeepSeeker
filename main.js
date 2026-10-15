@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-warningperf1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-roomsbreakers1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261015-admin2";
+import { Player } from "./player.js?v=20261015-roomsbreakers1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -3022,10 +3022,30 @@ const interaction=new InteractionSystem({
       computerSystem.open(target);
       return true;
     }
-    if(target.type==="stairwellDoor"){
-      // The sealed exit never animates open; interacting with it completes
-      // the game while the physical door remains shut.
-      beginVictoryEnding();
+    if(target.type==="roomDoor"){
+      const door=target.doorState;
+      if(!door)return false;
+      if(door.requiresPower&&!door.unlocked){
+        const message="NO POWER. FIND THE THREE BREAKERS.";
+        eventText.textContent=message;eventText.style.opacity="1";
+        setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2200);
+        return true;
+      }
+      target.toggle();
+      const message=door.targetOpen?"THE DOOR OPENS.":"THE DOOR CLOSES.";
+      eventText.textContent=message;eventText.style.opacity="1";
+      setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},1600);
+      return true;
+    }
+    if(target.type==="roomBreaker"){
+      const result=world.activateBreaker(target.breakerIndex);
+      const message=result.complete
+        ?"POWER RESTORED. MAINTENANCE DOOR UNLOCKED."
+        :result.correct
+          ?"BREAKER SET. FOLLOW THE RESET ORDER."
+          :"WRONG ORDER. BREAKERS RESET; THE LIGHTS CUT OUT.";
+      eventText.textContent=message;eventText.style.opacity="1";
+      setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2300);
       return true;
     }
     if(target.type==="levelRunSafe"){
@@ -3385,17 +3405,6 @@ function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
   });
   showSpiderScareMessage("FIND THE CODE. OPEN THE SAFE.",2200);
   return true;
-}
-
-function checkExitDoorEntrance(){
-  if(!gameStarted||houseMode||tutorialOpenRoomActive||levelRunActive||gameEnded)return;
-  const door=world.stairwellDoors.find(candidate=>{
-    if(!candidate||candidate.openProgress<.82)return false;
-    const progress=(player.pos.z-candidate.wallZ)*candidate.face;
-    return Math.abs(player.pos.x-candidate.centerX)<1.42&&progress>=-.06&&progress<=1.0;
-  });
-  if(!door)return;
-  beginVictoryEnding();
 }
 
 function applyLevelRunRoundState(payload={}){
@@ -7938,22 +7947,21 @@ function teleportAdminToExit(){
   if(houseMode) setHouseMode(false,{announceFall:false});
   setAdminFlyEnabled(false);
 
-  // Teleport onto the inside stair approach, facing the outer-wall exit door.
+  // Ensure the maintenance-room chunk and breaker stations are built before teleporting.
   const target={cx:-2,cz:-3};
   const chunkKey=target.cx+","+target.cz;
-  if(!world.chunks.has(chunkKey)) world.spawnChunk(target.cx,target.cz);
-  const door=world.stairwellDoors.find(item=>
-    item.staircase?.cx===target.cx && item.staircase?.cz===target.cz
-  );
+  if(!world.chunks.has(chunkKey))world.spawnChunk(target.cx,target.cz);
+  const door=world.maintenanceDoor;
   if(!door){
-    setAdminStatus("EXIT CHUNK NOT READY — TRY AGAIN");
+    setAdminStatus("MAINTENANCE ROOM NOT READY — TRY AGAIN");
     return;
   }
 
   door.targetOpen=false;
   door.openProgress=0;
   door.group.rotation.y=0;
-  player.pos.set(door.centerX,EYE,door.wallZ+door.face*3.6);
+  Object.assign(door.collisionBounds,door.closedCollisionBounds);
+  player.pos.set(door.centerX,EYE,door.doorZ+3.6);
   player.yaw=door.face>0?0:Math.PI;
   player.pitch=0;
   player.vel.set(0,0,0);
@@ -7977,7 +7985,7 @@ function teleportAdminToExit(){
 
   closeAdminAccess();
   if(phoneOpen) togglePhone();
-  eventText.textContent="ADMIN TELEPORT · EXIT DOOR AHEAD";
+  eventText.textContent="ADMIN TELEPORT · MAINTENANCE DOOR AHEAD";
   eventText.style.opacity="1";
   setTimeout(()=>{eventText.style.opacity="0";},2200);
 }
@@ -8645,8 +8653,8 @@ function animate(){
     player.extraCollisionBoxes=[];
   }
 
-  // Animate stairwell doors and update their collider before player movement.
-  world.updateStairwellDoors(dt);
+  // Animate room doors and update their colliders before player movement.
+  world.updateRoomDoors(dt);
 
   player.inputEnabled=(
     gameStarted &&
@@ -8660,7 +8668,6 @@ function animate(){
     !computerSystem.openState
   );
   player.update(dt);
-  if(!levelRunActive && !gameEnded) checkExitDoorEntrance();
   if(levelRunActive) updateLevelRunHUD();
   updateTutorialOpenRoomLights();
   updateAdminFly(dt);

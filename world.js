@@ -41,32 +41,18 @@ export function mulberry32(a) {
 }
 
 const cellKey = (x, z) => x + "," + z;
-const STAIR_COUNT=14;
-const STAIR_STEP_DEPTH=0.42;
-const STAIR_STEP_RISE=0.22;
-const STAIR_DEPTH=STAIR_COUNT*STAIR_STEP_DEPTH;
+const ROOM_DOOR_WIDTH=2.05;
+const ROOM_DOOR_HEIGHT=2.85;
+const ROOM_WALL_THICKNESS=0.24;
+const ROOM_HEIGHT=3.35;
+const OUTER_ROOM_DOOR=Object.freeze({cx:-2,cz:-3,localX:12});
+const BREAKER_SEQUENCE=Object.freeze([2,3,1]);
 
-// Concealed stairwells are integrated into the INNER FACE of the permanent
-// north and south boundary walls. The stairs descend inward from each opening.
-const WALL_STAIRCASES = Object.freeze([
-  { cx: -2, cz: -3, localX: 12, localZ: 0, face: 1, boundarySide: "north" },
-  { cx: 1, cz: 3, localX: 4, localZ: 16, face: -1, boundarySide: "south" },
-]);
-
-function getWallStaircase(cx, cz) {
-  return WALL_STAIRCASES.find(stair => stair.cx === cx && stair.cz === cz) || null;
-}
-
-function getWallStaircaseCollisionBounds(stair) {
-  // Boundary-wall stairwells use the segmented perimeter wall colliders instead.
-  if (stair.boundarySide) return [];
-  const centerX=(stair.cx*CHUNK_CELLS+stair.localX)*CELL;
-  const wallZ=(stair.cz*CHUNK_CELLS+stair.localZ)*CELL;
-  const halfT=WALL_T*0.5,halfWidth=1.7;
-  return [
-    {minX:centerX-7,maxX:centerX-halfWidth,minZ:wallZ-halfT,maxZ:wallZ+halfT},
-    {minX:centerX+halfWidth,maxX:centerX+7,minZ:wallZ-halfT,maxZ:wallZ+halfT},
-  ];
+function isProtectedRouteCell(gx,gz){
+  return (
+    (gz >= 7 && gz <= 9 && gx >= -23 && gx <= 23) ||
+    (gx >= -21 && gx <= -19 && gz >= -46 && gz <= 8)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -82,30 +68,36 @@ export function generateChunk(cx, cz, seed) {
   const walls = [];
   const cells = new Set();
   const spawnClear = cx === 0 && cz === 0;
-  const staircase = getWallStaircase(cx, cz);
+  const rooms = [];
+  const roomRng=mulberry32(hashSeed(cx,cz,seed ^ 0x5eeda11));
 
-  // Keep wide, guaranteed routes from spawn to both perimeter stairwells.
-  // Coordinates are absolute grid cells, so adjacent chunks reserve the same
-  // corridors and procedural walls cannot sever them at a chunk seam.
+  // Seeded room rolls make discoveries consistent across players and reloads.
+  if(!spawnClear && !(cx===OUTER_ROOM_DOOR.cx && cz===OUTER_ROOM_DOOR.cz) && roomRng()<0.24){
+    for(let attempt=0;attempt<8 && rooms.length===0;attempt++){
+      const w=3+(roomRng()<0.22?1:0);
+      const h=3+(roomRng()<0.22?1:0);
+      const x0=2+Math.floor(roomRng()*Math.max(1,CHUNK_CELLS-w-4));
+      const z0=2+Math.floor(roomRng()*Math.max(1,CHUNK_CELLS-h-4));
+      let safe=true;
+      for(let x=x0-1;x<=x0+w && safe;x++){
+        for(let z=z0-1;z<=z0+h;z++){
+          const gx=cx*CHUNK_CELLS+x, gz=cz*CHUNK_CELLS+z;
+          if(isProtectedRouteCell(gx,gz)){safe=false;break;}
+        }
+      }
+      if(safe)rooms.push({x0,z0,w,h,kind:roomRng()<0.38?"ruined":"door"});
+    }
+  }
+
+  // Reserve the spawn corridor and the approach to the new maintenance-room door.
   const inClear = (x, z) => {
     if (spawnClear && x >= 5 && x <= 10 && z >= 5 && z <= 10) return true;
-
-    const gx = cx * CHUNK_CELLS + x;
-    const gz = cz * CHUNK_CELLS + z;
-    const onGuaranteedRoute =
-      // Shared approach corridor across the spawn row.
-      (gz >= 7 && gz <= 9 && gx >= -23 && gx <= 23) ||
-      // North-west perimeter exit approach.
-      (gx >= -21 && gx <= -19 && gz >= -46 && gz <= 8) ||
-      // South-east perimeter exit approach.
-      (gx >= 19 && gx <= 21 && gz >= 7 && gz <= 62);
-    if (onGuaranteedRoute) return true;
-
-    if (!staircase) return false;
-    const minZ = staircase.face < 0 ? staircase.localZ - 3 : staircase.localZ;
-    const maxZ = staircase.face < 0 ? staircase.localZ : staircase.localZ + 3;
-    return x >= staircase.localX - 4 && x <= staircase.localX + 4 &&
-      z >= minZ && z <= maxZ;
+    const gx=cx*CHUNK_CELLS+x, gz=cz*CHUNK_CELLS+z;
+    if(isProtectedRouteCell(gx,gz)) return true;
+    return rooms.some(room=>
+      x>=room.x0-1 && x<=room.x0+room.w &&
+      z>=room.z0-1 && z<=room.z0+room.h
+    );
   };
 
   const tryAdd = (lx, lz, len, horiz) => {
@@ -217,7 +209,7 @@ export function generateChunk(cx, cz, seed) {
     else tryAdd(offset, start, len, false);
   }
 
-  return { cx, cz, walls, cells };
+  return { cx, cz, walls, cells, rooms };
 }
 
 // ---------------------------------------------------------------------------
@@ -309,12 +301,6 @@ export class World {
       color: 0x10100e,
       roughness: 0.96,
     });
-    this.stairStepMaterial = new THREE.MeshStandardMaterial({
-      color: 0x39372f, roughness: 0.98, metalness: 0,
-    });
-    this.stairRailMaterial = new THREE.MeshStandardMaterial({
-      color: 0x353a32, roughness: 0.82, metalness: 0.12,
-    });
     // Muted, worn institutional hardware: painted steel, dull stainless trim,
     // and dark wired safety glass rather than glossy decorative sci-fi panels.
     const doorPaintCanvas=document.createElement("canvas");
@@ -340,21 +326,51 @@ export class World {
     }
     const doorPaintTexture=new THREE.CanvasTexture(doorPaintCanvas);
     doorPaintTexture.colorSpace=THREE.SRGBColorSpace;
-    this.stairDoorMaterial=new THREE.MeshStandardMaterial({map:doorPaintTexture,roughness:0.96,metalness:0.03});
-    this.stairDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0x484b43,roughness:0.9,metalness:0.08});
-    this.stairDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x77786f,roughness:0.68,metalness:0.34});
-    this.stairDoorGlassMaterial=new THREE.MeshStandardMaterial({color:0x27312f,roughness:0.3,metalness:0.05});
+    this.roomDoorMaterial=new THREE.MeshStandardMaterial({map:doorPaintTexture,roughness:0.96,metalness:0.03});
+    this.roomDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0x484b43,roughness:0.9,metalness:0.08});
+    this.roomDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x77786f,roughness:0.68,metalness:0.34});
+    this.roomDoorGlassMaterial=new THREE.MeshStandardMaterial({color:0x27312f,roughness:0.3,metalness:0.05});
     const signCanvas=document.createElement("canvas");
     signCanvas.width=256;signCanvas.height=96;
     const signCtx=signCanvas.getContext("2d");
     signCtx.fillStyle="#603a32";signCtx.fillRect(0,0,256,96);
     signCtx.strokeStyle="#c8c0ac";signCtx.lineWidth=4;signCtx.strokeRect(5,5,246,86);
-    signCtx.fillStyle="#e4deca";signCtx.font="bold 49px Arial, sans-serif";
-    signCtx.textAlign="center";signCtx.textBaseline="middle";signCtx.fillText("EXIT",128,49);
+    signCtx.fillStyle="#e4deca";signCtx.font="bold 35px Arial, sans-serif";
+    signCtx.textAlign="center";signCtx.textBaseline="middle";signCtx.fillText("SERVICE",128,49);
     const signTexture=new THREE.CanvasTexture(signCanvas);
     signTexture.colorSpace=THREE.SRGBColorSpace;
-    this.stairDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.88,metalness:0.02,side:THREE.DoubleSide});
-    this.stairwellDoors=[];
+    this.roomDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.88,metalness:0.02,side:THREE.DoubleSide});
+    this.roomDoors=[];
+    this.breakerSwitches=[];
+    this.breakerProgress=0;
+    this.breakerSequence=[...BREAKER_SEQUENCE];
+    this.breakerFailTimer=0;
+    this.maintenanceDoor=null;
+
+    const breakerCanvas=document.createElement("canvas");
+    breakerCanvas.width=512;breakerCanvas.height=192;
+    const breakerCtx=breakerCanvas.getContext("2d");
+    breakerCtx.fillStyle="#20261e";breakerCtx.fillRect(0,0,512,192);
+    breakerCtx.strokeStyle="#c3b891";breakerCtx.lineWidth=5;breakerCtx.strokeRect(8,8,496,176);
+    breakerCtx.fillStyle="#d6d0b8";breakerCtx.textAlign="center";breakerCtx.textBaseline="middle";
+    breakerCtx.font="bold 29px Arial, sans-serif";breakerCtx.fillText("MAINTENANCE RESET ORDER",256,53);
+    breakerCtx.font="bold 61px monospace";breakerCtx.fillText("2  >  3  >  1",256,127);
+    const breakerTexture=new THREE.CanvasTexture(breakerCanvas);
+    breakerTexture.colorSpace=THREE.SRGBColorSpace;
+    this.breakerNoteMaterial=new THREE.MeshBasicMaterial({map:breakerTexture,side:THREE.DoubleSide,toneMapped:false});
+    this.breakerPanelMaterial=new THREE.MeshStandardMaterial({color:0x35372f,roughness:0.83,metalness:0.08});
+    this.breakerHandleMaterial=new THREE.MeshStandardMaterial({color:0x97988a,roughness:0.7,metalness:0.25});
+    this.breakerLampOffMaterial=new THREE.MeshStandardMaterial({color:0x4d2822,emissive:0x40100a,emissiveIntensity:0.35});
+    this.breakerLampOnMaterial=new THREE.MeshStandardMaterial({color:0x9bd78b,emissive:0x42ff40,emissiveIntensity:1.15});
+    this.breakerNumberMaterials=[];
+    for(let index=1;index<=3;index++){
+      const canvas=document.createElement("canvas");canvas.width=128;canvas.height=64;
+      const ctx=canvas.getContext("2d");ctx.fillStyle="#1e231c";ctx.fillRect(0,0,128,64);
+      ctx.fillStyle="#c8c2aa";ctx.font="bold 34px monospace";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(String(index),64,32);
+      const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+      this.breakerNumberMaterials.push(new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false}));
+    }
 
     // Ceiling fixtures use a tiny real-light budget. They only activate when
     // the player's camera is actually looking toward them.
@@ -388,163 +404,278 @@ export class World {
   // -- fixed map boundary ----------------------------------------------------
 
   buildMapBoundary() {
-    const minX = MAP_MIN_CHUNK * CHUNK_SIZE;
-    const maxX = (MAP_MAX_CHUNK + 1) * CHUNK_SIZE;
-    const minZ = MAP_MIN_CHUNK * CHUNK_SIZE;
-    const maxZ = (MAP_MAX_CHUNK + 1) * CHUNK_SIZE;
-    const thickness = 1.2;
-    const height = WALL_H + 4.0;
-    const width = maxX - minX;
-    const depth = maxZ - minZ;
-    const midX = (minX + maxX) * 0.5;
-    const midZ = (minZ + maxZ) * 0.5;
+    const minX=MAP_MIN_CHUNK*CHUNK_SIZE;
+    const maxX=(MAP_MAX_CHUNK+1)*CHUNK_SIZE;
+    const minZ=MAP_MIN_CHUNK*CHUNK_SIZE;
+    const maxZ=(MAP_MAX_CHUNK+1)*CHUNK_SIZE;
+    const thickness=1.2,height=WALL_H+4;
+    const width=maxX-minX,depth=maxZ-minZ;
+    const midX=(minX+maxX)*.5,midZ=(minZ+maxZ)*.5;
+    const doorCenterX=(OUTER_ROOM_DOOR.cx*CHUNK_CELLS+OUTER_ROOM_DOOR.localX)*CELL;
 
-    const addWall = (name, geometry, x, z, bounds, horizontal) => {
-      const length = horizontal ? geometry.parameters.width : geometry.parameters.depth;
-      if (horizontal) {
-        scaleFaceU(geometry, 4, length / CELL);
-        scaleFaceU(geometry, 5, length / CELL);
-        scaleFaceU(geometry, 0, thickness / CELL);
-        scaleFaceU(geometry, 1, thickness / CELL);
-      } else {
-        scaleFaceU(geometry, 0, length / CELL);
-        scaleFaceU(geometry, 1, length / CELL);
-        scaleFaceU(geometry, 4, thickness / CELL);
-        scaleFaceU(geometry, 5, thickness / CELL);
+    const addWall=(name,geometry,x,z,bounds,horizontal)=>{
+      const length=horizontal?geometry.parameters.width:geometry.parameters.depth;
+      if(horizontal){
+        scaleFaceU(geometry,4,length/CELL);scaleFaceU(geometry,5,length/CELL);
+        scaleFaceU(geometry,0,thickness/CELL);scaleFaceU(geometry,1,thickness/CELL);
+      }else{
+        scaleFaceU(geometry,0,length/CELL);scaleFaceU(geometry,1,length/CELL);
+        scaleFaceU(geometry,4,thickness/CELL);scaleFaceU(geometry,5,thickness/CELL);
       }
-      const mesh = new THREE.Mesh(geometry, this.boundaryMaterial);
-      mesh.name = name;
-      mesh.position.set(x, height * 0.5, z);
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      mesh.userData.fixtureLightOccluder = true;
-      this.boundaryGroup.add(mesh);
-      this.wallOccluders.push(mesh);
-      this.boundaryWallBounds.push(bounds);
+      const mesh=new THREE.Mesh(geometry,this.boundaryMaterial);
+      mesh.name=name;mesh.position.set(x,height*0.5,z);
+      mesh.castShadow=false;mesh.receiveShadow=false;mesh.userData.fixtureLightOccluder=true;
+      this.boundaryGroup.add(mesh);this.wallOccluders.push(mesh);this.boundaryWallBounds.push(bounds);
     };
 
-    const addHorizontalWallWithExit = (name, z, wallMinZ, wallMaxZ, staircase) => {
-      const wallMinX = minX - thickness;
-      const wallMaxX = maxX + thickness;
-      const centerX = (staircase.cx * CHUNK_CELLS + staircase.localX) * CELL;
-      const halfOpening = 1.9;
-      const openingLeft = centerX - halfOpening;
-      const openingRight = centerX + halfOpening;
-      const segment = (segmentName, x1, x2) => {
-        if (x2 <= x1) throw new Error("Invalid perimeter exit wall segment: " + segmentName);
-        addWall(
-          segmentName,
-          new THREE.BoxGeometry(x2 - x1, height, thickness),
-          (x1 + x2) * 0.5,
-          z,
-          { minX: x1, maxX: x2, minZ: wallMinZ, maxZ: wallMaxZ },
-          true
-        );
+    // Only the north wall has a real doorway; the former openings are now just one doorway.
+    const halfOpening=ROOM_DOOR_WIDTH*0.5+0.16;
+    const openingLeft=doorCenterX-halfOpening,openingRight=doorCenterX+halfOpening;
+    const wallMinX=minX-thickness,wallMaxX=maxX+thickness;
+    const addNorthSegment=(name,x1,x2)=>{
+      if(x2<=x1)throw new Error("Invalid maintenance room opening segment");
+      addWall(name,new THREE.BoxGeometry(x2-x1,height,thickness),(x1+x2)*.5,
+        minZ+thickness*.5,
+        {minX:x1,maxX:x2,minZ,maxZ:minZ+thickness},true);
+    };
+    addNorthSegment("BoundaryNorthWest",wallMinX,openingLeft);
+    addNorthSegment("BoundaryNorthEast",openingRight,wallMaxX);
+    const lintelTop=new THREE.Mesh(
+      new THREE.BoxGeometry(openingRight-openingLeft,height-ROOM_DOOR_HEIGHT,thickness),
+      this.boundaryMaterial
+    );
+    lintelTop.name="BoundaryNorthMaintenanceLintel";
+    lintelTop.position.set(doorCenterX,(height+ROOM_DOOR_HEIGHT)*.5,minZ+thickness*.5);
+    lintelTop.castShadow=false;lintelTop.receiveShadow=false;lintelTop.userData.fixtureLightOccluder=true;
+    this.boundaryGroup.add(lintelTop);this.wallOccluders.push(lintelTop);
+
+    addWall("BoundarySouth",new THREE.BoxGeometry(width+2*thickness,height,thickness),
+      midX,maxZ-thickness*.5,
+      {minX:minX-thickness,maxX:maxX+thickness,minZ:maxZ-thickness,maxZ},true);
+    addWall("BoundaryWest",new THREE.BoxGeometry(thickness,height,depth+2*thickness),
+      minX+thickness*.5,midZ,
+      {minX,minZ:minZ-thickness,maxX:minX+thickness,maxZ:maxZ+thickness},false);
+    addWall("BoundaryEast",new THREE.BoxGeometry(thickness,height,depth+2*thickness),
+      maxX-thickness*.5,midZ,
+      {minX:maxX-thickness,maxX,minZ:minZ-thickness,maxZ:maxZ+thickness},false);
+
+    this.buildOuterMaintenanceRoom(doorCenterX,minZ,thickness);
+  }
+
+  buildOuterMaintenanceRoom(centerX,minZ,boundaryThickness){
+    const roomWidth=10.2,roomDepth=13.5,roomHeight=ROOM_HEIGHT,wallT=ROOM_WALL_THICKNESS;
+    const frontZ=minZ+boundaryThickness;
+    const backZ=frontZ-roomDepth;
+    const centerZ=(backZ+frontZ)*.5;
+    const room=new THREE.Group();room.name="OuterMaintenanceRoom";this.boundaryGroup.add(room);
+    const addBox=(name,sx,sy,sz,x,y,z,material)=>{
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
+      mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;
+      mesh.userData.fixtureLightOccluder=true;room.add(mesh);return mesh;
+    };
+    addBox("MaintenanceRoomFloor",roomWidth-.08,.07,roomDepth-.05,centerX,-.025,centerZ,this.materials.floor);
+    addBox("MaintenanceRoomLeftWall",wallT,roomHeight,roomDepth,centerX-roomWidth*.5,roomHeight*.5,centerZ,this.materials.wall);
+    addBox("MaintenanceRoomRightWall",wallT,roomHeight,roomDepth,centerX+roomWidth*.5,roomHeight*.5,centerZ,this.materials.wall);
+    addBox("MaintenanceRoomBackWall",roomWidth,roomHeight,wallT,centerX,roomHeight*.5,backZ,this.materials.wall);
+    addBox("MaintenanceRoomCeiling",roomWidth,.13,roomDepth-.18,centerX,roomHeight,centerZ-.08,this.materials.ceiling);
+
+    this.boundaryWallBounds.push(
+      {minX:centerX-roomWidth*.5-wallT*.5,maxX:centerX-roomWidth*.5+wallT*.5,minZ:backZ,maxZ:frontZ},
+      {minX:centerX+roomWidth*.5-wallT*.5,maxX:centerX+roomWidth*.5+wallT*.5,minZ:backZ,maxZ:frontZ},
+      {minX:centerX-roomWidth*.5,maxX:centerX+roomWidth*.5,minZ:backZ-wallT*.5,maxZ:backZ+wallT*.5}
+    );
+    this.maintenanceDoor=this.buildRoomDoor(room,centerX,minZ+boundaryThickness*.5,{
+      doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:true,ownerChunk:null
+    },this.boundaryWallBounds);
+  }
+
+  buildRoomDoor(parent,centerX,frontZ,options={},boundsTarget=null){
+    const doorWidth=ROOM_DOOR_WIDTH,doorHeight=options.doorHeight||ROOM_DOOR_HEIGHT;
+    const frameMat=this.roomDoorTrimMaterial,metalMat=this.roomDoorMetalMaterial;
+    const addBox=(name,sx,sy,sz,x,y,z,material,host=parent)=>{
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
+      mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;host.add(mesh);return mesh;
+    };
+    addBox("RoomDoorFrameLeft",.12,doorHeight,.28,centerX-doorWidth*.5-.06,doorHeight*.5,frontZ,frameMat);
+    addBox("RoomDoorFrameRight",.12,doorHeight,.28,centerX+doorWidth*.5+.06,doorHeight*.5,frontZ,frameMat);
+    addBox("RoomDoorFrameTop",doorWidth+.16,.12,.28,centerX,doorHeight+.06,frontZ,frameMat);
+
+    const pivot=new THREE.Group();pivot.name=options.requiresPower?"MaintenanceRoomDoor":"ProceduralRoomDoor";
+    pivot.position.set(centerX-doorWidth*.5,0,frontZ);parent.add(pivot);
+    addBox("RoomDoorPanel",doorWidth-.07,doorHeight-.06,.13,doorWidth*.5,doorHeight*.5,0,this.roomDoorMaterial,pivot);
+    addBox("RoomDoorVisionGlass",.36,.47,.025,doorWidth*.5,doorHeight*.72,.079,this.roomDoorGlassMaterial,pivot);
+    addBox("RoomDoorVisionFrameTop",.44,.045,.035,doorWidth*.5,doorHeight*.72+.255,.088,metalMat,pivot);
+    addBox("RoomDoorVisionFrameBottom",.44,.045,.035,doorWidth*.5,doorHeight*.72-.255,.088,metalMat,pivot);
+    addBox("RoomDoorHandle",.24,.055,.06,doorWidth*.73,doorHeight*.48,.10,metalMat,pivot);
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(.64,.17),this.roomDoorSignMaterial);
+    sign.name="RoomDoorServicePlate";sign.position.set(doorWidth*.5,doorHeight*.9,.071);pivot.add(sign);
+
+    const bounds={minX:centerX-doorWidth*.5,maxX:centerX+doorWidth*.5,minZ:frontZ-.10,maxZ:frontZ+.10};
+    const state={
+      group:pivot,ownerChunk:options.ownerChunk||null,centerX,frontZ,doorZ:frontZ,face:1,doorWidth,doorHeight,
+      requiresPower:Boolean(options.requiresPower),unlocked:!options.requiresPower,targetOpen:false,openProgress:0,
+      rotationSign:1,collisionBounds:bounds,closedCollisionBounds:{...bounds},
+      toggle(){
+        if(this.requiresPower&&!this.unlocked)return false;
+        this.targetOpen=!this.targetOpen;return true;
+      }
+    };
+    const interactable={
+      type:"roomDoor",
+      prompt:state.requiresPower&&!state.unlocked?"Door has no power":"Open door",
+      doorState:state,toggle:()=>state.toggle(),isOpen:()=>state.openProgress>.82
+    };
+    state.interactable=interactable;pivot.userData.interactable=interactable;
+    if(boundsTarget)boundsTarget.push(bounds);
+    this.roomDoors.push(state);
+    return state;
+  }
+
+  buildProceduralRoom(group,room,cx,cz){
+    const left=(cx*CHUNK_CELLS+room.x0)*CELL;
+    const back=(cz*CHUNK_CELLS+room.z0)*CELL;
+    const width=room.w*CELL,depth=room.h*CELL;
+    const right=left+width,front=back+depth;
+    const centerX=(left+right)*.5,centerZ=(back+front)*.5;
+    const wallT=ROOM_WALL_THICKNESS;
+    const roomHeight=room.kind==="ruined"?2.9:ROOM_HEIGHT;
+    const bounds=group.userData.roomWallBounds;
+    const addBox=(name,sx,sy,sz,x,y,z,material)=>{
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
+      mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;group.add(mesh);return mesh;
+    };
+    const addBound=(minX,maxX,minZ,maxZ)=>bounds.push({minX,maxX,minZ,maxZ});
+    const floor=new THREE.Mesh(new THREE.BoxGeometry(width-.15,.065,depth-.15),this.materials.floor);
+    floor.name=room.kind==="ruined"?"RuinedRoomFloor":"ServiceRoomFloor";
+    floor.position.set(centerX,-.02,centerZ);group.add(floor);
+    addBox("RoomBackWall",width,roomHeight,wallT,centerX,roomHeight*.5,back,this.materials.wall);
+    addBound(left,right,back-wallT*.5,back+wallT*.5);
+
+    if(room.kind==="door"){
+      addBox("RoomLeftWall",wallT,roomHeight,depth,left,roomHeight*.5,centerZ,this.materials.wall);
+      addBox("RoomRightWall",wallT,roomHeight,depth,right,roomHeight*.5,centerZ,this.materials.wall);
+      addBound(left-wallT*.5,left+wallT*.5,back,front);
+      addBound(right-wallT*.5,right+wallT*.5,back,front);
+      const doorLeft=centerX-ROOM_DOOR_WIDTH*.5,doorRight=centerX+ROOM_DOOR_WIDTH*.5;
+      const leftWidth=doorLeft-left,rightWidth=right-doorRight;
+      if(leftWidth>.1){
+        addBox("RoomFrontWallLeft",leftWidth,roomHeight,wallT,(left+doorLeft)*.5,roomHeight*.5,front,this.materials.wall);
+        addBound(left,doorLeft,front-wallT*.5,front+wallT*.5);
+      }
+      if(rightWidth>.1){
+        addBox("RoomFrontWallRight",rightWidth,roomHeight,wallT,(doorRight+right)*.5,roomHeight*.5,front,this.materials.wall);
+        addBound(doorRight,right,front-wallT*.5,front+wallT*.5);
+      }
+      addBox("RoomFrontLintel",ROOM_DOOR_WIDTH,roomHeight-ROOM_DOOR_HEIGHT,wallT,
+        centerX,(roomHeight+ROOM_DOOR_HEIGHT)*.5,front,this.materials.wall);
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(width,.12,depth),this.materials.ceiling);
+      roof.name="RoomCeiling";roof.position.set(centerX,roomHeight,centerZ);group.add(roof);
+      this.buildRoomDoor(group,centerX,front,{
+        doorHeight:ROOM_DOOR_HEIGHT,roomHeight,ownerChunk:group
+      },bounds).ownerChunk=group;
+    }else{
+      // Ruined rooms are open dead ends with broken side walls, a missing entry,
+      // missing ceiling sections, and scattered low debris.
+      const sideDepth=depth*.74;
+      addBox("RuinedRoomLeftWall",wallT,roomHeight,sideDepth,left,roomHeight*.5,back+sideDepth*.52,this.materials.wall);
+      addBox("RuinedRoomRightWall",wallT,roomHeight*.78,sideDepth*.62,right,roomHeight*.39,back+sideDepth*.31,this.materials.wall);
+      addBound(left-wallT*.5,left+wallT*.5,back,back+sideDepth);
+      addBound(right-wallT*.5,right+wallT*.5,back,back+sideDepth*.62);
+      for(let i=0;i<5;i++){
+        const size=.35+(i%3)*.16;
+        const rubble=addBox("RuinedRoomDebris",size,.12+(i%2)*.12,size*.72,
+          left+width*(.25+.12*(i%4)),-.01+(i%2)*.06,back+depth*(.55+.08*(i%3)),this.roomDoorTrimMaterial);
+        rubble.rotation.y=(i*1.13)%Math.PI;
+      }
+      const brokenRoof=new THREE.Mesh(new THREE.BoxGeometry(width*.56,.10,depth*.42),this.materials.ceiling);
+      brokenRoof.name="RuinedCeilingRemnant";brokenRoof.position.set(centerX,roomHeight,back+depth*.3);
+      brokenRoof.rotation.z=-.035;group.add(brokenRoof);
+    }
+  }
+
+  buildMaintenanceBreakers(chunkGroup,cx,cz){
+    const centerX=(OUTER_ROOM_DOOR.cx*CHUNK_CELLS+OUTER_ROOM_DOOR.localX)*CELL;
+    const wallZ=MAP_MIN_CHUNK*CHUNK_SIZE;
+    const positions=[
+      {index:1,x:centerX-3.35,z:wallZ+8},
+      {index:2,x:centerX+3.35,z:wallZ+20},
+      {index:3,x:centerX-3.35,z:wallZ+32}
+    ];
+    chunkGroup.userData.breakerSwitches=[];
+    for(const spec of positions){
+      const root=new THREE.Group();root.name="MaintenanceBreaker"+spec.index;
+      root.position.set(spec.x,0,spec.z);chunkGroup.add(root);
+      const panel=new THREE.Mesh(new THREE.BoxGeometry(.78,1.18,.18),this.breakerPanelMaterial);
+      panel.name="BreakerPanelHousing";panel.position.set(0,1.02,0);root.add(panel);
+      const label=new THREE.Mesh(new THREE.PlaneGeometry(.34,.17),this.breakerNumberMaterials[spec.index-1]);
+      label.position.set(0,1.36,.096);root.add(label);
+      const handle=new THREE.Mesh(new THREE.BoxGeometry(.10,.32,.08),this.breakerHandleMaterial);
+      handle.name="BreakerLever";handle.position.set(0,.98,.15);handle.rotation.z=.42;root.add(handle);
+      const active=this.maintenanceDoor?.unlocked || this.breakerSequence.slice(0,this.breakerProgress).includes(spec.index);
+      const lamp=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),active?this.breakerLampOnMaterial:this.breakerLampOffMaterial);
+      lamp.name="BreakerStatusLamp";lamp.position.set(0,1.52,.11);root.add(lamp);
+      if(active)handle.rotation.z=-.42;
+      if(spec.index===3){
+        const board=new THREE.Mesh(new THREE.BoxGeometry(1.85,.76,.10),this.breakerPanelMaterial);
+        board.name="BreakerResetNoteBoard";board.position.set(0,2.02,.015);root.add(board);
+        const note=new THREE.Mesh(new THREE.PlaneGeometry(1.70,.63),this.breakerNoteMaterial);
+        note.name="BreakerResetSequence";note.position.set(0,2.02,.073);root.add(note);
+      }
+      const state={...spec,group:root,handle,lamp,ownerChunk:chunkGroup,active};
+      root.userData.interactable={
+        type:"roomBreaker",prompt:"Flip breaker "+spec.index,
+        breakerIndex:spec.index,breakerState:state
       };
-
-      // Leave a real doorway through the permanent perimeter wall.
-      // The 2D colliders intentionally omit this gap; the animated door itself
-      // supplies collision while closed.
-      segment(name + "West", wallMinX, openingLeft);
-      segment(name + "East", openingRight, wallMaxX);
-
-      // The stairwell door sits below floor level, so only the upper lintel
-      // spans this opening. It is visual-only for ground-plane collision.
-      const doorBottom = -(STAIR_COUNT - 1) * STAIR_STEP_RISE;
-      const doorTop = doorBottom + 3.75;
-      const lintel = new THREE.Mesh(
-        new THREE.BoxGeometry(halfOpening * 2, height - doorTop, thickness),
-        this.boundaryMaterial
-      );
-      lintel.name = name + "ExitLintel";
-      lintel.position.set(centerX, (height + doorTop) * 0.5, z);
-      lintel.castShadow = false;
-      lintel.receiveShadow = false;
-      lintel.userData.fixtureLightOccluder = true;
-      this.boundaryGroup.add(lintel);
-      this.wallOccluders.push(lintel);
-    };
-
-    // The corners overlap as before, while the north/south walls have real
-    // openings exactly where the two inner-face stairwell structures are built.
-    const northExit = WALL_STAIRCASES.find(stair => stair.boundarySide === "north");
-    if (northExit) {
-      addHorizontalWallWithExit(
-        "BoundaryNorth", minZ + thickness * 0.5,
-        minZ, minZ + thickness, northExit
-      );
-    } else {
-      addWall(
-        "BoundaryNorth",
-        new THREE.BoxGeometry(width + 2 * thickness, height, thickness),
-        midX, minZ + thickness * 0.5,
-        { minX: minX - thickness, maxX: maxX + thickness, minZ, maxZ: minZ + thickness },
-        true
-      );
+      chunkGroup.userData.breakerSwitches.push(state);
     }
+  }
 
-    const southExit = WALL_STAIRCASES.find(stair => stair.boundarySide === "south");
-    if (southExit) {
-      addHorizontalWallWithExit(
-        "BoundarySouth", maxZ - thickness * 0.5,
-        maxZ - thickness, maxZ, southExit
-      );
-    } else {
-      addWall(
-        "BoundarySouth",
-        new THREE.BoxGeometry(width + 2 * thickness, height, thickness),
-        midX, maxZ - thickness * 0.5,
-        { minX: minX - thickness, maxX: maxX + thickness, minZ: maxZ - thickness, maxZ },
-        true
-      );
+  activateBreaker(index){
+    if(!this.maintenanceDoor)return {correct:false,complete:false,missingDoor:true};
+    if(this.maintenanceDoor.unlocked)return {correct:true,complete:true,alreadyPowered:true};
+    const switchState=this.breakerSwitches.find(item=>item.index===index);
+    if(!switchState)return {correct:false,complete:false,missingSwitch:true};
+    if(index!==this.breakerSequence[this.breakerProgress]){
+      this.breakerProgress=0;this.breakerFailTimer=1.8;
+      for(const item of this.breakerSwitches){
+        item.active=false;item.handle.rotation.z=.42;item.lamp.material=this.breakerLampOffMaterial;
+      }
+      return {correct:false,complete:false,progress:0};
     }
-
-    // West and east boundaries stay completely solid.
-    addWall(
-      "BoundaryWest",
-      new THREE.BoxGeometry(thickness, height, depth + 2 * thickness),
-      minX + thickness * 0.5, midZ,
-      { minX, maxX: minX + thickness, minZ: minZ - thickness, maxZ: maxZ + thickness },
-      false
-    );
-    addWall(
-      "BoundaryEast",
-      new THREE.BoxGeometry(thickness, height, depth + 2 * thickness),
-      maxX - thickness * 0.5, midZ,
-      { minX: maxX - thickness, maxX, minZ: minZ - thickness, maxZ: maxZ + thickness },
-      false
-    );
+    this.breakerProgress++;
+    switchState.active=true;switchState.handle.rotation.z=-.42;
+    switchState.lamp.material=this.breakerLampOnMaterial;
+    if(this.breakerProgress>=this.breakerSequence.length){
+      this.maintenanceDoor.unlocked=true;this.maintenanceDoor.targetOpen=true;
+      this.breakerProgress=this.breakerSequence.length;
+      return {correct:true,complete:true,progress:this.breakerProgress};
+    }
+    return {correct:true,complete:false,progress:this.breakerProgress};
   }
 
   // -- chunk lifecycle -------------------------------------------------------
 
   spawnChunk(cx, cz) {
-    const data = generateChunk(cx, cz, this.seed);
-    const group = this.buildChunkMeshes(data, cx, cz);
-    const wallBounds = data.walls.map((w) => {
-      if (w.horiz) {
-        const minX = w.x * CELL;
-        const maxX = (w.x + w.len) * CELL;
-        const midZ = (w.z + 0.5) * CELL;
-        const halfT = WALL_T * 0.5;
-        return { minX, maxX, minZ: midZ - halfT, maxZ: midZ + halfT };
+    const data=generateChunk(cx,cz,this.seed);
+    const group=this.buildChunkMeshes(data,cx,cz);
+    const wallBounds=data.walls.map(w=>{
+      if(w.horiz){
+        const minX=w.x*CELL,maxX=(w.x+w.len)*CELL;
+        const midZ=(w.z+.5)*CELL,halfT=WALL_T*.5;
+        return {minX,maxX,minZ:midZ-halfT,maxZ:midZ+halfT};
       }
-
-      const midX = (w.x + 0.5) * CELL;
-      const halfT = WALL_T * 0.5;
-      const minZ = w.z * CELL;
-      const maxZ = (w.z + w.len) * CELL;
-      return { minX: midX - halfT, maxX: midX + halfT, minZ, maxZ };
+      const midX=(w.x+.5)*CELL,halfT=WALL_T*.5;
+      const minZ=w.z*CELL,maxZ=(w.z+w.len)*CELL;
+      return {minX:midX-halfT,maxX:midX+halfT,minZ,maxZ};
     });
-
-    const staircase = getWallStaircase(cx, cz);
-    if (staircase) {
-      wallBounds.push(...getWallStaircaseCollisionBounds(staircase));
-      const doorState=group.userData.stairwellDoorState;
-      if(doorState){wallBounds.push(doorState.collisionBounds);this.stairwellDoors.push(doorState);}
+    wallBounds.push(...(group.userData.roomWallBounds||[]));
+    for(const state of (group.userData.roomDoorStates||[])){
+      state.ownerChunk=group;
+      wallBounds.push(state.collisionBounds);
     }
+    this.breakerSwitches.push(...(group.userData.breakerSwitches||[]));
     this.root.add(group);
-    this.chunks.set(cellKey(cx, cz), { data, group, wallBounds });
+    this.chunks.set(cellKey(cx,cz),{data,group,wallBounds});
   }
 
   disposeChunk(key) {
@@ -564,9 +695,8 @@ export class World {
     this.fixtureLights = this.fixtureLights.filter(item=>
       item.light.parent && this.root.children.includes(item.light.parent)
     );
-    this.stairwellDoors=this.stairwellDoors.filter(door=>
-      door.group?.parent && this.root.children.includes(door.group.parent)
-    );
+    this.roomDoors=this.roomDoors.filter(door=>door.ownerChunk!==entry.group);
+    this.breakerSwitches=this.breakerSwitches.filter(item=>item.ownerChunk!==entry.group);
     this.chunks.delete(key);
   }
 
@@ -591,6 +721,11 @@ export class World {
     for(const item of this.fixtureLights){
       item.light.visible=true;
 
+      if(this.breakerFailTimer>0){
+        item.light.intensity=0;
+        item.light.visible=false;
+        continue;
+      }
       const flicker=item.cracked
         ? .88+.10*Math.sin(flickerTime*item.flickerSpeed+item.phase)
         : .95+.035*Math.sin(flickerTime*item.flickerSpeed+item.phase);
@@ -666,32 +801,24 @@ export class World {
     return chunk ? chunk.data.cells.has(cellKey(ax, az)) : false;
   }
 
-  updateStairwellDoors(_dt){
-    // Perimeter exits are sealed for this build. Keep their panels, hinge
-    // transforms, and collision planes permanently in the closed position.
-    for(const door of this.stairwellDoors){
-      door.targetOpen=false;
-      door.openProgress=0;
-      door.group.rotation.y=0;
-      const interactable=door.group.userData.interactable;
-      if(interactable)interactable.prompt="Enter exit";
-      door.collisionBounds.minX=door.centerX-1.7;
-      door.collisionBounds.maxX=door.centerX+1.7;
-      door.collisionBounds.minZ=door.doorZ-0.08;
-      door.collisionBounds.maxZ=door.doorZ+0.08;
+  updateRoomDoors(dt){
+    this.breakerFailTimer=Math.max(0,this.breakerFailTimer-dt);
+    for(const door of this.roomDoors){
+      if(!door.group?.parent)continue;
+      const direction=door.targetOpen?1:-1;
+      door.openProgress=THREE.MathUtils.clamp(door.openProgress+direction*dt*2.6,0,1);
+      door.group.rotation.y=door.openProgress*Math.PI*.49*door.rotationSign;
+      if(door.openProgress>.82){
+        Object.assign(door.collisionBounds,{minX:1e9,maxX:1e9+1,minZ:1e9,maxZ:1e9+1});
+      }else{
+        Object.assign(door.collisionBounds,door.closedCollisionBounds);
+      }
+      if(door.interactable){
+        door.interactable.prompt=door.requiresPower&&!door.unlocked
+          ?"Door has no power"
+          :(door.targetOpen?"Close door":"Open door");
+      }
     }
-  }
-  getStairwellFloorHeight(x,z){
-    for(const door of this.stairwellDoors){
-      const stair=door.staircase,centerX=(stair.cx*CHUNK_CELLS+stair.localX)*CELL;
-      const wallZ=(stair.cz*CHUNK_CELLS+stair.localZ)*CELL;
-      if(Math.abs(x-centerX)>1.52)continue;
-      const progress=(z-wallZ)*stair.face;
-      if(progress< -0.12||progress>STAIR_DEPTH+0.10)continue;
-      const index=THREE.MathUtils.clamp(Math.floor((STAIR_DEPTH-progress)/STAIR_STEP_DEPTH),0,STAIR_COUNT-1);
-      return -index*STAIR_STEP_RISE;
-    }
-    return 0;
   }
   // Return the actual axis-aligned wall rectangles near a world position.
   // Collision uses these real bounds instead of treating an entire 4m cell as solid.
@@ -735,11 +862,12 @@ export class World {
     const oz = cz * CHUNK_SIZE;
     const mid = CHUNK_SIZE / 2;
 
-    const staircase=getWallStaircase(cx,cz);
-    const floorGeometry=staircase?this.createStairwellFloorGeometry(staircase):this.floorGeo;
-    const floor=new THREE.Mesh(floorGeometry,this.materials.floor);
+    group.userData.roomWallBounds=[];
+    group.userData.roomDoorStates=[];
+    group.userData.breakerSwitches=[];
+    const floor=new THREE.Mesh(this.floorGeo,this.materials.floor);
     floor.position.set(ox+mid,0,oz+mid);
-    floor.name=staircase?"BackroomsFloorWithStairwellOpening":"BackroomsFloor";
+    floor.name="BackroomsFloor";
     group.add(floor);
 
     const ceiling = new THREE.Mesh(this.ceilGeo, this.materials.ceiling);
@@ -766,145 +894,11 @@ export class World {
       this.wallOccluders.push(wallMesh);
     }
 
-    if (staircase) this.buildWallStaircase(group, staircase);
-
-    this.buildCeilingFixtures(group, cx, cz);
-
+    for(const room of (data.rooms||[])) this.buildProceduralRoom(group,room,cx,cz);
+    group.userData.roomDoorStates=this.roomDoors.filter(door=>door.ownerChunk===group);
+    if(cx===OUTER_ROOM_DOOR.cx && cz===OUTER_ROOM_DOOR.cz)this.buildMaintenanceBreakers(group,cx,cz);
+    this.buildCeilingFixtures(group,cx,cz);
     return group;
-  }
-
-  createStairwellFloorGeometry(staircase) {
-    const mid=CHUNK_SIZE*0.5,shape=new THREE.Shape();
-    shape.moveTo(-mid,-mid);shape.lineTo(mid,-mid);shape.lineTo(mid,mid);shape.lineTo(-mid,mid);shape.lineTo(-mid,-mid);
-    const centerX=staircase.localX*CELL-mid,halfWidth=1.92;
-    const outwardZ=staircase.localZ*CELL+staircase.face*(STAIR_DEPTH+0.05)-mid;
-    // For perimeter exits, stop the cut at the chunk edge instead of extending
-    // the hole outside the floor mesh; the physical outer wall has its own gap.
-    const innerZ=staircase.localZ*CELL-(staircase.boundarySide?0:staircase.face*0.48)-mid;
-    const minZ=Math.min(outwardZ,innerZ),maxZ=Math.max(outwardZ,innerZ);
-    const hole=new THREE.Path(),lowerY=-maxZ,upperY=-minZ;
-    hole.moveTo(centerX-halfWidth,lowerY);hole.lineTo(centerX-halfWidth,upperY);
-    hole.lineTo(centerX+halfWidth,upperY);hole.lineTo(centerX+halfWidth,lowerY);hole.lineTo(centerX-halfWidth,lowerY);
-    shape.holes.push(hole);
-    const geometry=new THREE.ShapeGeometry(shape);
-    // ShapeGeometry UVs are raw shape-space coordinates (-32..32), unlike the
-    // regular PlaneGeometry floor's 0..1 UVs. Normalize them before the carpet
-    // material applies its existing 16x repeat, so the pattern matches seams.
-    const uv=geometry.attributes.uv;
-    for(let i=0;i<uv.count;i++){
-      uv.setXY(i,(uv.getX(i)+mid)/CHUNK_SIZE,(uv.getY(i)+mid)/CHUNK_SIZE);
-    }
-    uv.needsUpdate=true;
-    geometry.rotateX(-Math.PI/2);
-    geometry.computeVertexNormals();
-    return geometry;
-  }
-
-  buildWallStaircase(group, staircase) {
-    const centerX=(staircase.cx*CHUNK_CELLS+staircase.localX)*CELL;
-    const wallZ=(staircase.cz*CHUNK_CELLS+staircase.localZ)*CELL;
-    const face=staircase.face,halfWidth=1.7,stairWidth=3.05;
-    const stepDepth=STAIR_STEP_DEPTH,stepRise=STAIR_STEP_RISE;
-    const doorHeight=3.75,doorBottom=-(STAIR_COUNT-1)*stepRise,doorTop=doorBottom+doorHeight;
-    const doorWidth=halfWidth*2-0.16;
-    // Perimeter door panels are centered inside the thickness of the outer wall.
-    const doorZ=staircase.boundarySide
-      ? wallZ+face*0.6
-      : wallZ-face*0.22;
-    const hingeX=centerX-halfWidth+0.08;
-    const addBox=(name,size,pos,material,blocksSight=false,parent=group)=>{
-      const mesh=new THREE.Mesh(new THREE.BoxGeometry(size[0],size[1],size[2]),material);
-      mesh.name=name;mesh.position.set(pos[0],pos[1],pos[2]);mesh.castShadow=false;mesh.receiveShadow=true;parent.add(mesh);
-      if(blocksSight){mesh.userData.fixtureLightOccluder=true;this.wallOccluders.push(mesh);}return mesh;
-    };
-    const addWall=(name,widthCells,x,z)=>{
-      const geometry=wallGeometry(widthCells,true);geometry.translate(x,0,z);
-      const mesh=new THREE.Mesh(geometry,this.materials.wall);mesh.name=name;mesh.castShadow=false;mesh.receiveShadow=true;
-      mesh.userData.fixtureLightOccluder=true;group.add(mesh);this.wallOccluders.push(mesh);
-    };
-    if(!staircase.boundarySide){
-      const panelWidth=7-halfWidth,panelOffset=(7+halfWidth)*0.5;
-      addWall("StairwellWallLeft",panelWidth/CELL,centerX-panelOffset,wallZ);
-      addWall("StairwellWallRight",panelWidth/CELL,centerX+panelOffset,wallZ);
-      addBox("StairwellLintel",[halfWidth*2,WALL_H-doorTop,WALL_T],[centerX,(WALL_H+doorTop)*0.5,wallZ],this.materials.wall,true);
-    }
-
-    const geometries=[];
-    for(let i=0;i<STAIR_COUNT;i++){
-      const geometry=new THREE.BoxGeometry(stairWidth,stepRise,stepDepth);
-      geometry.translate(centerX,-(i+0.5)*stepRise,wallZ+face*(STAIR_COUNT-i-0.5)*stepDepth);geometries.push(geometry);
-    }
-    const merged=mergeGeometries(geometries,false);for(const geometry of geometries)geometry.dispose();
-    if(merged){const steps=new THREE.Mesh(merged,this.stairStepMaterial);steps.name="DescendingStairTreads";steps.castShadow=false;steps.receiveShadow=true;group.add(steps);}
-
-    const railTopY=0.55,railBottomY=doorBottom+0.35,dy=railTopY-railBottomY,railLength=Math.hypot(STAIR_DEPTH-0.25,dy);
-    for(const side of [-1,1]){
-      const rail=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,railLength,7),this.stairRailMaterial);
-      rail.name=side<0?"StairwellRailLeft":"StairwellRailRight";rail.position.set(centerX+side*1.36,(railTopY+railBottomY)*0.5,wallZ+face*STAIR_DEPTH*0.5);
-      rail.rotation.x=Math.atan2(face*STAIR_DEPTH,dy);rail.castShadow=false;rail.receiveShadow=false;group.add(rail);
-    }
-    for(const side of [-1,1]){
-      addBox(side<0?"StairwellDoorFrameLeft":"StairwellDoorFrameRight",[0.12,doorHeight,0.34],
-        [centerX+side*(halfWidth-0.01),(doorBottom+doorTop)*0.5,doorZ],this.stairDoorTrimMaterial);
-    }
-    addBox("StairwellDoorThreshold",[halfWidth*2,0.12,0.32],[centerX,doorBottom+0.06,doorZ],this.stairDoorTrimMaterial);
-    const pivot=new THREE.Group();pivot.name=staircase.testOnly?"SpawnTestStairwellDoor":"HiddenStairwellDoor";pivot.position.set(hingeX,doorBottom,doorZ);group.add(pivot);
-    const panel=addBox("StairwellDoorPanel",[doorWidth,doorHeight,0.13],[doorWidth*0.5,doorHeight*0.5,0],this.stairDoorMaterial,false,pivot);panel.castShadow=true;
-    const front=face;
-    const frontZ=offset=>front*offset;
-
-    // One small wired-glass vision panel with a plain metal surround.
-    const windowX=doorWidth*0.5,windowY=doorHeight*0.765;
-    const windowW=0.46,windowH=0.62;
-    addBox("StairwellVisionGlass",[windowW,windowH,0.022],
-      [windowX,windowY,frontZ(0.074)],this.stairDoorGlassMaterial,false,pivot);
-    const frameZ=frontZ(0.09);
-    addBox("StairwellVisionFrameTop",[windowW+0.10,0.055,0.035],
-      [windowX,windowY+windowH*0.5+0.027,frameZ],this.stairDoorMetalMaterial,false,pivot);
-    addBox("StairwellVisionFrameBottom",[windowW+0.10,0.055,0.035],
-      [windowX,windowY-windowH*0.5-0.027,frameZ],this.stairDoorMetalMaterial,false,pivot);
-    for(const side of [-1,1]){
-      addBox("StairwellVisionFrameSide",[0.055,windowH,0.035],
-        [windowX+side*(windowW*0.5+0.027),windowY,frameZ],this.stairDoorMetalMaterial,false,pivot);
-    }
-    // Two fine bars make the glazing read as safety glass, not a glowing screen.
-    addBox("StairwellVisionGlassCrossbarH",[windowW-0.035,0.012,0.012],
-      [windowX,windowY,frontZ(0.091)],this.stairDoorTrimMaterial,false,pivot);
-    addBox("StairwellVisionGlassCrossbarV",[0.012,windowH-0.035,0.012],
-      [windowX,windowY,frontZ(0.091)],this.stairDoorTrimMaterial,false,pivot);
-
-    // A small painted EXIT plaque above the window.
-    const sign=new THREE.Mesh(new THREE.PlaneGeometry(0.42,0.158),this.stairDoorSignMaterial);
-    sign.name="StairwellExitSign";
-    sign.position.set(doorWidth*0.5,doorHeight*0.94,frontZ(0.074));
-    if(front<0)sign.rotation.y=Math.PI;
-    pivot.add(sign);
-
-    // A straight horizontal panic bar is more plausible than a floating knob.
-    const barY=doorHeight*0.49,barX=doorWidth*0.57,barW=1.02;
-    addBox("StairwellPanicBar",[barW,0.085,0.07],
-      [barX,barY,frontZ(0.105)],this.stairDoorMetalMaterial,false,pivot);
-    for(const side of [-1,1]){
-      addBox("StairwellPanicBarMount",[0.075,0.145,0.095],
-        [barX+side*(barW*0.5-0.06),barY,frontZ(0.09)],this.stairDoorTrimMaterial,false,pivot);
-    }
-
-    // Plain kick plate and three properly spaced butt hinges; no fake paneling.
-    addBox("StairwellDoorKickPlate",[doorWidth*0.72,0.24,0.025],
-      [doorWidth*0.5,0.16,frontZ(0.078)],this.stairDoorMetalMaterial,false,pivot);
-    for(const y of [0.34,doorHeight*0.5,doorHeight-0.34]){
-      addBox("StairwellDoorHinge",[0.075,0.22,0.028],
-        [0.045,y,frontZ(0.082)],this.stairDoorMetalMaterial,false,pivot);
-    }
-    const collisionBounds={minX:centerX-halfWidth,maxX:centerX+halfWidth,minZ:doorZ-0.08,maxZ:doorZ+0.08};
-    const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,doorZ,face,doorWidth,toggle(){this.targetOpen=false;this.openProgress=0;return false;}};
-    pivot.userData.interactable={
-    type:"stairwellDoor",
-    prompt:"Enter exit",
-    toggle:()=>state.toggle(),
-    isOpen:()=>false
-  };
-    group.userData.stairwellDoorState=state; // Keep the animated panel out of the spider's static wall-occluder list.
   }
 
   buildCeilingFixtures(group, cx, cz) {
@@ -1036,9 +1030,10 @@ export class World {
   // generator has no imported interactables/camera records or animated
   // atmosphere layer, so expose safe empty/no-op APIs for those callers.
   getInteractables() {
-    return this.stairwellDoors
-      .filter(door=>door.group?.parent && this.root.children.includes(door.group.parent))
-      .map(door=>door.group);
+    return [
+      ...this.roomDoors.filter(door=>door.group?.parent).map(door=>door.group),
+      ...this.breakerSwitches.filter(item=>item.group?.parent).map(item=>item.group)
+    ];
   }
 
   getSecurityCameras() {
