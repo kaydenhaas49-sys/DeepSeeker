@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-inner-perimeter1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-sealed-exits1";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js?v=20261015-admin2";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
@@ -3300,13 +3300,11 @@ const interaction=new InteractionSystem({
       computerSystem.open(target);
       return true;
     }
-    if(target.type==="stairwellDoor" && typeof target.toggle==="function"){
-      // A hidden exit ends this build; it never launches Level RUN.
-      if(target.isOpen?.()){
-        beginVictoryEnding();
-        return true;
-      }
-      return target.toggle();
+    if(target.type==="stairwellDoor"){
+      // The sealed exit never animates open; interacting with it completes
+      // the game while the physical door remains shut.
+      beginVictoryEnding();
+      return true;
     }
     if(target.type==="levelRunSafe"){
       openLevelRunSafe();
@@ -8244,7 +8242,9 @@ function teleportAdminToExit(){
     return;
   }
 
-  door.targetOpen=true;
+  door.targetOpen=false;
+  door.openProgress=0;
+  door.group.rotation.y=0;
   player.pos.set(door.centerX,EYE,door.wallZ+door.face*3.6);
   player.yaw=door.face>0?0:Math.PI;
   player.pitch=0;

@@ -622,22 +622,19 @@ export class World {
     return chunk ? chunk.data.cells.has(cellKey(ax, az)) : false;
   }
 
-  updateStairwellDoors(dt){
+  updateStairwellDoors(_dt){
+    // Perimeter exits are sealed for this build. Keep their panels, hinge
+    // transforms, and collision planes permanently in the closed position.
     for(const door of this.stairwellDoors){
-      const target=door.targetOpen?1:0;
-      door.openProgress=THREE.MathUtils.damp(door.openProgress,target,7,dt);
-      if(Math.abs(door.openProgress-target)<0.006)door.openProgress=target;
-      door.group.rotation.y=-door.face*Math.PI*0.5*door.openProgress;
+      door.targetOpen=false;
+      door.openProgress=0;
+      door.group.rotation.y=0;
       const interactable=door.group.userData.interactable;
-      if(interactable)interactable.prompt=door.targetOpen?"Enter exit door":"Open exit door";
-      if(door.openProgress<0.82){
-        door.collisionBounds.minX=door.centerX-1.7;door.collisionBounds.maxX=door.centerX+1.7;
-        door.collisionBounds.minZ=door.doorZ-0.08;door.collisionBounds.maxZ=door.doorZ+0.08;
-      }else{
-        door.collisionBounds.minX=door.centerX-1.82;door.collisionBounds.maxX=door.centerX-1.58;
-        const openZ=door.doorZ+door.face*door.doorWidth;
-        door.collisionBounds.minZ=Math.min(door.wallZ,openZ);door.collisionBounds.maxZ=Math.max(door.wallZ,openZ);
-      }
+      if(interactable)interactable.prompt="Enter exit";
+      door.collisionBounds.minX=door.centerX-1.7;
+      door.collisionBounds.maxX=door.centerX+1.7;
+      door.collisionBounds.minZ=door.doorZ-0.08;
+      door.collisionBounds.maxZ=door.doorZ+0.08;
     }
   }
   getStairwellFloorHeight(x,z){
@@ -820,12 +817,12 @@ export class World {
     handle.name="StairwellDoorHandle";handle.rotation.x=Math.PI*0.5;handle.position.set(doorWidth-0.22,doorHeight*0.51,0.15);pivot.add(handle);
     for(const y of [0.28,doorHeight-0.28])addBox("StairwellDoorHinge",[0.06,0.16,0.19],[0.035,y,-0.02],this.stairDoorMetalMaterial,false,pivot);
     const collisionBounds={minX:centerX-halfWidth,maxX:centerX+halfWidth,minZ:doorZ-0.08,maxZ:doorZ+0.08};
-    const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,doorZ,face,doorWidth,toggle(){this.targetOpen=!this.targetOpen;return true;}};
+    const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,doorZ,face,doorWidth,toggle(){this.targetOpen=false;this.openProgress=0;return false;}};
     pivot.userData.interactable={
     type:"stairwellDoor",
-    prompt:"Open exit door",
+    prompt:"Enter exit",
     toggle:()=>state.toggle(),
-    isOpen:()=>state.openProgress>=0.82
+    isOpen:()=>false
   };
     group.userData.stairwellDoorState=state; // Keep the animated panel out of the spider's static wall-occluder list.
   }
