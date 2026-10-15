@@ -314,9 +314,45 @@ export class World {
     this.stairRailMaterial = new THREE.MeshStandardMaterial({
       color: 0x353a32, roughness: 0.82, metalness: 0.12,
     });
-    this.stairDoorMaterial=new THREE.MeshStandardMaterial({color:0xaaa6b5,roughness:0.91,metalness:0.02});
-    this.stairDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0xd6d2d8,roughness:0.82,metalness:0.16});
-    this.stairDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x888898,roughness:0.42,metalness:0.62});
+    // Muted, worn institutional hardware: painted steel, dull stainless trim,
+    // and dark wired safety glass rather than glossy decorative sci-fi panels.
+    const doorPaintCanvas=document.createElement("canvas");
+    doorPaintCanvas.width=256;doorPaintCanvas.height=512;
+    const doorPaintCtx=doorPaintCanvas.getContext("2d");
+    doorPaintCtx.fillStyle="#85877b";
+    doorPaintCtx.fillRect(0,0,256,512);
+    const grime=doorPaintCtx.createLinearGradient(0,0,0,512);
+    grime.addColorStop(0,"rgba(255,255,244,0.025)");
+    grime.addColorStop(0.58,"rgba(35,37,31,0.035)");
+    grime.addColorStop(1,"rgba(24,26,22,0.22)");
+    doorPaintCtx.fillStyle=grime;doorPaintCtx.fillRect(0,0,256,512);
+    for(let i=0;i<30;i++){
+      const x=(i*73+17)%256;
+      doorPaintCtx.fillStyle=i%3===0?"rgba(28,31,25,0.10)":"rgba(225,222,201,0.055)";
+      doorPaintCtx.fillRect(x,(i*61)%390,1+(i%3),25+(i*19)%125);
+    }
+    for(let i=0;i<24;i++){
+      const x=(i*47+9)%256,y=350+(i*29)%150;
+      doorPaintCtx.strokeStyle=i%2===0?"rgba(30,31,27,0.18)":"rgba(223,218,197,0.13)";
+      doorPaintCtx.lineWidth=1;
+      doorPaintCtx.beginPath();doorPaintCtx.moveTo(x,y);doorPaintCtx.lineTo(x+3+(i%9),y-1-(i%5));doorPaintCtx.stroke();
+    }
+    const doorPaintTexture=new THREE.CanvasTexture(doorPaintCanvas);
+    doorPaintTexture.colorSpace=THREE.SRGBColorSpace;
+    this.stairDoorMaterial=new THREE.MeshStandardMaterial({map:doorPaintTexture,roughness:0.96,metalness:0.03});
+    this.stairDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0x484b43,roughness:0.9,metalness:0.08});
+    this.stairDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x77786f,roughness:0.68,metalness:0.34});
+    this.stairDoorGlassMaterial=new THREE.MeshStandardMaterial({color:0x27312f,roughness:0.3,metalness:0.05});
+    const signCanvas=document.createElement("canvas");
+    signCanvas.width=256;signCanvas.height=96;
+    const signCtx=signCanvas.getContext("2d");
+    signCtx.fillStyle="#603a32";signCtx.fillRect(0,0,256,96);
+    signCtx.strokeStyle="#c8c0ac";signCtx.lineWidth=4;signCtx.strokeRect(5,5,246,86);
+    signCtx.fillStyle="#e4deca";signCtx.font="bold 49px Arial, sans-serif";
+    signCtx.textAlign="center";signCtx.textBaseline="middle";signCtx.fillText("EXIT",128,49);
+    const signTexture=new THREE.CanvasTexture(signCanvas);
+    signTexture.colorSpace=THREE.SRGBColorSpace;
+    this.stairDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.88,metalness:0.02,side:THREE.DoubleSide});
     this.stairwellDoors=[];
 
     // Ceiling fixtures use a tiny real-light budget. They only activate when
@@ -806,16 +842,52 @@ export class World {
     addBox("StairwellDoorThreshold",[halfWidth*2,0.12,0.32],[centerX,doorBottom+0.06,doorZ],this.stairDoorTrimMaterial);
     const pivot=new THREE.Group();pivot.name=staircase.testOnly?"SpawnTestStairwellDoor":"HiddenStairwellDoor";pivot.position.set(hingeX,doorBottom,doorZ);group.add(pivot);
     const panel=addBox("StairwellDoorPanel",[doorWidth,doorHeight,0.13],[doorWidth*0.5,doorHeight*0.5,0],this.stairDoorMaterial,false,pivot);panel.castShadow=true;
-    for(const yf of [0.30,0.69]){
-      const inset=new THREE.Mesh(new THREE.BoxGeometry(doorWidth*0.68,doorHeight*0.20,0.035),this.stairDoorTrimMaterial);
-      inset.name="StairwellDoorInsetPanel";inset.position.set(doorWidth*0.49,doorHeight*yf,0.078);pivot.add(inset);
+    const front=face;
+    const frontZ=offset=>front*offset;
+
+    // One small wired-glass vision panel with a plain metal surround.
+    const windowX=doorWidth*0.5,windowY=doorHeight*0.765;
+    const windowW=0.46,windowH=0.62;
+    addBox("StairwellVisionGlass",[windowW,windowH,0.022],
+      [windowX,windowY,frontZ(0.074)],this.stairDoorGlassMaterial,false,pivot);
+    const frameZ=frontZ(0.09);
+    addBox("StairwellVisionFrameTop",[windowW+0.10,0.055,0.035],
+      [windowX,windowY+windowH*0.5+0.027,frameZ],this.stairDoorMetalMaterial,false,pivot);
+    addBox("StairwellVisionFrameBottom",[windowW+0.10,0.055,0.035],
+      [windowX,windowY-windowH*0.5-0.027,frameZ],this.stairDoorMetalMaterial,false,pivot);
+    for(const side of [-1,1]){
+      addBox("StairwellVisionFrameSide",[0.055,windowH,0.035],
+        [windowX+side*(windowW*0.5+0.027),windowY,frameZ],this.stairDoorMetalMaterial,false,pivot);
     }
-    addBox("StairwellDoorKickPlate",[doorWidth*0.82,0.22,0.04],[doorWidth*0.5,0.24,0.09],this.stairDoorMetalMaterial,false,pivot);
-    addBox("StairwellDoorLabelPlate",[0.48,0.19,0.035],[doorWidth*0.5,doorHeight*0.87,0.084],this.stairDoorTrimMaterial,false,pivot);
-    addBox("StairwellDoorHandleMount",[0.10,0.14,0.045],[doorWidth-0.22,doorHeight*0.51,0.095],this.stairDoorTrimMaterial,false,pivot);
-    const handle=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.09,10),this.stairDoorMetalMaterial);
-    handle.name="StairwellDoorHandle";handle.rotation.x=Math.PI*0.5;handle.position.set(doorWidth-0.22,doorHeight*0.51,0.15);pivot.add(handle);
-    for(const y of [0.28,doorHeight-0.28])addBox("StairwellDoorHinge",[0.06,0.16,0.19],[0.035,y,-0.02],this.stairDoorMetalMaterial,false,pivot);
+    // Two fine bars make the glazing read as safety glass, not a glowing screen.
+    addBox("StairwellVisionGlassCrossbarH",[windowW-0.035,0.012,0.012],
+      [windowX,windowY,frontZ(0.091)],this.stairDoorTrimMaterial,false,pivot);
+    addBox("StairwellVisionGlassCrossbarV",[0.012,windowH-0.035,0.012],
+      [windowX,windowY,frontZ(0.091)],this.stairDoorTrimMaterial,false,pivot);
+
+    // A small painted EXIT plaque above the window.
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(0.42,0.158),this.stairDoorSignMaterial);
+    sign.name="StairwellExitSign";
+    sign.position.set(doorWidth*0.5,doorHeight*0.94,frontZ(0.074));
+    if(front<0)sign.rotation.y=Math.PI;
+    pivot.add(sign);
+
+    // A straight horizontal panic bar is more plausible than a floating knob.
+    const barY=doorHeight*0.49,barX=doorWidth*0.57,barW=1.02;
+    addBox("StairwellPanicBar",[barW,0.085,0.07],
+      [barX,barY,frontZ(0.105)],this.stairDoorMetalMaterial,false,pivot);
+    for(const side of [-1,1]){
+      addBox("StairwellPanicBarMount",[0.075,0.145,0.095],
+        [barX+side*(barW*0.5-0.06),barY,frontZ(0.09)],this.stairDoorTrimMaterial,false,pivot);
+    }
+
+    // Plain kick plate and three properly spaced butt hinges; no fake paneling.
+    addBox("StairwellDoorKickPlate",[doorWidth*0.72,0.24,0.025],
+      [doorWidth*0.5,0.16,frontZ(0.078)],this.stairDoorMetalMaterial,false,pivot);
+    for(const y of [0.34,doorHeight*0.5,doorHeight-0.34]){
+      addBox("StairwellDoorHinge",[0.075,0.22,0.028],
+        [0.045,y,frontZ(0.082)],this.stairDoorMetalMaterial,false,pivot);
+    }
     const collisionBounds={minX:centerX-halfWidth,maxX:centerX+halfWidth,minZ:doorZ-0.08,maxZ:doorZ+0.08};
     const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,doorZ,face,doorWidth,toggle(){this.targetOpen=false;this.openProgress=0;return false;}};
     pivot.userData.interactable={
