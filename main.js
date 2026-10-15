@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-ventcrawl3d1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-mathbreaker-ductdetail2";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261015-ventcrawl3d1";
+import { Player } from "./player.js?v=20261015-mathbreaker-ductdetail2";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -2929,8 +2929,8 @@ const multiplayer=new Multiplayer({
     }
     if(event?.type==="maintenance_door_toggle"){
       if(String(event.playerId||"")===String(multiplayer.playerId||""))return;
-      const door=world.maintenanceDoor;
-      if(door?.unlocked)door.targetOpen=Boolean(event.payload?.open);
+      const door=event.payload?.door==="breaker-room"?world.breakerRoomDoor:world.maintenanceDoor;
+      if(door&&(door.unlocked||!door.requiresPower))door.targetOpen=Boolean(event.payload?.open);
       return;
     }
     if(event?.type==="game_victory"){
@@ -3099,16 +3099,20 @@ const interaction=new InteractionSystem({
       if(door.requiresPower&&!door.unlocked){
         const message=door===world.maintenanceDoor&&world.maintenancePuzzleType==="ventilation"
           ?"AIRFLOW BLOCKED. CRAWL THROUGH THE DUCTS TO THE OUTLET VALVE."
-          :"NO POWER. FIND THE THREE BREAKERS.";
+          :"NO POWER. ENTER THE BREAKER ROOM AND SOLVE THE EQUATIONS.";
         eventText.textContent=message;eventText.style.opacity="1";
         setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2600);
         return true;
       }
       target.toggle();
-      if(door===world.maintenanceDoor&&multiplayer?.socket?.readyState===WebSocket.OPEN){
-        multiplayer.broadcastWorldEvent("maintenance_door_toggle","maintenance-puzzle",{open:door.targetOpen});
+      if((door===world.maintenanceDoor||door===world.breakerRoomDoor)&&multiplayer?.socket?.readyState===WebSocket.OPEN){
+        multiplayer.broadcastWorldEvent("maintenance_door_toggle","maintenance-puzzle",{
+          open:door.targetOpen,door:door===world.breakerRoomDoor?"breaker-room":"maintenance"
+        });
       }
-      const message=door.targetOpen?"THE DOOR OPENS.":"THE DOOR CLOSES.";
+      const message=door===world.breakerRoomDoor
+        ?(door.targetOpen?"THE BREAKER ROOM OPENS.":"THE BREAKER ROOM DOOR CLOSES.")
+        :(door.targetOpen?"THE DOOR OPENS.":"THE DOOR CLOSES.");
       eventText.textContent=message;eventText.style.opacity="1";
       setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},1600);
       return true;
@@ -3135,8 +3139,8 @@ const interaction=new InteractionSystem({
       const message=result.complete
         ?"POWER RESTORED. MAINTENANCE DOOR UNLOCKED."
         :result.correct
-          ?"BREAKER SET. FOLLOW THE RESET ORDER."
-          :"WRONG ORDER. BREAKERS RESET; THE LIGHTS CUT OUT.";
+          ?"CORRECT. SOLVE THE NEXT EQUATION AND KEEP THE ANSWERS IN ORDER."
+          :"WRONG ORDER. ALL BREAKERS RESET; THE LIGHTS CUT OUT.";
       eventText.textContent=message;eventText.style.opacity="1";
       setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2300);
       return true;
