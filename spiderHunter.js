@@ -55,6 +55,8 @@ export class SpiderHunter {
     this.soundOrigin=new THREE.Vector3();
     this.soundTarget=new THREE.Vector3();
     this.sightRaycaster=new THREE.Raycaster();
+    this.sightRefreshTimer=0;
+    this.targetVisible=false;
     this.tutorialLookTarget=new THREE.Vector3();
     this.lastHeardTime=-Infinity;
     this.hasPathTarget=false;
@@ -302,7 +304,12 @@ export class SpiderHunter {
   updateHunter(dt,time,target,{sprinting=false,flashlightOn=false,crouched=false}={}) {
     if(this.mode==="hidden") return;
     const distance=Math.hypot(this.position.x-target.pos.x,this.position.z-target.pos.z);
-    const visible=this.canSeeTarget(target.pos,target.eyeY??1.5,flashlightOn,crouched);
+    this.sightRefreshTimer-=dt;
+    if(this.sightRefreshTimer<=0){
+      this.sightRefreshTimer=.10;
+      this.targetVisible=this.canSeeTarget(target.pos,target.eyeY??1.5,flashlightOn,crouched);
+    }
+    const visible=this.targetVisible;
 
     if(visible){
       this.lastSeenTime=time;
@@ -340,7 +347,7 @@ export class SpiderHunter {
   }
 
   chooseRoamTarget(){
-    for(let attempt=0;attempt<8;attempt++){
+    for(let attempt=0;attempt<4;attempt++){
       const angle=Math.random()*Math.PI*2,distance=3.5+Math.random()*8.5;
       const x=this.position.x+Math.cos(angle)*distance;
       const z=this.position.z+Math.sin(angle)*distance;
@@ -393,7 +400,7 @@ export class SpiderHunter {
   }
 
   chooseInvestigationTarget(){
-    for(let attempt=0;attempt<8;attempt++){
+    for(let attempt=0;attempt<4;attempt++){
       const angle=Math.random()*Math.PI*2,distance=1.4+Math.random()*3.2;
       const x=this.lastKnownTarget.x+Math.cos(angle)*distance;
       const z=this.lastKnownTarget.z+Math.sin(angle)*distance;

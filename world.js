@@ -270,6 +270,7 @@ export class World {
     this.lastStreamCX = null;
     this.lastStreamCZ = null;
     this.streamNeedsWork = true;
+    this.lastChunkBuildAt = 0;
     this.wallQueryScratch = [];
     scene.add(this.root);
 
@@ -615,7 +616,12 @@ export class World {
       return;
     }
 
-    // Generate missing chunks within radius, nearest first (1–2 per frame).
+    // Chunk meshes require CPU-side geometry creation and merging. Space builds
+    // apart so streaming cannot produce a burst of expensive work in adjacent frames.
+    const now=performance.now();
+    const buildInterval=LOW_END_DEVICE ? 110 : 65;
+    if(this.lastChunkBuildAt && now-this.lastChunkBuildAt<buildInterval) return;
+
     const missing = [];
     for (let dz = -R_GENERATE; dz <= R_GENERATE; dz++) {
       for (let dx = -R_GENERATE; dx <= R_GENERATE; dx++) {
@@ -631,13 +637,15 @@ export class World {
       }
     }
     missing.sort((a, b) => a[2] - b[2]);
-    let budget = LOW_END_DEVICE ? 1 : 2;
+    let built=0;
     for (const [cx, cz] of missing) {
-      if (budget-- <= 0) break;
+      if(built>=1) break;
       this.spawnChunk(cx, cz);
+      built++;
     }
+    if(built) this.lastChunkBuildAt=performance.now();
 
-    this.streamNeedsWork=missing.length> (LOW_END_DEVICE ? 1 : 2);
+    this.streamNeedsWork=missing.length>built;
 
     // Dispose chunks beyond the dispose radius.
     for (const [key, entry] of this.chunks) {

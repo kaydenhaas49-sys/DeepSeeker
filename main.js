@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-naturaltext1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-warningperf1";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js?v=20261015-admin2";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
@@ -16,7 +16,7 @@ import { NavigationSystem } from "./navigation.js";
 import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
-import { SpiderHunter } from "./spiderHunter.js";
+import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -231,6 +231,8 @@ let perfCooldown=0;
 let uiRefreshElapsed=0;
 let storyRefreshElapsed=0;
 let debugPerfElapsed=0;
+let debugPerfFrames=0;
+let debugPerfMaxFrameMs=0;
 renderer.setPixelRatio(currentPixelRatio);
 // Keep the game's contrast/lighting response intact on Chromebooks.
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -5207,6 +5209,7 @@ let spiderModel=null;
 let spiderModelHalfHeight=0;
 let spiderMixer=null;
 let spiderOverlapMixer=null;
+let spiderAnimationHealthElapsed=0;
 const spiderActions=new Map();
 const spiderOverlapActions=new Map();
 const spiderAnimationClips=new Map();
@@ -8771,7 +8774,9 @@ fitGameToScreen();
 const clock=new THREE.Clock();
 function animate(){
   requestAnimationFrame(animate);
-  const dt=Math.min(clock.getDelta(),.05);
+  const frameDelta=clock.getDelta();
+  const frameMs=frameDelta*1000;
+  const dt=Math.min(frameDelta,.05);
   const t=clock.elapsedTime;
 
   // The title screen is independent of gameplay. Render it before the
@@ -8827,7 +8832,11 @@ function animate(){
   perfCooldown=Math.max(0,perfCooldown-dt);
   uiRefreshElapsed+=dt;
   storyRefreshElapsed+=dt;
-  debugPerfElapsed+=dt;
+  if(urlParams.get("perf")==="1"){
+    debugPerfElapsed+=frameDelta;
+    debugPerfFrames++;
+    debugPerfMaxFrameMs=Math.max(debugPerfMaxFrameMs,frameMs);
+  }
 
   if(perfElapsed>=0.5){
     const fps=perfFrames/perfElapsed;
@@ -9074,10 +9083,7 @@ function animate(){
   }
   flashlight.distance=activeFlashlightDistance;
   flashlight.target.position.set(0,0,-activeFlashlightDistance);
-  if(
-    spiderMixer &&
-    spiderActive
-  ){
+  if(spiderMixer && spiderActive){
     spiderMixer.timeScale=1;
     spiderMixer.update(dt);
     if(spiderOverlapMixer){
@@ -9085,43 +9091,43 @@ function animate(){
       spiderOverlapMixer.update(dt);
     }
 
-    // Kill a bad animation immediately instead of allowing one corrupted
-    // bone transform to poison every rendered frame.
-    let animationHealthy=true;
-    if(spiderModel){
-      spiderModel.traverse(obj=>{
-        if(!animationHealthy || !obj.isSkinnedMesh || !obj.skeleton) return;
-        for(const bone of obj.skeleton.bones){
-          const values=[
-            bone.position.x,bone.position.y,bone.position.z,
-            bone.quaternion.x,bone.quaternion.y,bone.quaternion.z,bone.quaternion.w,
-            bone.scale.x,bone.scale.y,bone.scale.z
-          ];
-          if(values.some(value=>!Number.isFinite(value)) ||
-             Math.abs(bone.position.x)>100 ||
-             Math.abs(bone.position.y)>100 ||
-             Math.abs(bone.position.z)>100 ||
-             Math.abs(bone.scale.x)>20 ||
-             Math.abs(bone.scale.y)>20 ||
-             Math.abs(bone.scale.z)>20){
-            animationHealthy=false;
-            return;
+    // Validate the imported rig ten times per second, not every rendered frame.
+    // Avoid allocating an array for every bone on every frame.
+    spiderAnimationHealthElapsed+=dt;
+    if(spiderAnimationHealthElapsed>=.10){
+      spiderAnimationHealthElapsed=0;
+      let animationHealthy=true;
+      if(spiderModel){
+        spiderModel.traverse(obj=>{
+          if(!animationHealthy || !obj.isSkinnedMesh || !obj.skeleton) return;
+          for(const bone of obj.skeleton.bones){
+            const p=bone.position,q=bone.quaternion,s=bone.scale;
+            if(
+              !Number.isFinite(p.x)||!Number.isFinite(p.y)||!Number.isFinite(p.z)||
+              !Number.isFinite(q.x)||!Number.isFinite(q.y)||!Number.isFinite(q.z)||!Number.isFinite(q.w)||
+              !Number.isFinite(s.x)||!Number.isFinite(s.y)||!Number.isFinite(s.z)||
+              Math.abs(p.x)>100||Math.abs(p.y)>100||Math.abs(p.z)>100||
+              Math.abs(s.x)>20||Math.abs(s.y)>20||Math.abs(s.z)>20
+            ){
+              animationHealthy=false;
+              return;
+            }
           }
-        }
-      });
-    }
+        });
+      }
 
-    if(!animationHealthy){
-      console.warn("[DeepSeeker] disabling unstable spider animation frame");
-      spiderMixer.stopAllAction();
-      spiderMixer=null;
-      if(spiderOverlapMixer) spiderOverlapMixer.stopAllAction();
-      spiderOverlapMixer=null;
-      spiderOverlapActions.clear();
-      spiderActions.clear();
-      spiderAnimationClips.clear();
-      spiderAnimationState="";
-      spiderWantedState="idle";
+      if(!animationHealthy){
+        console.warn("[DeepSeeker] disabling unstable spider animation frame");
+        spiderMixer.stopAllAction();
+        spiderMixer=null;
+        if(spiderOverlapMixer) spiderOverlapMixer.stopAllAction();
+        spiderOverlapMixer=null;
+        spiderOverlapActions.clear();
+        spiderActions.clear();
+        spiderAnimationClips.clear();
+        spiderAnimationState="";
+        spiderWantedState="idle";
+      }
     }
   }
 
@@ -9279,14 +9285,19 @@ function animate(){
   }
 
   if(urlParams.get("perf")==="1" && debugPerfElapsed>=.5){
-    debugPerfElapsed=0;
     console.debug("[DeepSeeker PERF]",{
-      fps:Math.round(perfFrames/Math.max(perfElapsed,.001)),
+      fps:Math.round(debugPerfFrames/Math.max(debugPerfElapsed,.001)),
+      maxFrameMs:Math.round(debugPerfMaxFrameMs*10)/10,
       calls:renderer.info.render.calls,
       triangles:renderer.info.render.triangles,
+      chunks:world.chunks.size,
+      spiderActive,
       pixelRatio:houseMode?housePixelRatio:currentPixelRatio,
       lowEnd:LOW_END_PERFORMANCE
     });
+    debugPerfElapsed=0;
+    debugPerfFrames=0;
+    debugPerfMaxFrameMs=0;
   }
 
   updateSpiderWallClipBounds(dt);
