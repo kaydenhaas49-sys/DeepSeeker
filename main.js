@@ -1192,7 +1192,7 @@ menuSet.add(menuDust);
 // The title screen uses a clone of the real Spider-Psionic rig loaded by the
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
-const MENU_SPIDER_SCALE=.85;
+const MENU_SPIDER_SCALE=.74;
 const MENU_DUCK_SCALE=.82;
 const MENU_SPIDER_CEILING_Y=8.98;
 // Put the duck on the foreground floor, centered in front of the title camera.
