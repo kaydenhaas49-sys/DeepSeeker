@@ -489,6 +489,10 @@ export class World {
     this.maintenanceDoor=this.buildRoomDoor(room,centerX,minZ+boundaryThickness*.5,{
       doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:true,ownerChunk:null
     },this.boundaryWallBounds);
+
+    // The breakers belong inside this room, mounted across its back wall.
+    this.buildMaintenanceBreakers(room,centerX,backZ);
+    this.breakerSwitches.push(...(room.userData.breakerSwitches||[]));
   }
 
   buildRoomDoor(parent,centerX,frontZ,options={},boundsTarget=null){
@@ -595,19 +599,18 @@ export class World {
     }
   }
 
-  buildMaintenanceBreakers(chunkGroup,cx,cz){
-    const centerX=(OUTER_ROOM_DOOR.cx*CHUNK_CELLS+OUTER_ROOM_DOOR.localX)*CELL;
-    const wallZ=MAP_MIN_CHUNK*CHUNK_SIZE;
+  buildMaintenanceBreakers(roomGroup,centerX,backZ){
+    const switchZ=backZ+ROOM_WALL_THICKNESS*.5+.09;
     const positions=[
-      {index:1,x:centerX-3.35,z:wallZ+8},
-      {index:2,x:centerX+3.35,z:wallZ+20},
-      {index:3,x:centerX-3.35,z:wallZ+32}
+      {index:1,x:centerX-2.65,z:switchZ},
+      {index:2,x:centerX,z:switchZ},
+      {index:3,x:centerX+2.65,z:switchZ}
     ];
-    chunkGroup.userData.breakerSwitches=[];
+    roomGroup.userData.breakerSwitches=[];
     for(const spec of positions){
       const root=new THREE.Group();root.name="MaintenanceBreaker"+spec.index;
       root.visible=this.maintenancePuzzleType==="breakers";
-      root.position.set(spec.x,0,spec.z);chunkGroup.add(root);
+      root.position.set(spec.x,0,spec.z);roomGroup.add(root);
       const panel=new THREE.Mesh(new THREE.BoxGeometry(.78,1.18,.18),this.breakerPanelMaterial);
       panel.name="BreakerPanelHousing";panel.position.set(0,1.02,0);root.add(panel);
       const label=new THREE.Mesh(new THREE.PlaneGeometry(.34,.17),this.breakerNumberMaterials[spec.index-1]);
@@ -624,12 +627,12 @@ export class World {
         const note=new THREE.Mesh(new THREE.PlaneGeometry(1.70,.63),this.breakerNoteMaterial);
         note.name="BreakerResetSequence";note.position.set(0,2.02,.073);root.add(note);
       }
-      const state={...spec,group:root,handle,lamp,ownerChunk:chunkGroup,active};
+      const state={...spec,group:root,handle,lamp,ownerChunk:null,active};
       root.userData.interactable={
         type:"roomBreaker",prompt:"Flip breaker "+spec.index,
         breakerIndex:spec.index,breakerState:state
       };
-      chunkGroup.userData.breakerSwitches.push(state);
+      roomGroup.userData.breakerSwitches.push(state);
     }
   }
 
@@ -948,7 +951,6 @@ export class World {
 
     for(const room of (data.rooms||[])) this.buildProceduralRoom(group,room,cx,cz);
     group.userData.roomDoorStates=this.roomDoors.filter(door=>door.ownerChunk===group);
-    if(cx===OUTER_ROOM_DOOR.cx && cz===OUTER_ROOM_DOOR.cz)this.buildMaintenanceBreakers(group,cx,cz);
     this.buildCeilingFixtures(group,cx,cz);
     return group;
   }
