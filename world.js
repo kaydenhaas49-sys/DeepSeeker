@@ -46,11 +46,11 @@ const STAIR_STEP_DEPTH=0.42;
 const STAIR_STEP_RISE=0.22;
 const STAIR_DEPTH=STAIR_COUNT*STAIR_STEP_DEPTH;
 
-// Two concealed exits remain available. The Level RUN stage is parked for now.
-// Each exit has a protected route through the procedural walls.
+// The two concealed exits sit near opposite outer edges of the playable map.
+// Their stair runs point toward the permanent north/south boundary walls.
 const WALL_STAIRCASES = Object.freeze([
-  { cx: -1, cz: 1, localX: 8, localZ: 8, face: -1 },
-  { cx: 1, cz: -1, localX: 8, localZ: 8, face: 1 },
+  { cx: -2, cz: -3, localX: 12, localZ: 2, face: -1 },
+  { cx: 1, cz: 3, localX: 4, localZ: 14, face: 1 },
 ]);
 
 function getWallStaircase(cx, cz) {
@@ -82,21 +82,21 @@ export function generateChunk(cx, cz, seed) {
   const spawnClear = cx === 0 && cz === 0;
   const staircase = getWallStaircase(cx, cz);
 
-  // Protect complete, wide walking routes from spawn to both hidden entrances.
-  // Coordinates here are absolute grid cells, so each chunk reserves its share
-  // of the same corridors; a random wall can't sever a route at a chunk seam.
+  // Keep wide, guaranteed routes from spawn to both perimeter stairwells.
+  // Coordinates are absolute grid cells, so adjacent chunks reserve the same
+  // corridors and procedural walls cannot sever them at a chunk seam.
   const inClear = (x, z) => {
     if (spawnClear && x >= 5 && x <= 10 && z >= 5 && z <= 10) return true;
 
     const gx = cx * CHUNK_CELLS + x;
     const gz = cz * CHUNK_CELLS + z;
     const onGuaranteedRoute =
-      // Shared west/east corridor across the spawn row.
-      (gz >= 7 && gz <= 9 && gx >= -9 && gx <= 25) ||
-      // Route north from the shared corridor to the (-1, 1) stairwell.
-      (gx >= -9 && gx <= -7 && gz >= 8 && gz <= 24) ||
-      // Route south from the shared corridor to the (1, -1) stairwell.
-      (gx >= 23 && gx <= 25 && gz >= -8 && gz <= 8);
+      // Shared approach corridor across the spawn row.
+      (gz >= 7 && gz <= 9 && gx >= -23 && gx <= 23) ||
+      // North-west perimeter exit approach.
+      (gx >= -21 && gx <= -19 && gz >= -46 && gz <= 8) ||
+      // South-east perimeter exit approach.
+      (gx >= 19 && gx <= 21 && gz >= 7 && gz <= 62);
     if (onGuaranteedRoute) return true;
 
     if (!staircase) return false;

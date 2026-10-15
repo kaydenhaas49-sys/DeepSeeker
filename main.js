@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-victory1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-perimeter-exits1";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js?v=20261015-admin2";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
@@ -8232,8 +8232,8 @@ function teleportAdminToExit(){
   if(houseMode) setHouseMode(false,{announceFall:false});
   setAdminFlyEnabled(false);
 
-  // The first concealed exit is stable and has a protected approach corridor.
-  const target={cx:-1,cz:1};
+  // Use the exit embedded near the north perimeter; the other is on the south.
+  const target={cx:-2,cz:-3};
   const chunkKey=target.cx+","+target.cz;
   if(!world.chunks.has(chunkKey)) world.spawnChunk(target.cx,target.cz);
   const door=world.stairwellDoors.find(item=>
