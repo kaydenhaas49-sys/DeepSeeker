@@ -42,4 +42,4 @@ Then open http://localhost:8000. This starts the static web server only; multipl
 
 ## Assets and licensing
 
-Keep the individual `THIRD_PARTY_LICENSE_*.txt` files with the assets they cover. The spider loader prefers `assets/animated_spider.glb` and falls back to `assets/Spider-Psionic.zip` if the standalone model cannot load.
+Keep the individual `THIRD_PARTY_LICENSE_*.txt` files with the assets they cover. The spider model is loaded from `assets/Spider-Psionic.zip`.

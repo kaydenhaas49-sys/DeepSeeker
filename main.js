@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-victory1";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js";
-import { HorrorAudio } from "./audio.js";
+import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
@@ -1608,6 +1608,7 @@ const HOUSE_TARGET_HEIGHT=3.0;
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
+const LEVEL_RUN_ENABLED=false; // Level RUN is parked until more levels are ready.
 let levelRunActive=false;
 const LEVEL_RUN_ORIGIN_X=96;
 const LEVEL_RUN_ORIGIN_Z=96;
@@ -3138,6 +3139,11 @@ const multiplayer=new Multiplayer({
     startBackroomsFall(startedAt,false);
   },
   onWorldEvent:(event)=>{
+    if(event?.type==="game_victory"){
+      beginVictoryEnding({broadcast:false});
+      return;
+    }
+    if(!LEVEL_RUN_ENABLED && String(event?.type||"").startsWith("level_run_")) return;
     if(event?.type==="level_run_enter"){
       if(!levelRunActive && !houseMode && !tutorialOpenRoomActive) {
         startLevelRun(event.payload||{},{broadcast:false});
@@ -3294,12 +3300,10 @@ const interaction=new InteractionSystem({
       return true;
     }
     if(target.type==="stairwellDoor" && typeof target.toggle==="function"){
-      if(target.staircaseTestOnly){
-        // The spawn-area test door is a direct test entry: do not make the
-        // tester walk through a narrow threshold to trigger the level change.
-        target.toggle();
-        const testDoor=world.stairwellDoors.find(door=>door.staircase?.testOnly)||null;
-        return startLevelRun({code:makeLevelRunCode(),round:1},{entryDoor:testDoor});
+      // A hidden exit ends this build; it never launches Level RUN.
+      if(target.isOpen?.()){
+        beginVictoryEnding();
+        return true;
       }
       return target.toggle();
     }
@@ -3622,7 +3626,7 @@ function resetLevelRunSpider(){
 }
 
 function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
-  if(levelRunActive||houseMode||tutorialOpenRoomActive)return false;
+  if(!LEVEL_RUN_ENABLED||levelRunActive||houseMode||tutorialOpenRoomActive)return false;
   ensureLevelRunBuilt();
   const participants=getLevelRunParticipantIds(),localId=getLevelRunLocalId();
   const runnerId=String(payload.runnerId||participants[Math.floor(Math.random()*participants.length)]||localId);
@@ -3662,7 +3666,7 @@ function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
   return true;
 }
 
-function checkLevelRunEntrance(){
+function checkExitDoorEntrance(){
   if(!gameStarted||houseMode||tutorialOpenRoomActive||levelRunActive||gameEnded)return;
   const door=world.stairwellDoors.find(candidate=>{
     if(!candidate||candidate.openProgress<.82)return false;
@@ -3670,10 +3674,7 @@ function checkLevelRunEntrance(){
     return Math.abs(player.pos.x-candidate.centerX)<1.42&&progress>=-.06&&progress<=1.0;
   });
   if(!door)return;
-  startLevelRun({
-    runnerId:null,code:makeLevelRunCode(),round:1,
-    returnX:door.centerX,returnZ:door.wallZ+door.face*7.2
-  },{entryDoor:door});
+  beginVictoryEnding();
 }
 
 function applyLevelRunRoundState(payload={}){
@@ -7735,6 +7736,7 @@ let storyStage=0;
 let maxStoryDistance=0;
 let gameEnded=false;
 let endingOverlay=null;
+let victoryOverlay=null;
 const ENDING_MARKUP="<div class=\"endingGlitch\"></div><div class=\"endingCenter\"><div class=\"endingKicker\">DEEPSEEKER // LOST SIGNAL</div><div class=\"endingTitle\" id=\"endingTitle\">THE BOTTOM</div><div class=\"endingLine\" id=\"endingLine\">YOU FOUND IT.</div><button id=\"endingReturn\" type=\"button\">RETURN TO TITLE</button></div>";
 const ENDING_DISTANCE=660;
 
@@ -7832,6 +7834,135 @@ function beginGameEnding(){
     line.textContent="LOST SIGNAL // CONNECTION CLOSED";
     button.style.opacity="1";
   },6500);
+}
+
+function beginVictoryEnding({broadcast=true}={}){
+  if(gameEnded||!gameStarted) return;
+
+  gameEnded=true;
+  player.inputEnabled=false;
+  player.keys.clear();
+  player.vel.set(0,0,0);
+  spiderActive=false;
+  spiderSpawnPending=false;
+  spiderJumpscareTimer=0;
+  spiderBehaviorState="idle";
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
+  normalSpiderHunter.hide();
+  flashlightOn=false;
+  flashlight.visible=false;
+  player.setFlashlightVisual(false);
+
+  if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
+  controlsOpen=false;
+  phoneOpen=false;
+  deepseekerAppOpen=false;
+  chatOpen=false;
+  controls.classList.add("hidden");
+  phone.classList.remove("open","app-open");
+  phone.setAttribute("aria-hidden","true");
+  crosshair.style.display="none";
+  overlay.classList.add("hidden");
+
+  if(broadcast) multiplayer.broadcastWorldEvent("game_victory","ending",{});
+  audio.start();
+  audio.celebrate();
+
+  if(!victoryOverlay){
+    const style=document.createElement("style");
+    style.id="deepseekerVictoryStyles";
+    style.textContent=[
+      '#deepseekerVictory{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% 32%,#242a1d 0%,#090d09 48%,#020403 100%);color:#fff7e7;font-family:system-ui,-apple-system,sans-serif;opacity:0;transition:opacity .8s ease;user-select:none}',
+      '#deepseekerVictory .victoryConfetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}',
+      '#deepseekerVictory .victoryConfetti i{position:absolute;top:-16vh;left:var(--confetti-left);width:9px;height:15px;border-radius:2px;background:hsl(var(--confetti-hue),94%,65%);animation:victoryConfettiFall var(--confetti-duration) linear var(--confetti-delay) infinite;box-shadow:0 0 8px hsl(var(--confetti-hue),94%,65%,.24)}',
+      '@keyframes victoryConfettiFall{0%{transform:translate3d(0,-10vh,0) rotate(0deg);opacity:0}10%{opacity:1}100%{transform:translate3d(var(--confetti-drift),115vh,0) rotate(760deg);opacity:0}}',
+      '#deepseekerVictory .victorySplash{position:relative;z-index:2;width:min(760px,88vw);box-sizing:border-box;padding:38px 26px;text-align:center;transition:opacity .8s ease,transform .8s ease}',
+      '#deepseekerVictory.creditsActive .victorySplash{opacity:0;transform:translateY(-22px);pointer-events:none}',
+      '#deepseekerVictory .victoryKicker{font-size:10px;letter-spacing:4px;color:#c7c4a7;margin-bottom:20px;text-transform:uppercase}',
+      '#deepseekerVictory .victoryPoppers{display:flex;align-items:center;justify-content:center;gap:20px;font-size:clamp(46px,8vw,76px);line-height:1.2;margin:0 auto 14px;filter:drop-shadow(0 6px 16px #0009);animation:victoryPop .85s cubic-bezier(.2,.8,.3,1.2) both}',
+      '#deepseekerVictory .victoryPoppers span:last-child{animation:victoryTilt 1.4s ease-in-out infinite alternate}',
+      '@keyframes victoryPop{from{opacity:0;transform:scale(.35) rotate(-12deg)}to{opacity:1;transform:scale(1) rotate(0)}}',
+      '@keyframes victoryTilt{from{transform:rotate(-10deg) translateY(0)}to{transform:rotate(9deg) translateY(-7px)}}',
+      '#deepseekerVictory h1{margin:10px 0 14px;font-size:clamp(32px,6vw,64px);letter-spacing:clamp(2px,.7vw,7px);line-height:1.08;font-weight:800;color:#fff5d6;text-shadow:0 0 30px #ffe39b35}',
+      '#deepseekerVictory .victoryLead{margin:15px 0 10px;font-size:clamp(15px,2vw,19px);color:#f0eedf}',
+      '#deepseekerVictory .victoryMore{max-width:520px;margin:0 auto;font-size:13px;line-height:1.8;color:#c4c8b7}',
+      '#deepseekerVictory .victoryCountdown{margin-top:29px;font-size:9px;letter-spacing:3px;color:#8e987f}',
+      '#deepseekerVictory .victoryCredits{position:absolute;inset:0;z-index:3;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;opacity:0;pointer-events:none;background:linear-gradient(180deg,#03050430,#030504e8);transition:opacity .8s ease}',
+      '#deepseekerVictory.creditsActive .victoryCredits{opacity:1}',
+      '#deepseekerVictory .victoryCreditsRoll{width:min(680px,90vw);box-sizing:border-box;padding:0 12px 8vh;text-align:center;color:#d9d7c6;animation:victoryCreditsRoll 23s linear forwards}',
+      '@keyframes victoryCreditsRoll{from{transform:translateY(105vh)}to{transform:translateY(-115%)}}',
+      '#deepseekerVictory .creditsTiny{font-size:10px;letter-spacing:4px;color:#8f9d84;margin-bottom:30px}',
+      '#deepseekerVictory .creditsHeading{font-size:clamp(32px,5vw,52px);font-weight:800;letter-spacing:8px;color:#fff4d4;margin-bottom:42px}',
+      '#deepseekerVictory .creditsLabel{font-size:9px;letter-spacing:3px;color:#84917b;margin:28px 0 9px}',
+      '#deepseekerVictory .creditsName{font-size:16px;letter-spacing:2px;color:#eee9d8;line-height:1.6}',
+      '#deepseekerVictory .creditsSpacer{height:50px}',
+      '#deepseekerVictory .creditsThanks{font-size:14px;letter-spacing:3px;line-height:2;color:#fff1ce}',
+      '#deepseekerVictory #victoryReturnButton{position:absolute;z-index:5;right:20px;bottom:18px;padding:12px 16px;border:1px solid #ffffff45;border-radius:8px;background:#070a08d9;color:#f5eacb;font:inherit;font-size:10px;letter-spacing:2px;cursor:pointer;pointer-events:auto;transition:background .2s,border-color .2s}',
+      '#deepseekerVictory #victoryReturnButton:hover{background:#293124;border-color:#f1dfab}'
+    ].join("");
+    if(!document.getElementById(style.id)) document.head.appendChild(style);
+
+    victoryOverlay=document.createElement("div");
+    victoryOverlay.id="deepseekerVictory";
+    victoryOverlay.setAttribute("role","dialog");
+    victoryOverlay.setAttribute("aria-modal","true");
+    victoryOverlay.setAttribute("aria-label","You beat the game. Credits follow.");
+    victoryOverlay.style.cssText="position:fixed;inset:0;opacity:0";
+    victoryOverlay.innerHTML=[
+      '<div class="victoryConfetti" aria-hidden="true"></div>',
+      '<section class="victorySplash" aria-live="polite">',
+      '<div class="victoryKicker">EXIT FOUND</div>',
+      '<div class="victoryPoppers" aria-hidden="true"><span>🎉</span><span>🎊</span></div>',
+      '<h1>YOU BEAT THE GAME!</h1>',
+      '<p class="victoryLead">You made it out. Thanks for playing.</p>',
+      '<p class="victoryMore">More levels are in development. This is everything available right now.</p>',
+      '<p class="victoryCountdown">CREDITS BEGIN IN A MOMENT</p>',
+      '</section>',
+      '<section class="victoryCredits" aria-label="Credits">',
+      '<div class="victoryCreditsRoll">',
+      '<div class="creditsTiny">BACKROOMS: LOST SIGNAL</div>',
+      '<div class="creditsHeading">CREDITS</div>',
+      '<div class="creditsLabel">GAME DESIGN &amp; DEVELOPMENT</div>',
+      '<div class="creditsName">BACKROOMS: LOST SIGNAL</div>',
+      '<div class="creditsLabel">REAL-TIME 3D ENGINE</div>',
+      '<div class="creditsName">THREE.JS</div>',
+      '<div class="creditsLabel">WORLD, STORY &amp; ATMOSPHERE</div>',
+      '<div class="creditsName">LOST SIGNAL</div>',
+      '<div class="creditsLabel">THIRD-PARTY ASSET ATTRIBUTIONS</div>',
+      '<div class="creditsName">SEE THE INCLUDED LICENSE FILES</div>',
+      '<div class="creditsSpacer"></div>',
+      '<div class="creditsThanks">THANK YOU FOR PLAYING</div>',
+      '<div class="creditsThanks">MORE LEVELS ARE ON THE WAY</div>',
+      '</div>',
+      '</section>',
+      '<button id="victoryReturnButton" type="button">BACK TO TITLE</button>'
+    ].join("");
+    document.body.appendChild(victoryOverlay);
+
+    const confetti=victoryOverlay.querySelector(".victoryConfetti");
+    for(let i=0;i<96;i++){
+      const piece=document.createElement("i");
+      piece.style.setProperty("--confetti-left",(Math.random()*100)+"%");
+      piece.style.setProperty("--confetti-hue",String(Math.floor(Math.random()*360)));
+      piece.style.setProperty("--confetti-drift",Math.round((Math.random()-.5)*320)+"px");
+      piece.style.setProperty("--confetti-delay",(-Math.random()*5)+"s");
+      piece.style.setProperty("--confetti-duration",(3.8+Math.random()*3.7)+"s");
+      confetti.appendChild(piece);
+    }
+    victoryOverlay.querySelector("#victoryReturnButton").addEventListener("click",()=>{
+      location.href=location.pathname;
+    });
+  }
+
+  const activeOverlay=victoryOverlay;
+  requestAnimationFrame(()=>{
+    if(victoryOverlay===activeOverlay) activeOverlay.style.opacity="1";
+  });
+  setTimeout(()=>{
+    if(victoryOverlay===activeOverlay) activeOverlay.classList.add("creditsActive");
+  },5200);
 }
 
 const STORY = [
@@ -8288,7 +8419,7 @@ document.addEventListener("pointerlockchange",()=>{
   if(!controlsOpen && !phoneOpen && !chatOpen && !levelRunState.keypad?.classList.contains("open")){
     if(locked){
       overlay.classList.add("hidden");
-    }else if(gameStarted){
+    }else if(gameStarted && !gameEnded){
       if(multiplayerMapOpen) toggleMultiplayerMap(false);
       loadingScreen.style.display="none";
       homeScreen.classList.add("hidden");
@@ -8744,7 +8875,7 @@ function animate(){
     !computerSystem.openState
   );
   player.update(dt);
-  if(!levelRunActive) checkLevelRunEntrance();
+  if(!levelRunActive && !gameEnded) checkExitDoorEntrance();
   if(levelRunActive) updateLevelRunHUD();
   updateTutorialOpenRoomLights();
   updateAdminFly(dt);

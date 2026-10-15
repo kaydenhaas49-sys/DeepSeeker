@@ -46,12 +46,11 @@ const STAIR_STEP_DEPTH=0.42;
 const STAIR_STEP_RISE=0.22;
 const STAIR_DEPTH=STAIR_COUNT*STAIR_STEP_DEPTH;
 
-// Two hidden Level RUN entrances plus a temporary spawn-area test stairwell.
-// Every entrance is paired with a protected route through procedural walls.
+// Two concealed exits remain available. The Level RUN stage is parked for now.
+// Each exit has a protected route through the procedural walls.
 const WALL_STAIRCASES = Object.freeze([
-  { cx: -1, cz: 1, localX: 8, localZ: 8, face: -1, testOnly: false },
-  { cx: 1, cz: -1, localX: 8, localZ: 8, face: 1, testOnly: false },
-  { cx: 0, cz: 0, localX: 8, localZ: 11, face: -1, testOnly: true },
+  { cx: -1, cz: 1, localX: 8, localZ: 8, face: -1 },
+  { cx: 1, cz: -1, localX: 8, localZ: 8, face: 1 },
 ]);
 
 function getWallStaircase(cx, cz) {
@@ -97,9 +96,7 @@ export function generateChunk(cx, cz, seed) {
       // Route north from the shared corridor to the (-1, 1) stairwell.
       (gx >= -9 && gx <= -7 && gz >= 8 && gz <= 24) ||
       // Route south from the shared corridor to the (1, -1) stairwell.
-      (gx >= 23 && gx <= 25 && gz >= -8 && gz <= 8) ||
-      // Temporary test stairwell just north of the player spawn.
-      (gx >= 7 && gx <= 9 && gz >= 8 && gz <= 11);
+      (gx >= 23 && gx <= 25 && gz >= -8 && gz <= 8);
     if (onGuaranteedRoute) return true;
 
     if (!staircase) return false;
@@ -567,9 +564,7 @@ export class World {
       if(Math.abs(door.openProgress-target)<0.006)door.openProgress=target;
       door.group.rotation.y=-door.face*Math.PI*0.5*door.openProgress;
       const interactable=door.group.userData.interactable;
-      if(interactable)interactable.prompt=door.targetOpen
-        ?(door.staircase?.testOnly?"Close test stairwell":"Descend to Level RUN")
-        :(door.staircase?.testOnly?"Open test stairwell":"Open Level RUN stairs");
+      if(interactable)interactable.prompt=door.targetOpen?"Enter exit door":"Open exit door";
       if(door.openProgress<0.82){
         door.collisionBounds.minX=door.centerX-1.7;door.collisionBounds.maxX=door.centerX+1.7;
         door.collisionBounds.minZ=door.wallZ-0.08;door.collisionBounds.maxZ=door.wallZ+0.08;
@@ -754,9 +749,9 @@ export class World {
     const state={staircase,group:pivot,collisionBounds,targetOpen:false,openProgress:0,centerX,wallZ,face,doorWidth,toggle(){this.targetOpen=!this.targetOpen;return true;}};
     pivot.userData.interactable={
     type:"stairwellDoor",
-    prompt:staircase.testOnly?"Open test stairwell":"Open Level RUN stairs",
+    prompt:"Open exit door",
     toggle:()=>state.toggle(),
-    staircaseTestOnly:Boolean(staircase.testOnly)
+    isOpen:()=>state.openProgress>=0.82
   };
     group.userData.stairwellDoorState=state; // Keep the animated panel out of the spider's static wall-occluder list.
   }

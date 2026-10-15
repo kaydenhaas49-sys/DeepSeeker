@@ -340,6 +340,45 @@ export class HorrorAudio {
     osc.stop(now+.22);
   }
 
+  celebrate(){
+    if(!this.ctx||this.muted||this.ctx.state!=="running") return;
+    const ctx=this.ctx,now=ctx.currentTime;
+    // Bright rising notes make the finish unmistakably celebratory.
+    const notes=[523.25,659.25,783.99,1046.5,1318.5];
+    notes.forEach((frequency,index)=>{
+      const at=now+index*.105;
+      const osc=ctx.createOscillator();
+      const filter=ctx.createBiquadFilter();
+      const gain=ctx.createGain();
+      osc.type="triangle";
+      osc.frequency.setValueAtTime(frequency,at);
+      osc.frequency.exponentialRampToValueAtTime(frequency*.985,at+.20);
+      filter.type="lowpass";filter.frequency.value=2800;
+      gain.gain.setValueAtTime(.0001,at);
+      gain.gain.exponentialRampToValueAtTime(.075,at+.012);
+      gain.gain.exponentialRampToValueAtTime(.0001,at+.25);
+      osc.connect(filter).connect(gain).connect(this.sfxGain);
+      osc.start(at);osc.stop(at+.27);
+    });
+    // Three short high-frequency bursts add the crackle of party poppers.
+    if(this.noiseBuffer){
+      for(let index=0;index<3;index++){
+        const at=now+index*.13;
+        const source=ctx.createBufferSource();
+        const filter=ctx.createBiquadFilter();
+        const gain=ctx.createGain();
+        source.buffer=this.noiseBuffer;
+        source.playbackRate.value=1.05+Math.random()*.35;
+        filter.type="highpass";filter.frequency.value=1500+Math.random()*900;
+        gain.gain.setValueAtTime(.0001,at);
+        gain.gain.exponentialRampToValueAtTime(.035,at+.006);
+        gain.gain.exponentialRampToValueAtTime(.0001,at+.19);
+        source.connect(filter).connect(gain).connect(this.sfxGain);
+        source.start(at,Math.random()*.3,.2);source.stop(at+.21);
+      }
+    }
+  }
+
   scare(){
     if(!this.ctx||this.muted)return;
 
