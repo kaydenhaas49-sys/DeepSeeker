@@ -346,6 +346,8 @@ export class World {
     this.breakerSequence=[...BREAKER_SEQUENCE];
     this.breakerFailTimer=0;
     this.maintenanceDoor=null;
+    this.maintenancePuzzleType="breakers";
+    this.maintenancePuzzleSeed=1;
 
     const breakerCanvas=document.createElement("canvas");
     breakerCanvas.width=512;breakerCanvas.height=192;
@@ -604,6 +606,7 @@ export class World {
     chunkGroup.userData.breakerSwitches=[];
     for(const spec of positions){
       const root=new THREE.Group();root.name="MaintenanceBreaker"+spec.index;
+      root.visible=this.maintenancePuzzleType==="breakers";
       root.position.set(spec.x,0,spec.z);chunkGroup.add(root);
       const panel=new THREE.Mesh(new THREE.BoxGeometry(.78,1.18,.18),this.breakerPanelMaterial);
       panel.name="BreakerPanelHousing";panel.position.set(0,1.02,0);root.add(panel);
@@ -630,7 +633,55 @@ export class World {
     }
   }
 
+  setMaintenancePuzzleType(type,seed=1){
+    this.maintenancePuzzleType=type==="ventilation"?"ventilation":"breakers";
+    this.maintenancePuzzleSeed=(Number(seed)>>>0);
+    this.breakerProgress=0;
+    this.breakerFailTimer=0;
+    for(const door of this.roomDoors){
+      if(!door)continue;
+      door.targetOpen=false;
+      door.openProgress=0;
+      if(door.group)door.group.rotation.y=0;
+      if(door.closedCollisionBounds)Object.assign(door.collisionBounds,door.closedCollisionBounds);
+    }
+    if(this.maintenanceDoor)this.maintenanceDoor.unlocked=false;
+    for(const item of this.breakerSwitches){
+      if(!item?.group)continue;
+      item.group.visible=this.maintenancePuzzleType==="breakers";
+      item.active=false;
+      item.handle.rotation.z=.42;
+      item.lamp.material=this.breakerLampOffMaterial;
+    }
+  }
+
+  restoreMaintenancePuzzleState(state={}){
+    if(state.unlocked){
+      this.completeMaintenancePuzzle(this.maintenancePuzzleType);
+      return;
+    }
+    this.breakerProgress=this.maintenancePuzzleType==="breakers"
+      ?THREE.MathUtils.clamp(Math.floor(Number(state.breakerProgress)||0),0,this.breakerSequence.length)
+      :0;
+    for(const item of this.breakerSwitches){
+      const active=this.breakerProgress>0&&this.breakerSequence.slice(0,this.breakerProgress).includes(item.index);
+      item.active=active;
+      item.handle.rotation.z=active?-.42:.42;
+      item.lamp.material=active?this.breakerLampOnMaterial:this.breakerLampOffMaterial;
+      item.group.visible=this.maintenancePuzzleType==="breakers";
+    }
+  }
+
+  completeMaintenancePuzzle(type=this.maintenancePuzzleType){
+    if(type!==this.maintenancePuzzleType||!this.maintenanceDoor)return false;
+    this.maintenanceDoor.unlocked=true;
+    this.maintenanceDoor.targetOpen=true;
+    if(this.maintenanceDoor.interactable)this.maintenanceDoor.interactable.prompt="Open door";
+    return true;
+  }
+
   activateBreaker(index){
+    if(this.maintenancePuzzleType!=="breakers")return {correct:false,complete:false,wrongPuzzle:true};
     if(!this.maintenanceDoor)return {correct:false,complete:false,missingDoor:true};
     if(this.maintenanceDoor.unlocked)return {correct:true,complete:true,alreadyPowered:true};
     const switchState=this.breakerSwitches.find(item=>item.index===index);
@@ -646,8 +697,8 @@ export class World {
     switchState.active=true;switchState.handle.rotation.z=-.42;
     switchState.lamp.material=this.breakerLampOnMaterial;
     if(this.breakerProgress>=this.breakerSequence.length){
-      this.maintenanceDoor.unlocked=true;this.maintenanceDoor.targetOpen=true;
       this.breakerProgress=this.breakerSequence.length;
+      this.completeMaintenancePuzzle("breakers");
       return {correct:true,complete:true,progress:this.breakerProgress};
     }
     return {correct:true,complete:false,progress:this.breakerProgress};
@@ -815,7 +866,8 @@ export class World {
       }
       if(door.interactable){
         door.interactable.prompt=door.requiresPower&&!door.unlocked
-          ?"Door has no power"
+          ?(door===this.maintenanceDoor&&this.maintenancePuzzleType==="ventilation"
+            ?"Access ventilation control":"Door has no power")
           :(door.targetOpen?"Close door":"Open door");
       }
     }
@@ -1032,7 +1084,9 @@ export class World {
   getInteractables() {
     return [
       ...this.roomDoors.filter(door=>door.group?.parent).map(door=>door.group),
-      ...this.breakerSwitches.filter(item=>item.group?.parent).map(item=>item.group)
+      ...(this.maintenancePuzzleType==="breakers"
+        ?this.breakerSwitches.filter(item=>item.group?.parent&&item.group.visible).map(item=>item.group)
+        :[])
     ];
   }
 
