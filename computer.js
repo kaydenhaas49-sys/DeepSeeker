@@ -19,7 +19,7 @@ export class ComputerSystem {
     ].join(";");
     overlay.innerHTML=
       '<div style="width:min(760px,92vw);max-height:76vh;overflow:auto;padding:22px;border:1px solid rgba(150,170,145,.28);background:#071008;box-shadow:0 30px 100px #000;color:#c8d9c5;font-family:ui-monospace,monospace">'+
-        '<div style="display:flex;justify-content:space-between;gap:20px"><strong>DEEPSEEKER FIELD TERMINAL</strong><span id="deepseekerComputerId"></span></div>'+
+        '<div style="display:flex;justify-content:space-between;gap:20px"><strong>FIELD TERMINAL</strong><span id="deepseekerComputerId"></span></div>'+
         '<div id="deepseekerComputerOutput" style="margin-top:18px;min-height:180px;padding:15px;border:1px solid #ffffff12;background:#020502;color:#aebcab;white-space:pre-wrap;font-size:12px;line-height:1.6"></div>'+
         '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">'+
           '<button data-cmd="status">STATUS</button>'+
@@ -58,26 +58,25 @@ export class ComputerSystem {
     const isSecurity=Boolean(this.current?.security);
     if(cmd==="status"){
       this.output.textContent=
-        "SYSTEM STATUS\n"+
-        "---------------\n"+
+        "STATUS\n"+
+        "------\n"+
         "UPLINK: LOST\n"+
-        "LOCAL NODE: "+id+"\n"+
-        "SIGNAL: UNSTABLE\n"+
-        "DEEPSEEKER NETWORK: PARTIAL\n"+
-        "CAMERA ACCESS: "+(isSecurity?"GRANTED":"UNAVAILABLE")+
-        "\n\nThe terminal is still receiving power.\nSomething else appears to be using the network.";
+        "NODE: "+id+"\n"+
+        "SIGNAL: WEAK\n"+
+        "CAMERAS: "+(isSecurity?"CONNECTED":"OFFLINE")+
+        "\n\nStill powered. Something's on the network.";
     }else if(cmd==="files"){
       this.output.textContent=
-        "RECOVERED FILES\n"+
-        "----------------\n"+
-        "[01] M_ENTRY_01\n"+
-        "[02] M_ENTRY_03\n"+
-        "[03] INCIDENT_REPORT\n"+
-        "[04] NODE_MAP_FRAGMENT\n\n"+
-        "Some files are corrupted.\nUse the phone to record anything important.";
+        "FILES\n"+
+        "-----\n"+
+        "M_ENTRY_01\n"+
+        "M_ENTRY_03\n"+
+        "INCIDENT_REPORT\n"+
+        "NODE_MAP\n\n"+
+        "A few files won't open. Check your phone for notes.";
     }else if(cmd==="cameras"){
       if(!isSecurity){
-        this.output.textContent="CAMERA ACCESS DENIED\n\nThis terminal is not connected to a security node.";
+        this.output.textContent="NO CAMERA FEED\n\nThis terminal has no cameras.";
         return;
       }
       this.onOpenCameras(this.current);

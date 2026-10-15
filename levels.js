@@ -7,7 +7,7 @@ export const LEVELS = [
     name: "LEVEL 0 · YELLOW",
     type: "procedural",
     profile: "classic",
-    description: "The first Backrooms layer: yellow walls, carpet and endless fluorescent corridors.",
+    description: "Yellow walls, damp carpet, and buzzing lights.",
     depth: 0
   },
   {
@@ -15,7 +15,7 @@ export const LEVELS = [
     name: "LEVEL RUN",
     type: "setpiece",
     profile: "industrial-run",
-    description: "A hostile service maze: find the randomized four-digit code, open the safe, and survive as the hunted runner role rotates.",
+    description: "Find the code and open the safe before the spider catches you.",
     depth: 0.5
   },
   {
@@ -23,7 +23,7 @@ export const LEVELS = [
     name: "LEVEL 1 · SERVICE",
     type: "procedural",
     profile: "service",
-    description: "A harsher industrial layer built around storage, maintenance and concrete service spaces.",
+    description: "Concrete halls, storage rooms, and bad lighting.",
     depth: 1
   },
   {
@@ -31,7 +31,7 @@ export const LEVELS = [
     name: "LEVEL 2 · MAINTENANCE",
     type: "procedural",
     profile: "maintenance",
-    description: "Narrower routes, exposed infrastructure and heavier electrical noise.",
+    description: "Tight halls, exposed pipes, and loud wiring.",
     depth: 2
   },
   {
@@ -39,7 +39,7 @@ export const LEVELS = [
     name: "LEVEL 3 · DEEP ZONE",
     type: "procedural",
     profile: "deep",
-    description: "The architecture begins to stop behaving like a building.",
+    description: "The halls stop making sense.",
     depth: 3
   },
   {
@@ -47,7 +47,7 @@ export const LEVELS = [
     name: "THE BOTTOM",
     type: "setpiece",
     profile: "bottom",
-    description: "The final descent. This should be a controlled set piece rather than ordinary chunk generation.",
+    description: "The last way down.",
     depth: 4
   }
 ];

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-realdoor1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-naturaltext1";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js?v=20261015-admin2";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
@@ -13,7 +13,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { flashlightFlicker } from "./character.js";
 import { InteractionSystem } from "./interaction.js";
 import { NavigationSystem } from "./navigation.js";
-import { ComputerSystem } from "./computer.js";
+import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js";
@@ -1192,7 +1192,7 @@ menuSet.add(menuDust);
 // The title screen uses a clone of the real Spider-Psionic rig loaded by the
 // gameplay spider. This keeps the menu model authentic without sharing the
 // gameplay entity, transform, or animation mixer.
-const MENU_SPIDER_SCALE=.04;
+const MENU_SPIDER_SCALE=.85;
 const MENU_DUCK_SCALE=.82;
 const MENU_SPIDER_CEILING_Y=8.98;
 // Put the duck on the foreground floor, centered in front of the title camera.
@@ -1202,9 +1202,9 @@ const MENU_DUCK_MENU_Z=8.5;
 const MENU_DUCK_SPIN_SPEED=1.35;
 const MENU_SPIDER_PATH_CENTER_X=3.0;
 const MENU_SPIDER_PATH_CENTER_Z=-18.0;
-const MENU_SPIDER_PATH_RADIUS_X=22.0;
-const MENU_SPIDER_PATH_RADIUS_Z=16.0;
-const MENU_SPIDER_PATH_SPEED=.072;
+const MENU_SPIDER_PATH_RADIUS_X=8.0;
+const MENU_SPIDER_PATH_RADIUS_Z=3.5;
+const MENU_SPIDER_PATH_SPEED=.038;
 
 const menuSpider=new THREE.Group();
 menuSpider.name="MenuSpider";
@@ -3189,10 +3189,10 @@ const multiplayer=new Multiplayer({
       return;
     }
     if(event?.type==="computer_opened"){
-      eventText.textContent="REMOTE TERMINAL ACTIVE · "+(event.id||"NODE");
+      eventText.textContent="TERMINAL OPEN · "+(event.id||"NODE");
       eventText.style.opacity="1";
       setTimeout(()=>{
-        if(eventText.textContent.startsWith("REMOTE TERMINAL ACTIVE")){
+        if(eventText.textContent.startsWith("TERMINAL OPEN")){
           eventText.style.opacity="0";
         }
       },1600);
@@ -3661,7 +3661,7 @@ function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
     runnerId:levelRunState.runnerId,code:levelRunState.code,round:levelRunState.round,
     returnX:levelRunState.returnPosition.x,returnZ:levelRunState.returnPosition.z
   });
-  showSpiderScareMessage("LEVEL RUN · FIND THE CODE, UNLOCK THE SAFE. THE RUNNER CHANGES EACH ROUND.",2200);
+  showSpiderScareMessage("FIND THE CODE. OPEN THE SAFE.",2200);
   return true;
 }
 
@@ -3724,7 +3724,7 @@ function leaveLevelRun(broadcast=true){
   levelRunState.runnerId=null;clearSpiderPath();
   objective.textContent="Find a way deeper. Stay in the light.";
   if(broadcast)multiplayer.broadcastWorldEvent("level_run_exit","level-run",{});
-  showSpiderScareMessage("BACKROOMS RESTORED.",1500);
+  showSpiderScareMessage("BACK IN THE BACKROOMS.",1500);
 }
 
 function toggleArachnophobia(){
@@ -4988,36 +4988,36 @@ function updateInitialLoadingScreen(){
 
   if(status){
     if(initialStartupError){
-      status.textContent="STARTUP PREPARATION FAILED — RELOAD TO RETRY.";
+      status.textContent="Couldn't start. Reload and try again.";
     }else if(!geometryDecoderReady){
-      status.textContent="INITIALIZING GEOMETRY DECODERS…";
+      status.textContent="Loading models…";
     }else if(!initialStartupPrepared){
-      status.textContent="PREPARING FIRST-ROOM ASSETS…";
+      status.textContent="Getting the first room ready…";
     }else if(!saveReady){
-      status.textContent="FINALIZING SAVE DATA…";
+      status.textContent="Loading saves…";
     }else if(!biscuitTextureReady){
-      status.textContent="LOADING ARAchnOPHOBIA REPLACEMENT TEXTURE…";
+      status.textContent="Loading duck mode…";
     }else if(!characterReady){
-      status.textContent="LOADING HAZMAT CHARACTER + FIRST-PERSON GEAR…";
+      status.textContent="Loading player…";
     }else if(!spiderLoaded){
       status.textContent=spiderStartupFailed
-        ? "SPIDER PACK FAILED — RETRYING…"
-        : "LOADING SPIDER MODEL + ANIMATIONS…";
+        ? "Spider didn't load. Trying again…"
+        : "Loading spider…";
     }else if(loadedWorldChunks<INITIAL_WORLD_CHUNK_KEYS.length){
-      status.textContent="GENERATING STARTING BACKROOMS REGION… "+
-        loadedWorldChunks+"/"+INITIAL_WORLD_CHUNK_KEYS.length+" CHUNKS READY.";
+      status.textContent="Building the Backrooms… "+
+        loadedWorldChunks+"/"+INITIAL_WORLD_CHUNK_KEYS.length;
     }else if(initialHouseRequired && !houseCollisionReady){
       status.textContent=houseLoadFailed
-        ? "SAVED APARTMENT FAILED TO LOAD — RELOAD TO RETRY."
-        : "LOADING SAVED APARTMENT + BUILDING COLLISION…";
+        ? "Couldn't load the saved room. Reload and try again."
+        : "Loading saved room…";
     }else if(player.characterLoadFailed && !player.characterLoaded){
-      status.textContent="PLAYER MODEL UNAVAILABLE — FALLBACK HANDS READY.";
+      status.textContent="Player model missing. Using fallback hands.";
     }else{
-      status.textContent="ALL REQUIRED GAME ASSETS READY — FINALIZING STARTUP.";
+      status.textContent="Almost ready…";
     }
   }
 
-  prompt.textContent="PREPARING WORLD… "+total+"%";
+  prompt.textContent="Loading… "+total+"%";
 }
 
 function finishInitialLoading(){
@@ -5939,15 +5939,15 @@ function updateTutorialGuide(){
   }
 
   const lessons={
-    1:["MOVE","W A S D","Walk around the room until the lesson completes."],
-    2:["JUMP","SPACE","Jump once. You do not need to jump high."],
-    3:["CROUCH","CTRL","Hold CTRL until you crouch."],
-    4:["SPRINT","SHIFT","Hold SHIFT and sprint across the room."],
-    5:["FLASHLIGHT","F","Your flashlight is off. Turn it on."],
-    6:["PHONE","P","Open the DeepSeeker phone."],
-    7:["MESSAGE","P","Read M's message, then close the phone."],
-    8:["APPROACH","W A S D","Move toward the figure ahead. Do not freeze."],
-    9:["RUN","SHIFT","Hold SHIFT and get away from it."]
+    1:["MOVE","W A S D","Move around a bit."],
+    2:["JUMP","SPACE","Press SPACE."],
+    3:["CROUCH","CTRL","Hold CTRL."],
+    4:["SPRINT","SHIFT","Hold SHIFT to run."],
+    5:["FLASHLIGHT","F","Press F."],
+    6:["PHONE","P","Press P to open your phone."],
+    7:["MESSAGE","P","Read M's note, then close the phone."],
+    8:["APPROACH","W A S D","Go toward the figure."],
+    9:["RUN","SHIFT","Run. Don't stop."]
   };
   const lesson=lessons[houseTutorialStage];
   if(!lesson){
@@ -7916,7 +7916,7 @@ function beginVictoryEnding({broadcast=true}={}){
       '<div class="victoryPoppers" aria-hidden="true"><span>🎉</span><span>🎊</span></div>',
       '<h1>YOU BEAT THE GAME!</h1>',
       '<p class="victoryLead">You made it out. Thanks for playing.</p>',
-      '<p class="victoryMore">More levels are in development. This is everything available right now.</p>',
+      '<p class="victoryMore">More levels coming.</p>',
       '<p class="victoryCountdown">CREDITS BEGIN IN A MOMENT</p>',
       '</section>',
       '<section class="victoryCredits" aria-label="Credits">',
@@ -7969,57 +7969,57 @@ const STORY = [
     distance: 0,
     depth: 0,
     title: "NOCLIP",
-    text: "You fell through the floor. The carpet is wet. The lights will not stop buzzing.",
-    objective: "Find a way out."
+    text: "The floor gave way. Now it's just wet carpet and buzzing lights.",
+    objective: "Find an exit."
   },
   {
     distance: 45,
     depth: 0,
     title: "M — ENTRY 01",
-    text: "If you found this, you're probably where I was. Don't panic. Keep moving. There are no doors where you think there should be.",
-    objective: "Follow the trail. Stay in the light."
+    text: "You're here too? Keep moving. The doors don't go where they should.",
+    objective: "Follow the halls."
   },
   {
     distance: 90,
     depth: 1,
     title: "M — ENTRY 02",
-    text: "I tried to map the place. Every time I turned around, the corridors were different. I think the building knows when we're looking.",
-    objective: "Keep exploring. Do not stay in one place."
+    text: "Tried mapping the halls. Turn around and they change. I swear it knows.",
+    objective: "Keep moving."
   },
   {
     distance: 150,
     depth: 1,
     title: "M — ENTRY 03",
-    text: "Don't trust the levels. I found the same room three times today, but none of them had the same exit.",
-    objective: "Something is wrong with the layout."
+    text: "Same room. Third time today. The exit changed again.",
+    objective: "Find another way through."
   },
   {
     distance: 230,
     depth: 2,
     title: "M — ENTRY 04",
-    text: "If you see someone who looks like you, don't follow them. I made that mistake once.",
-    objective: "If you see someone, keep your distance."
+    text: "Saw someone who looked like me. I followed them. Big mistake.",
+    objective: "Don't follow it."
   },
   {
     distance: 330,
     depth: 3,
     title: "DEEPSEEKER FILE 01",
-    text: "Found a record with the name DEEPSEEKER. They weren't trying to escape. They were going deeper on purpose.",
-    objective: "Find out what the DeepSeeker was looking for."
+    text: "Found a file marked DEEPSEEKER. They weren't trying to get out. They were looking for something.",
+    objective: "Find out what they wanted."
   },
   {
     distance: 450,
     depth: 4,
     title: "M — ENTRY 05",
-    text: "We're close. I can hear something underneath the walls. The others want to turn back. I don't think there is a way back anymore.",
-    objective: "Keep going deeper."
+    text: "Something's moving under the walls. The others want to leave. I don't think we can.",
+    objective: "Go deeper."
   },
   {
     distance: 600,
     depth: 5,
     title: "M — FINAL ENTRY",
-    text: "We found the bottom. You are not following my trail. I'm following yours.",
-    objective: "Find the bottom. Find the source of the signal."
+    text: "Made it to the bottom. I thought I was following your trail. It's the other way around.",
+    objective: "Find the signal."
   }
 ];
 
@@ -8044,7 +8044,7 @@ function applyStoryStage(index, announce=true){
   renderStoryLog();
 
   if(announce && storyStage>0){
-    eventText.textContent=entry.title==="DEEPSEEKER FILE 01" ? "NEW DEEPSEEKER FILE" : "NEW MESSAGE FROM M";
+    eventText.textContent=entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "NEW NOTE FROM M";
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},2200);
   }
@@ -8104,13 +8104,13 @@ function showHouseIntroPhoneMessage(){
   phoneDepth.textContent="!";
   phoneDepthLabel.textContent="NEW MESSAGE";
   phoneCardTitle.textContent="KEEP MOVING";
-  phoneCardText.textContent="You're in the Backrooms. Move around the room first. When this message closes, try your flashlight.";
+  phoneCardText.textContent="You're in the Backrooms. Have a look around. Press F to try your flashlight.";
 
   renderStoryLog();
   phoneStory.insertAdjacentHTML("afterbegin",`
     <div class="storyEntry">
       <div class="storyMeta">M · ENTRY TUTORIAL</div>
-      <div class="storyText">You're in the Backrooms. Move around the room first. When this message closes, try your flashlight.</div>
+      <div class="storyText">You're in the Backrooms. Have a look around. Press F to try your flashlight.</div>
     </div>
   `);
 }
