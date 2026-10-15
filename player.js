@@ -1,7 +1,7 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { EYE, WALL_H } from "./world.js";
+import { EYE, WALL_H } from "./world.js?v=20261015-ventcrawl3d1";
 import { createHazmatCharacter, createFirstPersonArms } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
@@ -372,6 +372,7 @@ export class Player {
     this.onSlide = null;
     this.ignoreWorldCollision = false;
     this.adminFlyMode = false;
+    this.wasInVentilationCrawl = false;
 
     this.characterModel = null;
     this.characterMixer = null;
@@ -613,6 +614,14 @@ export class Player {
   }
 
   update(dt) {
+    const insideVentilationCrawl=Boolean(this.world?.isVentilationCrawlArea?.(this.pos.x,this.pos.z));
+    if(insideVentilationCrawl){
+      // Low sheet-metal ducts are crawl-only: no standing or jumping inside.
+      this.crouched=true;this.sliding=false;this.slideTimer=0;this.jumpY=0;this.jumpVelocity=0;
+    }else if(this.wasInVentilationCrawl){
+      this.crouched=false;
+    }
+    this.wasInVentilationCrawl=insideVentilationCrawl;
     if(this.movementFrozen){
       this.keys.clear();
       this.vel.set(0,0,0);

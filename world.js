@@ -340,6 +340,10 @@ export class World {
     const signTexture=new THREE.CanvasTexture(signCanvas);
     signTexture.colorSpace=THREE.SRGBColorSpace;
     this.roomDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.88,metalness:0.02,side:THREE.DoubleSide});
+    this.ventDuctPanelMaterial=new THREE.MeshStandardMaterial({color:0x666b60,roughness:0.78,metalness:0.46});
+    this.ventDuctDarkMaterial=new THREE.MeshStandardMaterial({color:0x252a25,roughness:0.91,metalness:0.18});
+    this.ventDuctTrimMaterial=new THREE.MeshStandardMaterial({color:0x979b87,roughness:0.68,metalness:0.55});
+    this.ventDuctLampMaterial=new THREE.MeshStandardMaterial({color:0x9ce18a,emissive:0x46ff3d,emissiveIntensity:1.05,roughness:0.38});
     this.roomDoors=[];
     this.breakerSwitches=[];
     this.breakerProgress=0;
@@ -348,6 +352,12 @@ export class World {
     this.maintenanceDoor=null;
     this.maintenancePuzzleType="breakers";
     this.maintenancePuzzleSeed=1;
+    this.maintenanceEntryDoor=null;
+    this.maintenanceRoomGroup=null;
+    this.ventilationMazeGroup=null;
+    this.ventilationMazeBounds=[];
+    this.ventilationCrawlBounds=null;
+    this.ventilationExitPanel=null;
 
     const breakerCanvas=document.createElement("canvas");
     breakerCanvas.width=512;breakerCanvas.height=192;
@@ -465,34 +475,222 @@ export class World {
   }
 
   buildOuterMaintenanceRoom(centerX,minZ,boundaryThickness){
-    const roomWidth=10.2,roomDepth=13.5,roomHeight=ROOM_HEIGHT,wallT=ROOM_WALL_THICKNESS;
-    const frontZ=minZ+boundaryThickness;
-    const backZ=frontZ-roomDepth;
-    const centerZ=(backZ+frontZ)*.5;
-    const room=new THREE.Group();room.name="OuterMaintenanceRoom";this.boundaryGroup.add(room);
-    const addBox=(name,sx,sy,sz,x,y,z,material)=>{
+    // Large service chamber: a full crawlable maze replaces the tiny routing UI.
+    const roomWidth=32,roomDepth=42,roomHeight=4.25,wallT=ROOM_WALL_THICKNESS;
+    const frontZ=minZ+boundaryThickness,backZ=frontZ-roomDepth,centerZ=(backZ+frontZ)*.5;
+    this.maintenanceRoomFrontZ=frontZ;this.maintenanceRoomBackZ=backZ;
+    this.maintenanceRoomCenterX=centerX;this.maintenanceRoomWidth=roomWidth;
+    this.maintenanceRoomDepth=roomDepth;this.maintenanceRoomCenterZ=centerZ;
+    const room=this.maintenanceRoomGroup=new THREE.Group();
+    room.name="OuterMaintenanceRoom";this.boundaryGroup.add(room);
+    const addBox=(name,sx,sy,sz,x,y,z,material,host=room)=>{
       const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
       mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;
-      mesh.userData.fixtureLightOccluder=true;room.add(mesh);return mesh;
+      mesh.userData.fixtureLightOccluder=true;host.add(mesh);return mesh;
     };
     addBox("MaintenanceRoomFloor",roomWidth-.08,.07,roomDepth-.05,centerX,-.025,centerZ,this.materials.floor);
     addBox("MaintenanceRoomLeftWall",wallT,roomHeight,roomDepth,centerX-roomWidth*.5,roomHeight*.5,centerZ,this.materials.wall);
     addBox("MaintenanceRoomRightWall",wallT,roomHeight,roomDepth,centerX+roomWidth*.5,roomHeight*.5,centerZ,this.materials.wall);
-    addBox("MaintenanceRoomBackWall",roomWidth,roomHeight,wallT,centerX,roomHeight*.5,backZ,this.materials.wall);
-    addBox("MaintenanceRoomCeiling",roomWidth,.13,roomDepth-.18,centerX,roomHeight,centerZ-.08,this.materials.ceiling);
-
+    addBox("MaintenanceRoomCeiling",roomWidth,.13,roomDepth-.18,centerX,roomHeight,centerZ,this.materials.ceiling);
+    const leftEdge=centerX-roomWidth*.5,rightEdge=centerX+roomWidth*.5;
     this.boundaryWallBounds.push(
-      {minX:centerX-roomWidth*.5-wallT*.5,maxX:centerX-roomWidth*.5+wallT*.5,minZ:backZ,maxZ:frontZ},
-      {minX:centerX+roomWidth*.5-wallT*.5,maxX:centerX+roomWidth*.5+wallT*.5,minZ:backZ,maxZ:frontZ},
-      {minX:centerX-roomWidth*.5,maxX:centerX+roomWidth*.5,minZ:backZ-wallT*.5,maxZ:backZ+wallT*.5}
+      {minX:leftEdge-wallT*.5,maxX:leftEdge+wallT*.5,minZ:backZ,maxZ:frontZ},
+      {minX:rightEdge-wallT*.5,maxX:rightEdge+wallT*.5,minZ:backZ,maxZ:frontZ}
     );
-    this.maintenanceDoor=this.buildRoomDoor(room,centerX,minZ+boundaryThickness*.5,{
+
+    // The outer-wall door is the room entrance; the powered door is at the far end.
+    this.maintenanceEntryDoor=this.buildRoomDoor(room,centerX,frontZ,{
+      doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:false,ownerChunk:null
+    },this.boundaryWallBounds);
+
+    const doorLeft=centerX-ROOM_DOOR_WIDTH*.5,doorRight=centerX+ROOM_DOOR_WIDTH*.5;
+    const leftWidth=doorLeft-leftEdge,rightWidth=rightEdge-doorRight;
+    addBox("MaintenanceRoomBackWallLeft",leftWidth,roomHeight,wallT,(leftEdge+doorLeft)*.5,roomHeight*.5,backZ,this.materials.wall);
+    addBox("MaintenanceRoomBackWallRight",rightWidth,roomHeight,wallT,(doorRight+rightEdge)*.5,roomHeight*.5,backZ,this.materials.wall);
+    addBox("MaintenanceRoomBackDoorLintel",ROOM_DOOR_WIDTH,roomHeight-ROOM_DOOR_HEIGHT,wallT,
+      centerX,(roomHeight+ROOM_DOOR_HEIGHT)*.5,backZ,this.materials.wall);
+    this.boundaryWallBounds.push(
+      {minX:leftEdge,maxX:doorLeft,minZ:backZ-wallT*.5,maxZ:backZ+wallT*.5},
+      {minX:doorRight,maxX:rightEdge,minZ:backZ-wallT*.5,maxZ:backZ+wallT*.5}
+    );
+    this.maintenanceDoor=this.buildRoomDoor(room,centerX,backZ,{
       doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:true,ownerChunk:null
     },this.boundaryWallBounds);
 
-    // The breakers belong inside this room, mounted across its back wall.
-    this.buildMaintenanceBreakers(room,centerX,backZ);
+    this.ventilationMazeGroup=new THREE.Group();
+    this.ventilationMazeGroup.name="VentilationCrawlMaze";
+    this.ventilationMazeGroup.visible=false;
+    room.add(this.ventilationMazeGroup);
+    this.buildVentilationMaze(this.maintenancePuzzleSeed);
+    this.buildMaintenanceBreakers(room,centerX,backZ,roomWidth,centerZ);
     this.breakerSwitches.push(...(room.userData.breakerSwitches||[]));
+  }
+
+  buildVentilationMaze(seed=1){
+    if(!this.ventilationMazeGroup||!this.maintenanceRoomGroup)return;
+    for(const bound of this.ventilationMazeBounds){
+      const index=this.boundaryWallBounds.indexOf(bound);
+      if(index>=0)this.boundaryWallBounds.splice(index,1);
+    }
+    this.ventilationMazeBounds=[];
+    this.ventilationMazeGroup.traverse(object=>{
+      if(object.isMesh&&object.geometry)object.geometry.dispose();
+    });
+    this.ventilationMazeGroup.clear();
+    this.ventilationExitPanel=null;
+
+    const roomDepth=this.maintenanceRoomDepth;
+    const frontZ=this.maintenanceRoomFrontZ;
+    const centerX=this.maintenanceRoomCenterX;
+    const cols=7,rows=9,cellW=4.4,cellD=4.15,wallT=.18,ductHeight=1.62;
+    const gridWidth=cols*cellW,gridDepth=rows*cellD;
+    const gridLeft=centerX-gridWidth*.5;
+    const gridFrontZ=frontZ-(roomDepth-gridDepth)*.5;
+    const gridRearZ=gridFrontZ-gridDepth;
+    const entryCol=Math.floor(cols*.5),exitCol=entryCol,gap=2.0;
+    const cellIndex=(row,col)=>row*cols+col;
+    const edgeKey=(a,b)=>a<b?a+"-"+b:b+"-"+a;
+    const rng=mulberry32(((Number(seed)>>>0)||1)^0x71ea91c3);
+    const openEdges=new Set();
+    const visited=new Set([cellIndex(0,entryCol)]);
+    const stack=[cellIndex(0,entryCol)];
+    const neighbors=id=>{
+      const row=Math.floor(id/cols),col=id%cols,out=[];
+      if(row>0)out.push(cellIndex(row-1,col));
+      if(col<cols-1)out.push(cellIndex(row,col+1));
+      if(row<rows-1)out.push(cellIndex(row+1,col));
+      if(col>0)out.push(cellIndex(row,col-1));
+      return out;
+    };
+    // Seeded depth-first carving guarantees entry-to-outlet connectivity and creates dead ends.
+    while(stack.length){
+      const current=stack[stack.length-1];
+      const choices=neighbors(current).filter(next=>!visited.has(next));
+      if(!choices.length){stack.pop();continue;}
+      const next=choices[Math.floor(rng()*choices.length)];
+      openEdges.add(edgeKey(current,next));visited.add(next);stack.push(next);
+    }
+    for(let row=0;row<rows;row++){
+      for(let col=0;col<cols;col++){
+        const id=cellIndex(row,col);
+        if(col<cols-1&&rng()<.075)openEdges.add(edgeKey(id,id+1));
+        if(row<rows-1&&rng()<.075)openEdges.add(edgeKey(id,id+cols));
+      }
+    }
+
+    const bounds=this.ventilationMazeBounds;
+    const addPanel=(name,sx,sy,sz,x,y,z,material=this.ventDuctPanelMaterial)=>{
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
+      mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;
+      mesh.userData.fixtureLightOccluder=true;this.ventilationMazeGroup.add(mesh);return mesh;
+    };
+    const addWall=(name,sx,sz,x,z)=>{
+      if(sx<.08||sz<.08)return;
+      addPanel(name,sx,ductHeight,sz,x,ductHeight*.5,z);
+      bounds.push({minX:x-sx*.5,maxX:x+sx*.5,minZ:z-sz*.5,maxZ:z+sz*.5});
+    };
+    const xCenter=col=>gridLeft+(col+.5)*cellW;
+    const zCenter=row=>gridFrontZ-(row+.5)*cellD;
+    const addXWallOpening=(name,z,startX,length,openingCenter,openingWidth)=>{
+      if(!openingWidth){addWall(name,length,wallT,startX+length*.5,z);return;}
+      const leftEnd=openingCenter-openingWidth*.5,rightStart=openingCenter+openingWidth*.5;
+      addWall(name+"L",leftEnd-startX,wallT,(startX+leftEnd)*.5,z);
+      addWall(name+"R",startX+length-rightStart,wallT,(rightStart+startX+length)*.5,z);
+    };
+    const addZWallOpening=(name,x,startZ,length,openingCenter,openingWidth)=>{
+      if(!openingWidth){addWall(name,wallT,length,x,startZ+length*.5);return;}
+      const nearEnd=openingCenter-openingWidth*.5,farStart=openingCenter+openingWidth*.5;
+      addWall(name+"A",wallT,nearEnd-startZ,x,(startZ+nearEnd)*.5);
+      addWall(name+"B",wallT,startZ+length-farStart,x,(farStart+startZ+length)*.5);
+    };
+
+    // These 63 crawl-height cells are physical, enclosed metal passages.
+    for(let row=0;row<rows;row++){
+      for(let col=0;col<cols;col++){
+        const x=xCenter(col),z=zCenter(row);
+        addPanel("VentilationDuctCeiling",cellW-.035,.10,cellD-.035,x,ductHeight-.02,z,this.ventDuctDarkMaterial);
+        addPanel("VentilationDuctCeilingRib",cellW-.20,.055,.075,x,ductHeight-.11,z,this.ventDuctTrimMaterial);
+        if((row+col)%3===0)addPanel("VentilationDuctServicePlate",.66,.035,.42,x,ductHeight-.095,z+.62,this.ventDuctPanelMaterial);
+      }
+    }
+
+    for(let col=0;col<cols;col++){
+      const startX=gridLeft+col*cellW,cx=xCenter(col);
+      addXWallOpening("VentDuctFrontWall",gridFrontZ,startX,cellW,cx,col===entryCol?gap:0);
+      addXWallOpening("VentDuctRearWall",gridRearZ,startX,cellW,cx,col===exitCol?gap:0);
+    }
+    for(let row=0;row<rows;row++){
+      const z=zCenter(row);
+      addWall("VentDuctLeftWall",wallT,cellD,gridLeft,z);
+      addWall("VentDuctRightWall",wallT,cellD,gridLeft+gridWidth,z);
+    }
+    for(let row=0;row<rows;row++){
+      for(let col=0;col<cols-1;col++){
+        const left=cellIndex(row,col),right=cellIndex(row,col+1);
+        const open=openEdges.has(edgeKey(left,right));
+        addZWallOpening("VentDuctDividerVertical",gridLeft+(col+1)*cellW,
+          gridFrontZ-(row+1)*cellD,cellD,zCenter(row),open?gap:0);
+      }
+    }
+    for(let row=0;row<rows-1;row++){
+      const z=gridFrontZ-(row+1)*cellD;
+      for(let col=0;col<cols;col++){
+        const north=cellIndex(row+1,col),south=cellIndex(row,col);
+        const open=openEdges.has(edgeKey(north,south));
+        addXWallOpening("VentDuctDividerHorizontal",z,gridLeft+col*cellW,cellW,xCenter(col),open?gap:0);
+      }
+    }
+
+    // A physical outlet valve beside the exit gap unlocks the powered door beyond the maze.
+    const outletX=centerX+1.52;
+    const valve=addPanel("VentilationOutletValve",.82,.72,.14,outletX,.92,gridRearZ+.07,this.ventDuctTrimMaterial);
+    valve.userData.interactable={type:"ventilationExit",prompt:"Reset ventilation outlet"};
+    const lamp=new THREE.Mesh(new THREE.SphereGeometry(.085,10,8),this.ventDuctLampMaterial);
+    lamp.position.set(.18,.17,.09);valve.add(lamp);
+    const lever=new THREE.Mesh(new THREE.BoxGeometry(.07,.30,.06),this.roomDoorMetalMaterial);
+    lever.position.set(-.18,-.05,.10);lever.rotation.z=-.42;valve.add(lever);
+
+    this.ventilationCrawlBounds={
+      minX:gridLeft+wallT*.5,maxX:gridLeft+gridWidth-wallT*.5,
+      minZ:gridRearZ+wallT*.5,maxZ:gridFrontZ-wallT*.5
+    };
+    this.ventilationMazeGroup.visible=this.maintenancePuzzleType==="ventilation";
+    if(this.maintenancePuzzleType==="ventilation")this.boundaryWallBounds.push(...bounds);
+  }
+
+  buildMaintenanceBreakers(roomGroup,centerX,backZ,roomWidth,centerZ){
+    // Side-wall breakers are accessible from the entrance, before the far door unlocks.
+    const wallX=centerX-roomWidth*.5+ROOM_WALL_THICKNESS*.5+.11;
+    const positions=[
+      {index:1,x:wallX,z:centerZ+9},
+      {index:2,x:wallX,z:centerZ},
+      {index:3,x:wallX,z:centerZ-9}
+    ];
+    roomGroup.userData.breakerSwitches=[];
+    for(const spec of positions){
+      const root=new THREE.Group();root.name="MaintenanceBreaker"+spec.index;
+      root.visible=this.maintenancePuzzleType==="breakers";
+      root.position.set(spec.x,0,spec.z);root.rotation.y=Math.PI*.5;roomGroup.add(root);
+      const panel=new THREE.Mesh(new THREE.BoxGeometry(.78,1.18,.18),this.breakerPanelMaterial);
+      panel.name="BreakerPanelHousing";panel.position.set(0,1.02,0);root.add(panel);
+      const label=new THREE.Mesh(new THREE.PlaneGeometry(.34,.17),this.breakerNumberMaterials[spec.index-1]);
+      label.position.set(0,1.36,.096);root.add(label);
+      const handle=new THREE.Mesh(new THREE.BoxGeometry(.10,.32,.08),this.breakerHandleMaterial);
+      handle.name="BreakerLever";handle.position.set(0,.98,.15);handle.rotation.z=.42;root.add(handle);
+      const active=this.maintenanceDoor?.unlocked||this.breakerSequence.slice(0,this.breakerProgress).includes(spec.index);
+      const lamp=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),active?this.breakerLampOnMaterial:this.breakerLampOffMaterial);
+      lamp.name="BreakerStatusLamp";lamp.position.set(0,1.52,.11);root.add(lamp);
+      if(active)handle.rotation.z=-.42;
+      if(spec.index===3){
+        const board=new THREE.Mesh(new THREE.BoxGeometry(1.85,.76,.10),this.breakerPanelMaterial);
+        board.name="BreakerResetNoteBoard";board.position.set(0,2.02,.015);root.add(board);
+        const note=new THREE.Mesh(new THREE.PlaneGeometry(1.70,.63),this.breakerNoteMaterial);
+        note.name="BreakerResetSequence";note.position.set(0,2.02,.073);root.add(note);
+      }
+      const state={...spec,group:root,handle,lamp,ownerChunk:null,active};
+      root.userData.interactable={type:"roomBreaker",prompt:"Flip breaker "+spec.index,breakerIndex:spec.index,breakerState:state};
+      roomGroup.userData.breakerSwitches.push(state);
+    }
   }
 
   buildRoomDoor(parent,centerX,frontZ,options={},boundsTarget=null){
@@ -637,25 +835,30 @@ export class World {
   }
 
   setMaintenancePuzzleType(type,seed=1){
-    this.maintenancePuzzleType=type==="ventilation"?"ventilation":"breakers";
-    this.maintenancePuzzleSeed=(Number(seed)>>>0);
-    this.breakerProgress=0;
-    this.breakerFailTimer=0;
+    const nextType=type==="ventilation"?"ventilation":"breakers";
+    const nextSeed=(Number(seed)>>>0);
+    const changed=nextType!==this.maintenancePuzzleType||nextSeed!==this.maintenancePuzzleSeed;
+    this.maintenancePuzzleType=nextType;this.maintenancePuzzleSeed=nextSeed;
+    this.breakerProgress=0;this.breakerFailTimer=0;
     for(const door of this.roomDoors){
       if(!door)continue;
-      door.targetOpen=false;
-      door.openProgress=0;
+      door.targetOpen=false;door.openProgress=0;
       if(door.group)door.group.rotation.y=0;
       if(door.closedCollisionBounds)Object.assign(door.collisionBounds,door.closedCollisionBounds);
     }
     if(this.maintenanceDoor)this.maintenanceDoor.unlocked=false;
+    if(changed)this.buildVentilationMaze(nextSeed);
+    else if(this.ventilationMazeGroup)this.ventilationMazeGroup.visible=nextType==="ventilation";
     for(const item of this.breakerSwitches){
       if(!item?.group)continue;
-      item.group.visible=this.maintenancePuzzleType==="breakers";
-      item.active=false;
-      item.handle.rotation.z=.42;
-      item.lamp.material=this.breakerLampOffMaterial;
+      item.group.visible=nextType==="breakers";item.active=false;
+      item.handle.rotation.z=.42;item.lamp.material=this.breakerLampOffMaterial;
     }
+  }
+
+  isVentilationCrawlArea(x,z){
+    const b=this.ventilationCrawlBounds;
+    return Boolean(this.maintenancePuzzleType==="ventilation"&&b&&x>=b.minX&&x<=b.maxX&&z>=b.minZ&&z<=b.maxZ);
   }
 
   restoreMaintenancePuzzleState(state={}){
@@ -870,7 +1073,7 @@ export class World {
       if(door.interactable){
         door.interactable.prompt=door.requiresPower&&!door.unlocked
           ?(door===this.maintenanceDoor&&this.maintenancePuzzleType==="ventilation"
-            ?"Access ventilation control":"Door has no power")
+            ?"Find ventilation outlet":"Door has no power")
           :(door.targetOpen?"Close door":"Open door");
       }
     }
@@ -1088,7 +1291,8 @@ export class World {
       ...this.roomDoors.filter(door=>door.group?.parent).map(door=>door.group),
       ...(this.maintenancePuzzleType==="breakers"
         ?this.breakerSwitches.filter(item=>item.group?.parent&&item.group.visible).map(item=>item.group)
-        :[])
+        :[]),
+      ...(this.maintenancePuzzleType==="ventilation"&&this.ventilationExitPanel?[this.ventilationExitPanel]:[])
     ];
   }
 

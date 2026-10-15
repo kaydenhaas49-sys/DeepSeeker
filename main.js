@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-breakerroom1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-ventcrawl3d1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261015-roomsbreakers1";
+import { Player } from "./player.js?v=20261015-ventcrawl3d1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -2483,7 +2483,7 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
     maintenancePuzzleSeed:world.maintenancePuzzleSeed,
     maintenanceDoorUnlocked:Boolean(world.maintenanceDoor?.unlocked),
     maintenanceBreakerProgress:world.breakerProgress,
-    maintenanceVentRotations:maintenanceVentBoard?.tiles.map(tile=>tile?tile.rotation:null)||null
+    maintenanceVentRotations:null
   };
 
   const stored=persistSaveSlot(targetSlot,data);
@@ -2684,261 +2684,43 @@ function ensureHouseLoading(){
 }
 
 
-let maintenancePuzzlePanel=null;
-let maintenancePuzzleGrid=null;
-let maintenancePuzzleStatus=null;
-let maintenanceVentBoard=null;
 const MAINTENANCE_PUZZLE_TYPES=["breakers","ventilation"];
 const MAINTENANCE_PUZZLE_LAST_KEY="deepseeker-last-maintenance-puzzle";
-const VENT_DIRS=["N","E","S","W"];
-const VENT_DELTAS={N:[-1,0],E:[0,1],S:[1,0],W:[0,-1]};
-const VENT_OPPOSITE={N:"S",E:"W",S:"N",W:"E"};
-
-function makeVentilationBoard(seed){
-  const rng=mulberry32((Number(seed)>>>0)||1);
-  const rows=4,cols=4,startRow=Math.floor(rng()*2),path=[];
-  for(let col=0;col<cols;col++)path.push({row:startRow,col});
-  path.push({row:startRow+1,col:cols-1});
-  for(let col=cols-2;col>=0;col--)path.push({row:startRow+1,col});
-  path.push({row:startRow+2,col:0});
-  for(let col=1;col<cols;col++)path.push({row:startRow+2,col});
-  const tiles=Array.from({length:rows*cols},(_,index)=>({
-    index,row:Math.floor(index/cols),col:index%cols,
-    active:false,rotation:0,initialRotation:0,baseConnections:[]
-  }));
-  const direction=(from,to)=>{
-    if(to.row<from.row)return "N";
-    if(to.col>from.col)return "E";
-    if(to.row>from.row)return "S";
-    return "W";
-  };
-  path.forEach((cell,i)=>{
-    const connections=[];
-    connections.push(i===0?"W":direction(cell,path[i-1]));
-    connections.push(i===path.length-1?"E":direction(cell,path[i+1]));
-    const tile=tiles[cell.row*cols+cell.col];
-    tile.active=true;tile.baseConnections=connections;
-    tile.rotation=Math.floor(rng()*4);tile.initialRotation=tile.rotation;
-  });
-  const board={
-    rows,cols,tiles,
-    startIndex:path[0].row*cols+path[0].col,
-    endIndex:path[path.length-1].row*cols+path[path.length-1].col,
-    seed:Number(seed)>>>0,solved:false
-  };
-  for(let attempt=0;attempt<8&&isVentilationBoardSolved(board);attempt++){
-    for(const tile of tiles)if(tile.active)tile.rotation=(tile.rotation+1)%4;
-  }
-  for(const tile of tiles)tile.initialRotation=tile.rotation;
-  return board;
-}
-
-function ventilationConnections(tile){
-  return tile.baseConnections.map(direction=>{
-    const index=VENT_DIRS.indexOf(direction);
-    return VENT_DIRS[(index+tile.rotation)%4];
-  });
-}
-
-function isVentilationBoardSolved(board){
-  if(!board)return false;
-  const start=board.tiles[board.startIndex],endIndex=board.endIndex;
-  if(!start?.active||!ventilationConnections(start).includes("W"))return false;
-  const visited=new Set([start.index]),queue=[start.index];
-  while(queue.length){
-    const index=queue.shift(),tile=board.tiles[index];
-    const connections=ventilationConnections(tile);
-    if(index===endIndex&&connections.includes("E"))return true;
-    for(const dir of connections){
-      const [dr,dc]=VENT_DELTAS[dir],row=tile.row+dr,col=tile.col+dc;
-      if(row<0||row>=board.rows||col<0||col>=board.cols)continue;
-      const nextIndex=row*board.cols+col,next=board.tiles[nextIndex];
-      if(!next?.active||visited.has(nextIndex))continue;
-      if(!ventilationConnections(next).includes(VENT_OPPOSITE[dir]))continue;
-      visited.add(nextIndex);queue.push(nextIndex);
-    }
-  }
-  return false;
-}
 
 function applyMaintenancePuzzleConfiguration(type,seed,state={}){
   const puzzleType=type==="ventilation"?"ventilation":"breakers";
   const parsedSeed=Number.isFinite(Number(seed))?(Number(seed)>>>0):1;
   world.setMaintenancePuzzleType(puzzleType,parsedSeed);
-  maintenanceVentBoard=makeVentilationBoard(parsedSeed);
-  const savedRotations=Array.isArray(state.ventRotations)?state.ventRotations:
-    (Array.isArray(state.rotations)?state.rotations:null);
-  if(puzzleType==="ventilation"&&savedRotations&&savedRotations.length===maintenanceVentBoard.tiles.length){
-    savedRotations.forEach((rotation,index)=>{
-      const tile=maintenanceVentBoard.tiles[index];
-      if(tile?.active&&Number.isFinite(Number(rotation)))tile.rotation=((Math.floor(Number(rotation))%4)+4)%4;
-    });
-  }
-  for(const tile of maintenanceVentBoard.tiles)tile.initialRotation=tile.rotation;
   world.restoreMaintenancePuzzleState({
     unlocked:Boolean(state.unlocked??state.maintenanceDoorUnlocked),
     breakerProgress:Number(state.breakerProgress??state.maintenanceBreakerProgress)||0
   });
   try{localStorage.setItem(MAINTENANCE_PUZZLE_LAST_KEY,puzzleType);}catch{}
-  if(maintenancePuzzlePanel?.classList.contains("open"))drawVentilationPuzzle();
 }
 
 function configureMaintenancePuzzleForRun(save=null,{broadcast=true}={}){
-  const savedType=MAINTENANCE_PUZZLE_TYPES.includes(save?.maintenancePuzzleType)
-    ?save.maintenancePuzzleType:null;
+  const savedType=MAINTENANCE_PUZZLE_TYPES.includes(save?.maintenancePuzzleType)?save.maintenancePuzzleType:null;
   let type=savedType;
   if(!type){
     let previous="";
     try{previous=localStorage.getItem(MAINTENANCE_PUZZLE_LAST_KEY)||"";}catch{}
-    // With only two puzzle types, keep both in the draw so each new run is
-    // genuinely random. Once the pool grows, avoid repeating the previous type.
     const choices=MAINTENANCE_PUZZLE_TYPES.length>2
-      ?MAINTENANCE_PUZZLE_TYPES.filter(item=>item!==previous)
-      :MAINTENANCE_PUZZLE_TYPES;
+      ?MAINTENANCE_PUZZLE_TYPES.filter(item=>item!==previous):MAINTENANCE_PUZZLE_TYPES;
     const pool=choices.length?choices:MAINTENANCE_PUZZLE_TYPES;
     type=pool[Math.floor(Math.random()*pool.length)];
   }
   const storedSeed=Number(save?.maintenancePuzzleSeed);
   const seed=Number.isFinite(storedSeed)&&storedSeed>=0
-    ?(storedSeed>>>0)
-    :(Math.floor(Math.random()*0xffffffff)>>>0);
+    ?(storedSeed>>>0):(Math.floor(Math.random()*0xffffffff)>>>0);
   applyMaintenancePuzzleConfiguration(type,seed,{
-    unlocked:Boolean(save?.maintenanceDoorUnlocked),
-    breakerProgress:save?.maintenanceBreakerProgress,
-    ventRotations:save?.maintenanceVentRotations
+    unlocked:Boolean(save?.maintenanceDoorUnlocked),breakerProgress:save?.maintenanceBreakerProgress
   });
   if(broadcast&&multiplayer?.socket?.readyState===WebSocket.OPEN&&multiplayer.isWorldAuthority()){
     multiplayer.broadcastWorldEvent("maintenance_puzzle_select","maintenance-puzzle",{
-      type:world.maintenancePuzzleType,
-      seed:world.maintenancePuzzleSeed,
-      unlocked:Boolean(world.maintenanceDoor?.unlocked),
-      breakerProgress:world.breakerProgress,
-      ventRotations:maintenanceVentBoard?.tiles.map(tile=>tile?tile.rotation:null)||null
+      type:world.maintenancePuzzleType,seed:world.maintenancePuzzleSeed,
+      unlocked:Boolean(world.maintenanceDoor?.unlocked),breakerProgress:world.breakerProgress
     });
   }
-}
-
-function ensureVentilationPuzzlePanel(){
-  if(maintenancePuzzlePanel)return;
-  const panel=document.createElement("div");
-  panel.id="maintenanceVentilationPuzzle";
-  panel.style.cssText="position:fixed;inset:0;z-index:82;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(2,4,3,.84);backdrop-filter:blur(7px);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#e4e3d0";
-  panel.innerHTML=
-    "<style>"+
-    "#maintenanceVentilationPuzzle .ventCard{width:min(560px,100%);padding:clamp(18px,4vw,30px);box-sizing:border-box;background:linear-gradient(180deg,#1d211b,#0b0e0b);border:1px solid #535c49;box-shadow:0 24px 100px #000}"+
-    "#maintenanceVentilationPuzzle .ventKicker{font-size:10px;letter-spacing:3px;color:#b3b79a}"+
-    "#maintenanceVentilationPuzzle h2{margin:13px 0 7px;font-size:clamp(19px,4vw,25px);letter-spacing:1.5px}"+
-    "#maintenanceVentilationPuzzle .ventInstructions{font-size:12px;line-height:1.65;color:#b5baac;margin:0 0 18px}"+
-    "#maintenanceVentilationPuzzle .ventEndpoints{display:flex;justify-content:space-between;margin:0 0 7px;font-size:10px;letter-spacing:2px;color:#bac19b}"+
-    "#maintenanceVentilationPuzzle .ventPipeGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-width:396px;margin:0 auto}"+
-    "#maintenanceVentilationPuzzle .ventPipeTile,#maintenanceVentilationPuzzle .ventBlank{position:relative;aspect-ratio:1;min-width:0;border:1px solid #454c3d;background:#151912;border-radius:3px;display:flex;align-items:center;justify-content:center}"+
-    "#maintenanceVentilationPuzzle .ventPipeTile{padding:4px;cursor:pointer;touch-action:manipulation}"+
-    "#maintenanceVentilationPuzzle .ventPipeTile:hover{background:#232b1e;border-color:#9da879}"+
-    "#maintenanceVentilationPuzzle .ventPipeTile:focus-visible{outline:2px solid #d3dca5;outline-offset:1px}"+
-    "#maintenanceVentilationPuzzle .ventPipeTile svg{width:100%;height:100%;overflow:visible}"+
-    "#maintenanceVentilationPuzzle .ventPipeTile .ventTag{position:absolute;bottom:3px;font-size:7px;letter-spacing:1px;color:#d5deaa}"+
-    "#maintenanceVentilationPuzzle .ventBlank{background:rgba(4,6,4,.52);border-color:rgba(70,77,60,.3)}"+
-    "#maintenanceVentilationPuzzle .ventStatus{min-height:36px;margin:14px 0 0;font-size:11px;line-height:1.6;color:#c8cdb6;text-align:center}"+
-    "#maintenanceVentilationPuzzle .ventActions{display:flex;gap:8px;margin-top:12px}"+
-    "#maintenanceVentilationPuzzle .ventActions button{flex:1;min-height:42px;padding:10px 12px;background:#20261c;color:#e4e3d0;border:1px solid #5c654a;font:11px ui-monospace,monospace;letter-spacing:1px;cursor:pointer}"+
-    "#maintenanceVentilationPuzzle .ventActions button:hover{background:#303927}"+
-    "#maintenanceVentilationPuzzle .ventActions .ventClose{flex:0 0 auto;background:#191b18;border-color:#42453c}"+
-    "@media(max-width:420px){#maintenanceVentilationPuzzle .ventPipeGrid{gap:4px}#maintenanceVentilationPuzzle .ventPipeTile{padding:2px}}"+
-    "</style>"+
-    "<section class='ventCard' role='dialog' aria-modal='true' aria-labelledby='ventTitle'>"+
-      "<div class='ventKicker'>MAINTENANCE ACCESS · AIRFLOW CONTROL</div>"+
-      "<h2 id='ventTitle'>VENTILATION ROUTING</h2>"+
-      "<p class='ventInstructions'>ROTATE THE PIPE TILES UNTIL AIR CAN TRAVEL FROM THE INLET TO THE EXIT. Every pipe connection must line up with its neighbour.</p>"+
-      "<div class='ventEndpoints'><span>← INLET</span><span>EXIT →</span></div>"+
-      "<div class='ventPipeGrid' id='maintenanceVentilationGrid'></div>"+
-      "<div class='ventStatus' id='maintenanceVentilationStatus' aria-live='polite'>Click a pipe tile to rotate it.</div>"+
-      "<div class='ventActions'><button type='button' id='maintenanceVentilationReset'>RESET ROUTE</button><button type='button' class='ventClose' id='maintenanceVentilationClose'>CLOSE</button></div>"+
-    "</section>";
-  document.body.appendChild(panel);
-  maintenancePuzzlePanel=panel;
-  maintenancePuzzleGrid=panel.querySelector("#maintenanceVentilationGrid");
-  maintenancePuzzleStatus=panel.querySelector("#maintenanceVentilationStatus");
-  panel.querySelector("#maintenanceVentilationClose").addEventListener("click",closeVentilationPuzzle);
-  panel.querySelector("#maintenanceVentilationReset").addEventListener("click",()=>{
-    if(!maintenanceVentBoard)return;
-    for(const tile of maintenanceVentBoard.tiles)if(tile.active)tile.rotation=tile.initialRotation;
-    maintenanceVentBoard.solved=false;
-    drawVentilationPuzzle("Route reset. Find the open path.");
-  });
-  panel.addEventListener("pointerdown",event=>{
-    if(event.target===panel)closeVentilationPuzzle();
-  });
-}
-
-function drawVentilationPuzzle(message=null){
-  if(!maintenancePuzzleGrid||!maintenanceVentBoard)return;
-  maintenancePuzzleGrid.innerHTML="";
-  for(const tile of maintenanceVentBoard.tiles){
-    if(!tile.active){
-      const blank=document.createElement("div");
-      blank.className="ventBlank";blank.setAttribute("aria-hidden","true");
-      maintenancePuzzleGrid.appendChild(blank);
-      continue;
-    }
-    const button=document.createElement("button");
-    button.type="button";button.className="ventPipeTile";
-    button.setAttribute("aria-label","Rotate pipe at row "+(tile.row+1)+", column "+(tile.col+1));
-    const connections=ventilationConnections(tile);
-    const edge={N:[50,7],E:[93,50],S:[50,93],W:[7,50]};
-    const line=(dir)=>{
-      const [x,y]=edge[dir];
-      return "<line x1='50' y1='50' x2='"+x+"' y2='"+y+"'/>";
-    };
-    const accent=maintenanceVentBoard.solved?"#97d58c":"#d6d0ad";
-    const paths=connections.map(line).join("");
-    button.innerHTML="<svg viewBox='0 0 100 100' aria-hidden='true'>"+
-      "<g fill='none' stroke='#384234' stroke-width='23' stroke-linecap='square'>"+paths+"</g>"+
-      "<g fill='none' stroke='"+accent+"' stroke-width='11' stroke-linecap='square'>"+paths+"</g>"+
-      "<circle cx='50' cy='50' r='8' fill='"+accent+"' stroke='#273123' stroke-width='3'/></svg>";
-    if(tile.index===maintenanceVentBoard.startIndex){
-      const tag=document.createElement("span");tag.className="ventTag";tag.textContent="IN";button.appendChild(tag);
-    }else if(tile.index===maintenanceVentBoard.endIndex){
-      const tag=document.createElement("span");tag.className="ventTag";tag.textContent="OUT";button.appendChild(tag);
-    }
-    button.disabled=maintenanceVentBoard.solved;
-    button.addEventListener("click",()=>{
-      if(maintenanceVentBoard.solved)return;
-      tile.rotation=(tile.rotation+1)%4;
-      if(isVentilationBoardSolved(maintenanceVentBoard)){
-        maintenanceVentBoard.solved=true;
-        const completed=world.completeMaintenancePuzzle("ventilation");
-        maintenancePuzzleStatus.textContent="AIRFLOW RESTORED. MAINTENANCE DOOR UNLOCKED.";
-        drawVentilationPuzzle();
-        if(completed){
-          if(multiplayer?.socket?.readyState===WebSocket.OPEN){
-            multiplayer.broadcastWorldEvent("maintenance_puzzle_solved","maintenance-puzzle",{type:"ventilation"});
-          }
-          saveGame(undefined,{confirmOverwrite:false});
-        }
-      }else{
-        drawVentilationPuzzle("Airflow blocked. Rotate the connected pipes until the route reaches the exit.");
-      }
-    });
-    maintenancePuzzleGrid.appendChild(button);
-  }
-  if(message)maintenancePuzzleStatus.textContent=message;
-  else if(maintenanceVentBoard.solved)maintenancePuzzleStatus.textContent="AIRFLOW RESTORED. MAINTENANCE DOOR UNLOCKED.";
-}
-
-function openVentilationPuzzle(){
-  ensureVentilationPuzzlePanel();
-  drawVentilationPuzzle();
-  if(document.pointerLockElement)document.exitPointerLock();
-  maintenancePuzzlePanel.classList.add("open");
-  maintenancePuzzlePanel.style.display="flex";
-  player.keys.clear();
-}
-
-function closeVentilationPuzzle(){
-  if(!maintenancePuzzlePanel)return;
-  maintenancePuzzlePanel.classList.remove("open");
-  maintenancePuzzlePanel.style.display="none";
-  if(gameStarted&&!gameEnded&&!houseMode)player.lock();
 }
 
 function startGame(save=null,saveSlot=selectedSaveSlot){
@@ -3315,13 +3097,11 @@ const interaction=new InteractionSystem({
       const door=target.doorState;
       if(!door)return false;
       if(door.requiresPower&&!door.unlocked){
-        if(door===world.maintenanceDoor&&world.maintenancePuzzleType==="ventilation"){
-          openVentilationPuzzle();
-          return true;
-        }
-        const message="NO POWER. FIND THE THREE BREAKERS.";
+        const message=door===world.maintenanceDoor&&world.maintenancePuzzleType==="ventilation"
+          ?"AIRFLOW BLOCKED. CRAWL THROUGH THE DUCTS TO THE OUTLET VALVE."
+          :"NO POWER. FIND THE THREE BREAKERS.";
         eventText.textContent=message;eventText.style.opacity="1";
-        setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2200);
+        setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2600);
         return true;
       }
       target.toggle();
@@ -3331,6 +3111,20 @@ const interaction=new InteractionSystem({
       const message=door.targetOpen?"THE DOOR OPENS.":"THE DOOR CLOSES.";
       eventText.textContent=message;eventText.style.opacity="1";
       setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},1600);
+      return true;
+    }
+    if(target.type==="ventilationExit"){
+      if(world.maintenancePuzzleType!=="ventilation")return false;
+      const completed=world.completeMaintenancePuzzle("ventilation");
+      if(completed){
+        const message="AIRFLOW RESTORED. MAINTENANCE DOOR UNLOCKED.";
+        eventText.textContent=message;eventText.style.opacity="1";
+        setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2600);
+        if(multiplayer?.socket?.readyState===WebSocket.OPEN){
+          multiplayer.broadcastWorldEvent("maintenance_puzzle_solved","maintenance-puzzle",{type:"ventilation"});
+        }
+        saveGame(undefined,{confirmOverwrite:false});
+      }
       return true;
     }
     if(target.type==="roomBreaker"){
@@ -8962,7 +8756,6 @@ function animate(){
     !controlsOpen &&
     !chatOpen &&
     !levelRunState.keypad?.classList.contains("open") &&
-    !maintenancePuzzlePanel?.classList.contains("open") &&
     !securityCameras.active &&
     !adminOverlay.classList.contains("open") &&
     !computerSystem.openState
