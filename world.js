@@ -887,7 +887,7 @@ export class World {
     );
 
     const flickerTime=now*.003;
-    const lightBudget=LOW_END_DEVICE?4:5;
+    const lightBudget=LOW_END_DEVICE?3:4;
     const nearestLights=this.fixtureLights
       .map(item=>({
         item,
@@ -1164,7 +1164,7 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=cracked ? 2.5+rng()*.6 : 4.8+rng()*1.2;
+      const power=cracked ? 1.6+rng()*.45 : 3.1+rng()*.8;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
       const y=WALL_H-.035;

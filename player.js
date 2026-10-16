@@ -1,7 +1,7 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { EYE, WALL_H } from "./world.js?v=20261016-moodlights2";
+import { EYE, WALL_H } from "./world.js?v=20261016-moodlights3";
 import { createHazmatCharacter } from "./character.js";
 
 const WALK_SPEED = 4; // m/s

@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-moodlights2";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-moodlights3";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261016-moodlights2";
+import { Player } from "./player.js?v=20261016-moodlights3";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -239,19 +239,19 @@ let debugPerfMaxFrameMs=0;
 renderer.setPixelRatio(currentPixelRatio);
 // Keep the game's contrast/lighting response intact on Chromebooks.
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.08;
+renderer.toneMappingExposure=1.0;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
 // Keep distant walls readable instead of fading into near-black fog. Chromebooks
 // get a little more range and a warmer fog so the Backrooms stay navigable.
-const BACKROOMS_FOG_COLOR=LOW_END_PERFORMANCE?0x302d22:0x262318;
+const BACKROOMS_FOG_COLOR=LOW_END_PERFORMANCE?0x282619:0x201f15;
 scene.background=new THREE.Color(BACKROOMS_FOG_COLOR);
 scene.fog=new THREE.Fog(
   BACKROOMS_FOG_COLOR,
-  LOW_END_PERFORMANCE?14:16,
-  LOW_END_PERFORMANCE?72:84
+  LOW_END_PERFORMANCE?13:15,
+  LOW_END_PERFORMANCE?66:78
 );
 
 const camera=new THREE.PerspectiveCamera(
@@ -450,9 +450,10 @@ function updateTutorialOpenRoomLights(dt=0){
   if(tutorialLightsOutState==="flickering"){
     tutorialLightsOutElapsed+=Math.min(Math.max(dt,0),.1);
     const t=tutorialLightsOutElapsed;
-    const litWindows=[[0,.11],[.18,.27],[.36,.42],[.52,.60],[.72,.77]];
+    // Slow, uneven fluorescent failures: linger on, hesitate, then finally die.
+    const litWindows=[[0,.34],[.70,.91],[1.34,1.60],[2.03,2.25],[2.72,2.90],[3.24,3.34]];
     tutorialCeilingLightsOn=litWindows.some(([start,end])=>t>=start&&t<end);
-    if(t>=.94){
+    if(t>=3.60){
       tutorialLightsOutState="off";
       tutorialCeilingLightsOn=false;
     }
@@ -505,11 +506,11 @@ function disableTutorialOpenRoom(){
 }
 
 // Chromebook-friendly fill without washing out the yellow wallpaper and shadows.
-const WORLD_HEMISPHERE_BASE_INTENSITY=LOW_END_PERFORMANCE?0.46:0.31;
-const WORLD_AMBIENT_BASE_INTENSITY=LOW_END_PERFORMANCE?0.12:0.075;
-const hemi=new THREE.HemisphereLight(0xc2b889,0x33291a,WORLD_HEMISPHERE_BASE_INTENSITY);
+const WORLD_HEMISPHERE_BASE_INTENSITY=LOW_END_PERFORMANCE?0.30:0.20;
+const WORLD_AMBIENT_BASE_INTENSITY=LOW_END_PERFORMANCE?0.065:0.035;
+const hemi=new THREE.HemisphereLight(0xb5a77d,0x2d2417,WORLD_HEMISPHERE_BASE_INTENSITY);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0x8f815d,WORLD_AMBIENT_BASE_INTENSITY);
+const ambient=new THREE.AmbientLight(0x827451,WORLD_AMBIENT_BASE_INTENSITY);
 scene.add(ambient);
 
 
@@ -5504,9 +5505,9 @@ player.hands.visible=true;
 const spiderEntity=new THREE.Group();
 spiderEntity.name="SpiderEntity";
 spiderEntity.visible=false;
-const spiderRevealLight=new THREE.PointLight(0xff160f,0,42,1.45);
-spiderRevealLight.position.set(0,1.2,0);
-spiderEntity.add(spiderRevealLight);
+// Kept as a lightweight compatibility state only. The spider must not emit
+// its own red light; use the flashlight and room lighting to reveal its shape.
+const spiderRevealLight={visible:false,intensity:0};
 
 scene.add(spiderEntity);
 
@@ -5565,9 +5566,8 @@ normalSpiderHunter.visualRig.root.visible=false;
 const tutorialSpiderEntity=new THREE.Group();
 tutorialSpiderEntity.name="TutorialSignalStalkerEntity";
 tutorialSpiderEntity.visible=false;
-const tutorialSpiderRevealLight=new THREE.PointLight(0xff160f,0,42,1.45);
-tutorialSpiderRevealLight.position.set(0,1.3,0);
-tutorialSpiderEntity.add(tutorialSpiderRevealLight);
+// Tutorial uses the same no-glow rule as normal gameplay.
+const tutorialSpiderRevealLight={visible:false,intensity:0};
 scene.add(tutorialSpiderEntity);
 
 const spiderHunter=new SpiderHunter({
