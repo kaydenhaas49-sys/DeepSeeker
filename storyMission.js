@@ -1,20 +1,19 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 // Optional CC0 models served directly from 3DAssets.dev's immutable GLB CDN.
 // These never participate in the initial loading gate: interaction markers work
 // even if a decorative model request fails.
 const ASSETS = Object.freeze({
   stairwell: "https://cdn.3dassets.dev/assets/25338/v1/model.glb",
-  transmitter: "https://cdn.3dassets.dev/assets/30259/v1/model.glb",
-  radio: "https://cdn.3dassets.dev/assets/31047/v1/model.glb",
   fireDoor: "https://cdn.3dassets.dev/assets/25820/v1/model.glb",
   poolroom: "https://cdn.3dassets.dev/assets/25335/v1/model.glb",
 });
 
 const RELAYS = Object.freeze([
-  { id: 0, title: "FIELD RADIO", x: -80, z: -92, model: "radio" },
-  { id: 1, title: "SIGNAL RELAY 02", x: -80, z: -238, model: "transmitter" },
-  { id: 2, title: "SIGNAL RELAY 03", x: -80, z: -394, model: "transmitter" },
+  { id: 0, title: "FIELD RADIO", x: -80, z: -92, device: "radio" },
+  { id: 1, title: "SIGNAL RELAY 02", x: -80, z: -238, device: "transmitter" },
+  { id: 2, title: "SIGNAL RELAY 03", x: -80, z: -394, device: "transmitter" },
 ]);
 
 const STAIRWELLS = Object.freeze([
@@ -30,6 +29,227 @@ function makeBox(parent, name, w, h, d, x, y, z, material) {
   mesh.receiveShadow = true;
   parent.add(mesh);
   return mesh;
+}
+
+
+
+function addDeviceMesh(parent, name, geometry, material, x=0, y=0, z=0, rotation=[0,0,0]) {
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = name;
+  mesh.position.set(x,y,z);
+  mesh.rotation.set(rotation[0],rotation[1],rotation[2]);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addDeviceTube(parent, name, points, radius, material) {
+  const curve = new THREE.CatmullRomCurve3(points.map(point => new THREE.Vector3(...point)));
+  return addDeviceMesh(parent,name,new THREE.TubeGeometry(curve,24,radius,8,false),material);
+}
+
+function makeRelayDisplayTexture(relay, active=false) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 384;
+  canvas.height = 192;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#06100d";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle = "#436957";
+  ctx.lineWidth = 5;
+  ctx.strokeRect(7,7,370,178);
+  ctx.fillStyle = "#85c59c";
+  ctx.font = "bold 24px monospace";
+  ctx.fillText(relay.device === "radio" ? "FIELD LINK" : "RF TRANSMITTER",20,38);
+  ctx.fillStyle = "#bde9c7";
+  ctx.font = "bold 36px monospace";
+  ctx.fillText("CH 0"+(relay.id+1),20,91);
+  ctx.fillStyle = "#df9a54";
+  ctx.font = "bold 23px monospace";
+  ctx.fillText(active ? "SIGNAL LOCKED" : "NO CARRIER",20,127);
+  ctx.fillStyle = "#345a45";
+  for(let i=0;i<14;i++){
+    const h=8+((i*17+relay.id*11)%30);
+    ctx.fillRect(20+i*24,164-h,12,h);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+function makeDishGeometry(radius=0.23, depth=0.12, radialSegments=12, segments=28) {
+  const positions=[];
+  const indices=[];
+  for(let ring=0;ring<=radialSegments;ring++){
+    const t=ring/radialSegments;
+    const r=radius*t;
+    const z=-depth*(1-t*t);
+    for(let segment=0;segment<=segments;segment++){
+      const angle=segment/segments*Math.PI*2;
+      positions.push(Math.cos(angle)*r,Math.sin(angle)*r,z);
+    }
+  }
+  for(let ring=0;ring<radialSegments;ring++){
+    for(let segment=0;segment<segments;segment++){
+      const a=ring*(segments+1)+segment;
+      const b=a+segments+1;
+      indices.push(a,b,a+1,a+1,b,b+1);
+    }
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function buildRelayDevice(station, relay, baseMaterial) {
+  const root=new THREE.Group();
+  root.name=relay.device==="radio" ? "DetailedFieldRadio" : "DetailedSignalTransmitter";
+  station.add(root);
+
+  const housing=new THREE.MeshStandardMaterial({
+    color:relay.device==="radio"?0x505847:(relay.id===1?0x434a43:0x45433a),
+    roughness:0.76,metalness:0.22
+  });
+  const trim=new THREE.MeshStandardMaterial({color:0x252c28,roughness:0.54,metalness:0.52});
+  const edgeMetal=new THREE.MeshStandardMaterial({color:0x73776b,roughness:0.42,metalness:0.66});
+  const panelMat=new THREE.MeshStandardMaterial({color:0x171c19,roughness:0.48,metalness:0.32});
+  const rubber=new THREE.MeshStandardMaterial({color:0x101512,roughness:0.94,metalness:0.02});
+  let screenTexture=makeRelayDisplayTexture(relay);
+  const screenMat=new THREE.MeshBasicMaterial({map:screenTexture,toneMapped:false});
+  const redLed=new THREE.MeshStandardMaterial({color:0xb33a27,emissive:0x601005,emissiveIntensity:0.8,roughness:0.3});
+  const greenLed=new THREE.MeshStandardMaterial({color:0x58b87e,emissive:0x087432,emissiveIntensity:1.05,roughness:0.24});
+  const amberLed=new THREE.MeshStandardMaterial({color:0xe5a64d,emissive:0x82440b,emissiveIntensity:0.72,roughness:0.28});
+
+  addDeviceMesh(station,"SignalRelayPedestal",
+    new RoundedBoxGeometry(1.72,0.16,1.32,4,0.045),baseMaterial,0,0.08,0);
+  for(const x of [-0.72,0.72]){
+    for(const z of [-0.52,0.52]){
+      addDeviceMesh(root,"PedestalBolt",new THREE.CylinderGeometry(0.025,0.025,0.018,10),edgeMetal,x,0.165,z);
+    }
+  }
+
+  let statusLed;
+  if(relay.device==="radio"){
+    addDeviceMesh(root,"RadioMainHousing",new RoundedBoxGeometry(1.04,0.50,0.43,5,0.055),
+      housing,0,0.46,0);
+    addDeviceMesh(root,"RadioLowerRubberBumper",new RoundedBoxGeometry(1.06,0.075,0.45,4,0.022),
+      rubber,0,0.225,0);
+    addDeviceMesh(root,"RadioFrontPanel",new RoundedBoxGeometry(0.90,0.36,0.035,4,0.012),
+      panelMat,0,0.46,0.224);
+
+    for(let row=0;row<5;row++){
+      for(let col=0;col<5;col++){
+        addDeviceMesh(root,"SpeakerPerforation",new THREE.CircleGeometry(0.010,8),rubber,
+          -0.30+col*0.045,0.385+row*0.036,0.247);
+      }
+    }
+    addDeviceMesh(root,"RadioScreenRim",new RoundedBoxGeometry(0.31,0.145,0.018,3,0.008),
+      edgeMetal,0.205,0.525,0.24);
+    addDeviceMesh(root,"RadioStatusScreen",new THREE.PlaneGeometry(0.27,0.105),
+      screenMat,0.205,0.525,0.252);
+    for(const x of [0.14,0.28]){
+      addDeviceMesh(root,"TuningKnobBase",new THREE.CylinderGeometry(0.052,0.052,0.026,16),
+        rubber,x,0.365,0.246,[Math.PI/2,0,0]);
+      addDeviceMesh(root,"TuningKnob",new THREE.CylinderGeometry(0.037,0.037,0.038,16),
+        edgeMetal,x,0.365,0.268,[Math.PI/2,0,0]);
+      addDeviceMesh(root,"KnobGrip",new THREE.BoxGeometry(0.008,0.038,0.012),rubber,
+        x,0.365,0.291,[0,0,-0.35]);
+    }
+    for(let i=0;i<3;i++){
+      addDeviceMesh(root,"RadioFunctionButton",new THREE.CylinderGeometry(0.018,0.018,0.012,10),
+        i===0?redLed:(i===1?amberLed:greenLed),0.37,0.37+i*0.075,0.25,[Math.PI/2,0,0]);
+    }
+    addDeviceTube(root,"RadioCarryHandle",
+      [[-0.27,0.72,-0.04],[-0.27,0.89,-0.04],[-0.12,0.94,-0.04],[0.12,0.94,-0.04],[0.27,0.89,-0.04],[0.27,0.72,-0.04]],
+      0.018,trim);
+    addDeviceMesh(root,"AntennaFoot",new THREE.CylinderGeometry(0.045,0.052,0.075,12),
+      edgeMetal,0.37,0.755,-0.12);
+    addDeviceMesh(root,"RadioAntenna",new THREE.CylinderGeometry(0.008,0.018,0.60,10),
+      edgeMetal,0.37,1.08,-0.12);
+    const coilPoints=[];
+    for(let i=0;i<=32;i++){
+      const angle=i/32*Math.PI*8;
+      coilPoints.push([0.37+Math.cos(angle)*0.018,0.82+(i/32)*0.12,-0.12+Math.sin(angle)*0.018]);
+    }
+    addDeviceTube(root,"RadioAntennaCoil",coilPoints,0.006,trim);
+    addDeviceTube(root,"RadioCoiledCable",
+      [[-0.48,0.58,0.05],[-0.58,0.50,0.02],[-0.56,0.33,-0.09],[-0.43,0.25,-0.17]],
+      0.018,rubber);
+    statusLed=addDeviceMesh(root,"RadioLinkStatusLED",new THREE.SphereGeometry(0.033,14,10),
+      redLed,0.37,0.64,0.25);
+  }else{
+    addDeviceMesh(root,"TransmitterCabinet",new RoundedBoxGeometry(0.91,1.10,0.49,5,0.045),
+      housing,0,0.76,0);
+    addDeviceMesh(root,"TransmitterFrontPlate",new RoundedBoxGeometry(0.73,0.84,0.035,4,0.012),
+      panelMat,0,0.76,0.258);
+    addDeviceMesh(root,"TransmitterScreenFrame",new RoundedBoxGeometry(0.43,0.19,0.018,3,0.008),
+      edgeMetal,-0.04,1.075,0.283);
+    addDeviceMesh(root,"TransmitterSignalScreen",new THREE.PlaneGeometry(0.38,0.14),
+      screenMat,-0.04,1.075,0.295);
+    for(const x of [-0.49,0.49]){
+      addDeviceMesh(root,"CabinetSideRail",new RoundedBoxGeometry(0.055,0.74,0.13,3,0.014),
+        trim,x,0.78,-0.055);
+    }
+    for(let i=0;i<8;i++){
+      addDeviceMesh(root,"TransmitterVent",new RoundedBoxGeometry(0.045,0.012,0.012,2,0.004),
+        rubber,-0.24+i*0.068,0.47,0.284);
+    }
+    for(let i=0;i<3;i++){
+      addDeviceMesh(root,"SignalStrengthLED",new THREE.SphereGeometry(0.025,12,8),
+        i===0?redLed:(i===1?amberLed:greenLed),0.22+i*0.075,0.91,0.286);
+    }
+    statusLed=addDeviceMesh(root,"RelayOnlineLED",new THREE.SphereGeometry(0.034,14,10),
+      redLed,0.25,0.67,0.288);
+
+    addDeviceMesh(root,"DishMastBase",new THREE.CylinderGeometry(0.065,0.078,0.13,16),
+      edgeMetal,-0.27,1.385,-0.08);
+    addDeviceMesh(root,"DishAntennaMast",new THREE.CylinderGeometry(0.012,0.022,0.60,12),
+      edgeMetal,-0.27,1.73,-0.08);
+    for(let i=0;i<5;i++){
+      const y=1.49+i*0.035;
+      addDeviceMesh(root,"MastTunerCoil",new THREE.TorusGeometry(0.035,0.008,6,16),
+        amberLed,-0.27,y,-0.08,[Math.PI/2,0,0]);
+    }
+    addDeviceTube(root,"DishSupportArm",
+      [[-0.17,1.39,-0.02],[-0.05,1.49,0.12],[0.08,1.59,0.27],[0.15,1.66,0.32]],
+      0.022,edgeMetal);
+    const dishMat=new THREE.MeshStandardMaterial({
+      color:0x7d8578,roughness:0.5,metalness:0.58,side:THREE.DoubleSide
+    });
+    addDeviceMesh(root,"ParabolicSignalDish",makeDishGeometry(),dishMat,0.15,1.70,0.43);
+    addDeviceMesh(root,"DishOuterRim",new THREE.TorusGeometry(0.23,0.016,8,32),
+      edgeMetal,0.15,1.70,0.43);
+    addDeviceMesh(root,"DishFeedArm",new THREE.CylinderGeometry(0.010,0.018,0.17,10),
+      edgeMetal,0.15,1.70,0.365,[Math.PI/2,0,0]);
+    addDeviceMesh(root,"DishFeedHorn",new THREE.SphereGeometry(0.035,14,10),
+      amberLed,0.15,1.70,0.465);
+    addDeviceMesh(root,"AuxAntennaFoot",new THREE.CylinderGeometry(0.035,0.045,0.07,12),
+      edgeMetal,0.31,1.35,-0.12);
+    addDeviceMesh(root,"AuxAntenna",new THREE.CylinderGeometry(0.007,0.014,0.51,10),
+      edgeMetal,0.31,1.64,-0.12);
+    addDeviceTube(root,"TransmitterCable",
+      [[0.47,0.56,-0.08],[0.56,0.47,-0.11],[0.53,0.27,-0.20],[0.34,0.22,-0.30]],
+      0.022,rubber);
+  }
+
+  return {
+    root,
+    setActive(active){
+      const online=Boolean(active);
+      statusLed.material=online?greenLed:redLed;
+      if(root.userData.online!==online){
+        root.userData.online=online;
+        screenTexture.dispose();
+        screenTexture=makeRelayDisplayTexture(relay,online);
+        screenMat.map=screenTexture;
+        screenMat.needsUpdate=true;
+      }
+    }
+  };
 }
 
 function placeModelOnFloor(model, { x = 0, z = 0, scale = 1, rotationY = 0 } = {}) {
@@ -61,6 +281,7 @@ export class StoryMissionWorld {
 
     this.interactables = [];
     this.relayCards = [];
+    this.relayDevices = [];
     this.levelRunEntrances = [];
     this.poolroomsDoorCard = null;
     this.poolroomsExitCard = null;
@@ -193,23 +414,12 @@ export class StoryMissionWorld {
       station.name = "StoryRelay_" + relay.id;
       station.position.set(relay.x, 0, relay.z);
       this.root.add(station);
-      makeBox(station, "RelayBase", 1.5, 0.18, 1.12, 0, 0.09, 0, darkMetal);
+      this.relayDevices.push(buildRelayDevice(station,relay,darkMetal));
       this.relayCards.push(this._addSign(station, {
-        x: 0, y: 2.28, z: 0.55, width: 1.65, height: 0.72,
+        x: 0, y: 2.28, z: 0.78, width: 1.65, height: 0.72,
         title: relay.title, subtitle: "PRESS E TO RESTORE", status: "OFFLINE",
         interactable: { type: "storyRelay", relayIndex: relay.id, prompt: "Restore " + relay.title },
       }));
-      this.loadModel(relay.model).then(gltf => {
-        const instance = gltf.scene.clone(true);
-        instance.name = relay.model === "radio" ? "FieldRadioModel" : "SignalTransmitterModel";
-        placeModelOnFloor(instance, {
-          x: 0, z: 0,
-          scale: relay.model === "radio" ? 1.5 : 1
-        });
-        station.add(instance);
-      }).catch(() => {
-        // The objective sign remains usable if the optional GLB cannot load.
-      });
     }
 
     this.loadModel("stairwell").then(gltf => {
@@ -335,6 +545,7 @@ export class StoryMissionWorld {
     );
     for (let i = 0; i < this.relayCards.length; i++) {
       const active = Boolean(relays[i]);
+      this.relayDevices[i]?.setActive(active);
       this._updateCard(this.relayCards[i], RELAYS[i].title,
         active ? "SIGNAL RESTORED" : "PRESS E TO RESTORE",
         active ? "ONLINE" : "OFFLINE");

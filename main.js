@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-moodlights3";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-qualityrelay1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261016-moodlights3";
+import { Player } from "./player.js?v=20261016-qualityrelay1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -17,7 +17,7 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
-import { StoryMissionWorld } from "./storyMission.js?v=20261016-missions1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261016-qualityrelay1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -51,9 +51,11 @@ function detectLowEndHardware(){
   const forcedLow=QUALITY_PARAM==="low";
   const forcedPotato=QUALITY_PARAM==="potato";
 
+  const discreteGpu=/nvidia|geforce|radeon\s+rx|arc\s*[ab]\d+/i.test(gpu);
   return {
     low:forcedLow || forcedPotato || softwareRasterizer || oldIntelGpu || weakCpu,
-    ultraLow:forcedPotato || softwareRasterizer || (cores<=2 && memory<=2)
+    ultraLow:forcedPotato || softwareRasterizer || (cores<=2 && memory<=2),
+    discreteGpu
   };
 }
 
@@ -218,7 +220,7 @@ renderer.setSize(innerWidth,innerHeight,false);
 
 const BASE_PIXEL_RATIO=LOW_END_PERFORMANCE
   ? Math.min(devicePixelRatio,ULTRA_LOW_PERFORMANCE?.55:.78)
-  : Math.min(devicePixelRatio,1.0);
+  : Math.min(devicePixelRatio,1.5);
 const HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE
   ? (ULTRA_LOW_PERFORMANCE?.50:.70)
   : .66;
@@ -260,7 +262,7 @@ const camera=new THREE.PerspectiveCamera(
   .08,
   LOW_END_PERFORMANCE?180:300
 );
-const world=new World(scene,SEED,Math.min(renderer.capabilities.getMaxAnisotropy(),4));
+const world=new World(scene,SEED,Math.min(renderer.capabilities.getMaxAnisotropy(),LOW_END_PERFORMANCE?4:8));
 
 const tutorialOpenRoomRoot=new THREE.Group();
 tutorialOpenRoomRoot.name="DeepSeekerTutorialOpenRoom";
@@ -437,7 +439,7 @@ function ensureTutorialOpenRoom(){
   tutorialOpenRoomActive=true;
   renderer.shadowMap.enabled=true;
   flashlight.castShadow=true;
-  flashlight.shadow.mapSize.set(256,256);
+  flashlight.shadow.mapSize.set(FLASHLIGHT_SHADOW_RESOLUTION,FLASHLIGHT_SHADOW_RESOLUTION);
   flashlight.shadow.bias=-0.0004;
   flashlight.shadow.normalBias=0.018;
   player.ignoreWorldCollision=true;
@@ -1362,9 +1364,15 @@ const flashlight=new THREE.SpotLight(
   LOW_END_PERFORMANCE?.72:.68,
   1.35
 );
-const ENABLE_SHADOWS=new URLSearchParams(location.search).get("shadows")==="1";
+const SHADOWS_PARAM=urlParams.get("shadows");
+const ENABLE_SHADOWS=SHADOWS_PARAM==="1" || (
+  SHADOWS_PARAM!=="0" && PERFORMANCE_TIER.discreteGpu && !LOW_END_PERFORMANCE
+);
+const FLASHLIGHT_SHADOW_RESOLUTION=PERFORMANCE_TIER.discreteGpu?768:512;
+renderer.shadowMap.enabled=ENABLE_SHADOWS;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 flashlight.castShadow=ENABLE_SHADOWS;
-if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(256,256);
+if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(FLASHLIGHT_SHADOW_RESOLUTION,FLASHLIGHT_SHADOW_RESOLUTION);
 flashlight.shadow.bias=-0.0004;
 flashlight.shadow.normalBias=0.018;
 flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);

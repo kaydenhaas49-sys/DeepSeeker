@@ -226,8 +226,29 @@ export function generateChunk(cx, cz, seed) {
 // ---------------------------------------------------------------------------
 
 const QUALITY_PARAM=new URLSearchParams(location.search).get("quality");
-// Lightweight world streaming is the default. ?quality=high opts into the heavier path.
-const LOW_END_DEVICE=QUALITY_PARAM!=="high";
+function detectLowEndWorldHardware(){
+  const cores=navigator.hardwareConcurrency||4;
+  const memory=navigator.deviceMemory||4;
+  let gpu="";
+  try{
+    const canvas=document.createElement("canvas");
+    const gl=canvas.getContext("webgl2")||canvas.getContext("webgl");
+    const ext=gl?.getExtension("WEBGL_debug_renderer_info");
+    gpu=ext
+      ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||"")
+      : String(gl?.getParameter(gl.RENDERER)||"");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  }catch{}
+  const softwareRasterizer=/swiftshader|llvmpipe|software rasterizer|microsoft basic render/i.test(gpu);
+  const oldIntelGpu=/intel(?:r)?\s+hd\s+graphics|mesa.*intel\s+hd/i.test(gpu);
+  const weakCpu=cores<=4&&memory<=4;
+  return softwareRasterizer||oldIntelGpu||weakCpu;
+}
+// Use detailed chunk streaming by default on capable devices. ?quality=low and
+// ?quality=potato remain available for slower hardware; ?quality=high forces it.
+const LOW_END_DEVICE=QUALITY_PARAM==="high"
+  ? false
+  : QUALITY_PARAM==="low"||QUALITY_PARAM==="potato"||detectLowEndWorldHardware();
 const R_GENERATE = LOW_END_DEVICE ? 1 : 2;
 const R_DISPOSE = LOW_END_DEVICE ? 1 : 3;
 // BoxGeometry face order: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z (4 verts each).
