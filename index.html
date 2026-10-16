@@ -26,6 +26,16 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 #controlsBox{width:min(680px,calc(100vw - 42px));padding:28px;border:1px solid #fff2;border-radius:18px;background:#090b09f5;box-shadow:0 25px 100px #000}
 #fitScreenButton{margin-top:16px;width:100%;min-height:40px;border:1px solid rgba(226,214,166,.18);border-radius:6px;background:rgba(226,214,166,.06);color:#d9d2b5;font:inherit;font-size:11px;letter-spacing:2px;cursor:pointer}
 #fitScreenButton:hover{background:rgba(226,214,166,.12);border-color:rgba(226,214,166,.32)}
+#controlsBox{max-height:calc(100vh - 28px);overflow-y:auto;box-sizing:border-box}
+.graphicsSettings{margin:20px 0 4px;padding:16px;border:1px solid rgba(226,214,166,.17);border-radius:8px;background:rgba(226,214,166,.035);text-align:left}
+.graphicsSettings label{display:block;margin-bottom:9px;color:#d8cfaa;font-size:10px;letter-spacing:2px}
+#graphicsQualitySelect{display:block;width:100%;min-height:42px;padding:9px 12px;border:1px solid rgba(226,214,166,.30);border-radius:5px;background:#111510;color:#ece5c6;font:inherit;font-size:13px}
+#graphicsQualityDescription{margin:10px 0 0!important;color:#aaa58e!important;font-size:11px!important;line-height:1.5}
+#graphicsQualityStatus{display:block;margin-top:8px;color:#8bce9b;font:10px/1.5 ui-monospace,monospace;letter-spacing:.8px}
+#graphicsSettingsButton{position:fixed;top:14px;right:14px;z-index:8;display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 13px;border:1px solid rgba(226,214,166,.24);border-radius:6px;background:rgba(5,7,5,.82);color:#ddd3aa;font:inherit;font-size:10px;letter-spacing:1.3px;cursor:pointer;pointer-events:auto;backdrop-filter:blur(5px)}
+#graphicsSettingsButton[hidden]{display:none}
+#graphicsSettingsButton:hover{background:rgba(45,46,33,.95);border-color:rgba(226,214,166,.5)}
+@media(max-width:650px){#controlsBox{width:calc(100vw - 24px);padding:18px}.graphicsSettings{padding:12px}.grid{gap:6px 12px}.row{font-size:11px}#graphicsSettingsButton{top:8px;right:8px;min-height:36px}}
 #controlsBox h2{margin:0 0 8px;font-size:22px;letter-spacing:4px;font-weight:500;color:#e2dcb5}
 #controlsBox p{margin:0 0 20px;color:#969788;font-size:12px;line-height:1.6}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 24px}
@@ -352,6 +362,7 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
   </div>
 </div>
 
+<button id="graphicsSettingsButton" type="button" aria-label="Open graphics settings" hidden>⚙ GRAPHICS</button>
 <div id="controlsPanel" class="hidden">
   <div id="controlsBox">
     <h2>CONTROLS</h2>
@@ -369,8 +380,20 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
       <div class="row"><span class="key">← →</span><span class="action">Switch security camera</span></div>
       <div class="row"><span class="key">F11</span><span class="action">Fit game to full screen</span></div>
     </div>
+    <section class="graphicsSettings" aria-labelledby="graphicsQualityLabel">
+      <label id="graphicsQualityLabel" for="graphicsQualitySelect">GRAPHICS QUALITY</label>
+      <select id="graphicsQualitySelect" aria-describedby="graphicsQualityDescription">
+        <option value="auto">Auto · Recommended</option>
+        <option value="low">Low · Performance</option>
+        <option value="medium">Medium · Balanced</option>
+        <option value="high">High · Detailed</option>
+        <option value="ultra">Ultra · Maximum</option>
+      </select>
+      <p id="graphicsQualityDescription">Automatically picks a good preset for this device. Your choice is saved in this browser.</p>
+      <span id="graphicsQualityStatus" role="status" aria-live="polite"></span>
+    </section>
     <button id="fitScreenButton" type="button">FIT TO SCREEN</button>
-    <p class="closeHint">TAB to close • click the world to resume</p>
+    <p class="closeHint">TAB to close · click outside to close · click the world to resume</p>
     <p class="closeHint">ENTER to chat • ESC to close chat</p>
   </div>
 </div>
@@ -463,6 +486,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
   }
 }
 </script>
-<script type="module" src="./main.js?v=20261016-qualityrelay1"></script>
+<script type="module" src="./main.js?v=20261016-qualitymenu1"></script>
 </body>
 </html>

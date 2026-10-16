@@ -227,30 +227,35 @@ export function generateChunk(cx, cz, seed) {
 
 const QUALITY_PARAM=new URLSearchParams(location.search).get("quality");
 function detectLowEndWorldHardware(){
-  const cores=navigator.hardwareConcurrency||4;
-  const memory=navigator.deviceMemory||4;
-  let gpu="";
-  try{
-    const canvas=document.createElement("canvas");
-    const gl=canvas.getContext("webgl2")||canvas.getContext("webgl");
-    const ext=gl?.getExtension("WEBGL_debug_renderer_info");
-    gpu=ext
-      ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||"")
-      : String(gl?.getParameter(gl.RENDERER)||"");
-    gl?.getExtension("WEBGL_lose_context")?.loseContext();
-  }catch{}
-  const softwareRasterizer=/swiftshader|llvmpipe|software rasterizer|microsoft basic render/i.test(gpu);
-  const oldIntelGpu=/intel(?:r)?\s+hd\s+graphics|mesa.*intel\s+hd/i.test(gpu);
-  const weakCpu=cores<=4&&memory<=4;
-  return softwareRasterizer||oldIntelGpu||weakCpu;
+ const cores=navigator.hardwareConcurrency||4,memory=navigator.deviceMemory||4;let gpu="";
+ try{const canvas=document.createElement("canvas"),gl=canvas.getContext("webgl2")||canvas.getContext("webgl");
+ const ext=gl?.getExtension("WEBGL_debug_renderer_info");
+ gpu=ext?String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||""):String(gl?.getParameter(gl.RENDERER)||"");
+ gl?.getExtension("WEBGL_lose_context")?.loseContext();}catch{}
+ const software=/swiftshader|llvmpipe|software rasterizer|microsoft basic render/i.test(gpu);
+ const oldIntel=/intel(?:r)?\s+hd\s+graphics|mesa.*intel\s+hd/i.test(gpu);
+ return software||oldIntel||(cores<=4&&memory<=4);
 }
-// Use detailed chunk streaming by default on capable devices. ?quality=low and
-// ?quality=potato remain available for slower hardware; ?quality=high forces it.
-const LOW_END_DEVICE=QUALITY_PARAM==="high"
-  ? false
-  : QUALITY_PARAM==="low"||QUALITY_PARAM==="potato"||detectLowEndWorldHardware();
-const R_GENERATE = LOW_END_DEVICE ? 1 : 2;
-const R_DISPOSE = LOW_END_DEVICE ? 1 : 3;
+const WORLD_QUALITY_PROFILES={
+ low:{lowEnd:true,generate:1,dispose:1,lightBudget:2,lightInterval:170,buildInterval:135,anisotropy:2},
+ medium:{lowEnd:false,generate:1,dispose:2,lightBudget:3,lightInterval:125,buildInterval:90,anisotropy:4},
+ high:{lowEnd:false,generate:2,dispose:3,lightBudget:4,lightInterval:100,buildInterval:65,anisotropy:8},
+ ultra:{lowEnd:false,generate:2,dispose:3,lightBudget:5,lightInterval:80,buildInterval:50,anisotropy:16}
+};
+function readWorldQualityPreset(){
+ try{const saved=localStorage.getItem("deepseeker-quality-v1");if(["auto","low","medium","high","ultra"].includes(saved))return saved;}catch{}
+ if(QUALITY_PARAM==="low"||QUALITY_PARAM==="potato")return "low";
+ return ["auto","medium","high","ultra"].includes(QUALITY_PARAM)?QUALITY_PARAM:"auto";
+}
+let worldQualityPreset=readWorldQualityPreset(),LOW_END_DEVICE=false,R_GENERATE=2,R_DISPOSE=3,LIGHT_BUDGET=4,LIGHT_INTERVAL=100,CHUNK_BUILD_INTERVAL=65;
+function configureWorldQuality(preset){
+ worldQualityPreset=["auto","low","medium","high","ultra"].includes(preset)?preset:"auto";
+ const effective=worldQualityPreset==="auto"?(detectLowEndWorldHardware()?"low":"high"):worldQualityPreset;
+ const profile=WORLD_QUALITY_PROFILES[effective]||WORLD_QUALITY_PROFILES.high;
+ LOW_END_DEVICE=profile.lowEnd;R_GENERATE=profile.generate;R_DISPOSE=profile.dispose;
+ LIGHT_BUDGET=profile.lightBudget;LIGHT_INTERVAL=profile.lightInterval;CHUNK_BUILD_INTERVAL=profile.buildInterval;
+}
+configureWorldQuality(worldQualityPreset);
 // BoxGeometry face order: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z (4 verts each).
 // Scale the U coordinate of a face so the wallpaper repeats every CELL meters.
 function scaleFaceU(geo, face, s) {
@@ -287,6 +292,7 @@ export class World {
   constructor(scene, seed, anisotropy) {
     this.scene = scene;
     this.seed = seed;
+    this.maxAnisotropy = anisotropy;
     this.chunks = new Map(); // "cx,cz" -> { data, group, wallBounds }
     this.root = new THREE.Group();
     this.lastStreamCX = null;
@@ -296,7 +302,8 @@ export class World {
     this.wallQueryScratch = [];
     scene.add(this.root);
 
-    const tex = createTextures(anisotropy);
+    const effectiveQuality=worldQualityPreset==="auto"?(LOW_END_DEVICE?"low":"high"):worldQualityPreset;
+    const tex = createTextures(Math.min(anisotropy,WORLD_QUALITY_PROFILES[effectiveQuality]?.anisotropy||8));
     this.materials = {
       wall: new THREE.MeshStandardMaterial({ map: tex.wall, roughness: 0.92 }),
       floor: new THREE.MeshStandardMaterial({ map: tex.floor, roughness: 1.0 }),
@@ -892,10 +899,17 @@ export class World {
     this.chunks.delete(key);
   }
 
+  setQualityPreset(preset){
+    configureWorldQuality(preset);this.streamNeedsWork=true;this.lastChunkBuildAt=0;
+    const effective=worldQualityPreset==="auto"?(LOW_END_DEVICE?"low":"high"):worldQualityPreset;
+    const anisotropy=Math.min(this.maxAnisotropy,WORLD_QUALITY_PROFILES[effective]?.anisotropy||8);
+    for(const material of Object.values(this.materials)){const map=material?.map;if(map){map.anisotropy=anisotropy;map.needsUpdate=true;}}
+  }
+
   // Called every frame with the player position.
   updateFixtureLights(px,pz){
     const now=performance.now();
-    const interval=LOW_END_DEVICE ? 140 : 100;
+    const interval=LIGHT_INTERVAL;
 
     if(now-this.fixtureLightLastUpdate<interval) return;
     this.fixtureLightLastUpdate=now;
@@ -908,7 +922,7 @@ export class World {
     );
 
     const flickerTime=now*.003;
-    const lightBudget=LOW_END_DEVICE?3:4;
+    const lightBudget=LIGHT_BUDGET;
     const nearestLights=this.fixtureLights
       .map(item=>({
         item,
@@ -954,7 +968,7 @@ export class World {
     // Chunk meshes require CPU-side geometry creation and merging. Space builds
     // apart so streaming cannot produce a burst of expensive work in adjacent frames.
     const now=performance.now();
-    const buildInterval=LOW_END_DEVICE ? 110 : 65;
+    const buildInterval=CHUNK_BUILD_INTERVAL;
     if(this.lastChunkBuildAt && now-this.lastChunkBuildAt<buildInterval) return;
 
     const missing = [];

@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-qualityrelay1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-qualitymenu1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261016-qualityrelay1";
+import { Player } from "./player.js?v=20261016-qualitymenu1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -17,7 +17,7 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
-import { StoryMissionWorld } from "./storyMission.js?v=20261016-qualityrelay1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261016-qualitymenu1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -27,42 +27,43 @@ const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
 const MENU_WORLD_X=32;
 const MENU_WORLD_Z=32;
 const QUALITY_PARAM=urlParams.get("quality");
-
-function detectLowEndHardware(){
-  const cores=navigator.hardwareConcurrency||4;
-  const memory=navigator.deviceMemory||4;
-  let gpu="";
-  try{
-    const canvas=document.createElement("canvas");
-    const gl=canvas.getContext("webgl2")||canvas.getContext("webgl");
-    const ext=gl?.getExtension("WEBGL_debug_renderer_info");
-    gpu=ext
-      ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||"")
-      : String(gl?.getParameter(gl.RENDERER)||"");
-    gl?.getExtension("WEBGL_lose_context")?.loseContext();
-  }catch{}
-
-  // Modern Chromebook Intel UHD/Iris graphics are not automatically treated as
-  // potato hardware anymore. Reserve the lowest visual tier for software
-  // rendering, old Intel HD-class GPUs, or very small CPU/RAM systems.
-  const softwareRasterizer=/swiftshader|llvmpipe|software rasterizer|microsoft basic render/i.test(gpu);
-  const oldIntelGpu=/intel(?:r)?\s+hd\s+graphics|mesa.*intel\s+hd/i.test(gpu);
-  const weakCpu=cores<=4 && memory<=4;
-  const forcedLow=QUALITY_PARAM==="low";
-  const forcedPotato=QUALITY_PARAM==="potato";
-
-  const discreteGpu=/nvidia|geforce|radeon\s+rx|arc\s*[ab]\d+/i.test(gpu);
-  return {
-    low:forcedLow || forcedPotato || softwareRasterizer || oldIntelGpu || weakCpu,
-    ultraLow:forcedPotato || softwareRasterizer || (cores<=2 && memory<=2),
-    discreteGpu
-  };
+const QUALITY_STORAGE_KEY="deepseeker-quality-v1";
+const QUALITY_PRESETS=["auto","low","medium","high","ultra"];
+function readQualityPreset(){
+ try{const saved=localStorage.getItem(QUALITY_STORAGE_KEY);if(QUALITY_PRESETS.includes(saved))return saved;}catch{}
+ if(QUALITY_PARAM==="low"||QUALITY_PARAM==="potato")return "low";
+ if(QUALITY_PRESETS.includes(QUALITY_PARAM))return QUALITY_PARAM;
+ return "auto";
 }
-
+function detectLowEndHardware(){
+ const cores=navigator.hardwareConcurrency||4,memory=navigator.deviceMemory||4;let gpu="";
+ try{const canvas=document.createElement("canvas"),gl=canvas.getContext("webgl2")||canvas.getContext("webgl");
+  const ext=gl?.getExtension("WEBGL_debug_renderer_info");
+  gpu=ext?String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||""):String(gl?.getParameter(gl.RENDERER)||"");
+  gl?.getExtension("WEBGL_lose_context")?.loseContext();
+ }catch{}
+ const software=/swiftshader|llvmpipe|software rasterizer|microsoft basic render/i.test(gpu);
+ const oldIntel=/intel(?:r)?\s+hd\s+graphics|mesa.*intel\s+hd/i.test(gpu);
+ const weakCpu=cores<=4&&memory<=4,discreteGpu=/nvidia|geforce|radeon\s+rx|arc\s*[ab]\d+/i.test(gpu);
+ return {low:software||oldIntel||weakCpu,ultraLow:software||(cores<=2&&memory<=2),discreteGpu};
+}
 const PERFORMANCE_TIER=detectLowEndHardware();
-const LOW_END_PERFORMANCE=QUALITY_PARAM!=="high" && PERFORMANCE_TIER.low;
-const ULTRA_LOW_PERFORMANCE=QUALITY_PARAM!=="high" && PERFORMANCE_TIER.ultraLow;
-if(LOW_END_PERFORMANCE) document.documentElement.classList.add("deepseeker-low");
+const QUALITY_PROFILES={
+ low:{lowEnd:true,ultraLow:PERFORMANCE_TIER.ultraLow,pixelRatioCap:.65,housePixelRatio:.58,minHousePixelRatio:.38,shadows:false,shadowResolution:256,farPlane:165,fogNear:13,fogFar:60,fogColor:0x282619,hemisphere:.30,ambient:.065,anisotropy:2,targetFps:45},
+ medium:{lowEnd:false,ultraLow:false,pixelRatioCap:1,housePixelRatio:.70,minHousePixelRatio:.52,shadows:false,shadowResolution:512,farPlane:230,fogNear:14,fogFar:70,fogColor:0x252419,hemisphere:.22,ambient:.04,anisotropy:4,targetFps:50},
+ high:{lowEnd:false,ultraLow:false,pixelRatioCap:1.5,housePixelRatio:.82,minHousePixelRatio:.64,shadows:true,shadowResolution:768,farPlane:300,fogNear:15,fogFar:78,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:8,targetFps:60},
+ ultra:{lowEnd:false,ultraLow:false,pixelRatioCap:2,housePixelRatio:.95,minHousePixelRatio:.72,shadows:true,shadowResolution:1024,farPlane:380,fogNear:18,fogFar:100,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:16,targetFps:60}
+};
+let activeQualityPreset=readQualityPreset();
+function getQualitySettings(preset=activeQualityPreset){
+ let effective=preset;if(effective==="auto")effective=PERFORMANCE_TIER.low?"low":"high";
+ const profile={...(QUALITY_PROFILES[effective]||QUALITY_PROFILES.high)};
+ if(preset==="auto"&&effective==="high")profile.shadows=PERFORMANCE_TIER.discreteGpu;
+ profile.preset=preset;profile.effectivePreset=effective;return profile;
+}
+let activeQualitySettings=getQualitySettings();
+let LOW_END_PERFORMANCE=activeQualitySettings.lowEnd,ULTRA_LOW_PERFORMANCE=activeQualitySettings.ultraLow;
+if(LOW_END_PERFORMANCE)document.documentElement.classList.add("deepseeker-low");
 
 const container=document.getElementById("app");
 const overlay=document.getElementById("overlay");
@@ -89,6 +90,10 @@ const leaveLobbyButton=document.getElementById("leaveLobbyButton");
 const crosshair=document.getElementById("crosshair");
 const controls=document.getElementById("controlsPanel");
 const fitScreenButton=document.getElementById("fitScreenButton");
+const graphicsQualitySelect=document.getElementById("graphicsQualitySelect");
+const graphicsQualityDescription=document.getElementById("graphicsQualityDescription");
+const graphicsQualityStatus=document.getElementById("graphicsQualityStatus");
+const graphicsSettingsButton=document.getElementById("graphicsSettingsButton");
 const staminaBar=document.getElementById("staminaBar");
 const staminaValue=document.getElementById("staminaValue");
 const batteryBar=document.getElementById("batteryBar");
@@ -218,16 +223,10 @@ const renderer=new THREE.WebGLRenderer({
 });
 renderer.setSize(innerWidth,innerHeight,false);
 
-const BASE_PIXEL_RATIO=LOW_END_PERFORMANCE
-  ? Math.min(devicePixelRatio,ULTRA_LOW_PERFORMANCE?.55:.78)
-  : Math.min(devicePixelRatio,1.5);
-const HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE
-  ? (ULTRA_LOW_PERFORMANCE?.50:.70)
-  : .66;
-const MIN_HOUSE_PIXEL_RATIO=LOW_END_PERFORMANCE
-  ? (ULTRA_LOW_PERFORMANCE?.34:.54)
-  : .52;
-const PERFORMANCE_TARGET_FPS=60;
+let BASE_PIXEL_RATIO=Math.min(devicePixelRatio,activeQualitySettings.pixelRatioCap);
+let HOUSE_PIXEL_RATIO=activeQualitySettings.housePixelRatio;
+let MIN_HOUSE_PIXEL_RATIO=activeQualitySettings.minHousePixelRatio;
+let PERFORMANCE_TARGET_FPS=activeQualitySettings.targetFps;
 let currentPixelRatio=BASE_PIXEL_RATIO;
 let housePixelRatio=HOUSE_PIXEL_RATIO;
 let perfElapsed=0;
@@ -248,21 +247,22 @@ container.appendChild(renderer.domElement);
 const scene=new THREE.Scene();
 // Keep distant walls readable instead of fading into near-black fog. Chromebooks
 // get a little more range and a warmer fog so the Backrooms stay navigable.
-const BACKROOMS_FOG_COLOR=LOW_END_PERFORMANCE?0x282619:0x201f15;
+let BACKROOMS_FOG_COLOR=activeQualitySettings.fogColor;
 scene.background=new THREE.Color(BACKROOMS_FOG_COLOR);
 scene.fog=new THREE.Fog(
   BACKROOMS_FOG_COLOR,
-  LOW_END_PERFORMANCE?13:15,
-  LOW_END_PERFORMANCE?66:78
+  activeQualitySettings.fogNear,
+  activeQualitySettings.fogFar
 );
 
 const camera=new THREE.PerspectiveCamera(
   70,
   innerWidth/innerHeight,
   .08,
-  LOW_END_PERFORMANCE?180:300
+  activeQualitySettings.farPlane
 );
-const world=new World(scene,SEED,Math.min(renderer.capabilities.getMaxAnisotropy(),LOW_END_PERFORMANCE?4:8));
+const world=new World(scene,SEED,renderer.capabilities.getMaxAnisotropy());
+world.setQualityPreset(activeQualityPreset);
 
 const tutorialOpenRoomRoot=new THREE.Group();
 tutorialOpenRoomRoot.name="DeepSeekerTutorialOpenRoom";
@@ -437,8 +437,8 @@ function ensureTutorialOpenRoom(){
 
   tutorialOpenRoomRoot.visible=true;
   tutorialOpenRoomActive=true;
-  renderer.shadowMap.enabled=true;
-  flashlight.castShadow=true;
+  renderer.shadowMap.enabled=ENABLE_SHADOWS;
+  flashlight.castShadow=ENABLE_SHADOWS;
   flashlight.shadow.mapSize.set(FLASHLIGHT_SHADOW_RESOLUTION,FLASHLIGHT_SHADOW_RESOLUTION);
   flashlight.shadow.bias=-0.0004;
   flashlight.shadow.normalBias=0.018;
@@ -508,8 +508,8 @@ function disableTutorialOpenRoom(){
 }
 
 // Chromebook-friendly fill without washing out the yellow wallpaper and shadows.
-const WORLD_HEMISPHERE_BASE_INTENSITY=LOW_END_PERFORMANCE?0.30:0.20;
-const WORLD_AMBIENT_BASE_INTENSITY=LOW_END_PERFORMANCE?0.065:0.035;
+let WORLD_HEMISPHERE_BASE_INTENSITY=activeQualitySettings.hemisphere;
+let WORLD_AMBIENT_BASE_INTENSITY=activeQualitySettings.ambient;
 const hemi=new THREE.HemisphereLight(0xb5a77d,0x2d2417,WORLD_HEMISPHERE_BASE_INTENSITY);
 scene.add(hemi);
 const ambient=new THREE.AmbientLight(0x827451,WORLD_AMBIENT_BASE_INTENSITY);
@@ -1364,11 +1364,8 @@ const flashlight=new THREE.SpotLight(
   LOW_END_PERFORMANCE?.72:.68,
   1.35
 );
-const SHADOWS_PARAM=urlParams.get("shadows");
-const ENABLE_SHADOWS=SHADOWS_PARAM==="1" || (
-  SHADOWS_PARAM!=="0" && PERFORMANCE_TIER.discreteGpu && !LOW_END_PERFORMANCE
-);
-const FLASHLIGHT_SHADOW_RESOLUTION=PERFORMANCE_TIER.discreteGpu?768:512;
+let ENABLE_SHADOWS=activeQualitySettings.shadows;
+let FLASHLIGHT_SHADOW_RESOLUTION=activeQualitySettings.shadowResolution;
 renderer.shadowMap.enabled=ENABLE_SHADOWS;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 flashlight.castShadow=ENABLE_SHADOWS;
@@ -1379,6 +1376,40 @@ flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
 scene.add(camera);
 
 const player=new Player(camera,renderer.domElement,world);
+
+
+const QUALITY_DESCRIPTIONS={
+ auto:"Automatically picks a good preset for this device. The choice is saved in this browser.",
+ low:"Lower resolution, shorter view distance, fewer active lights, and no dynamic flashlight shadows.",
+ medium:"Balanced resolution and world detail for smoother gameplay on everyday laptops and tablets.",
+ high:"Sharper rendering, farther visibility, more world detail, and dynamic flashlight shadows.",
+ ultra:"Maximum resolution, longest view distance, denser lighting, and higher-resolution shadows. May run slowly on weaker devices."
+};
+function applyQualityPreset(preset,{save=true,announce=true}={}){
+ if(!QUALITY_PRESETS.includes(preset))return false;
+ activeQualityPreset=preset;activeQualitySettings=getQualitySettings(preset);
+ LOW_END_PERFORMANCE=activeQualitySettings.lowEnd;ULTRA_LOW_PERFORMANCE=activeQualitySettings.ultraLow;
+ document.documentElement.classList.toggle("deepseeker-low",LOW_END_PERFORMANCE);
+ BASE_PIXEL_RATIO=Math.min(devicePixelRatio,activeQualitySettings.pixelRatioCap);
+ HOUSE_PIXEL_RATIO=activeQualitySettings.housePixelRatio;MIN_HOUSE_PIXEL_RATIO=activeQualitySettings.minHousePixelRatio;
+ PERFORMANCE_TARGET_FPS=activeQualitySettings.targetFps;currentPixelRatio=BASE_PIXEL_RATIO;housePixelRatio=HOUSE_PIXEL_RATIO;
+ renderer.setPixelRatio(houseMode?housePixelRatio:currentPixelRatio);perfElapsed=0;perfFrames=0;perfCooldown=1;
+ BACKROOMS_FOG_COLOR=activeQualitySettings.fogColor;scene.background.set(BACKROOMS_FOG_COLOR);
+ if(scene.fog){scene.fog.color.set(BACKROOMS_FOG_COLOR);scene.fog.near=activeQualitySettings.fogNear;scene.fog.far=activeQualitySettings.fogFar;}
+ camera.far=activeQualitySettings.farPlane;camera.updateProjectionMatrix();
+ WORLD_HEMISPHERE_BASE_INTENSITY=activeQualitySettings.hemisphere;WORLD_AMBIENT_BASE_INTENSITY=activeQualitySettings.ambient;
+ hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY;ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY;
+ ENABLE_SHADOWS=activeQualitySettings.shadows;FLASHLIGHT_SHADOW_RESOLUTION=activeQualitySettings.shadowResolution;
+ renderer.shadowMap.enabled=ENABLE_SHADOWS;flashlight.castShadow=ENABLE_SHADOWS;
+ flashlight.shadow.mapSize.set(FLASHLIGHT_SHADOW_RESOLUTION,FLASHLIGHT_SHADOW_RESOLUTION);
+ if(flashlight.shadow.map){flashlight.shadow.map.dispose();flashlight.shadow.map=null;}
+ world.setQualityPreset(preset);
+ if(save){try{localStorage.setItem(QUALITY_STORAGE_KEY,preset);}catch(error){console.warn("[DeepSeeker] Could not save graphics preference:",error);}}
+ if(graphicsQualitySelect)graphicsQualitySelect.value=preset;
+ if(graphicsQualityDescription)graphicsQualityDescription.textContent=QUALITY_DESCRIPTIONS[preset];
+ if(graphicsQualityStatus&&announce)graphicsQualityStatus.textContent="APPLIED: "+preset.toUpperCase()+" · SAVED ON THIS DEVICE";
+ return true;
+}
 
 // Mount the actual light to the same camera-local torch as the visible prop.
 // This stops the beam from appearing to originate at the middle of the camera.
@@ -8873,6 +8904,8 @@ adminClearWaterButton.addEventListener("click",()=>{ if(adminUnlocked){ clearAdm
 function showControls(){
   controlsOpen=true;
   controls.classList.remove("hidden");
+  if(graphicsQualitySelect)graphicsQualitySelect.value=activeQualityPreset;
+  if(graphicsQualityDescription)graphicsQualityDescription.textContent=QUALITY_DESCRIPTIONS[activeQualityPreset];
   if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
 }
 function hideControls(){
@@ -8914,6 +8947,8 @@ controls.addEventListener("click",e=>{
 fitScreenButton?.addEventListener("click",()=>{
   toggleFitScreen();
 });
+graphicsQualitySelect?.addEventListener("change",()=>applyQualityPreset(graphicsQualitySelect.value));
+graphicsSettingsButton?.addEventListener("click",()=>showControls());
 
 document.addEventListener("pointerlockchange",()=>{
   const locked=document.pointerLockElement===renderer.domElement;
@@ -9289,6 +9324,7 @@ function animate(){
     return;
   }
 
+  if(graphicsSettingsButton)graphicsSettingsButton.hidden=!(gameStarted&&!gameEnded);
   perfElapsed+=dt;
   perfFrames++;
   perfCooldown=Math.max(0,perfCooldown-dt);
