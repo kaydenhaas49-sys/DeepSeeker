@@ -879,8 +879,6 @@ export class World {
     if(now-this.fixtureLightLastUpdate<interval) return;
     this.fixtureLightLastUpdate=now;
 
-    // Keep every fixture in currently streamed chunks active, not only the
-    // nearest light that happens to be inside the camera view.
     this.fixtureLights=this.fixtureLights.filter(item=>
       item.light.parent && this.root.children.includes(item.light.parent)
     );
@@ -889,12 +887,22 @@ export class World {
     );
 
     const flickerTime=now*.003;
-    for(const item of this.fixtureLights){
-      item.light.visible=true;
+    const lightBudget=LOW_END_DEVICE?4:5;
+    const nearestLights=this.fixtureLights
+      .map(item=>({
+        item,
+        distanceSq:(item.x-px)*(item.x-px)+(item.z-pz)*(item.z-pz)
+      }))
+      .filter(entry=>entry.distanceSq<=Math.pow(entry.item.light.distance||32,2))
+      .sort((a,b)=>a.distanceSq-b.distanceSq)
+      .slice(0,lightBudget);
+    const activeLights=new Set(nearestLights.map(entry=>entry.item));
 
-      if(this.breakerFailTimer>0){
+    for(const item of this.fixtureLights){
+      const active=activeLights.has(item)&&this.breakerFailTimer<=0;
+      item.light.visible=active;
+      if(!active){
         item.light.intensity=0;
-        item.light.visible=false;
         continue;
       }
       const flicker=item.cracked

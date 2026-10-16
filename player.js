@@ -1,8 +1,8 @@
 // player.js — pointer lock, WASD+SHIFT movement, collision, head bob / FOV kick.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { EYE, WALL_H } from "./world.js?v=20261016-brighterrooms1";
-import { createHazmatCharacter, createFirstPersonArms } from "./character.js";
+import { EYE, WALL_H } from "./world.js?v=20261016-moodlights2";
+import { createHazmatCharacter } from "./character.js";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -519,31 +519,14 @@ export class Player {
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
-      // First-person arms are our separate camera-local hazmat viewmodel.
-      // The world avatar is intentionally hidden in first-person and in this
-      // local-only client path. Extract the authored skinned arms for the viewmodel.
+      // Keep the opaque camera-local sleeves, gloves, and held torch as the
+      // first-person viewmodel. Cropping the full-body skinned mesh at the
+      // shoulders was producing awkward cut-offs and hand silhouettes.
       this.hands.visible=true;
       this.hands.renderOrder=2999;
+      this.proceduralHands.visible=true;
+      this.proceduralArmFlashlight.visible=true;
       if(this.characterFlashlight) this.characterFlashlight.visible=false;
-
-      try{
-        const viewmodel=createFirstPersonArms(character.model);
-        const importedTorch=viewmodel.getObjectByName("HeldFlashlight");
-        const extractedCount=Number(viewmodel.userData.extractedArmMeshCount)||0;
-        if(importedTorch) importedTorch.visible=false; // use the fitted custom torch instead
-        if(extractedCount>0){
-          viewmodel.name="FirstPersonHazmatHands";
-          viewmodel.visible=true;
-          this.hands.add(viewmodel);
-          this.firstPersonArmViewmodel=viewmodel;
-          this.proceduralHands.visible=false;
-        }else{
-          console.warn("[DeepSeeker] real arm extraction returned no meshes; keeping fallback hands");
-        }
-      }catch(armError){
-        // The fallback stays visible if a particular character rig cannot be extracted.
-        console.warn("[DeepSeeker] real first-person arms unavailable; keeping fallback hands:",armError);
-      }
 
       this.worldAvatar.add(character.model);
       this.characterLoaded = true;

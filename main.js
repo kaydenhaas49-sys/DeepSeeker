@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-brighterrooms1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-moodlights2";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261016-brighterrooms1";
+import { Player } from "./player.js?v=20261016-moodlights2";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -246,12 +246,12 @@ container.appendChild(renderer.domElement);
 const scene=new THREE.Scene();
 // Keep distant walls readable instead of fading into near-black fog. Chromebooks
 // get a little more range and a warmer fog so the Backrooms stay navigable.
-const BACKROOMS_FOG_COLOR=LOW_END_PERFORMANCE?0x393626:0x2d2b20;
+const BACKROOMS_FOG_COLOR=LOW_END_PERFORMANCE?0x302d22:0x262318;
 scene.background=new THREE.Color(BACKROOMS_FOG_COLOR);
 scene.fog=new THREE.Fog(
   BACKROOMS_FOG_COLOR,
-  LOW_END_PERFORMANCE?17:18,
-  LOW_END_PERFORMANCE?82:94
+  LOW_END_PERFORMANCE?14:16,
+  LOW_END_PERFORMANCE?72:84
 );
 
 const camera=new THREE.PerspectiveCamera(
@@ -270,7 +270,11 @@ scene.add(tutorialOpenRoomRoot);
 const tutorialOpenRoomCollisionBoxes=[];
 const tutorialHiddenWallMeshes=[];
 const tutorialOpenRoomLights=[];
+const tutorialFillLights=[];
 const tutorialOpenRoomOccluders=[];
+let tutorialLightsOutState="on";
+let tutorialLightsOutElapsed=0;
+let tutorialCeilingLightsOn=true;
 let tutorialOpenRoomLightLastUpdate=0;
 const tutorialOpenRoomLightOrigin=new THREE.Vector3();
 const tutorialOpenRoomLightDirection=new THREE.Vector3();
@@ -280,8 +284,10 @@ const tutorialOpenRoomLightRaycaster=new THREE.Raycaster();
 let tutorialOpenRoomActive=false;
 function clearTutorialOpenRoomGeometry(){
   tutorialOpenRoomLights.length=0;
+  tutorialFillLights.length=0;
   tutorialOpenRoomOccluders.length=0;
   tutorialOpenRoomLightLastUpdate=0;
+  tutorialCeilingLightsOn=true;
   while(tutorialOpenRoomRoot.children.length){
     const child=tutorialOpenRoomRoot.children.pop();
     if(!child) continue;
@@ -413,9 +419,11 @@ function ensureTutorialOpenRoom(){
   const tutorialFillHemisphere=new THREE.HemisphereLight(0xfff2d1,0x958565,.46);
   tutorialFillHemisphere.name="TutorialFullBrightnessHemisphere";
   tutorialOpenRoomRoot.add(tutorialFillHemisphere);
+  tutorialFillLights.push({light:tutorialFillHemisphere,baseIntensity:.46});
   const tutorialFillAmbient=new THREE.AmbientLight(0xfff0d0,.24);
   tutorialFillAmbient.name="TutorialFullBrightnessAmbient";
   tutorialOpenRoomRoot.add(tutorialFillAmbient);
+  tutorialFillLights.push({light:tutorialFillAmbient,baseIntensity:.24});
 
   const half=t*.5;
   tutorialOpenRoomCollisionBoxes.push(
@@ -436,16 +444,50 @@ function ensureTutorialOpenRoom(){
   player.extraCollisionBoxes=tutorialOpenRoomCollisionBoxes;
 }
 
-function updateTutorialOpenRoomLights(){
+function updateTutorialOpenRoomLights(dt=0){
   if(!tutorialOpenRoomActive || !tutorialOpenRoomLights.length) return;
 
+  if(tutorialLightsOutState==="flickering"){
+    tutorialLightsOutElapsed+=Math.min(Math.max(dt,0),.1);
+    const t=tutorialLightsOutElapsed;
+    const litWindows=[[0,.11],[.18,.27],[.36,.42],[.52,.60],[.72,.77]];
+    tutorialCeilingLightsOn=litWindows.some(([start,end])=>t>=start&&t<end);
+    if(t>=.94){
+      tutorialLightsOutState="off";
+      tutorialCeilingLightsOn=false;
+    }
+  }else{
+    tutorialCeilingLightsOn=tutorialLightsOutState==="on";
+  }
+
+  const lightsOn=tutorialCeilingLightsOn;
   for(const item of tutorialOpenRoomLights){
-    item.light.visible=true;
-    item.light.intensity=item.baseIntensity;
-    if(item.mesh?.material?.emissiveIntensity!==undefined){
-      item.mesh.material.emissiveIntensity=2.1;
+    item.light.visible=lightsOn;
+    item.light.intensity=lightsOn?item.baseIntensity:0;
+    const material=item.mesh?.material;
+    if(material?.emissiveIntensity!==undefined){
+      material.color.setHex(lightsOn?0xffedbd:0x514b39);
+      material.emissive.setHex(lightsOn?0xffe7ad:0x000000);
+      material.emissiveIntensity=lightsOn?2.1:0;
     }
   }
+
+  const fillScale=tutorialLightsOutState==="on"
+    ?1
+    :tutorialLightsOutState==="off"
+      ?.12
+      :lightsOn
+        ?.72
+        :.18;
+  for(const item of tutorialFillLights){
+    item.light.intensity=item.baseIntensity*fillScale;
+  }
+}
+
+function getTutorialAmbientScale(){
+  if(!tutorialOpenRoomActive||tutorialLightsOutState==="on")return 1;
+  if(tutorialLightsOutState==="off")return .14;
+  return tutorialCeilingLightsOn?.72:.20;
 }
 
 function disableTutorialOpenRoom(){
@@ -462,11 +504,12 @@ function disableTutorialOpenRoom(){
   player.extraCollisionBoxes=[];
 }
 
-const WORLD_HEMISPHERE_BASE_INTENSITY=LOW_END_PERFORMANCE?0.86:0.68;
-const WORLD_AMBIENT_BASE_INTENSITY=LOW_END_PERFORMANCE?0.34:0.23;
-const hemi=new THREE.HemisphereLight(0xd8cc9b,0x51452f,WORLD_HEMISPHERE_BASE_INTENSITY);
+// Chromebook-friendly fill without washing out the yellow wallpaper and shadows.
+const WORLD_HEMISPHERE_BASE_INTENSITY=LOW_END_PERFORMANCE?0.46:0.31;
+const WORLD_AMBIENT_BASE_INTENSITY=LOW_END_PERFORMANCE?0.12:0.075;
+const hemi=new THREE.HemisphereLight(0xc2b889,0x33291a,WORLD_HEMISPHERE_BASE_INTENSITY);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0xb8a77b,WORLD_AMBIENT_BASE_INTENSITY);
+const ambient=new THREE.AmbientLight(0x8f815d,WORLD_AMBIENT_BASE_INTENSITY);
 scene.add(ambient);
 
 
@@ -6323,6 +6366,17 @@ function setHouseTutorialStage(stage){
   if(!gameStarted || houseMode) return;
 
   houseTutorialStage=stage;
+  if(stage===1){
+    tutorialLightsOutState="on";
+    tutorialLightsOutElapsed=0;
+    tutorialCeilingLightsOn=true;
+  }else if(stage===5){
+    // The room is bright for the movement lessons, then the fluorescents fail
+    // right as the player is asked to turn on the flashlight.
+    tutorialLightsOutState="flickering";
+    tutorialLightsOutElapsed=0;
+    tutorialCeilingLightsOn=true;
+  }
 
   // Hard-reset the normal director for every tutorial stage. This covers stale
   // chases, pounces, pending asset loads, and timers from a previous run.
@@ -9344,7 +9398,7 @@ function animate(){
   );
   player.update(dt);
   if(levelRunActive) updateLevelRunHUD();
-  updateTutorialOpenRoomLights();
+  updateTutorialOpenRoomLights(dt);
   updateAdminFly(dt);
   updateAdminProjectiles(dt);
 
@@ -9668,13 +9722,15 @@ function animate(){
     camera.position.y+=Math.sin(t*61)*pulse*.006;
     // Signal pulses can briefly dim the Backrooms, but must never black them out.
     // The tutorial always stays bright so its instructions remain easy to see.
-    const pulseScale=tutorialOpenRoomActive?1:.22;
+    const tutorialScale=getTutorialAmbientScale();
+    const pulseScale=tutorialOpenRoomActive?tutorialScale:.22;
     hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY*pulseScale;
     ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY*pulseScale;
   }else{
     vignette.style.opacity=".70";
-    hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY;
-    ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY;
+    const tutorialScale=getTutorialAmbientScale();
+    hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY*tutorialScale;
+    ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY*tutorialScale;
   }
 
   if(uiRefreshElapsed>=(
