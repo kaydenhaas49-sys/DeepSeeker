@@ -168,7 +168,7 @@ document.addEventListener("click",(event)=>{
   if(gameStarted) return;
 
   try{
-    resetForNewGame(selectedSaveSlot,{skipConfirm:true});
+    resetForNewGame(selectedSaveSlot);
   }catch(error){
     console.error("[DeepSeeker] NEW GAME click failed:",error);
     const message=String(error?.message||error||"Unknown error");
