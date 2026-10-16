@@ -19,6 +19,29 @@ The active game is the browser version, starting at `index.html` and `main.js`. 
 
 The old Godot prototype and unrelated reference-project files are not part of the active game.
 
+## Campaign progression
+
+The campaign streams a larger 21 × 21 chunk Backrooms area and guides players
+through three signal relays, the eight-breaker maintenance puzzle, and the
+red-lit Level Run. Four side-mounted clue panels reveal the safe code during
+the chase. After the required relays, breaker puzzle, and run are complete, a
+powered fire door opens into the Poolrooms; follow the dry deck to the signal
+source to finish the campaign.
+
+Decorative assets load automatically from 3DAssets.dev's CC0 CDN. They are
+optional during boot, so a failed prop request cannot block the main menu or
+normal Backrooms gameplay. The Poolrooms environment must load before that level
+can be entered, and the entrance allows a retry if a model request fails.
+
+Models integrated:
+- [Poolroom hall](https://3dassets.dev/assets/liminal-spaces-kit-poolroom-hall-d800e372) — Poolrooms architecture
+- [Garage to stairwell](https://3dassets.dev/assets/liminal-spaces-kit-garage-stairwell-f8abafc9) — Level Run entrances
+- [Transmitter cabinet](https://3dassets.dev/assets/broadcast-tower-and-relay-station-broadcast-tower-and--fa1fb98a) — signal relays and code-fragment cabinets
+- [Fire door module](https://3dassets.dev/assets/hotel-and-resort-operations-corridor-fire-door-module-95fdcb74) — Poolrooms entrance
+
+The assets are CC0 1.0 Universal and load directly as GLB files, so no manual
+download or copying into the assets folder is needed.
+
 ## Controls
 
 - **W A S D** — move

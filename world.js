@@ -10,9 +10,9 @@ export const WALL_H = 9.0; // 9 m Backrooms ceiling
 export const WALL_T = 0.35; // wall thickness
 export const EYE = 1.6; // eye height
 
-// Seven-by-seven 64m chunks make a finite 448m x 448m floor.
-export const MAP_MIN_CHUNK = -3;
-export const MAP_MAX_CHUNK = 3;
+// Twenty-one-by-twenty-one 64m chunks create a finite 1344m x 1344m floor.
+export const MAP_MIN_CHUNK = -10;
+export const MAP_MAX_CHUNK = 10;
 
 // ---------------------------------------------------------------------------
 // Seeded RNG
@@ -60,7 +60,7 @@ const BREAKER_MATH_PROBLEMS=Object.freeze([
 function isProtectedRouteCell(gx,gz){
   return (
     (gz >= 7 && gz <= 9 && gx >= -23 && gx <= 23) ||
-    (gx >= -21 && gx <= -19 && gz >= -46 && gz <= 8)
+    (gx >= -21 && gx <= -19 && gz >= MAP_MIN_CHUNK * CHUNK_CELLS && gz <= 8)
   );
 }
 

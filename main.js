@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261015-breakeronly1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-expandedmap1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261015-breakeronly1";
+import { Player } from "./player.js?v=20261016-expandedmap1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -17,12 +17,15 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261016-missions1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
 const urlParams=new URLSearchParams(location.search);
 const seedParam=urlParams.get("seed");
 const SEED=seedParam!==null&&seedParam!==""?(parseInt(seedParam,10)||0):1337;
+const MENU_WORLD_X=32;
+const MENU_WORLD_Z=32;
 const QUALITY_PARAM=urlParams.get("quality");
 
 function detectLowEndHardware(){
@@ -1340,12 +1343,13 @@ const HOUSE_TARGET_HEIGHT=3.0;
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
-const LEVEL_RUN_ENABLED=false; // Level RUN is parked until more levels are ready.
+const LEVEL_RUN_ENABLED=true; // Level Run is a core campaign objective.
 let levelRunActive=false;
 const LEVEL_RUN_ORIGIN_X=96;
 const LEVEL_RUN_ORIGIN_Z=96;
 const levelRunState={
   active:false,group:null,code:"0000",round:1,runnerId:null,
+  successfulRuns:0,cluesFound:[false,false,false,false],clueCards:[],cluePositions:[],
   collisionBoxes:[],occluders:[],interactables:[],
   keypad:null,keypadInput:null,keypadMessage:null,
   screenContext:null,screenTexture:null,
@@ -1353,6 +1357,220 @@ const levelRunState={
   returnPosition:new THREE.Vector3(32,EYE,32),
   target:{pos:new THREE.Vector3(0,EYE,0),eyeY:EYE,crouched:false,flashlight:false}
 };
+let missionState={
+  relays:[false,false,false],
+  breakerSolved:false,
+  levelRunCleared:false,
+  poolroomsUnlocked:false,
+  poolroomsExitReached:false,
+  log:[]
+};
+let storyMissionWorld=null;
+let poolroomsActive=false;
+let poolroomsPreviousEnvironment=null;
+
+function missionStateSnapshot(){
+  return {
+    relays:missionState.relays.slice(0,3).map(Boolean),
+    breakerSolved:Boolean(missionState.breakerSolved||world.maintenanceDoor?.unlocked),
+    levelRunCleared:Boolean(missionState.levelRunCleared),
+    poolroomsUnlocked:Boolean(missionState.relays.every(Boolean)&&
+      (missionState.breakerSolved||world.maintenanceDoor?.unlocked)&&missionState.levelRunCleared),
+    poolroomsExitReached:Boolean(missionState.poolroomsExitReached),
+    log:missionState.log.slice(-12).map(item=>({
+      title:String(item?.title||"FIELD NOTE").slice(0,48),
+      text:String(item?.text||"").slice(0,180)
+    }))
+  };
+}
+
+function refreshMissionState({broadcast=false}={}){
+  missionState.breakerSolved=Boolean(missionState.breakerSolved||world.maintenanceDoor?.unlocked);
+  missionState.poolroomsUnlocked=Boolean(
+    missionState.relays.every(Boolean)&&missionState.breakerSolved&&missionState.levelRunCleared
+  );
+  storyMissionWorld?.syncState(missionState,{
+    tutorialActive:Boolean(tutorialOpenRoomActive||(gameStarted&&houseTutorialStage>0&&houseTutorialStage<10)),
+    poolroomsActive,
+    missionVisible:!levelRunActive
+  });
+  updateMissionObjective();
+  if(broadcast&&multiplayer.isWorldAuthority()){
+    multiplayer.broadcastWorldEvent("mission_state","campaign",missionStateSnapshot());
+  }
+}
+
+function restoreMissionState(data={}){
+  missionState={
+    relays:Array.isArray(data?.relays)?[0,1,2].map(i=>Boolean(data.relays[i])):[false,false,false],
+    breakerSolved:Boolean(data?.breakerSolved||world.maintenanceDoor?.unlocked),
+    levelRunCleared:Boolean(data?.levelRunCleared),
+    poolroomsUnlocked:Boolean(data?.poolroomsUnlocked),
+    poolroomsExitReached:Boolean(data?.poolroomsExitReached),
+    log:Array.isArray(data?.log)?data.log.slice(-12).map(item=>({
+      title:String(item?.title||"FIELD NOTE").slice(0,48),
+      text:String(item?.text||"").slice(0,180)
+    })):[]
+  };
+  refreshMissionState({broadcast:false});
+}
+
+function resetMissionState(){
+  missionState={
+    relays:[false,false,false],
+    breakerSolved:false,
+    levelRunCleared:false,
+    poolroomsUnlocked:false,
+    poolroomsExitReached:false,
+    log:[]
+  };
+  refreshMissionState({broadcast:false});
+}
+
+function recordMissionLog(title,text){
+  const cleanTitle=String(title||"FIELD NOTE").slice(0,48);
+  if(missionState.log.some(item=>item.title===cleanTitle))return;
+  missionState.log.push({title:cleanTitle,text:String(text||"").slice(0,180)});
+  missionState.log=missionState.log.slice(-12);
+  renderStoryLog();
+}
+
+function getMissionTarget(){
+  const missingRelay=missionState.relays.findIndex(value=>!value);
+  if(missingRelay>=0){
+    const relay=storyMissionWorld?.getRelayLocations?.()[missingRelay];
+    const fallbacks=[
+      {x:-80,z:-92,title:"FIELD RADIO"},
+      {x:-80,z:-238,title:"SIGNAL RELAY 02"},
+      {x:-80,z:-394,title:"SIGNAL RELAY 03"}
+    ];
+    const point=relay||fallbacks[missingRelay];
+    return {...point,hint:"SIGNAL "+missionState.relays.filter(Boolean).length+"/3 · FIND "+point.title};
+  }
+  if(!missionState.breakerSolved&&!world.maintenanceDoor?.unlocked){
+    return {
+      x:-80,z:MAP_MIN_CHUNK*CHUNK_SIZE+3,
+      hint:"ALL RELAYS ONLINE · FIND THE MAINTENANCE ROOM AND SOLVE THE EIGHT BREAKERS"
+    };
+  }
+  if(!missionState.levelRunCleared){
+    const entries=storyMissionWorld?.getStairwellEntries?.()||[
+      {id:"north",x:-80,z:-164,title:"LEVEL RUN ACCESS A"},
+      {id:"deep",x:-80,z:-326,title:"LEVEL RUN ACCESS B"}
+    ];
+    const nearest=entries.slice().sort((a,b)=>
+      Math.hypot(player.pos.x-a.x,player.pos.z-a.z)-
+      Math.hypot(player.pos.x-b.x,player.pos.z-b.z)
+    )[0];
+    return {...nearest,hint:"POWER RESTORED · ENTER "+nearest.title+" AND SURVIVE THE RUN"};
+  }
+  return {x:-80,z:-472,hint:"MISSION COMPLETE · RETURN TO THE POOLROOMS DOOR"};
+}
+
+function updateMissionObjective(){
+  if(!gameStarted||gameEnded||houseMode||levelRunActive||poolroomsActive||tutorialOpenRoomActive)return;
+  if(houseTutorialStage>0&&houseTutorialStage<10)return;
+  const target=getMissionTarget();
+  const dx=target.x-player.pos.x,dz=target.z-player.pos.z;
+  const distance=Math.round(Math.hypot(dx,dz));
+  const horizontal=Math.abs(dx),vertical=Math.abs(dz);
+  const direction=horizontal>vertical*1.65
+    ?(dx<0?"WEST":"EAST")
+    :vertical>horizontal*1.65
+      ?(dz<0?"NORTH":"SOUTH")
+      :(dx<0?"WEST":"EAST")+(dz<0?"-NORTH":"-SOUTH");
+  const label=distance<=3
+    ?target.hint+" · OBJECTIVE REACHED"
+    :target.hint+" · "+distance+" M "+direction;
+  if(objective&&objective.textContent!==label)objective.textContent=label;
+  if(phoneCardText&&phoneCardText.textContent!==label)phoneCardText.textContent=label;
+}
+
+function activateMissionRelay(index,{broadcast=true}={}){
+  if(!multiplayer.isWorldAuthority())return false;
+  if(!Number.isInteger(index)||index<0||index>=3||missionState.relays[index])return false;
+  missionState.relays[index]=true;
+  const details=[
+    ["FIELD RADIO RESTORED","The radio finally clears. M's voice breaks through the static."],
+    ["RELAY TWO ONLINE","The second relay repeats a message from the maintenance room."],
+    ["RELAY THREE ONLINE","The last relay locks onto a signal beyond the Poolrooms door."]
+  ][index];
+  recordMissionLog(details[0],details[1]);
+  eventText.textContent=details[0];
+  eventText.style.opacity="1";
+  refreshMissionState({broadcast});
+  if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
+  return true;
+}
+
+async function enterPoolroomsLevel({broadcast=true}={}){
+  if(!missionState.poolroomsUnlocked||poolroomsActive||!storyMissionWorld)return false;
+  const ready=await storyMissionWorld.enterPoolrooms();
+  if(!ready){
+    eventText.textContent="POOLROOMS MODEL FAILED TO LOAD · CHECK CONNECTION AND PRESS E TO RETRY.";
+    eventText.style.opacity="1";
+    return false;
+  }
+  if(poolroomsPreviousEnvironment===null){
+    poolroomsPreviousEnvironment={
+      background:scene.background?.clone?.()??scene.background??null,
+      fogColor:scene.fog?.color?.clone?.()??null,
+      fogNear:scene.fog?.near??null,
+      fogFar:scene.fog?.far??null
+    };
+  }
+  poolroomsActive=true;
+  // The Poolrooms are a separate level, so don't carry a live Backrooms chase
+  // through the door or let stale snapshots keep the spider visible here.
+  spiderActive=false;
+  spiderSpawnPending=false;
+  spiderJumpscareTimer=0;
+  spiderCaughtFreezeTimer=0;
+  spiderBehaviorState="idle";
+  spiderBehaviorTime=0;
+  normalSpiderHunter.hide();
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
+  player.movementFrozen=false;
+  clearSpiderPath();
+  world.root.visible=false;
+  houseRoot.visible=false;
+  if(levelRunState.group)levelRunState.group.visible=false;
+  player.ignoreWorldCollision=true;
+  player.extraCollisionBoxes=storyMissionWorld.getPoolroomsCollisionBoxes();
+  player.pos.set(0,EYE,-3.0);
+  player.vel.set(0,0,0);
+  player.keys.clear();
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  player.yaw=Math.PI;
+  player.pitch=0;
+  player.crouched=false;
+  player.sliding=false;
+  scene.background=new THREE.Color(0x071b1c);
+  if(scene.fog){
+    scene.fog.color.set(0x1c5553);
+    scene.fog.near=13;
+    scene.fog.far=58;
+  }
+  storyMissionWorld.syncState(missionState,{poolroomsActive:true,missionVisible:false});
+  objective.textContent="FOLLOW THE DIM BLUE LIGHTS ALONG THE DRY DECK · FIND THE SOURCE OF THE SIGNAL.";
+  if(phoneCardText)phoneCardText.textContent=objective.textContent;
+  eventText.textContent="THE POOLROOMS · SIGNAL LOCKED";
+  eventText.style.opacity="1";
+  player.lock();
+  if(broadcast)multiplayer.broadcastWorldEvent("poolrooms_enter","campaign",{});
+  return true;
+}
+
+function triggerMissionEnding({broadcast=true}={}){
+  if(!poolroomsActive||gameEnded)return;
+  missionState.poolroomsExitReached=true;
+  recordMissionLog("THE SOURCE","You found the end of the transmission. It was waiting for you.");
+  if(broadcast)multiplayer.broadcastWorldEvent("mission_ending","campaign",missionStateSnapshot());
+  beginGameEnding();
+}
 // Retain the apartment in memory if a save slot actually uses this level.
 let initialHouseRequired=false;
 let houseSpawn=new THREE.Vector3(0,EYE,0);
@@ -2443,6 +2661,11 @@ function updateHouseLoadingUI(progress=null,status=null){
 }
 
 async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
+  if(poolroomsActive){
+    eventText.textContent="THE POOLROOMS ARE NOT A CHECKPOINT.";
+    eventText.style.opacity="1";
+    return false;
+  }
   const targetSlot=normalizeSaveSlot(slot);
 
   if(confirmOverwrite && getSavedGame(targetSlot) && !window.confirm("SLOT "+targetSlot+" ALREADY HAS A SAVE. OVERWRITE IT?")){
@@ -2462,7 +2685,7 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
   }catch{}
 
   const data={
-    version:5,
+    version:6,
     seed:SEED,
     level:"backrooms",
     savedAt:Date.now(),
@@ -2483,6 +2706,7 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
     maintenancePuzzleSeed:world.maintenancePuzzleSeed,
     maintenanceDoorUnlocked:Boolean(world.maintenanceDoor?.unlocked),
     maintenanceBreakerProgress:world.breakerProgress,
+    missionState:missionStateSnapshot(),
   };
 
   const stored=persistSaveSlot(targetSlot,data);
@@ -2559,12 +2783,19 @@ function applySavedGame(data){
     ? data.maxStoryDistance
     : 0;
   applyStoryStage(stage,false);
+  restoreMissionState(data.missionState||{
+    relays:[false,false,false],
+    breakerSolved:Boolean(data.maintenanceDoorUnlocked),
+    levelRunCleared:false,
+    poolroomsUnlocked:false,
+    log:[]
+  });
 
   const savedLevel=getSavedLevel(data);
   if(savedLevel==="apartment" && houseLoaded){
     setHouseMode(true,{announceFall:false});
   }else{
-    setHouseMode(false,{announceFall:false});
+    setHouseMode(false,{announceFall:false,suppressSpiderSpawn:true});
   }
 }
 
@@ -2730,6 +2961,11 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   configureMaintenancePuzzleForRun(save);
   overlay.classList.add("hidden");
   audio.start();
+  if(storyMissionWorld){
+    storyMissionWorld.build()
+      .then(()=>refreshMissionState({broadcast:false}))
+      .catch(error=>console.warn("[DeepSeeker] Mission markers could not finish building:",error));
+  }
 
   // Core player/spider assets are now readiness-gated before the menu or
   // gameplay can start; no model download is kicked off from this path.
@@ -2742,6 +2978,7 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   }else{
     houseMode=false;
     ensureTutorialOpenRoom();
+    resetMissionState();
     player.pos.set(32,EYE,32);
     player.vel.set(0,0,0);
     player.jumpY=0;
@@ -2875,7 +3112,7 @@ let chatHideTimer=0;
 const multiplayer=new Multiplayer({
   scene,
   player,
-  getLevel:()=>houseMode ? "house" : "backrooms",
+  getLevel:()=>houseMode ? "house" : poolroomsActive ? "poolrooms" : "backrooms",
   getFlashlightOn:()=>flashlightOn,
   onStatus:(message)=>{
     if(!message) return;
@@ -2918,7 +3155,13 @@ const multiplayer=new Multiplayer({
     }
     if(event?.type==="maintenance_breaker_action"){
       if(String(event.playerId||"")===String(multiplayer.playerId||""))return;
-      world.activateBreaker(Number(event.payload?.index));
+      const result=world.activateBreaker(Number(event.payload?.index));
+      if(result.complete&&multiplayer.isWorldAuthority()){
+        missionState.breakerSolved=true;
+        recordMissionLog("MAINTENANCE POWER RESTORED","Eight equations brought the breaker room back online.");
+        refreshMissionState({broadcast:true});
+        if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
+      }
       return;
     }
     if(event?.type==="maintenance_puzzle_solved"){
@@ -2937,8 +3180,94 @@ const multiplayer=new Multiplayer({
       return;
     }
     if(!LEVEL_RUN_ENABLED && String(event?.type||"").startsWith("level_run_")) return;
+    if(event?.type==="mission_state"){
+      if(!multiplayer.isWorldAuthority())restoreMissionState(event.payload||{});
+      return;
+    }
+    if(event?.type==="mission_relay_attempt"){
+      if(!multiplayer.isWorldAuthority())return;
+      const index=Number(event.payload?.index);
+      const relay=storyMissionWorld?.getRelayLocations?.()[index];
+      const remote=multiplayer.players.get(String(event.playerId||""));
+      const state=remote?.current||remote?.target;
+      if(relay&&state&&Math.hypot(Number(state.x)-relay.x,Number(state.z)-relay.z)<5.0){
+        activateMissionRelay(index,{broadcast:true});
+      }
+      return;
+    }
+    if(event?.type==="level_run_entry_attempt"){
+      if(!multiplayer.isWorldAuthority()||levelRunActive||!missionState.relays.every(Boolean)||!missionState.breakerSolved)return;
+      const payload=event.payload||{};
+      const remote=multiplayer.players.get(String(event.playerId||""));
+      const state=remote?.current||remote?.target;
+      const entry=storyMissionWorld?.getStairwellEntries?.().find(item=>item.id===String(payload.entryId||""));
+      if(!entry||!state||Math.hypot(Number(state.x)-entry.x,Number(state.z)-entry.z)>5.0)return;
+      startLevelRun({
+        runnerId:String(event.playerId),
+        returnX:Number(payload.returnX),
+        returnZ:Number(payload.returnZ)
+      },{
+        entryDoor:payload.entryDoor||{centerX:entry.x,wallZ:entry.z,face:1}
+      });
+      return;
+    }
+    if(event?.type==="level_run_clue_found"){
+      if(!multiplayer.isWorldAuthority()||!levelRunActive)return;
+      if(String(event.playerId||"")!==String(levelRunState.runnerId||""))return;
+      const payload=event.payload||{};
+      if(Number(payload.round)!==levelRunState.round)return;
+      const index=Number(payload.clueIndex);
+      if(Number.isInteger(index)&&index>=0&&index<4&&!levelRunState.cluesFound[index]){
+        levelRunState.cluesFound[index]=true;
+        drawLevelRunClueCards();
+        drawLevelRunCodeScreen();
+        multiplayer.broadcastWorldEvent("level_run_clue_state","level-run",{
+          round:levelRunState.round,cluesFound:levelRunState.cluesFound.slice()
+        });
+      }
+      return;
+    }
+    if(event?.type==="level_run_clue_state"){
+      if(multiplayer.isWorldAuthority()||!levelRunActive)return;
+      const payload=event.payload||{};
+      if(Number(payload.round)!==levelRunState.round)return;
+      levelRunState.cluesFound=Array.isArray(payload.cluesFound)
+        ?[0,1,2,3].map(i=>Boolean(payload.cluesFound[i]))
+        :[false,false,false,false];
+      drawLevelRunClueCards();
+      drawLevelRunCodeScreen();
+      return;
+    }
+    if(event?.type==="poolrooms_enter_attempt"){
+      if(multiplayer.isWorldAuthority()&&missionState.poolroomsUnlocked){
+        void enterPoolroomsLevel({broadcast:true});
+      }
+      return;
+    }
+    if(event?.type==="poolrooms_enter"){
+      if(!multiplayer.isWorldAuthority())void enterPoolroomsLevel({broadcast:false});
+      return;
+    }
+    if(event?.type==="mission_ending_attempt"){
+      if(multiplayer.isWorldAuthority()&&poolroomsActive)triggerMissionEnding({broadcast:true});
+      return;
+    }
+    if(event?.type==="mission_ending"){
+      if(!multiplayer.isWorldAuthority()){
+        restoreMissionState(event.payload||{});
+        beginGameEnding();
+      }
+      return;
+    }
+    if(event?.type==="level_run_complete"){
+      if(!multiplayer.isWorldAuthority()){
+        restoreMissionState(event.payload?.missionState||{});
+        if(levelRunActive)leaveLevelRun(false);
+      }
+      return;
+    }
     if(event?.type==="level_run_enter"){
-      if(!levelRunActive && !houseMode && !tutorialOpenRoomActive) {
+      if(!levelRunActive && !houseMode && !tutorialOpenRoomActive && !poolroomsActive) {
         startLevelRun(event.payload||{},{broadcast:false});
       }
       return;
@@ -2954,7 +3283,7 @@ const multiplayer=new Multiplayer({
         levelRunActive &&
         String(event.playerId||"")===String(levelRunState.runnerId||"") &&
         Number(payload.round)===levelRunState.round
-      ) advanceLevelRunRound();
+      ) advanceLevelRunRound({success:true});
       return;
     }
     if(event?.type==="level_run_exit"){
@@ -3054,7 +3383,7 @@ const multiplayer=new Multiplayer({
 
 const navigation=new NavigationSystem({
   player,
-  getLevelName:()=>levelRunActive ? "LEVEL RUN" : houseMode ? "APARTMENT" : "BACKROOMS"
+  getLevelName:()=>levelRunActive ? "LEVEL RUN" : poolroomsActive ? "POOLROOMS" : houseMode ? "APARTMENT" : "BACKROOMS"
 });
 
 const securityCameras=new SecurityCameraSystem({
@@ -3082,10 +3411,18 @@ const computerSystem=new ComputerSystem({
   onClose:()=>{ if(gameStarted) player.lock(); }
 });
 
+storyMissionWorld=new StoryMissionWorld({scene,world,loader:gltfLoader});
+
 const interaction=new InteractionSystem({
   camera,
   domElement:renderer.domElement,
-  getCandidates:()=>levelRunActive ? levelRunState.interactables : world.getInteractables(),
+  getCandidates:()=>levelRunActive
+    ? levelRunState.interactables
+    : poolroomsActive
+      ? [storyMissionWorld?.getPoolroomsExitInteractable()]
+      : houseMode||tutorialOpenRoomActive
+        ? []
+        : [...world.getInteractables(),...(storyMissionWorld?.getInteractables()||[])],
   onInteract:(target)=>{
     if(!gameStarted || houseMode) return false;
     if(target.type==="computer"){
@@ -3119,6 +3456,12 @@ const interaction=new InteractionSystem({
       if(multiplayer?.socket?.readyState===WebSocket.OPEN){
         multiplayer.broadcastWorldEvent("maintenance_breaker_action","maintenance-puzzle",{index:target.breakerIndex});
       }
+      if(result.complete&&multiplayer.isWorldAuthority()){
+        missionState.breakerSolved=true;
+        recordMissionLog("MAINTENANCE POWER RESTORED","Eight equations brought the breaker room back online.");
+        refreshMissionState({broadcast:true});
+        if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
+      }
       const message=result.complete
         ?"POWER RESTORED. MAINTENANCE DOOR UNLOCKED."
         :result.correct
@@ -3126,6 +3469,60 @@ const interaction=new InteractionSystem({
           :"WRONG ORDER. ALL BREAKERS RESET; THE LIGHTS CUT OUT.";
       eventText.textContent=message;eventText.style.opacity="1";
       setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2300);
+      return true;
+    }
+    if(target.type==="storyRelay"){
+      const index=Number(target.relayIndex);
+      if(multiplayer.isWorldAuthority()){
+        activateMissionRelay(index,{broadcast:true});
+      }else{
+        multiplayer.broadcastWorldEvent("mission_relay_attempt","campaign",{index});
+        eventText.textContent="SIGNAL RELAY REQUESTED.";
+        eventText.style.opacity="1";
+      }
+      return true;
+    }
+    if(target.type==="levelRunEntry"){
+      if(!missionState.relays.every(Boolean)||!missionState.breakerSolved){
+        eventText.textContent="RESTORE ALL THREE RELAYS AND SOLVE THE MAINTENANCE BREAKERS FIRST.";
+        eventText.style.opacity="1";
+        return true;
+      }
+      if(multiplayer.isWorldAuthority()){
+        startLevelRun({}, {entryDoor:target.entryDoor});
+      }else{
+        multiplayer.broadcastWorldEvent("level_run_entry_attempt","campaign",{
+          entryId:String(target.entryId||"north"),
+          entryDoor:target.entryDoor,
+          returnX:player.pos.x,
+          returnZ:player.pos.z
+        });
+        eventText.textContent="REQUESTING ACCESS TO LEVEL RUN.";
+        eventText.style.opacity="1";
+      }
+      return true;
+    }
+    if(target.type==="poolroomsDoor"){
+      if(!missionState.poolroomsUnlocked){
+        eventText.textContent="THE DOOR HAS NO POWER · RESTORE THE RELAYS, BREAKERS, AND LEVEL RUN.";
+        eventText.style.opacity="1";
+        return true;
+      }
+      if(multiplayer.isWorldAuthority())void enterPoolroomsLevel({broadcast:true});
+      else{
+        multiplayer.broadcastWorldEvent("poolrooms_enter_attempt","campaign",{});
+        eventText.textContent="WAITING FOR THE HOST TO OPEN THE DOOR.";
+        eventText.style.opacity="1";
+      }
+      return true;
+    }
+    if(target.type==="poolroomsExit"){
+      if(multiplayer.isWorldAuthority())triggerMissionEnding({broadcast:true});
+      else multiplayer.broadcastWorldEvent("mission_ending_attempt","campaign",{});
+      return true;
+    }
+    if(target.type==="levelRunClue"){
+      collectLevelRunClue(Number(target.clueIndex));
       return true;
     }
     if(target.type==="levelRunSafe"){
@@ -3194,28 +3591,86 @@ function isInsideLevelRun(x,z){
 function updateLevelRunHUD(){
   if(!levelRunActive) return;
   const role=isLocalLevelRunRunner()?"YOU ARE THE RUNNER":"RUNNER: "+getLevelRunRunnerName();
-  const text="LEVEL RUN · ROUND "+levelRunState.round+" · "+role+" · FIND THE CODE, UNLOCK THE SAFE";
+  const fragments=levelRunState.cluesFound.filter(Boolean).length;
+  const text="LEVEL RUN · ROUND "+levelRunState.round+" · "+role+
+    " · FRAGMENTS "+fragments+"/4 · UNLOCK THE SAFE";
   if(objective.textContent!==text) objective.textContent=text;
 }
 
 function drawLevelRunCodeScreen(){
   const ctx=levelRunState.screenContext;
-  if(!ctx) return;
+  if(!ctx)return;
   const canvas=ctx.canvas;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle="#08120e";ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.strokeStyle="#3b9873";ctx.lineWidth=5;ctx.strokeRect(12,12,canvas.width-24,canvas.height-24);
   ctx.textAlign="center";ctx.fillStyle="#70e2ac";ctx.font="bold 25px monospace";
   ctx.fillText("SECURE CACHE",canvas.width/2,55);
-  ctx.fillStyle="#9cb8a8";ctx.font="18px monospace";ctx.fillText("CURRENT ACCESS CODE",canvas.width/2,100);
-  ctx.fillStyle="#d4ffdf";ctx.font="bold 68px monospace";ctx.fillText(levelRunState.code,canvas.width/2,180);
-  ctx.fillStyle="#67917b";ctx.font="14px monospace";ctx.fillText("CODE RESETS WHEN ROLES ROTATE",canvas.width/2,224);
-  if(levelRunState.screenTexture) levelRunState.screenTexture.needsUpdate=true;
+  ctx.fillStyle="#9cb8a8";ctx.font="18px monospace";
+  ctx.fillText("SIGNAL CORRUPTED",canvas.width/2,102);
+  ctx.fillStyle="#d4ffdf";ctx.font="bold 33px monospace";
+  ctx.fillText("FRAGMENTS "+levelRunState.cluesFound.filter(Boolean).length+"/4",canvas.width/2,166);
+  ctx.fillStyle="#67917b";ctx.font="14px monospace";
+  ctx.fillText("SEARCH SIDE PANELS · E TO SCAN",canvas.width/2,216);
+  if(levelRunState.screenTexture)levelRunState.screenTexture.needsUpdate=true;
+}
+
+function drawLevelRunClueCards(){
+  for(const card of levelRunState.clueCards){
+    const ctx=card.context;
+    if(!ctx)continue;
+    const canvas=ctx.canvas;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#0a100d";ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle=levelRunState.cluesFound[card.index]?"#73d6a0":"#764b4e";
+    ctx.lineWidth=5;ctx.strokeRect(12,12,canvas.width-24,canvas.height-24);
+    ctx.textAlign="center";
+    ctx.fillStyle="#b3c8b9";ctx.font="bold 20px monospace";
+    ctx.fillText("FRAGMENT "+(card.index+1),canvas.width/2,62);
+    ctx.fillStyle=levelRunState.cluesFound[card.index]?"#d5ffe0":"#c0aaa9";
+    ctx.font="bold 62px monospace";
+    ctx.fillText(levelRunState.cluesFound[card.index]?levelRunState.code[card.index]:"?",canvas.width/2,145);
+    ctx.fillStyle=levelRunState.cluesFound[card.index]?"#73d6a0":"#de777b";
+    ctx.font="bold 16px monospace";
+    ctx.fillText(levelRunState.cluesFound[card.index]?"FRAGMENT RECOVERED":"PRESS E TO SCAN",canvas.width/2,202);
+    card.texture.needsUpdate=true;
+  }
+}
+
+function collectLevelRunClue(index){
+  if(!levelRunActive||!Number.isInteger(index)||index<0||index>=4)return false;
+  if(!isLocalLevelRunRunner()){
+    eventText.textContent="THE RUNNER HAS TO SCAN THE FRAGMENTS.";
+    eventText.style.opacity="1";
+    return true;
+  }
+  if(levelRunState.cluesFound[index]){
+    eventText.textContent="FRAGMENT ALREADY RECOVERED.";
+    eventText.style.opacity="1";
+    return true;
+  }
+  if(!multiplayer.isWorldAuthority()){
+    multiplayer.broadcastWorldEvent("level_run_clue_found","level-run",{
+      clueIndex:index,round:levelRunState.round
+    });
+    eventText.textContent="SCANNING FRAGMENT…";
+    eventText.style.opacity="1";
+    return true;
+  }
+  levelRunState.cluesFound[index]=true;
+  drawLevelRunClueCards();
+  drawLevelRunCodeScreen();
+  eventText.textContent="FRAGMENT "+(index+1)+" RECOVERED.";
+  eventText.style.opacity="1";
+  multiplayer.broadcastWorldEvent("level_run_clue_state","level-run",{
+    round:levelRunState.round,cluesFound:levelRunState.cluesFound.slice()
+  });
+  return true;
 }
 
 function ensureLevelRunBuilt(){
   if(levelRunState.group) return;
-  const root=new THREE.Group();root.name="LevelRUN_IndustrialMaze";root.visible=false;scene.add(root);
+  const root=new THREE.Group();root.name="LevelRun_RedSignalCorridor";root.visible=false;scene.add(root);
   levelRunState.group=root;
   levelRunState.collisionBoxes.length=0;levelRunState.occluders.length=0;levelRunState.interactables.length=0;
 
@@ -3312,6 +3767,50 @@ function ensureLevelRunBuilt(){
   exitPanel.userData.interactable={type:"levelRunExit",prompt:"Return to the Backrooms"};
   root.add(exitPanel);levelRunState.interactables.push(exitPanel);
 
+  // Four side-mounted scan panels disclose one digit apiece. Each is paired
+  // with a real CC0 transmitter cabinet when the optional model is available.
+  levelRunState.clueCards=[];
+  levelRunState.cluePositions=[];
+  const clueOffsets=[-8,4,15,23];
+  for(let i=0;i<4;i++){
+    const side=i%2===0?-1:1;
+    const clueZ=LEVEL_RUN_ORIGIN_Z+clueOffsets[i];
+    const clueX=LEVEL_RUN_ORIGIN_X+side*7.55;
+    levelRunState.cluePositions.push({x:clueX,z:clueZ});
+    const canvas=document.createElement("canvas");canvas.width=256;canvas.height=256;
+    const ctx=canvas.getContext("2d");
+    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+    const material=new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false});
+    const panel=new THREE.Mesh(new THREE.PlaneGeometry(.92,.76),material);
+    panel.name="LevelRunCodeFragment_"+(i+1);
+    panel.position.set(clueX,1.82,clueZ);
+    panel.rotation.y=side<0?Math.PI/2:-Math.PI/2;
+    panel.userData.interactable={type:"levelRunClue",clueIndex:i,prompt:"Scan code fragment "+(i+1)};
+    root.add(panel);levelRunState.interactables.push(panel);
+    levelRunState.clueCards.push({index:i,context:ctx,texture,material,mesh:panel});
+  }
+  storyMissionWorld?.loadModel("transmitter").then(gltf=>{
+    for(const card of levelRunState.clueCards){
+      const position=levelRunState.cluePositions[card.index];
+      const side=card.index%2===0?-1:1;
+      const cabinet=gltf.scene.clone(true);
+      cabinet.name="LevelRunTransmitterClueCabinet";
+      cabinet.scale.setScalar(.78);
+      cabinet.rotation.y=side<0?Math.PI/2:-Math.PI/2;
+      cabinet.position.set(0,0,0);
+      cabinet.updateMatrixWorld(true);
+      const bounds=new THREE.Box3().setFromObject(cabinet);
+      const center=bounds.getCenter(new THREE.Vector3());
+      cabinet.position.set(
+        LEVEL_RUN_ORIGIN_X+side*8.35-center.x,
+        -bounds.min.y,
+        position.z-center.z
+      );
+      root.add(cabinet);
+    }
+  }).catch(()=>{});
+  drawLevelRunClueCards();
+
   // Red fixtures add both visible glow and real red light. Emissive floor/walls
   // keep the whole corridor red between fixtures without adding shadow cost.
   const tubeMaterial=new THREE.MeshStandardMaterial({
@@ -3357,6 +3856,10 @@ function ensureLevelRunKeypad(){
   panel.querySelector("#levelRunKeypadForm").addEventListener("submit",event=>{
     event.preventDefault();
     if(!levelRunActive)return closeLevelRunKeypad(false);
+    if(!levelRunState.cluesFound.every(Boolean)){
+      levelRunState.keypadMessage.textContent="THE SAFE NEEDS ALL FOUR FRAGMENTS. SCAN EVERY SIDE PANEL FIRST.";
+      return;
+    }
     if(!isLocalLevelRunRunner()){
       levelRunState.keypadMessage.textContent="YOU ARE THE DECOY THIS ROUND. WAIT FOR THE ROLE SWITCH.";
       return;
@@ -3367,7 +3870,7 @@ function ensureLevelRunKeypad(){
     }
     const payload={runnerId:getLevelRunLocalId(),round:levelRunState.round};
     closeLevelRunKeypad(true);
-    if(multiplayer.isWorldAuthority()) advanceLevelRunRound();
+    if(multiplayer.isWorldAuthority()) advanceLevelRunRound({success:true});
     else multiplayer.broadcastWorldEvent("level_run_safe_opened","level-run",payload);
   });
 }
@@ -3375,9 +3878,11 @@ function ensureLevelRunKeypad(){
 function openLevelRunSafe(){
   if(!levelRunActive)return;
   ensureLevelRunKeypad();
-  levelRunState.keypadMessage.textContent=isLocalLevelRunRunner()
-    ?"ENTER THE FOUR-DIGIT CODE SHOWN ON THE GREEN TERMINAL."
-    :"YOU ARE THE DECOY THIS ROUND. WAIT FOR THE ROLE SWITCH.";
+  levelRunState.keypadMessage.textContent=!isLocalLevelRunRunner()
+    ?"YOU ARE THE DECOY THIS ROUND. WAIT FOR THE ROLE SWITCH."
+    :!levelRunState.cluesFound.every(Boolean)
+      ?"FIND AND SCAN ALL FOUR SIDE FRAGMENTS BEFORE ENTERING THE CODE."
+      :"ENTER THE FOUR-DIGIT CODE YOU RECOVERED FROM THE SIDE FRAGMENTS.";
   levelRunState.keypadInput.value="";
   levelRunState.keypad.classList.add("open");
   levelRunState.keypad.style.display="flex";
@@ -3447,7 +3952,7 @@ function resetLevelRunSpider(){
 }
 
 function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
-  if(!LEVEL_RUN_ENABLED||levelRunActive||houseMode||tutorialOpenRoomActive)return false;
+  if(!LEVEL_RUN_ENABLED||levelRunActive||houseMode||tutorialOpenRoomActive||poolroomsActive)return false;
   ensureLevelRunBuilt();
   const participants=getLevelRunParticipantIds(),localId=getLevelRunLocalId();
   const runnerId=String(payload.runnerId||participants[Math.floor(Math.random()*participants.length)]||localId);
@@ -3466,6 +3971,8 @@ function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
   }
   levelRunState.code=/^[0-9]{4}$/.test(code)?code:makeLevelRunCode();
   levelRunState.round=Math.max(1,Math.floor(Number(payload.round)||1));
+  levelRunState.successfulRuns=0;
+  levelRunState.cluesFound=[false,false,false,false];
   if(Number.isFinite(Number(payload.returnX))&&Number.isFinite(Number(payload.returnZ))){
     levelRunState.returnPosition.set(Number(payload.returnX),EYE,Number(payload.returnZ));
   }else if(entryDoor){
@@ -3476,9 +3983,9 @@ function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
   player.ignoreWorldCollision=true;player.extraCollisionBoxes=levelRunState.collisionBoxes;
   const spawn=getLevelRunSpawnFor(localId);player.pos.set(spawn.x,EYE,spawn.z);
   player.vel.set(0,0,0);player.keys.clear();player.jumpY=0;player.jumpVelocity=0;
-  player.yaw=0;player.pitch=0;player.crouched=false;player.sliding=false;player.slideTimer=0;
+  player.yaw=Math.PI;player.pitch=0;player.crouched=false;player.sliding=false;player.slideTimer=0;
   spiderActive=false;normalSpiderHunter.hide();spiderEntity.visible=false;spiderRevealLight.visible=false;
-  drawLevelRunCodeScreen();resetLevelRunSpider();updateLevelRunHUD();
+  drawLevelRunClueCards();drawLevelRunCodeScreen();resetLevelRunSpider();updateLevelRunHUD();
   if(broadcast)multiplayer.broadcastWorldEvent("level_run_enter","level-run",{
     runnerId:levelRunState.runnerId,code:levelRunState.code,round:levelRunState.round,
     returnX:levelRunState.returnPosition.x,returnZ:levelRunState.returnPosition.z
@@ -3493,20 +4000,53 @@ function applyLevelRunRoundState(payload={}){
   levelRunState.round=Math.max(levelRunState.round+1,Math.floor(Number(payload.round)||1));
   const code=String(payload.code||makeLevelRunCode());
   levelRunState.code=/^[0-9]{4}$/.test(code)?code:makeLevelRunCode();
-  drawLevelRunCodeScreen();updateLevelRunHUD();
+  levelRunState.successfulRuns=Math.max(0,Math.floor(Number(payload.successfulRuns)||0));
+  levelRunState.cluesFound=[false,false,false,false];
+  const spawn=getLevelRunSpawnFor(getLevelRunLocalId());
+  player.pos.set(spawn.x,EYE,spawn.z);
+  player.vel.set(0,0,0);player.keys.clear();player.jumpY=0;player.jumpVelocity=0;
+  player.yaw=Math.PI;player.pitch=0;
+  drawLevelRunClueCards();drawLevelRunCodeScreen();updateLevelRunHUD();
   if(multiplayer.isWorldAuthority())resetLevelRunSpider();
   else{spiderActive=true;spiderEntity.visible=true;}
 }
 
-function advanceLevelRunRound(){
+function completeLevelRun(){
   if(!levelRunActive||!multiplayer.isWorldAuthority())return;
+  missionState.levelRunCleared=true;
+  recordMissionLog("LEVEL RUN CLEARED","The secure cache opened. The Poolrooms door has a source to follow.");
+  refreshMissionState({broadcast:false});
+  leaveLevelRun(false);
+  if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
+  multiplayer.broadcastWorldEvent("level_run_complete","level-run",{
+    missionState:missionStateSnapshot()
+  });
+  eventText.textContent="LEVEL RUN CLEARED · THE POOLROOMS DOOR IS NOW POWERED.";
+  eventText.style.opacity="1";
+}
+
+function advanceLevelRunRound({success=false}={}){
+  if(!levelRunActive||!multiplayer.isWorldAuthority())return;
+  if(success){
+    levelRunState.successfulRuns++;
+    const requiredRuns=getLevelRunParticipantIds().length>1?2:1;
+    if(levelRunState.successfulRuns>=requiredRuns){
+      completeLevelRun();
+      return;
+    }
+  }
   const ids=getLevelRunParticipantIds(),current=String(levelRunState.runnerId||getLevelRunLocalId());
   const currentIndex=ids.indexOf(current);
   const nextRunner=ids.length>1?ids[((currentIndex<0?0:currentIndex)+1)%ids.length]:current;
-  const payload={runnerId:nextRunner,code:makeLevelRunCode(),round:levelRunState.round+1};
+  const payload={
+    runnerId:nextRunner,code:makeLevelRunCode(),round:levelRunState.round+1,
+    successfulRuns:levelRunState.successfulRuns
+  };
   applyLevelRunRoundState(payload);
   multiplayer.broadcastWorldEvent("level_run_round_state","level-run",payload);
-  showSpiderScareMessage("RUNNER SWITCHED · ROUND "+payload.round,1300);
+  showSpiderScareMessage(success
+    ?"SAFE OPENED · RUNNER SWITCHED · ROUND "+payload.round
+    :"CAUGHT · NEW RUNNER · ROUND "+payload.round,1500);
 }
 
 function leaveLevelRun(broadcast=true){
@@ -3534,6 +4074,7 @@ function leaveLevelRun(broadcast=true){
   spiderActive=false;normalSpiderHunter.hide();spiderEntity.visible=false;spiderRevealLight.visible=false;
   levelRunState.runnerId=null;clearSpiderPath();
   objective.textContent="Find a way deeper. Stay in the light.";
+  refreshMissionState({broadcast:false});
   if(broadcast)multiplayer.broadcastWorldEvent("level_run_exit","level-run",{});
   showSpiderScareMessage("BACK IN THE BACKROOMS.",1500);
 }
@@ -4657,8 +5198,12 @@ function setHouseMode(enabled,options={}){
     renderer.setPixelRatio(currentPixelRatio);
     flashlight.castShadow=ENABLE_SHADOWS;
 
-    spiderSpawnPending=true;
-    ensureSpiderLoading();
+    if(options.suppressSpiderSpawn){
+      spiderSpawnPending=false;
+    }else{
+      spiderSpawnPending=true;
+      ensureSpiderLoading();
+    }
 
     if(options.forceBackroomsSpawn || houseModeWasActive){
       player.pos.set(32,EYE,32);
@@ -4669,7 +5214,7 @@ function setHouseMode(enabled,options={}){
 
     objective.textContent=STORY[storyStage].objective;
 
-    if(gameStarted){
+    if(gameStarted&&!options.suppressSpiderSpawn){
       spawnSpiderAtPlayer();
     }
 
@@ -5841,6 +6386,8 @@ function setHouseTutorialStage(stage){
     );
     updateTutorialGuide();
     disableTutorialOpenRoom();
+    refreshMissionState({broadcast:false});
+    updateMissionObjective();
 
     // Resume normal encounters only after a fresh post-tutorial delay.
     spiderSpawnPending=false;
@@ -7822,14 +8369,31 @@ const STORY = [
 
 
 
+function escapeStoryHtml(value){
+  return String(value??"").replace(/[&<>"']/g,char=>({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    "\"":"&quot;",
+    "'":"&#39;"
+  })[char]);
+}
+
 function renderStoryLog(){
   const unlocked=STORY.slice(0,storyStage+1);
-  phoneStory.innerHTML=unlocked.map(entry=>`
-    <div class="storyEntry">
-      <div class="storyMeta">${entry.title} · DEPTH ${entry.depth}</div>
-      <div class="storyText">${entry.text}</div>
-    </div>
-  `).join("");
+  const storyHtml=unlocked.map(entry=>
+    '<div class="storyEntry">'+
+      '<div class="storyMeta">'+escapeStoryHtml(entry.title)+' · DEPTH '+entry.depth+'</div>'+
+      '<div class="storyText">'+escapeStoryHtml(entry.text)+'</div>'+
+    '</div>'
+  ).join("");
+  const missionHtml=missionState.log.map(entry=>
+    '<div class="storyEntry">'+
+      '<div class="storyMeta">'+escapeStoryHtml(entry.title)+' · FIELD LOG</div>'+
+      '<div class="storyText">'+escapeStoryHtml(entry.text)+'</div>'+
+    '</div>'
+  ).join("");
+  phoneStory.innerHTML=storyHtml+missionHtml;
 }
 
 function applyStoryStage(index, announce=true){
@@ -7848,6 +8412,7 @@ function applyStoryStage(index, announce=true){
 }
 
 function updateStoryProgress(){
+  if(poolroomsActive||levelRunActive||houseMode)return;
   const dx=player.pos.x-32;
   const dz=player.pos.z-32;
   maxStoryDistance=Math.max(maxStoryDistance,Math.hypot(dx,dz));
@@ -7859,11 +8424,13 @@ function updateStoryProgress(){
   if(nextStage!==storyStage){
     applyStoryStage(nextStage,true);
   }
+  updateMissionObjective();
 
   if(
     !gameEnded &&
     storyStage===STORY.length-1 &&
-    maxStoryDistance>=ENDING_DISTANCE
+    maxStoryDistance>=ENDING_DISTANCE &&
+    missionState.poolroomsExitReached
   ){
     beginGameEnding();
   }
@@ -8400,7 +8967,7 @@ document.addEventListener("keydown",e=>{
 });
 
 function triggerEvent(){
-  if(!multiplayer.isWorldAuthority()||tutorialOpenRoomActive||houseMode||spiderActive)return;
+  if(!multiplayer.isWorldAuthority()||tutorialOpenRoomActive||houseMode||poolroomsActive||spiderActive)return;
   eventCooldown=4.5;
   if(!spiderLoaded){ensureSpiderLoading();return;}
   // Start from out of sight; a chase begins only after the spider detects a clue.
@@ -8419,7 +8986,7 @@ function publishMultiplayerSpiderSnapshot(dt){
   }
 
   spiderSyncElapsed+=dt;
-  const active=Boolean(spiderActive && !houseMode && !tutorialOpenRoomActive && gameStarted);
+  const active=Boolean(spiderActive && !houseMode && !tutorialOpenRoomActive && !poolroomsActive && gameStarted);
   if(!active){
     if(spiderSyncLastActive || spiderSyncNeedsInitial){
       multiplayer.broadcastWorldEvent("spider_snapshot","main-spider",{
@@ -8461,6 +9028,16 @@ function publishMultiplayerSpiderSnapshot(dt){
 
 function applyRemoteSpiderSnapshot(dt){
   if(multiplayer.isWorldAuthority() || houseMode || tutorialOpenRoomActive) return;
+  if(poolroomsActive){
+    spiderActive=false;
+    spiderBehaviorState="idle";
+    spiderJumpscareTimer=0;
+    spiderCaughtFreezeTimer=0;
+    spiderEntity.visible=false;
+    spiderRevealLight.visible=false;
+    spiderRevealLight.intensity=0;
+    return;
+  }
   const snapshot=remoteSpiderSnapshot;
   const fresh=snapshot && performance.now()-remoteSpiderSnapshotReceivedAt<1200;
   if(!fresh || !snapshot.active){
@@ -8729,7 +9306,11 @@ function animate(){
     if(houseDoorCollisionDirty || houseCollisionRefreshTimer<=0 || movedEnough){
       updateHouseDoorCollisions();
     }
+  }else if(poolroomsActive){
+    player.ignoreWorldCollision=true;
+    player.extraCollisionBoxes=storyMissionWorld?.getPoolroomsCollisionBoxes()||[];
   }else if(!tutorialOpenRoomActive && !levelRunActive){
+    player.ignoreWorldCollision=false;
     player.extraCollisionBoxes=[];
   }
 
@@ -8770,21 +9351,21 @@ function animate(){
   }
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
-    if(!houseMode && !levelRunActive && storyRefreshElapsed>=(
+    if(!houseMode && !levelRunActive && !poolroomsActive && storyRefreshElapsed>=(
     LOW_END_PERFORMANCE?.08:.02
   )){
     storyRefreshElapsed=0;
     updateStoryProgress();
   }
 
-  if(gameStarted){
+  if(gameStarted&&!poolroomsActive){
     if(t-lastAutoSave>20){
       lastAutoSave=t;
       saveGame(undefined,{confirmOverwrite:false});
     }
   }
 
-  if(!houseMode && !levelRunActive){
+  if(!houseMode && !levelRunActive && !poolroomsActive){
     if(!gameStarted){
       // Keep the title-screen camera centered on a known open section of
       // chunk 0,0 while the game remains on the menu.
@@ -8969,7 +9550,7 @@ function animate(){
           const caughtX=huntInfo.target.pos.x;
           const caughtZ=huntInfo.target.pos.z;
           if(normalSpiderHunter.distanceToHitbox(caughtX,caughtZ)<=.06){
-            if(levelRunActive) advanceLevelRunRound();
+            if(levelRunActive) advanceLevelRunRound({success:false});
             else startSpiderCatchFreeze();
           }else if(
             !levelRunActive && spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
@@ -9060,7 +9641,7 @@ function animate(){
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
-  if(!houseMode && !levelRunActive && !tutorialOpenRoomActive && !spiderActive &&
+  if(!houseMode && !levelRunActive && !poolroomsActive && !tutorialOpenRoomActive && !spiderActive &&
      eventCooldown<=0 && t>nextEvent){
     triggerEvent();
     nextEvent=t+28+Math.random()*35;
@@ -9108,6 +9689,7 @@ function animate(){
   }
 
   updateSpiderWallClipBounds(dt);
+  storyMissionWorld?.update(dt);
 
   renderer.render(scene,camera);
 }
@@ -9115,7 +9697,7 @@ beginInitialLoading();
 animate();
 
 window.addEventListener("beforeunload",()=>{
-  if(gameStarted) saveGame(undefined,{confirmOverwrite:false});
+  if(gameStarted&&!poolroomsActive) saveGame(undefined,{confirmOverwrite:false});
 });
 
 // URL-based save continuation is consumed by finishInitialLoading() only
