@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-expandedmap1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-brighterrooms1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261016-expandedmap1";
+import { Player } from "./player.js?v=20261016-brighterrooms1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -244,11 +244,14 @@ renderer.outputColorSpace=THREE.SRGBColorSpace;
 container.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x000100);
+// Keep distant walls readable instead of fading into near-black fog. Chromebooks
+// get a little more range and a warmer fog so the Backrooms stay navigable.
+const BACKROOMS_FOG_COLOR=LOW_END_PERFORMANCE?0x393626:0x2d2b20;
+scene.background=new THREE.Color(BACKROOMS_FOG_COLOR);
 scene.fog=new THREE.Fog(
-  0x030302,
-  LOW_END_PERFORMANCE?13:14,
-  LOW_END_PERFORMANCE?56:62
+  BACKROOMS_FOG_COLOR,
+  LOW_END_PERFORMANCE?17:18,
+  LOW_END_PERFORMANCE?82:94
 );
 
 const camera=new THREE.PerspectiveCamera(
@@ -326,7 +329,7 @@ function ensureTutorialOpenRoom(){
   });
   const ceilingMaterial=new THREE.MeshStandardMaterial({
     map:world.materials.ceiling.map,
-    color:0x3a382e,
+    color:0x77725e,
     roughness:.96,
     side:THREE.DoubleSide
   });
@@ -405,6 +408,15 @@ function ensureTutorialOpenRoom(){
     });
   }
 
+  // The tutorial is a teaching space, not a low-light survival section.
+  // These fill lights are only present while this dedicated room is visible.
+  const tutorialFillHemisphere=new THREE.HemisphereLight(0xfff2d1,0x958565,.46);
+  tutorialFillHemisphere.name="TutorialFullBrightnessHemisphere";
+  tutorialOpenRoomRoot.add(tutorialFillHemisphere);
+  const tutorialFillAmbient=new THREE.AmbientLight(0xfff0d0,.24);
+  tutorialFillAmbient.name="TutorialFullBrightnessAmbient";
+  tutorialOpenRoomRoot.add(tutorialFillAmbient);
+
   const half=t*.5;
   tutorialOpenRoomCollisionBoxes.push(
     {minX:min,maxX:max,minZ:min-half,maxZ:min+half},
@@ -450,9 +462,11 @@ function disableTutorialOpenRoom(){
   player.extraCollisionBoxes=[];
 }
 
-const hemi=new THREE.HemisphereLight(0xc2b889,0x211d12,0.16);
+const WORLD_HEMISPHERE_BASE_INTENSITY=LOW_END_PERFORMANCE?0.86:0.68;
+const WORLD_AMBIENT_BASE_INTENSITY=LOW_END_PERFORMANCE?0.34:0.23;
+const hemi=new THREE.HemisphereLight(0xd8cc9b,0x51452f,WORLD_HEMISPHERE_BASE_INTENSITY);
 scene.add(hemi);
-const ambient=new THREE.AmbientLight(0x8f815d,0.035);
+const ambient=new THREE.AmbientLight(0xb8a77b,WORLD_AMBIENT_BASE_INTENSITY);
 scene.add(ambient);
 
 
@@ -9652,12 +9666,15 @@ function animate(){
     vignette.style.opacity=String(.70+.07*pulse);
     camera.position.x+=Math.sin(t*70)*pulse*.008;
     camera.position.y+=Math.sin(t*61)*pulse*.006;
-    hemi.intensity=0;
-    ambient.intensity=0;
+    // Signal pulses can briefly dim the Backrooms, but must never black them out.
+    // The tutorial always stays bright so its instructions remain easy to see.
+    const pulseScale=tutorialOpenRoomActive?1:.22;
+    hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY*pulseScale;
+    ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY*pulseScale;
   }else{
     vignette.style.opacity=".70";
-    hemi.intensity=0;
-    ambient.intensity=0;
+    hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY;
+    ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY;
   }
 
   if(uiRefreshElapsed>=(

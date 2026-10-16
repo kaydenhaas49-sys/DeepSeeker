@@ -349,7 +349,10 @@ export class World {
     const signTexture=new THREE.CanvasTexture(signCanvas);
     signTexture.colorSpace=THREE.SRGBColorSpace;
     this.roomDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.88,metalness:0.02,side:THREE.DoubleSide});
-    this.breakerRoomLightMaterial=new THREE.MeshStandardMaterial({color:0xe0d9b9,emissive:0xe7e0c1,emissiveIntensity:1.4,roughness:0.4});
+    this.breakerRoomLightMaterial=new THREE.MeshStandardMaterial({
+      color:0x353328,emissive:0x000000,emissiveIntensity:0,roughness:0.4
+    });
+    this.breakerRoomLights=[];
     this.roomDoors=[];
     this.breakerSwitches=[];
     this.breakerProgress=0;
@@ -526,7 +529,7 @@ export class World {
   }
 
   buildBreakerControlRoom(centerX,backZ){
-    this.breakerRoomBounds=[];this.breakerSwitches=[];
+    this.breakerRoomBounds=[];this.breakerSwitches=[];this.breakerRoomLights=[];
     const group=this.breakerRoomGroup,wallT=.22,roomHeight=3.95,roomWidth=26.4,half=roomWidth*.5;
     const leftX=centerX-half,rightX=centerX+half,partitionZ=this.maintenanceRoomFrontZ-35.5;
     const depth=partitionZ-backZ,midZ=(partitionZ+backZ)*.5;
@@ -553,8 +556,25 @@ export class World {
     addBox("BreakerRoomCeiling",roomWidth,.10,depth-.15,centerX,3.82,midZ,this.materials.ceiling);
     for(let rib=0;rib<5;rib++){
       const z=partitionZ-2.2-rib*((depth-4.4)/4);
+      const fixtureZ=z+.72;
       addBox("BreakerRoomCeilingCrossbrace",roomWidth-.35,.10,.12,centerX,3.68,z,this.roomDoorMetalMaterial);
-      addBox("BreakerRoomFluorescentStrip",3.8,.06,.18,centerX,3.59,z+.72,this.breakerRoomLightMaterial);
+      addBox("BreakerRoomFluorescentStrip",3.8,.06,.18,centerX,3.59,fixtureZ,this.breakerRoomLightMaterial);
+
+      // The breaker room is unlit behind its closed door. Two non-shadow-casting
+      // ceiling lights per row illuminate the wall-mounted breakers after entry.
+      for(const side of [-1,1]){
+        const light=new THREE.PointLight(0xffe7ad,0,18,1.45);
+        light.name="BreakerRoomOverheadLight";
+        light.position.set(centerX+side*6.35,3.35,fixtureZ);
+        light.visible=false;
+        light.castShadow=false;
+        group.add(light);
+        this.breakerRoomLights.push({
+          light,
+          baseIntensity:10,
+          phase:rib*.83+(side>0?.45:0)
+        });
+      }
     }
     const boardZ=backZ+.24;
     addBox("BreakerMathInstructionBoard",5.9,.70,.14,centerX,3.50,boardZ,this.breakerPanelMaterial);
@@ -954,6 +974,27 @@ export class World {
 
   updateRoomDoors(dt){
     this.breakerFailTimer=Math.max(0,this.breakerFailTimer-dt);
+    const breakerRoomLightsOn=Boolean(
+      this.breakerRoomDoor &&
+      this.breakerRoomDoor.openProgress>.05 &&
+      this.breakerFailTimer<=0
+    );
+    // The fluorescent strips are dark when the door is shut. Opening it wakes
+    // the fixtures and their actual light sources together.
+    this.breakerRoomLightMaterial.color.setHex(
+      breakerRoomLightsOn?0xffe8b5:0x353328
+    );
+    this.breakerRoomLightMaterial.emissive.setHex(
+      breakerRoomLightsOn?0xffd98d:0x000000
+    );
+    this.breakerRoomLightMaterial.emissiveIntensity=breakerRoomLightsOn?1.65:0;
+    const lightFlickerTime=performance.now()*.004;
+    for(const item of this.breakerRoomLights){
+      item.light.visible=breakerRoomLightsOn;
+      item.light.intensity=breakerRoomLightsOn
+        ? item.baseIntensity*(.97+.03*Math.sin(lightFlickerTime+item.phase))
+        : 0;
+    }
     for(const door of this.roomDoors){
       if(!door.group?.parent)continue;
       const direction=door.targetOpen?1:-1;
