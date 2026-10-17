@@ -8,6 +8,7 @@ const ASSETS = Object.freeze({
   stairwell: "https://cdn.3dassets.dev/assets/25338/v1/model.glb",
   fireDoor: "https://cdn.3dassets.dev/assets/25820/v1/model.glb",
   poolroom: "https://cdn.3dassets.dev/assets/25335/v1/model.glb",
+  openedRadio: "https://cdn.3dassets.dev/assets/25477/v1/model.glb",
 });
 
 const RELAYS = Object.freeze([
@@ -118,8 +119,8 @@ function buildRelayDevice(station, relay, baseMaterial) {
   const edgeMetal=new THREE.MeshStandardMaterial({color:0x73776b,roughness:0.42,metalness:0.66});
   const panelMat=new THREE.MeshStandardMaterial({color:0x171c19,roughness:0.48,metalness:0.32});
   const rubber=new THREE.MeshStandardMaterial({color:0x101512,roughness:0.94,metalness:0.02});
-  let screenTexture=makeRelayDisplayTexture(relay);
-  const screenMat=new THREE.MeshBasicMaterial({map:screenTexture,toneMapped:false});
+  let screenTexture=relay.device==="radio" ? null : makeRelayDisplayTexture(relay);
+  const screenMat=screenTexture ? new THREE.MeshBasicMaterial({map:screenTexture,toneMapped:false}) : null;
   const redLed=new THREE.MeshStandardMaterial({color:0xb33a27,emissive:0x601005,emissiveIntensity:0.8,roughness:0.3});
   const greenLed=new THREE.MeshStandardMaterial({color:0x58b87e,emissive:0x087432,emissiveIntensity:1.05,roughness:0.24});
   const amberLed=new THREE.MeshStandardMaterial({color:0xe5a64d,emissive:0x82440b,emissiveIntensity:0.72,roughness:0.28});
@@ -134,53 +135,11 @@ function buildRelayDevice(station, relay, baseMaterial) {
 
   let statusLed;
   if(relay.device==="radio"){
-    addDeviceMesh(root,"RadioMainHousing",new RoundedBoxGeometry(1.04,0.50,0.43,5,0.055),
-      housing,0,0.46,0);
-    addDeviceMesh(root,"RadioLowerRubberBumper",new RoundedBoxGeometry(1.06,0.075,0.45,4,0.022),
-      rubber,0,0.225,0);
-    addDeviceMesh(root,"RadioFrontPanel",new RoundedBoxGeometry(0.90,0.36,0.035,4,0.012),
-      panelMat,0,0.46,0.224);
-
-    for(let row=0;row<5;row++){
-      for(let col=0;col<5;col++){
-        addDeviceMesh(root,"SpeakerPerforation",new THREE.CircleGeometry(0.010,8),rubber,
-          -0.30+col*0.045,0.385+row*0.036,0.247);
-      }
-    }
-    addDeviceMesh(root,"RadioScreenRim",new RoundedBoxGeometry(0.31,0.145,0.018,3,0.008),
-      edgeMetal,0.205,0.525,0.24);
-    addDeviceMesh(root,"RadioStatusScreen",new THREE.PlaneGeometry(0.27,0.105),
-      screenMat,0.205,0.525,0.252);
-    for(const x of [0.14,0.28]){
-      addDeviceMesh(root,"TuningKnobBase",new THREE.CylinderGeometry(0.052,0.052,0.026,16),
-        rubber,x,0.365,0.246,[Math.PI/2,0,0]);
-      addDeviceMesh(root,"TuningKnob",new THREE.CylinderGeometry(0.037,0.037,0.038,16),
-        edgeMetal,x,0.365,0.268,[Math.PI/2,0,0]);
-      addDeviceMesh(root,"KnobGrip",new THREE.BoxGeometry(0.008,0.038,0.012),rubber,
-        x,0.365,0.291,[0,0,-0.35]);
-    }
-    for(let i=0;i<3;i++){
-      addDeviceMesh(root,"RadioFunctionButton",new THREE.CylinderGeometry(0.018,0.018,0.012,10),
-        i===0?redLed:(i===1?amberLed:greenLed),0.37,0.37+i*0.075,0.25,[Math.PI/2,0,0]);
-    }
-    addDeviceTube(root,"RadioCarryHandle",
-      [[-0.27,0.72,-0.04],[-0.27,0.89,-0.04],[-0.12,0.94,-0.04],[0.12,0.94,-0.04],[0.27,0.89,-0.04],[0.27,0.72,-0.04]],
-      0.018,trim);
-    addDeviceMesh(root,"AntennaFoot",new THREE.CylinderGeometry(0.045,0.052,0.075,12),
-      edgeMetal,0.37,0.755,-0.12);
-    addDeviceMesh(root,"RadioAntenna",new THREE.CylinderGeometry(0.008,0.018,0.60,10),
-      edgeMetal,0.37,1.08,-0.12);
-    const coilPoints=[];
-    for(let i=0;i<=32;i++){
-      const angle=i/32*Math.PI*8;
-      coilPoints.push([0.37+Math.cos(angle)*0.018,0.82+(i/32)*0.12,-0.12+Math.sin(angle)*0.018]);
-    }
-    addDeviceTube(root,"RadioAntennaCoil",coilPoints,0.006,trim);
-    addDeviceTube(root,"RadioCoiledCable",
-      [[-0.48,0.58,0.05],[-0.58,0.50,0.02],[-0.56,0.33,-0.09],[-0.43,0.25,-0.17]],
-      0.018,rubber);
+    // The visible radio comes from a real CC0 GLB loaded by StoryMissionWorld.
+    // Keep only an online/offline indicator here so the relay still responds
+    // to campaign state without recreating the old blocky radio from primitives.
     statusLed=addDeviceMesh(root,"RadioLinkStatusLED",new THREE.SphereGeometry(0.033,14,10),
-      redLed,0.37,0.64,0.25);
+      redLed,0.24,0.62,0.15);
   }else{
     addDeviceMesh(root,"TransmitterCabinet",new RoundedBoxGeometry(0.91,1.10,0.49,5,0.045),
       housing,0,0.76,0);
@@ -243,10 +202,12 @@ function buildRelayDevice(station, relay, baseMaterial) {
       statusLed.material=online?greenLed:redLed;
       if(root.userData.online!==online){
         root.userData.online=online;
-        screenTexture.dispose();
-        screenTexture=makeRelayDisplayTexture(relay,online);
-        screenMat.map=screenTexture;
-        screenMat.needsUpdate=true;
+        if(screenTexture && screenMat){
+          screenTexture.dispose();
+          screenTexture=makeRelayDisplayTexture(relay,online);
+          screenMat.map=screenTexture;
+          screenMat.needsUpdate=true;
+        }
       }
     }
   };
@@ -414,7 +375,23 @@ export class StoryMissionWorld {
       station.name = "StoryRelay_" + relay.id;
       station.position.set(relay.x, 0, relay.z);
       this.root.add(station);
-      this.relayDevices.push(buildRelayDevice(station,relay,darkMetal));
+      const device=buildRelayDevice(station,relay,darkMetal);
+      this.relayDevices.push(device);
+      if(relay.device==="radio"){
+        this.loadModel("openedRadio").then(gltf=>{
+          const model=gltf.scene.clone(true);
+          model.name="CC0OpenedRadioModel";
+          model.traverse(node=>{
+            if(!node.isMesh)return;
+            node.castShadow=true;
+            node.receiveShadow=true;
+          });
+          placeModelOnFloor(model,{scale:1.5});
+          model.position.y+=0.16; // sit on top of the relay pedestal
+          device.root.add(model);
+          device.root.userData.modelAsset="opened-radio-cc0";
+        }).catch(()=>{});
+      }
       this.relayCards.push(this._addSign(station, {
         x: 0, y: 2.28, z: 0.78, width: 1.65, height: 0.72,
         title: relay.title, subtitle: "PRESS E TO RESTORE", status: "OFFLINE",
