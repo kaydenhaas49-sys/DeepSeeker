@@ -325,13 +325,13 @@ export class World {
     this.fixtureMaterial = new THREE.MeshStandardMaterial({
       color: 0xfff4ca,
       emissive: 0xffe2a0,
-      emissiveIntensity: 0.55,
+      emissiveIntensity: 0.30,
       roughness: 0.28,
     });
     this.fixtureDimMaterial = new THREE.MeshStandardMaterial({
       color: 0xfff4ca,
       emissive: 0xffe2a0,
-      emissiveIntensity: 0.34,
+      emissiveIntensity: 0.19,
       roughness: 0.30,
     });
     this.fixtureBlackMaterial = new THREE.MeshStandardMaterial({
@@ -1204,7 +1204,7 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=cracked ? 1.6+rng()*.45 : 3.1+rng()*.8;
+      const power=cracked ? .95+rng()*.30 : 2.0+rng()*.45;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
       const y=WALL_H-.035;
