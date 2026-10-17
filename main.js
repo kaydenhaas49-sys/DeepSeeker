@@ -8595,28 +8595,28 @@ const STORY = [
   {
     distance: 45,
     depth: 0,
-    title: "M — ENTRY 01",
+    title: "???? — ENTRY 01",
     text: "You're here too? Keep moving. The doors don't go where they should.",
     objective: "Follow the halls."
   },
   {
     distance: 90,
     depth: 1,
-    title: "M — ENTRY 02",
+    title: "???? — ENTRY 02",
     text: "Tried mapping the halls. Turn around and they change. I swear it knows.",
     objective: "Keep moving."
   },
   {
     distance: 150,
     depth: 1,
-    title: "M — ENTRY 03",
+    title: "???? — ENTRY 03",
     text: "Same room. Third time today. The exit changed again.",
     objective: "Find another way through."
   },
   {
     distance: 230,
     depth: 2,
-    title: "M — ENTRY 04",
+    title: "???? — ENTRY 04",
     text: "Saw someone who looked like me. I followed them. Big mistake.",
     objective: "Don't follow it."
   },
@@ -8630,14 +8630,14 @@ const STORY = [
   {
     distance: 450,
     depth: 4,
-    title: "M — ENTRY 05",
+    title: "???? — ENTRY 05",
     text: "Something's moving under the walls. The others want to leave. I don't think we can.",
     objective: "Go deeper."
   },
   {
     distance: 600,
     depth: 5,
-    title: "M — FINAL ENTRY",
+    title: "???? — FINAL ENTRY",
     text: "Made it to the bottom. I thought I was following your trail. It's the other way around.",
     objective: "Find the signal."
   }
@@ -8681,7 +8681,7 @@ function applyStoryStage(index, announce=true){
   renderStoryLog();
 
   if(announce && storyStage>0){
-    eventText.textContent=entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "NEW NOTE FROM M";
+    eventText.textContent=entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "NEW NOTE FROM ????";
     eventText.style.opacity="1";
     setTimeout(()=>{eventText.style.opacity="0";},2200);
   }
@@ -8740,7 +8740,7 @@ function showHouseIntroPhoneMessage(){
   phone.setAttribute("aria-hidden","false");
   crosshair.style.display="none";
 
-  phoneAppName.textContent="MESSAGE FROM M";
+  phoneAppName.textContent="MESSAGE FROM ????";
   phoneDepth.textContent="!";
   phoneDepthLabel.textContent="NEW MESSAGE";
   phoneCardTitle.textContent="KEEP MOVING";
@@ -8749,7 +8749,7 @@ function showHouseIntroPhoneMessage(){
   renderStoryLog();
   phoneStory.insertAdjacentHTML("afterbegin",`
     <div class="storyEntry">
-      <div class="storyMeta">M · ENTRY TUTORIAL</div>
+      <div class="storyMeta">???? · ENTRY TUTORIAL</div>
       <div class="storyText">You're in the Backrooms. Have a look around. Press F to try your flashlight.</div>
     </div>
   `);
