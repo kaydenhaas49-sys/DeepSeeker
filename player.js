@@ -15,326 +15,115 @@ const JUMP_SPEED = 3.2;
 const JUMP_GRAVITY = 20;
 
 
-function makeFirstPersonArmMesh(group,geometry,material,name,renderOrder=2000){
-  const mesh=new THREE.Mesh(geometry,material);
-  mesh.name=name;
-  mesh.renderOrder=renderOrder;
-  mesh.frustumCulled=false;
-  mesh.castShadow=false;
-  mesh.receiveShadow=false;
-  group.add(mesh);
-  return mesh;
-}
-
-function makeFirstPersonCapsuleSegment(group,start,end,radius,material,name,renderOrder=2000){
-  const direction=end.clone().sub(start);
-  const length=direction.length();
-  if(length<.001) return null;
-  const geometry=new THREE.CapsuleGeometry(radius,Math.max(.001,length-2*radius),5,14);
-  const mesh=makeFirstPersonArmMesh(group,geometry,material,name,renderOrder);
-  mesh.position.copy(start).add(end).multiplyScalar(.5);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
-  return mesh;
-}
-
-function makeFirstPersonPalm(group,position,material,name,rotationZ=0){
-  const mesh=makeFirstPersonArmMesh(
-    group,
-    new RoundedBoxGeometry(.158,.072,.176,4,.027),
-    material,
-    name
-  );
-  mesh.position.copy(position);
-  mesh.rotation.z=rotationZ;
-  return mesh;
-}
-
-function makeFirstPersonGloveDetail(group,position,scale,material,name){
-  const mesh=makeFirstPersonArmMesh(group,new THREE.SphereGeometry(1,16,12),material,name);
-  mesh.position.copy(position);
-  mesh.scale.set(scale.x,scale.y,scale.z);
-  return mesh;
-}
-
-function makeSleeveBand(group,position,direction,radius,material,name){
-  const mesh=makeFirstPersonArmMesh(
-    group,new THREE.TorusGeometry(radius,.007,8,24),material,name
-  );
-  mesh.position.copy(position);
-  mesh.quaternion.setFromUnitVectors(
-    new THREE.Vector3(0,0,1),direction.clone().normalize()
-  );
-  return mesh;
-}
-
-function makeContinuousSleeve(group,points,material,name){
-  const curve=new THREE.CatmullRomCurve3(points,false,"catmullrom",.25);
-  const ringCount=40;
-  const radialCount=20;
-  const positions=new Float32Array((ringCount+1)*(radialCount+1)*3);
-  const uvs=new Float32Array((ringCount+1)*(radialCount+1)*2);
-  const indices=[];
-  const referenceUp=new THREE.Vector3(0,1,0);
-  const referenceSide=new THREE.Vector3(1,0,0);
-  const sideVector=new THREE.Vector3();
-  const normalVector=new THREE.Vector3();
-
-  const radiusAt=(t)=>{
-    const stops=[
-      [0,.178],[.16,.163],[.34,.145],[.50,.126],
-      [.67,.108],[.82,.093],[.94,.082],[1,.078]
-    ];
-    for(let i=1;i<stops.length;i++){
-      if(t<=stops[i][0]){
-        const [t0,r0]=stops[i-1];
-        const [t1,r1]=stops[i];
-        const p=(t-t0)/(t1-t0);
-        return THREE.MathUtils.lerp(r0,r1,p);
-      }
-    }
-    return stops[stops.length-1][1];
-  };
-
-  for(let ring=0;ring<=ringCount;ring++){
-    const t=ring/ringCount;
-    const center=curve.getPointAt(t);
-    const tangent=curve.getTangentAt(t).normalize();
-    const reference=Math.abs(tangent.dot(referenceUp))>.92 ? referenceSide : referenceUp;
-    sideVector.crossVectors(tangent,reference).normalize();
-    normalVector.crossVectors(sideVector,tangent).normalize();
-    const radius=radiusAt(t);
-
-    for(let segment=0;segment<=radialCount;segment++){
-      const angle=segment/radialCount*Math.PI*2;
-      const around=normalVector.clone().multiplyScalar(Math.cos(angle))
-        .addScaledVector(sideVector,Math.sin(angle));
-      const vertex=center.clone().addScaledVector(around,radius);
-      const offset=(ring*(radialCount+1)+segment);
-      positions[offset*3]=vertex.x;
-      positions[offset*3+1]=vertex.y;
-      positions[offset*3+2]=vertex.z;
-      uvs[offset*2]=segment/radialCount;
-      uvs[offset*2+1]=t;
-    }
-  }
-
-  for(let ring=0;ring<ringCount;ring++){
-    for(let segment=0;segment<radialCount;segment++){
-      const a=ring*(radialCount+1)+segment;
-      const b=a+radialCount+1;
-      const c=b+1;
-      const d=a+1;
-      indices.push(a,d,b,b,d,c);
-    }
-  }
-
-  const geometry=new THREE.BufferGeometry();
-  geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
-  geometry.setAttribute("uv",new THREE.BufferAttribute(uvs,2));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-
-  const sleeve=makeFirstPersonArmMesh(group,geometry,material,name,2000);
-  sleeve.userData.sleeveCurve=curve;
-  sleeve.userData.radiusAt=radiusAt;
-  return sleeve;
-}
-
-function makeLocalFirstPersonArms(group){
-  // Keep the sleeves low and wide, then bring both hands inward and upward
-  // toward the lower center of the camera. Fingers extend along camera -Z.
-  const suit=new THREE.MeshStandardMaterial({
-    color:0xb2aa82, roughness:.94, metalness:0,
-    side:THREE.DoubleSide, depthTest:true, depthWrite:false
-  });
-  const seamMaterial=new THREE.MeshStandardMaterial({
-    color:0x5b5944, roughness:.95, metalness:0,
-    side:THREE.DoubleSide, depthTest:true, depthWrite:false
-  });
-  const hazardBand=new THREE.MeshStandardMaterial({
-    color:0xd3c878, roughness:.82, metalness:0,
-    side:THREE.DoubleSide, depthTest:true, depthWrite:false
-  });
-  const glove=new THREE.MeshStandardMaterial({
-    color:0x30372f, roughness:.9, metalness:0,
-    side:THREE.DoubleSide, depthTest:true, depthWrite:false
-  });
-  const gloveHighlight=new THREE.MeshStandardMaterial({
-    color:0x4b5547, roughness:.93, metalness:0,
-    side:THREE.DoubleSide, depthTest:true, depthWrite:false
-  });
-
-  // Arms enter off-screen at the lower corners, move forward past the elbows,
-  // then angle inward toward the wrists instead of flaring out toward the edges.
-  const wristPositions={};
-  for(const side of [-1,1]){
-    const name=side<0?"Left":"Right";
-    const points=[
-      new THREE.Vector3(side*.91,-1.04,-.24),  // shoulder starts below the viewport
-      new THREE.Vector3(side*.72,-.83,-.48),   // upper arm angles forward
-      new THREE.Vector3(side*.51,-.62,-.73),   // elbow stays outside the hand
-      new THREE.Vector3(side*.305,-.41,-.98)   // wrist ends higher and closer to center
-    ];
-
-    const sleeve=makeContinuousSleeve(group,points,suit,name+"ContinuousHazmatSleeve");
-    const curve=sleeve.userData.sleeveCurve;
-    const cuffT=.94;
-    makeSleeveBand(
-      group,curve.getPointAt(cuffT),curve.getTangentAt(cuffT).normalize(),
-      .084,hazardBand,name+"WristReflectiveCuff"
-    );
-    const seamT=.57;
-    makeSleeveBand(
-      group,curve.getPointAt(seamT),curve.getTangentAt(seamT).normalize(),
-      .118,seamMaterial,name+"ForearmSeam"
-    );
-    wristPositions[name]=curve.getPointAt(1);
-  }
-
-  // Left hand: rounded palm meets the sleeve with the fingers aimed ahead and
-  // slightly down. The small inward-facing thumb avoids a splayed / claw pose.
-  const leftPalm=wristPositions.Left.clone().add(new THREE.Vector3(.012,-.004,-.070));
-  makeFirstPersonPalm(group,leftPalm,glove,"LeftGlovePalm",-.035);
-  makeFirstPersonGloveDetail(
-    group,leftPalm.clone().add(new THREE.Vector3(0,.039,-.006)),
-    new THREE.Vector3(.076,.012,.070),gloveHighlight,"LeftGloveBackPanel"
-  );
-
-  for(let finger=0;finger<4;finger++){
-    const spread=(finger-1.5)*.031;
-    const base=new THREE.Vector3(leftPalm.x+spread,leftPalm.y-.018,leftPalm.z-.055);
-    const joint=new THREE.Vector3(
-      leftPalm.x+spread*.92,leftPalm.y-.030-Math.abs(finger-1.5)*.002,leftPalm.z-.092
-    );
-    const tip=new THREE.Vector3(
-      leftPalm.x+spread*.78,leftPalm.y-.038-Math.abs(finger-1.5)*.002,leftPalm.z-.119
-    );
-    makeFirstPersonCapsuleSegment(group,base,joint,.0175,glove,"LeftGloveFinger"+finger+"A");
-    makeFirstPersonCapsuleSegment(group,joint,tip,.0145,glove,"LeftGloveFinger"+finger+"B");
-    makeFirstPersonGloveDetail(
-      group,joint,new THREE.Vector3(.017,.017,.017),gloveHighlight,"LeftGloveKnuckle"+finger
-    );
-  }
-
-  const leftThumbBase=leftPalm.clone().add(new THREE.Vector3(.066,.006,-.005));
-  const leftThumbJoint=leftPalm.clone().add(new THREE.Vector3(.084,-.010,-.040));
-  const leftThumbTip=leftPalm.clone().add(new THREE.Vector3(.060,-.026,-.072));
-  makeFirstPersonCapsuleSegment(group,leftThumbBase,leftThumbJoint,.021,glove,"LeftGloveThumbA");
-  makeFirstPersonCapsuleSegment(group,leftThumbJoint,leftThumbTip,.0175,glove,"LeftGloveThumbB");
-
-  // Right glove is built relative to its wrist, so its palm, grip and flashlight
-  // move together. Fingers curve over the torch barrel instead of floating near it.
-  const rightPalm=wristPositions.Right.clone().add(new THREE.Vector3(-.012,-.004,-.070));
-  makeFirstPersonPalm(group,rightPalm,glove,"RightGlovePalm",.035);
-  makeFirstPersonGloveDetail(
-    group,rightPalm.clone().add(new THREE.Vector3(.006,.039,-.006)),
-    new THREE.Vector3(.076,.012,.070),gloveHighlight,"RightGloveBackPanel"
-  );
-
-  for(let finger=0;finger<4;finger++){
-    const z=rightPalm.z+.075-finger*.040;
-    const base=new THREE.Vector3(rightPalm.x+.066,rightPalm.y+.060-finger*.006,z);
-    const joint=new THREE.Vector3(rightPalm.x,rightPalm.y+.028-finger*.006,z-.012);
-    const tip=new THREE.Vector3(rightPalm.x-.061,rightPalm.y-.007-finger*.004,z-.023);
-    makeFirstPersonCapsuleSegment(group,base,joint,.020,glove,"RightGripFinger"+finger+"A",2020);
-    makeFirstPersonCapsuleSegment(group,joint,tip,.017,glove,"RightGripFinger"+finger+"B",2020);
-    makeFirstPersonGloveDetail(
-      group,joint,new THREE.Vector3(.020,.020,.020),gloveHighlight,"RightGripKnuckle"+finger,2020
-    );
-  }
-
-  const rightThumbBase=rightPalm.clone().add(new THREE.Vector3(-.052,.028,.067));
-  const rightThumbJoint=rightPalm.clone().add(new THREE.Vector3(-.091,-.004,.008));
-  const rightThumbTip=rightPalm.clone().add(new THREE.Vector3(-.071,-.024,-.052));
-  makeFirstPersonCapsuleSegment(group,rightThumbBase,rightThumbJoint,.024,glove,"RightGripThumbA",2020);
-  makeFirstPersonCapsuleSegment(group,rightThumbJoint,rightThumbTip,.019,glove,"RightGripThumbB",2020);
-  makeFirstPersonGloveDetail(
-    group,rightThumbJoint,new THREE.Vector3(.023,.023,.023),gloveHighlight,"RightGripThumbJoint",2020
-  );
-
+function makeLocalFirstPersonFlashlight(group){
+  // A standalone first-person torch. Keep the camera-local viewmodel free of
+  // sleeves, gloves, fingers, or arm meshes so the prop remains clean and stable.
   const flashlight=new THREE.Group();
   flashlight.name="LocalFirstPersonFlashlight";
-  flashlight.position.copy(rightPalm).add(new THREE.Vector3(-.020,.010,.006));
-  // The prop and its spotlight share this exact transform: forward, slightly
-  // down, and just inward toward the center of the view.
+  flashlight.position.set(.245,-.365,-.78);
   flashlight.rotation.set(
-    THREE.MathUtils.degToRad(-5),
+    THREE.MathUtils.degToRad(-3),
     THREE.MathUtils.degToRad(4),
-    0
+    THREE.MathUtils.degToRad(-1)
   );
   group.add(flashlight);
 
   const metal=new THREE.MeshStandardMaterial({
-    color:0x20231f, roughness:.64, metalness:.16,
-    side:THREE.DoubleSide, depthTest:false, depthWrite:false,
-    emissive:0x000000, emissiveIntensity:.05
+    color:0x252923, roughness:.52, metalness:.34,
+    side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const trim=new THREE.MeshStandardMaterial({
-    color:0x67695e, roughness:.46, metalness:.32,
+    color:0x73766a, roughness:.38, metalness:.62,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const gripMaterial=new THREE.MeshStandardMaterial({
-    color:0x111410, roughness:.82, metalness:.04,
+    color:0x131611, roughness:.84, metalness:.08,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const lensMaterial=new THREE.MeshStandardMaterial({
-    color:0x514f40, emissive:0x514f40, emissiveIntensity:.08,
-    roughness:.24, metalness:.02,
+    color:0x37392f, emissive:0x18170f, emissiveIntensity:.08,
+    roughness:.22, metalness:.02,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
-  const body=makeFirstPersonArmMesh(
-    flashlight,new THREE.CylinderGeometry(.032,.036,.30,20),
-    metal,"LocalFlashlightBody",2010
+
+  const addPart=(geometry,material,name,renderOrder=2010)=>{
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name=name;
+    mesh.renderOrder=renderOrder;
+    mesh.frustumCulled=false;
+    mesh.castShadow=false;
+    mesh.receiveShadow=false;
+    flashlight.add(mesh);
+    return mesh;
+  };
+
+  // The body and lens all share the flashlight's local -Z axis.
+  const body=addPart(
+    new THREE.CylinderGeometry(.034,.038,.36,24),
+    metal,
+    "LocalFlashlightBody"
   );
   body.rotation.x=Math.PI/2;
-  const head=makeFirstPersonArmMesh(
-    flashlight,new THREE.CylinderGeometry(.045,.054,.07,24),
-    metal,"LocalFlashlightHead",2010
+
+  const head=addPart(
+    new THREE.CylinderGeometry(.047,.056,.09,28),
+    metal,
+    "LocalFlashlightHead"
   );
   head.rotation.x=Math.PI/2;
-  head.position.z=-.165;
-  const bezel=makeFirstPersonArmMesh(
-    flashlight,new THREE.TorusGeometry(.051,.0045,8,24),
-    trim,"LocalFlashlightBezel",2010
+  head.position.z=-.185;
+
+  const bezel=addPart(
+    new THREE.TorusGeometry(.052,.0055,8,28),
+    trim,
+    "LocalFlashlightBezel"
   );
-  bezel.position.z=-.203;
-  const lens=makeFirstPersonArmMesh(
-    flashlight,new THREE.CylinderGeometry(.044,.044,.009,24),
-    lensMaterial,"FlashlightLens",2011
+  bezel.position.z=-.235;
+
+  const lens=addPart(
+    new THREE.CylinderGeometry(.046,.046,.014,28),
+    lensMaterial,
+    "FlashlightLens",
+    2011
   );
   lens.rotation.x=Math.PI/2;
-  lens.position.z=-.208;
-  const rear=makeFirstPersonArmMesh(
-    flashlight,new THREE.CylinderGeometry(.033,.033,.018,20),
-    trim,"LocalFlashlightRearCap",2010
+  lens.position.z=-.239;
+
+  const rear=addPart(
+    new THREE.CylinderGeometry(.036,.036,.025,24),
+    trim,
+    "LocalFlashlightRearCap"
   );
   rear.rotation.x=Math.PI/2;
-  rear.position.z=.153;
+  rear.position.z=.187;
 
-  // Grip rings and a raised switch make the torch read as a held object.
-  for(const [index,z] of [.010,.055,.100].entries()){
-    const rib=makeFirstPersonArmMesh(
-      flashlight,new THREE.TorusGeometry(.032,.0025,6,20),
-      gripMaterial,"FlashlightGripRib"+index,2010
+  // Grip grooves and a visible top switch give the torch a more readable shape.
+  for(const [index,z] of [.015,.055,.095,.135].entries()){
+    const rib=addPart(
+      new THREE.TorusGeometry(.035,.0026,7,24),
+      gripMaterial,
+      "FlashlightGripRib"+index
     );
     rib.position.z=z;
   }
-  const powerSwitch=makeFirstPersonArmMesh(
-    flashlight,new RoundedBoxGeometry(.022,.009,.032,3,.003),
-    trim,"FlashlightPowerSwitch",2010
-  );
-  powerSwitch.position.set(.003,.036,.064);
 
-  group.traverse(obj=>{
-    if(obj.isMesh){
-      obj.frustumCulled=false;
-      obj.castShadow=false;
-      obj.receiveShadow=false;
-    }
-  });
+  const switchBase=addPart(
+    new RoundedBoxGeometry(.026,.012,.038,3,.003),
+    gripMaterial,
+    "FlashlightSwitchBase"
+  );
+  switchBase.position.set(0,.035,.055);
+
+  const powerSwitch=addPart(
+    new RoundedBoxGeometry(.016,.008,.023,3,.002),
+    trim,
+    "FlashlightPowerSwitch"
+  );
+  powerSwitch.position.set(0,.043,.055);
+
   return {lens,flashlight};
 }
+
 export class Player {
   constructor(camera, domElement, world) {
     this.camera = camera;
@@ -459,26 +248,18 @@ export class Player {
   }
 
   setupHands() {
-    // The hazmat is the actual player character, not a camera prop.
-    // First-person keeps the world-space body hidden to avoid clipping through
-    // the camera; multiplayer renders the same full-body model.
+    // Retain the historical property name because main.js toggles this
+    // camera-local container, but its only visible child is the flashlight.
     this.hands = new THREE.Group();
     this.hands.name = "PlayerFirstPersonHands";
     this.hands.visible = true;
     this.hands.renderOrder = 2999;
     this.camera.add(this.hands);
 
-    // Keep a lightweight fallback visible immediately. Once the hazmat GLB is
-    // ready, replace these tube arms with its actual skinned sleeves and gloves.
-    this.proceduralHands=new THREE.Group();
-    this.proceduralHands.name="ProceduralHandsFallback";
-    this.hands.add(this.proceduralHands);
-    const fallbackViewmodel=makeLocalFirstPersonArms(this.proceduralHands);
-    this.proceduralArmFlashlightLens=fallbackViewmodel.lens;
-    this.proceduralArmFlashlight=fallbackViewmodel.flashlight;
-    // The prop stays outside the fallback group so the real arm mesh can
-    // replace the hands without also hiding the flashlight or its beam.
-    this.hands.add(this.proceduralArmFlashlight);
+    const viewmodel=makeLocalFirstPersonFlashlight(this.hands);
+    this.proceduralArmFlashlightLens=viewmodel.lens;
+    this.proceduralArmFlashlight=viewmodel.flashlight;
+    this.proceduralHands=null;
     this.firstPersonArmViewmodel=null;
 
     this.characterModel = null;
@@ -495,7 +276,7 @@ export class Player {
     worldRoot.add(this.worldAvatar);
 
     // Defer the 16+ MB player GLB until gameplay actually starts so the
-    // title screen does not wait for its network/decode/clone work.
+    // title screen doesn't wait for its network/decode/clone work.
     this.characterReadyPromise=null;
   }
 
@@ -519,12 +300,10 @@ export class Player {
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
-      // Keep the opaque camera-local sleeves, gloves, and held torch as the
-      // first-person viewmodel. Cropping the full-body skinned mesh at the
-      // shoulders was producing awkward cut-offs and hand silhouettes.
+      // The first-person viewmodel is now only the standalone flashlight.
+      // Keep the full hazmat character for the world/multiplayer avatar.
       this.hands.visible=true;
       this.hands.renderOrder=2999;
-      this.proceduralHands.visible=true;
       this.proceduralArmFlashlight.visible=true;
       if(this.characterFlashlight) this.characterFlashlight.visible=false;
 
@@ -536,7 +315,7 @@ export class Player {
       return true;
     }catch(error){
       this.characterLoadFailed = true;
-      // The camera-local gloves are independent of this optional body asset,
+      // The camera-local flashlight is independent of this optional body asset,
       // so model failure must not hide the hands or flashlight.
       this.hands.visible=true;
       console.error("[DeepSeeker] local hazmat avatar failed:",error);
@@ -547,8 +326,9 @@ export class Player {
   setFlashlightVisual(on){
     const updateLens=(lens)=>{
       if(!lens?.material) return;
-      lens.material.emissiveIntensity=on ? 2.8 : .08;
-      lens.material.color.set(on ? 0xf4e8be : 0x514f40);
+      lens.material.emissive.set(on ? 0xffd780 : 0x17150d);
+      lens.material.emissiveIntensity=on ? 3.0 : .08;
+      lens.material.color.set(on ? 0xfff1c4 : 0x37392f);
     };
 
     updateLens(this.characterFlashlightLens);
