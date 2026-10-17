@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-qualitymenu1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261017-demo-pause1";
+import { Player } from "./player.js?v=20261017-flashlightfix2";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1372,7 +1372,7 @@ flashlight.castShadow=ENABLE_SHADOWS;
 if(ENABLE_SHADOWS) flashlight.shadow.mapSize.set(FLASHLIGHT_SHADOW_RESOLUTION,FLASHLIGHT_SHADOW_RESOLUTION);
 flashlight.shadow.bias=-0.0004;
 flashlight.shadow.normalBias=0.018;
-flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
+flashlight.target.position.set(0,0,-.255-FLASHLIGHT_BASE_DISTANCE);
 scene.add(camera);
 
 const player=new Player(camera,renderer.domElement,world);
@@ -1419,7 +1419,7 @@ function mountFlashlightOnHeldProp(mount){
   camera.remove(flashlight.target);
   mount.add(flashlight);
   mount.add(flashlight.target);
-  flashlight.position.set(0,0,0);
+  flashlight.position.set(0,0,-.255);
   flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
 }
 mountFlashlightOnHeldProp(player.proceduralArmFlashlight);
