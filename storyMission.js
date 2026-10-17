@@ -491,7 +491,7 @@ export class StoryMissionWorld {
           this.poolDoorOpenAction = this.poolDoorMixer.clipAction(openClip);
           this.poolDoorOpenAction.setLoop(THREE.LoopOnce, 1);
           this.poolDoorOpenAction.clampWhenFinished = true;
-          if (this.lastGateUnlocked) this._playOpenDoor();
+          // The Poolrooms gate remains shut in the demo build.
         }
       }
     }).catch(() => {});
@@ -555,22 +555,18 @@ export class StoryMissionWorld {
     }
     if (this.poolroomsDoorCard) {
       this._updateCard(this.poolroomsDoorCard, "POOLROOMS",
-        unlocked ? "PRESS E TO ENTER" : "3 RELAYS + BREAKERS + RUN",
-        unlocked ? "ACCESS GRANTED" : "LOCKED");
+        unlocked ? "FINISH DEMO" : "3 RELAYS + BREAKERS + RUN",
+        unlocked ? "GATE SEALED" : "LOCKED");
       this.poolroomsDoorCard.mesh.userData.interactable.prompt = unlocked
-        ? "Enter the Poolrooms"
+        ? "Finish the demo"
         : "The Poolrooms door has no power";
     }
-    if (unlocked !== this.lastGateUnlocked) {
-      if (unlocked) {
-        const index = this.world.boundaryWallBounds.indexOf(this.gateDoorBounds);
-        if (index >= 0) this.world.boundaryWallBounds.splice(index, 1);
-        this._playOpenDoor();
-      } else if (this.gateDoorBounds && !this.world.boundaryWallBounds.includes(this.gateDoorBounds)) {
-        this.world.boundaryWallBounds.push(this.gateDoorBounds);
-      }
-      this.lastGateUnlocked = unlocked;
+    // The Poolrooms are future content. Even after the demo objectives are
+    // complete, retain the physical gate collider and never play its open animation.
+    if (this.gateDoorBounds && !this.world.boundaryWallBounds.includes(this.gateDoorBounds)) {
+      this.world.boundaryWallBounds.push(this.gateDoorBounds);
     }
+    this.lastGateUnlocked = unlocked;
   }
 
   syncState(state, { tutorialActive = false, poolroomsActive = false, missionVisible = true } = {}) {

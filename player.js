@@ -146,23 +146,23 @@ function makeLocalFirstPersonArms(group){
   // toward the lower center of the camera. Fingers extend along camera -Z.
   const suit=new THREE.MeshStandardMaterial({
     color:0xb2aa82, roughness:.94, metalness:0,
-    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+    side:THREE.DoubleSide, depthTest:true, depthWrite:false
   });
   const seamMaterial=new THREE.MeshStandardMaterial({
     color:0x5b5944, roughness:.95, metalness:0,
-    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+    side:THREE.DoubleSide, depthTest:true, depthWrite:false
   });
   const hazardBand=new THREE.MeshStandardMaterial({
     color:0xd3c878, roughness:.82, metalness:0,
-    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+    side:THREE.DoubleSide, depthTest:true, depthWrite:false
   });
   const glove=new THREE.MeshStandardMaterial({
     color:0x30372f, roughness:.9, metalness:0,
-    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+    side:THREE.DoubleSide, depthTest:true, depthWrite:false
   });
   const gloveHighlight=new THREE.MeshStandardMaterial({
     color:0x4b5547, roughness:.93, metalness:0,
-    side:THREE.DoubleSide, depthTest:false, depthWrite:false
+    side:THREE.DoubleSide, depthTest:true, depthWrite:false
   });
 
   // Arms enter off-screen at the lower corners, move forward past the elbows,

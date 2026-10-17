@@ -21,17 +21,16 @@ The old Godot prototype and unrelated reference-project files are not part of th
 
 ## Campaign progression
 
-The campaign streams a larger 21 × 21 chunk Backrooms area and guides players
-through three signal relays, the eight-breaker maintenance puzzle, and the
-red-lit Level Run. Four side-mounted clue panels reveal the safe code during
-the chase. After the required relays, breaker puzzle, and run are complete, a
-powered fire door opens into the Poolrooms; follow the dry deck to the signal
-source to finish the campaign.
+The classroom/playtest demo follows players through three signal relays,
+the eight-breaker maintenance puzzle, and the red-lit Level Run. Four
+side-mounted clue panels reveal the safe code during the chase. Completing
+those objectives unlocks the sealed Poolrooms gate and triggers the confetti
+"DEMO COMPLETE" screen. The Poolrooms themselves are intentionally reserved
+for a future update and are not accessible in this build.
 
 Decorative assets load automatically from 3DAssets.dev's CC0 CDN. They are
 optional during boot, so a failed prop request cannot block the main menu or
-normal Backrooms gameplay. The Poolrooms environment must load before that level
-can be entered, and the entrance allows a retry if a model request fails.
+normal Backrooms gameplay.
 
 Models integrated:
 - [Poolroom hall](https://3dassets.dev/assets/liminal-spaces-kit-poolroom-hall-d800e372) — Poolrooms architecture

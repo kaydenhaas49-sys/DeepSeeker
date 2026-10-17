@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-qualitymenu1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261016-qualitymenu1";
+import { Player } from "./player.js?v=20261017-demo-pause1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -17,7 +17,7 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
-import { StoryMissionWorld } from "./storyMission.js?v=20261016-qualitymenu1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261017-demo-pause1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -3272,6 +3272,10 @@ const multiplayer=new Multiplayer({
       if(door&&(door.unlocked||!door.requiresPower))door.targetOpen=Boolean(event.payload?.open);
       return;
     }
+    if(event?.type==="demo_complete"){
+      if(!multiplayer.isWorldAuthority())beginVictoryEnding({broadcast:false,demo:true});
+      return;
+    }
     if(event?.type==="game_victory"){
       beginVictoryEnding({broadcast:false});
       return;
@@ -3335,14 +3339,14 @@ const multiplayer=new Multiplayer({
       drawLevelRunCodeScreen();
       return;
     }
-    if(event?.type==="poolrooms_enter_attempt"){
+    if(event?.type==="demo_complete_attempt"||event?.type==="poolrooms_enter_attempt"){
       if(multiplayer.isWorldAuthority()&&missionState.poolroomsUnlocked){
-        void enterPoolroomsLevel({broadcast:true});
+        beginVictoryEnding({broadcast:true,demo:true});
       }
       return;
     }
     if(event?.type==="poolrooms_enter"){
-      if(!multiplayer.isWorldAuthority())void enterPoolroomsLevel({broadcast:false});
+      // Poolrooms are not part of this demo build; keep the gate sealed.
       return;
     }
     if(event?.type==="mission_ending_attempt"){
@@ -3605,10 +3609,10 @@ const interaction=new InteractionSystem({
         eventText.style.opacity="1";
         return true;
       }
-      if(multiplayer.isWorldAuthority())void enterPoolroomsLevel({broadcast:true});
+      if(multiplayer.isWorldAuthority())beginVictoryEnding({broadcast:true,demo:true});
       else{
-        multiplayer.broadcastWorldEvent("poolrooms_enter_attempt","campaign",{});
-        eventText.textContent="WAITING FOR THE HOST TO OPEN THE DOOR.";
+        multiplayer.broadcastWorldEvent("demo_complete_attempt","campaign",{});
+        eventText.textContent="WAITING FOR THE HOST TO FINISH THE DEMO.";
         eventText.style.opacity="1";
       }
       return true;
@@ -7670,6 +7674,19 @@ function finishSpiderModel(model,animations,sourceName){
     -placedCenter.z
   );
 
+  function stripSpiderEmission(root){
+    root?.traverse?.(object=>{
+      if(!object.isMesh)return;
+      const materials=Array.isArray(object.material)?object.material:[object.material];
+      for(const material of materials){
+        if(!material)continue;
+        if(material.emissive?.set)material.emissive.set(0x000000);
+        if("emissiveIntensity" in material)material.emissiveIntensity=0;
+        material.needsUpdate=true;
+      }
+    });
+  }
+  stripSpiderEmission(visualRoot);
   spiderModel=visualRoot;
   spiderOriginalModel=visualRoot;
   spiderEntity.add(visualRoot);
@@ -8187,6 +8204,9 @@ let maxStoryDistance=0;
 let gameEnded=false;
 let endingOverlay=null;
 let victoryOverlay=null;
+let pauseMenuOpen=false;
+let pauseOverlay=null;
+let pauseReturnPending=false;
 const ENDING_MARKUP="<div class=\"endingGlitch\"></div><div class=\"endingCenter\"><div class=\"endingKicker\">DEEPSEEKER // LOST SIGNAL</div><div class=\"endingTitle\" id=\"endingTitle\">THE BOTTOM</div><div class=\"endingLine\" id=\"endingLine\">YOU FOUND IT.</div><button id=\"endingReturn\" type=\"button\">RETURN TO TITLE</button></div>";
 const ENDING_DISTANCE=660;
 
@@ -8213,6 +8233,9 @@ function beginGameEnding(){
   phoneOpen=false;
   deepseekerAppOpen=false;
   chatOpen=false;
+  pauseMenuOpen=false;
+  pauseOverlay?.classList.remove("visible");
+  pauseOverlay?.setAttribute("aria-hidden","true");
   controls.classList.add("hidden");
   phone.classList.remove("open","app-open");
   phone.setAttribute("aria-hidden","true");
@@ -8286,10 +8309,13 @@ function beginGameEnding(){
   },6500);
 }
 
-function beginVictoryEnding({broadcast=true}={}){
+function beginVictoryEnding({broadcast=true,demo=false}={}){
   if(gameEnded||!gameStarted) return;
 
   gameEnded=true;
+  pauseMenuOpen=false;
+  pauseOverlay?.classList.remove("visible");
+  pauseOverlay?.setAttribute("aria-hidden","true");
   player.inputEnabled=false;
   player.keys.clear();
   player.vel.set(0,0,0);
@@ -8316,7 +8342,7 @@ function beginVictoryEnding({broadcast=true}={}){
   crosshair.style.display="none";
   overlay.classList.add("hidden");
 
-  if(broadcast) multiplayer.broadcastWorldEvent("game_victory","ending",{});
+  if(broadcast) multiplayer.broadcastWorldEvent(demo?"demo_complete":"game_victory","ending",{});
   audio.start();
   audio.celebrate();
 
@@ -8406,6 +8432,18 @@ function beginVictoryEnding({broadcast=true}={}){
     });
   }
 
+  const kicker=victoryOverlay.querySelector(".victoryKicker");
+  const title=victoryOverlay.querySelector(".victorySplash h1");
+  const lead=victoryOverlay.querySelector(".victoryLead");
+  const more=victoryOverlay.querySelector(".victoryMore");
+  const countdown=victoryOverlay.querySelector(".victoryCountdown");
+  if(kicker)kicker.textContent=demo?"BACKROOMS: LOST SIGNAL // DEMO":"EXIT FOUND";
+  if(title)title.textContent=demo?"DEMO COMPLETE!":"YOU BEAT THE GAME!";
+  if(lead)lead.textContent=demo?"You finished the Backrooms demo.":"You made it out. Thanks for playing.";
+  if(more)more.textContent=demo?"The Poolrooms are saved for a future update.":"More levels coming.";
+  if(countdown)countdown.textContent=demo?"THANKS FOR PLAYTESTING":"CREDITS BEGIN IN A MOMENT";
+  victoryOverlay.setAttribute("aria-label",demo?"Demo complete. The Poolrooms are planned for a future update.":"You beat the game. Credits follow.");
+
   const activeOverlay=victoryOverlay;
   requestAnimationFrame(()=>{
     if(victoryOverlay===activeOverlay) activeOverlay.style.opacity="1";
@@ -8413,6 +8451,137 @@ function beginVictoryEnding({broadcast=true}={}){
   setTimeout(()=>{
     if(victoryOverlay===activeOverlay) activeOverlay.classList.add("creditsActive");
   },5200);
+}
+
+
+function inMultiplayerRoom(){
+  return Boolean((new URLSearchParams(location.search).get("room")||"").trim());
+}
+
+function ensurePauseMenu(){
+  if(pauseOverlay)return;
+  if(!document.getElementById("deepseekerPauseStyles")){
+    const style=document.createElement("style");
+    style.id="deepseekerPauseStyles";
+    style.textContent=[
+      "#deepseekerPause{position:fixed;inset:0;z-index:11000;display:none;place-items:center;padding:20px;box-sizing:border-box;background:rgba(2,4,3,.84);backdrop-filter:blur(8px);color:#eee7ca;font-family:system-ui,-apple-system,sans-serif}",
+      "#deepseekerPause.visible{display:grid}",
+      "#deepseekerPause .pauseCard{width:min(440px,calc(100vw - 32px));box-sizing:border-box;padding:clamp(24px,5vw,40px);border:1px solid rgba(229,218,170,.20);border-radius:16px;background:linear-gradient(150deg,rgba(20,23,18,.98),rgba(5,7,5,.99));box-shadow:0 25px 90px #000b;text-align:center}",
+      "#deepseekerPause .pauseKicker{font-size:9px;letter-spacing:3px;color:#8f927b}",
+      "#deepseekerPause h1{margin:12px 0;font-size:clamp(28px,7vw,42px);letter-spacing:6px;font-weight:500;color:#eee6c4}",
+      "#deepseekerPause p{font-size:13px;line-height:1.6;color:#ada991}",
+      "#deepseekerPause .pauseActions{display:grid;gap:9px;margin-top:24px}",
+      "#deepseekerPause button{min-height:46px;padding:12px 16px;border:1px solid rgba(229,218,170,.25);border-radius:9px;background:rgba(216,201,138,.08);color:#eee6c4;font:inherit;font-size:11px;letter-spacing:2px;cursor:pointer}",
+      "#deepseekerPause button:hover{background:rgba(216,201,138,.16);border-color:rgba(216,201,138,.50)}",
+      "#deepseekerPause button:disabled{opacity:.5;cursor:wait}",
+      "#deepseekerPause #pauseReturn{background:rgba(255,255,255,.03);color:#c5bea5}",
+      "#deepseekerPause #pauseConfirm{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.09)}",
+      "#deepseekerPause #pauseConfirm[hidden]{display:none}",
+      "#deepseekerPause .pauseConfirmActions{display:grid;gap:8px;margin-top:12px}",
+      "#deepseekerPause #pauseSaveReturn{background:rgba(115,145,91,.18);border-color:rgba(150,180,125,.38)}",
+      "#deepseekerPause #pauseStatus{min-height:18px;margin-top:16px;font-size:10px;line-height:1.5;color:#aeb995}",
+      "#deepseekerPause .pauseHint{margin-top:20px!important;font-size:9px!important;letter-spacing:2px;color:#7f7d6b!important}",
+      "@media(max-width:480px){#deepseekerPause .pauseCard{padding:24px 18px}#deepseekerPause h1{letter-spacing:4px}}"
+    ].join("");
+    document.head.appendChild(style);
+  }
+
+  pauseOverlay=document.createElement("div");
+  pauseOverlay.id="deepseekerPause";
+  pauseOverlay.setAttribute("role","dialog");
+  pauseOverlay.setAttribute("aria-modal","true");
+  pauseOverlay.setAttribute("aria-label","Paused");
+  pauseOverlay.setAttribute("aria-hidden","true");
+  pauseOverlay.innerHTML=[
+    '<section class="pauseCard">',
+    '<div class="pauseKicker">BACKROOMS: LOST SIGNAL</div>',
+    '<h1>PAUSED</h1>',
+    '<p>Your game is paused.</p>',
+    '<div class="pauseActions">',
+    '<button id="pauseResume" type="button">RESUME</button>',
+    '<button id="pauseReturn" type="button">RETURN TO TITLE</button>',
+    '</div>',
+    '<div id="pauseConfirm" hidden>',
+    '<p>Return to the title screen? We will try to save this run first.</p>',
+    '<div class="pauseConfirmActions">',
+    '<button id="pauseCancelReturn" type="button">KEEP PLAYING</button>',
+    '<button id="pauseSaveReturn" type="button">SAVE &amp; RETURN</button>',
+    '</div>',
+    '</div>',
+    '<div id="pauseStatus" role="status" aria-live="polite"></div>',
+    '<p class="pauseHint">ESC TO RESUME</p>',
+    '</section>'
+  ].join("");
+  document.body.appendChild(pauseOverlay);
+
+  pauseOverlay.querySelector("#pauseResume").addEventListener("click",()=>hidePauseMenu());
+  pauseOverlay.querySelector("#pauseReturn").addEventListener("click",()=>{
+    pauseOverlay.querySelector("#pauseConfirm").hidden=false;
+    pauseOverlay.querySelector("#pauseStatus").textContent="";
+    pauseOverlay.querySelector("#pauseSaveReturn").focus();
+  });
+  pauseOverlay.querySelector("#pauseCancelReturn").addEventListener("click",()=>{
+    pauseOverlay.querySelector("#pauseConfirm").hidden=true;
+    pauseOverlay.querySelector("#pauseStatus").textContent="";
+    pauseOverlay.querySelector("#pauseReturn").focus();
+  });
+  pauseOverlay.querySelector("#pauseSaveReturn").addEventListener("click",async()=>{
+    const saveButton=pauseOverlay.querySelector("#pauseSaveReturn");
+    const status=pauseOverlay.querySelector("#pauseStatus");
+    if(!pauseMenuOpen||pauseReturnPending)return;
+    pauseReturnPending=true;
+    saveButton.disabled=true;
+    status.textContent="SAVING YOUR GAME…";
+    try{
+      const saved=await saveGame(selectedSaveSlot,{confirmOverwrite:false});
+      if(!saved){
+        status.textContent="SAVE FAILED. RETRY OR KEEP PLAYING.";
+        return;
+      }
+      status.textContent="SAVE COMPLETE · RETURNING TO TITLE…";
+      location.href=location.pathname;
+    }catch(error){
+      status.textContent="SAVE FAILED · "+String(error?.message||error||"UNKNOWN ERROR").slice(0,90);
+    }finally{
+      pauseReturnPending=false;
+      saveButton.disabled=false;
+    }
+  });
+}
+
+function showPauseMenu(){
+  if(!gameStarted||gameEnded||pauseMenuOpen)return;
+  ensurePauseMenu();
+  pauseMenuOpen=true;
+  pauseOverlay.classList.add("visible");
+  pauseOverlay.setAttribute("aria-hidden","false");
+  pauseOverlay.querySelector("#pauseConfirm").hidden=true;
+  pauseOverlay.querySelector("#pauseStatus").textContent="";
+  player.keys.clear();
+  player.vel.set(0,0,0);
+  player.inputEnabled=false;
+  if(multiplayerMapOpen)toggleMultiplayerMap(false);
+  loadingScreen.style.display="none";
+  homeScreen.classList.add("hidden");
+  lobbyScreen.classList.add("hidden");
+  overlay.classList.add("hidden");
+  crosshair.style.display="none";
+  if(graphicsSettingsButton)graphicsSettingsButton.hidden=true;
+  if(document.pointerLockElement===renderer.domElement)document.exitPointerLock();
+  if(audio.ctx?.state==="running")void audio.ctx.suspend().catch(()=>{});
+  pauseOverlay.querySelector("#pauseResume").focus();
+}
+
+function hidePauseMenu({resume=true}={}){
+  pauseMenuOpen=false;
+  if(pauseOverlay){
+    pauseOverlay.classList.remove("visible");
+    pauseOverlay.setAttribute("aria-hidden","true");
+  }
+  if(resume&&gameStarted&&!gameEnded){
+    audio.start();
+    player.lock();
+  }
 }
 
 const STORY = [
@@ -8953,9 +9122,14 @@ graphicsSettingsButton?.addEventListener("click",()=>showControls());
 document.addEventListener("pointerlockchange",()=>{
   const locked=document.pointerLockElement===renderer.domElement;
 
-  // CCTV intentionally releases pointer lock. Do not turn that intentional
-  // transition into the normal gameplay pause/loading overlay.
+  // CCTV intentionally releases pointer lock and uses its own controls.
   if(securityCameras.active){
+    overlay.classList.add("hidden");
+    crosshair.style.display="none";
+    return;
+  }
+
+  if(pauseMenuOpen){
     overlay.classList.add("hidden");
     crosshair.style.display="none";
     return;
@@ -8965,12 +9139,7 @@ document.addEventListener("pointerlockchange",()=>{
     if(locked){
       overlay.classList.add("hidden");
     }else if(gameStarted && !gameEnded){
-      if(multiplayerMapOpen) toggleMultiplayerMap(false);
-      loadingScreen.style.display="none";
-      homeScreen.classList.add("hidden");
-      lobbyScreen.classList.add("hidden");
-      prompt.textContent="CLICK TO RESUME";
-      overlay.classList.remove("hidden");
+      showPauseMenu();
     }
   }
   crosshair.style.display=locked && !chatOpen?"block":"none";
@@ -8989,6 +9158,7 @@ document.addEventListener("visibilitychange",()=>{
   }
 
   fitGameToScreen();
+  if(pauseMenuOpen)return;
 
   if(
     gameStarted &&
@@ -8998,12 +9168,7 @@ document.addEventListener("visibilitychange",()=>{
     !chatOpen &&
     document.pointerLockElement!==renderer.domElement
   ){
-    loadingScreen.style.display="none";
-    homeScreen.classList.add("hidden");
-    lobbyScreen.classList.add("hidden");
-    prompt.textContent="CLICK TO RESUME";
-    overlay.classList.remove("hidden");
-    crosshair.style.display="none";
+    showPauseMenu();
   }
 });
 
@@ -9055,6 +9220,14 @@ document.addEventListener("keydown",e=>{
   }
 
   if(chatOpen) return;
+
+  if(e.code==="Escape"&&gameStarted&&!gameEnded){
+    e.preventDefault();
+    if(controlsOpen){hideControls();player.lock();return;}
+    if(phoneOpen){togglePhone();return;}
+    showPauseMenu();
+    return;
+  }
 
   if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen && !chatOpen){
     if(interaction.interact()){
@@ -9324,6 +9497,14 @@ function animate(){
     return;
   }
 
+  if(pauseMenuOpen&&!inMultiplayerRoom()){
+    // Hold the in-game clock still while the single-player simulation is paused.
+    clock.elapsedTime=Math.max(0,clock.elapsedTime-frameDelta);
+    if(graphicsSettingsButton)graphicsSettingsButton.hidden=true;
+    renderer.render(scene,camera);
+    return;
+  }
+
   if(graphicsSettingsButton)graphicsSettingsButton.hidden=!(gameStarted&&!gameEnded);
   perfElapsed+=dt;
   perfFrames++;
@@ -9432,6 +9613,7 @@ function animate(){
   player.inputEnabled=(
     gameStarted &&
     !gameEnded &&
+    !pauseMenuOpen &&
     !phoneOpen &&
     !controlsOpen &&
     !chatOpen &&
