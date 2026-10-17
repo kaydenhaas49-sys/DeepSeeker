@@ -237,10 +237,10 @@ function detectLowEndWorldHardware(){
  return software||oldIntel||(cores<=4&&memory<=4);
 }
 const WORLD_QUALITY_PROFILES={
- low:{lowEnd:true,generate:1,dispose:1,lightBudget:2,lightInterval:170,buildInterval:135,anisotropy:2},
- medium:{lowEnd:false,generate:1,dispose:2,lightBudget:3,lightInterval:125,buildInterval:90,anisotropy:4},
- high:{lowEnd:false,generate:2,dispose:3,lightBudget:4,lightInterval:100,buildInterval:65,anisotropy:8},
- ultra:{lowEnd:false,generate:2,dispose:3,lightBudget:5,lightInterval:80,buildInterval:50,anisotropy:16}
+ low:{lowEnd:true,generate:1,dispose:1,lightBudget:6,lightInterval:170,buildInterval:135,anisotropy:2},
+ medium:{lowEnd:false,generate:1,dispose:2,lightBudget:10,lightInterval:125,buildInterval:90,anisotropy:4},
+ high:{lowEnd:false,generate:2,dispose:3,lightBudget:14,lightInterval:100,buildInterval:65,anisotropy:8},
+ ultra:{lowEnd:false,generate:2,dispose:3,lightBudget:18,lightInterval:80,buildInterval:50,anisotropy:16}
 };
 function readWorldQualityPreset(){
  try{const saved=localStorage.getItem("deepseeker-quality-v1");if(["auto","low","medium","high","ultra"].includes(saved))return saved;}catch{}
@@ -426,6 +426,9 @@ export class World {
     this.wallOccluders = [];
     this.fixtureLightLastUpdate = 0;
     this.fixtureLightCamera = null;
+    this.fixtureLightFrustum = new THREE.Frustum();
+    this.fixtureLightProjectionView = new THREE.Matrix4();
+    this.fixtureLightSphere = new THREE.Sphere(new THREE.Vector3(),1.8);
     this.fixtureLightRaycaster = new THREE.Raycaster();
     this.fixtureLightViewOrigin = new THREE.Vector3();
     this.fixtureLightDirection = new THREE.Vector3();
@@ -923,12 +926,31 @@ export class World {
 
     const flickerTime=now*.003;
     const lightBudget=LIGHT_BUDGET;
+    const camera=this.fixtureLightCamera;
+    if(camera){
+      camera.updateMatrixWorld(true);
+      this.fixtureLightProjectionView.multiplyMatrices(
+        camera.projectionMatrix,
+        camera.matrixWorldInverse
+      );
+      this.fixtureLightFrustum.setFromProjectionMatrix(this.fixtureLightProjectionView);
+      camera.getWorldPosition(this.fixtureLightViewOrigin);
+    }
     const nearestLights=this.fixtureLights
       .map(item=>({
         item,
         distanceSq:(item.x-px)*(item.x-px)+(item.z-pz)*(item.z-pz)
       }))
-      .filter(entry=>entry.distanceSq<=Math.pow(entry.item.light.distance||32,2))
+      .filter(entry=>{
+        // Increase the activation range and only spend real-light budget on
+        // fixtures actually in the camera's view, not lamps behind the player.
+        const range=entry.item.light.distance||48;
+        if(entry.distanceSq>range*range) return false;
+        if(!camera) return true;
+        entry.item.light.getWorldPosition(this.fixtureLightTarget);
+        this.fixtureLightSphere.center.copy(this.fixtureLightTarget);
+        return this.fixtureLightFrustum.intersectsSphere(this.fixtureLightSphere);
+      })
       .sort((a,b)=>a.distanceSq-b.distanceSq)
       .slice(0,lightBudget);
     const activeLights=new Set(nearestLights.map(entry=>entry.item));
@@ -1228,7 +1250,7 @@ export class World {
       const point=new THREE.PointLight(
         0xffe6a8,
         power,
-        cracked ? 26 : 32,
+        cracked ? 48 : 56,
         1.3
       );
       // The emitter sits just below the ceiling panel so its real light cone
