@@ -246,7 +246,8 @@ container.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
 // Black fog blends into the dark Backrooms and keeps the distant halls ominous.
-let BACKROOMS_FOG_COLOR=0x000000;
+// 15% sRGB grey: a very dark charcoal fog rather than absolute black.
+let BACKROOMS_FOG_COLOR=0x262626;
 scene.background=new THREE.Color(BACKROOMS_FOG_COLOR);
 scene.fog=new THREE.Fog(
   BACKROOMS_FOG_COLOR,
@@ -1239,8 +1240,8 @@ function updateMenuScene(t,dt){
       menuSet.visible=false;
       world.root.visible=true;
       if(menuBackdropElement) menuBackdropElement.style.display="none";
-      scene.background.set(0x000100);
-      scene.fog.color.set(0x030302);
+      scene.background.set(BACKROOMS_FOG_COLOR);
+      scene.fog.color.set(BACKROOMS_FOG_COLOR);
       scene.fog.near=14;
       scene.fog.far=62;
     }
@@ -1394,7 +1395,7 @@ function applyQualityPreset(preset,{save=true,announce=true}={}){
  HOUSE_PIXEL_RATIO=activeQualitySettings.housePixelRatio;MIN_HOUSE_PIXEL_RATIO=activeQualitySettings.minHousePixelRatio;
  PERFORMANCE_TARGET_FPS=activeQualitySettings.targetFps;FLASHLIGHT_BASE_DISTANCE=activeQualitySettings.flashlightDistance;currentPixelRatio=BASE_PIXEL_RATIO;housePixelRatio=HOUSE_PIXEL_RATIO;
  renderer.setPixelRatio(houseMode?housePixelRatio:currentPixelRatio);perfElapsed=0;perfFrames=0;perfCooldown=1;
- BACKROOMS_FOG_COLOR=0x000000;scene.background.set(BACKROOMS_FOG_COLOR);
+ BACKROOMS_FOG_COLOR=0x262626;scene.background.set(BACKROOMS_FOG_COLOR);
  if(scene.fog){scene.fog.color.set(BACKROOMS_FOG_COLOR);scene.fog.near=activeQualitySettings.fogNear;scene.fog.far=activeQualitySettings.fogFar;}
  camera.far=activeQualitySettings.farPlane;camera.updateProjectionMatrix();
  WORLD_HEMISPHERE_BASE_INTENSITY=activeQualitySettings.hemisphere;WORLD_AMBIENT_BASE_INTENSITY=activeQualitySettings.ambient;
