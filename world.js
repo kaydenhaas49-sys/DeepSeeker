@@ -94,7 +94,7 @@ export function generateChunk(cx, cz, seed) {
           if(isProtectedRouteCell(gx,gz)){safe=false;break;}
         }
       }
-      if(safe)rooms.push({x0,z0,w,h,kind:roomRng()<0.38?"ruined":"door"});
+      if(safe)rooms.push({x0,z0,w,h,kind:"door"});
     }
   }
 
@@ -686,7 +686,7 @@ export class World {
     const right=left+width,front=back+depth;
     const centerX=(left+right)*.5,centerZ=(back+front)*.5;
     const wallT=ROOM_WALL_THICKNESS;
-    const roomHeight=room.kind==="ruined"?2.9:ROOM_HEIGHT;
+    const roomHeight=ROOM_HEIGHT;
     const bounds=group.userData.roomWallBounds;
     const addBox=(name,sx,sy,sz,x,y,z,material)=>{
       const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
@@ -694,7 +694,7 @@ export class World {
     };
     const addBound=(minX,maxX,minZ,maxZ)=>bounds.push({minX,maxX,minZ,maxZ});
     const floor=new THREE.Mesh(new THREE.BoxGeometry(width-.15,.065,depth-.15),this.materials.floor);
-    floor.name=room.kind==="ruined"?"RuinedRoomFloor":"ServiceRoomFloor";
+    floor.name="ServiceRoomFloor";
     floor.position.set(centerX,-.02,centerZ);group.add(floor);
     addBox("RoomBackWall",width,roomHeight,wallT,centerX,roomHeight*.5,back,this.materials.wall);
     addBound(left,right,back-wallT*.5,back+wallT*.5);
@@ -721,23 +721,6 @@ export class World {
       this.buildRoomDoor(group,centerX,front,{
         doorHeight:ROOM_DOOR_HEIGHT,roomHeight,ownerChunk:group
       },bounds).ownerChunk=group;
-    }else{
-      // Ruined rooms are open dead ends with broken side walls, a missing entry,
-      // missing ceiling sections, and scattered low debris.
-      const sideDepth=depth*.74;
-      addBox("RuinedRoomLeftWall",wallT,roomHeight,sideDepth,left,roomHeight*.5,back+sideDepth*.52,this.materials.wall);
-      addBox("RuinedRoomRightWall",wallT,roomHeight*.78,sideDepth*.62,right,roomHeight*.39,back+sideDepth*.31,this.materials.wall);
-      addBound(left-wallT*.5,left+wallT*.5,back,back+sideDepth);
-      addBound(right-wallT*.5,right+wallT*.5,back,back+sideDepth*.62);
-      for(let i=0;i<5;i++){
-        const size=.35+(i%3)*.16;
-        const rubble=addBox("RuinedRoomDebris",size,.12+(i%2)*.12,size*.72,
-          left+width*(.25+.12*(i%4)),-.01+(i%2)*.06,back+depth*(.55+.08*(i%3)),this.roomDoorTrimMaterial);
-        rubble.rotation.y=(i*1.13)%Math.PI;
-      }
-      const brokenRoof=new THREE.Mesh(new THREE.BoxGeometry(width*.56,.10,depth*.42),this.materials.ceiling);
-      brokenRoof.name="RuinedCeilingRemnant";brokenRoof.position.set(centerX,roomHeight,back+depth*.3);
-      brokenRoof.rotation.z=-.035;group.add(brokenRoof);
     }
   }
 
