@@ -20,7 +20,7 @@ function makeLocalFirstPersonFlashlight(group){
   // sleeves, gloves, fingers, or arm meshes so the prop remains clean and stable.
   const flashlight=new THREE.Group();
   flashlight.name="LocalFirstPersonFlashlight";
-  flashlight.position.set(.245,-.365,-.90);
+  flashlight.position.set(.245,-.345,-.68);
   flashlight.rotation.set(
     THREE.MathUtils.degToRad(-3),
     THREE.MathUtils.degToRad(4),
@@ -41,7 +41,7 @@ function makeLocalFirstPersonFlashlight(group){
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
   const lensMaterial=new THREE.MeshStandardMaterial({
-    color:0x37392f, emissive:0x18170f, emissiveIntensity:.08,
+    color:0x37392f, emissive:0x000000, emissiveIntensity:0,
     roughness:.22, metalness:.02,
     side:THREE.DoubleSide, depthTest:false, depthWrite:false
   });
@@ -326,9 +326,9 @@ export class Player {
   setFlashlightVisual(on){
     const updateLens=(lens)=>{
       if(!lens?.material) return;
-      lens.material.emissive.set(on ? 0x6e4912 : 0x17150d);
-      lens.material.emissiveIntensity=on ? .4 : .04;
-      lens.material.color.set(on ? 0xc4b47c : 0x37392f);
+      lens.material.emissive.set(0x000000);
+      lens.material.emissiveIntensity=0;
+      lens.material.color.set(on ? 0x696653 : 0x37392f);
     };
 
     updateLens(this.characterFlashlightLens);

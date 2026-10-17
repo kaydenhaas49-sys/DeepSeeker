@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261016-qualitymenu1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261017-flashlightfix2";
+import { Player } from "./player.js?v=20261017-flashlightfix3";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
