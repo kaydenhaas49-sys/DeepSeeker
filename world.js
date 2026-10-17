@@ -247,6 +247,8 @@ function readWorldQualityPreset(){
  if(QUALITY_PARAM==="low"||QUALITY_PARAM==="potato")return "low";
  return ["auto","medium","high","ultra"].includes(QUALITY_PARAM)?QUALITY_PARAM:"auto";
 }
+// Nearby ceiling fixtures stay electrically on around the player even when turned away.
+const FIXTURE_LOCAL_ON_RADIUS=32;
 let worldQualityPreset=readWorldQualityPreset(),LOW_END_DEVICE=false,R_GENERATE=2,R_DISPOSE=3,LIGHT_BUDGET=4,LIGHT_INTERVAL=100,CHUNK_BUILD_INTERVAL=65;
 function configureWorldQuality(preset){
  worldQualityPreset=["auto","low","medium","high","ultra"].includes(preset)?preset:"auto";
@@ -929,7 +931,9 @@ export class World {
         // fixtures actually in the camera's view, not lamps behind the player.
         const range=entry.item.light.distance||48;
         if(entry.distanceSq>range*range) return false;
-        if(!camera) return true;
+        // Within this local radius, keep the fixture illuminated regardless of
+        // camera direction. Farther fixtures can still turn on when in view.
+        if(!camera || entry.distanceSq<=FIXTURE_LOCAL_ON_RADIUS*FIXTURE_LOCAL_ON_RADIUS) return true;
         entry.item.light.getWorldPosition(this.fixtureLightTarget);
         this.fixtureLightSphere.center.copy(this.fixtureLightTarget);
         return this.fixtureLightFrustum.intersectsSphere(this.fixtureLightSphere);

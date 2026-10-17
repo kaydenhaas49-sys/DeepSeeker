@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261017-darkbackrooms2";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261017-ceilingradius1";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js?v=20261017-flashlightfix3";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
@@ -9944,7 +9944,7 @@ function animate(){
 
   // Keep the tutorial bright, but reduce the background fill in the main
   // Backrooms so ceiling lights and the player's torch shape the atmosphere.
-  // This is another 30% reduction from the previous regular-Backrooms fill;
+  // Keep it very dark, with local fixtures and the player's torch providing contrast;
   // menu/apartment lighting and the tutorial's special fill remain unchanged.
   const tutorialScale=getTutorialAmbientScale();
   const regularBackroomsScale=(
@@ -9952,7 +9952,7 @@ function animate(){
     !houseMode &&
     !poolroomsActive &&
     !tutorialOpenRoomActive
-  ) ? .406 : 1;
+  ) ? .284 : 1;
 
   if(pulse>0){
     pulse=Math.max(0,pulse-dt*2.8);
