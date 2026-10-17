@@ -9944,14 +9944,15 @@ function animate(){
 
   // Keep the tutorial bright, but reduce the background fill in the main
   // Backrooms so ceiling lights and the player's torch shape the atmosphere.
-  // This leaves menu/apartment lighting and the tutorial's special fill unchanged.
+  // This is another 30% reduction from the previous regular-Backrooms fill;
+  // menu/apartment lighting and the tutorial's special fill remain unchanged.
   const tutorialScale=getTutorialAmbientScale();
   const regularBackroomsScale=(
     gameStarted &&
     !houseMode &&
     !poolroomsActive &&
     !tutorialOpenRoomActive
-  ) ? .58 : 1;
+  ) ? .406 : 1;
 
   if(pulse>0){
     pulse=Math.max(0,pulse-dt*2.8);
