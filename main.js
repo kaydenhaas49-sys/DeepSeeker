@@ -452,10 +452,10 @@ function updateTutorialOpenRoomLights(dt=0){
   if(tutorialLightsOutState==="flickering"){
     tutorialLightsOutElapsed+=Math.min(Math.max(dt,0),.1);
     const t=tutorialLightsOutElapsed;
-    // Slow, uneven fluorescent failures: linger on, hesitate, then finally die.
-    const litWindows=[[0,.34],[.70,.91],[1.34,1.60],[2.03,2.25],[2.72,2.90],[3.24,3.34]];
+    // Keep the pulses slow and uneven, but end the tutorial blackout sequence sooner.
+    const litWindows=[[0,.34],[.70,.91],[1.34,1.60],[2.03,2.25]];
     tutorialCeilingLightsOn=litWindows.some(([start,end])=>t>=start&&t<end);
-    if(t>=3.60){
+    if(t>=2.60){
       tutorialLightsOutState="off";
       tutorialCeilingLightsOn=false;
     }
