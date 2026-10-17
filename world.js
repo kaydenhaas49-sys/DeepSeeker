@@ -1250,7 +1250,7 @@ export class World {
       const point=new THREE.PointLight(
         0xffe6a8,
         power,
-        cracked ? 48 : 56,
+        100,
         1.3
       );
       // The emitter sits just below the ceiling panel so its real light cone
