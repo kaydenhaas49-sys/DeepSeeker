@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261017-darkbackrooms1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261017-darkbackrooms2";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js?v=20261017-flashlightfix3";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
@@ -9942,22 +9942,30 @@ function animate(){
     nextEvent=t+28+Math.random()*35;
   }
 
+  // Keep the tutorial bright, but reduce the background fill in the main
+  // Backrooms so ceiling lights and the player's torch shape the atmosphere.
+  // This leaves menu/apartment lighting and the tutorial's special fill unchanged.
+  const tutorialScale=getTutorialAmbientScale();
+  const regularBackroomsScale=(
+    gameStarted &&
+    !houseMode &&
+    !poolroomsActive &&
+    !tutorialOpenRoomActive
+  ) ? .58 : 1;
+
   if(pulse>0){
     pulse=Math.max(0,pulse-dt*2.8);
     vignette.style.opacity=String(.70+.07*pulse);
     camera.position.x+=Math.sin(t*70)*pulse*.008;
     camera.position.y+=Math.sin(t*61)*pulse*.006;
     // Signal pulses can briefly dim the Backrooms, but must never black them out.
-    // The tutorial always stays bright so its instructions remain easy to see.
-    const tutorialScale=getTutorialAmbientScale();
     const pulseScale=tutorialOpenRoomActive?tutorialScale:.22;
-    hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY*pulseScale;
-    ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY*pulseScale;
+    hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY*pulseScale*regularBackroomsScale;
+    ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY*pulseScale*regularBackroomsScale;
   }else{
     vignette.style.opacity=".70";
-    const tutorialScale=getTutorialAmbientScale();
-    hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY*tutorialScale;
-    ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY*tutorialScale;
+    hemi.intensity=WORLD_HEMISPHERE_BASE_INTENSITY*tutorialScale*regularBackroomsScale;
+    ambient.intensity=WORLD_AMBIENT_BASE_INTENSITY*tutorialScale*regularBackroomsScale;
   }
 
   if(uiRefreshElapsed>=(
