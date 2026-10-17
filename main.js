@@ -49,10 +49,10 @@ function detectLowEndHardware(){
 }
 const PERFORMANCE_TIER=detectLowEndHardware();
 const QUALITY_PROFILES={
- low:{lowEnd:true,ultraLow:PERFORMANCE_TIER.ultraLow,pixelRatioCap:.65,housePixelRatio:.58,minHousePixelRatio:.38,shadows:false,shadowResolution:256,farPlane:165,fogNear:13,fogFar:60,fogColor:0x282619,hemisphere:.30,ambient:.065,anisotropy:2,targetFps:45},
- medium:{lowEnd:false,ultraLow:false,pixelRatioCap:1,housePixelRatio:.70,minHousePixelRatio:.52,shadows:false,shadowResolution:512,farPlane:230,fogNear:14,fogFar:70,fogColor:0x252419,hemisphere:.22,ambient:.04,anisotropy:4,targetFps:50},
- high:{lowEnd:false,ultraLow:false,pixelRatioCap:1.5,housePixelRatio:.82,minHousePixelRatio:.64,shadows:true,shadowResolution:768,farPlane:300,fogNear:15,fogFar:78,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:8,targetFps:60},
- ultra:{lowEnd:false,ultraLow:false,pixelRatioCap:2,housePixelRatio:.95,minHousePixelRatio:.72,shadows:true,shadowResolution:1024,farPlane:380,fogNear:18,fogFar:100,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:16,targetFps:60}
+ low:{lowEnd:true,ultraLow:PERFORMANCE_TIER.ultraLow,pixelRatioCap:.65,housePixelRatio:.58,minHousePixelRatio:.38,shadows:false,shadowResolution:256,farPlane:165,fogNear:13,fogFar:60,fogColor:0x282619,hemisphere:.30,ambient:.065,anisotropy:2,targetFps:45,flashlightDistance:46},
+ medium:{lowEnd:false,ultraLow:false,pixelRatioCap:1,housePixelRatio:.70,minHousePixelRatio:.52,shadows:false,shadowResolution:512,farPlane:230,fogNear:14,fogFar:70,fogColor:0x252419,hemisphere:.22,ambient:.04,anisotropy:4,targetFps:50,flashlightDistance:52},
+ high:{lowEnd:false,ultraLow:false,pixelRatioCap:1.5,housePixelRatio:.82,minHousePixelRatio:.64,shadows:true,shadowResolution:768,farPlane:300,fogNear:15,fogFar:78,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:8,targetFps:60,flashlightDistance:58},
+ ultra:{lowEnd:false,ultraLow:false,pixelRatioCap:2,housePixelRatio:.95,minHousePixelRatio:.72,shadows:true,shadowResolution:1024,farPlane:380,fogNear:18,fogFar:100,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:16,targetFps:60,flashlightDistance:64}
 };
 let activeQualityPreset=readQualityPreset();
 function getQualitySettings(preset=activeQualityPreset){
@@ -1355,7 +1355,7 @@ function updateMenuScene(t,dt){
 }
 
 
-const FLASHLIGHT_BASE_DISTANCE=LOW_END_PERFORMANCE?46:58;
+let FLASHLIGHT_BASE_DISTANCE=activeQualitySettings.flashlightDistance;
 const flashlight=new THREE.SpotLight(
   0xf0dfad,
   LOW_END_PERFORMANCE?17:20,
@@ -1392,7 +1392,7 @@ function applyQualityPreset(preset,{save=true,announce=true}={}){
  document.documentElement.classList.toggle("deepseeker-low",LOW_END_PERFORMANCE);
  BASE_PIXEL_RATIO=Math.min(devicePixelRatio,activeQualitySettings.pixelRatioCap);
  HOUSE_PIXEL_RATIO=activeQualitySettings.housePixelRatio;MIN_HOUSE_PIXEL_RATIO=activeQualitySettings.minHousePixelRatio;
- PERFORMANCE_TARGET_FPS=activeQualitySettings.targetFps;currentPixelRatio=BASE_PIXEL_RATIO;housePixelRatio=HOUSE_PIXEL_RATIO;
+ PERFORMANCE_TARGET_FPS=activeQualitySettings.targetFps;FLASHLIGHT_BASE_DISTANCE=activeQualitySettings.flashlightDistance;currentPixelRatio=BASE_PIXEL_RATIO;housePixelRatio=HOUSE_PIXEL_RATIO;
  renderer.setPixelRatio(houseMode?housePixelRatio:currentPixelRatio);perfElapsed=0;perfFrames=0;perfCooldown=1;
  BACKROOMS_FOG_COLOR=activeQualitySettings.fogColor;scene.background.set(BACKROOMS_FOG_COLOR);
  if(scene.fog){scene.fog.color.set(BACKROOMS_FOG_COLOR);scene.fog.near=activeQualitySettings.fogNear;scene.fog.far=activeQualitySettings.fogFar;}
