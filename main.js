@@ -9944,15 +9944,16 @@ function animate(){
 
   // Keep the tutorial bright, but reduce the background fill in the main
   // Backrooms so ceiling lights and the player's torch shape the atmosphere.
-  // Keep it very dark, with local fixtures and the player's torch providing contrast;
-  // menu/apartment lighting and the tutorial's special fill remain unchanged.
+  // Make the regular Backrooms extremely dark so nearby ceiling fixtures and
+  // the player's torch provide nearly all useful illumination. Keep the tutorial,
+  // apartment, and Poolrooms lighting unchanged.
   const tutorialScale=getTutorialAmbientScale();
   const regularBackroomsScale=(
     gameStarted &&
     !houseMode &&
     !poolroomsActive &&
     !tutorialOpenRoomActive
-  ) ? .284 : 1;
+  ) ? .11 : 1;
 
   if(pulse>0){
     pulse=Math.max(0,pulse-dt*2.8);
