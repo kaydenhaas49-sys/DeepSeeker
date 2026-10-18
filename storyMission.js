@@ -8,7 +8,7 @@ const ASSETS = Object.freeze({
   stairwell: "https://cdn.3dassets.dev/assets/25338/v1/model.glb",
   fireDoor: "https://cdn.3dassets.dev/assets/25820/v1/model.glb",
   poolroom: "https://cdn.3dassets.dev/assets/25335/v1/model.glb",
-  openedRadio: "https://cdn.3dassets.dev/assets/25477/v1/model.glb",
+  fieldRadio: "https://cdn.3dassets.dev/assets/28236/v1/model.glb",
 });
 
 const RELAYS = Object.freeze([
@@ -378,18 +378,18 @@ export class StoryMissionWorld {
       const device=buildRelayDevice(station,relay,darkMetal);
       this.relayDevices.push(device);
       if(relay.device==="radio"){
-        this.loadModel("openedRadio").then(gltf=>{
+        this.loadModel("fieldRadio").then(gltf=>{
           const model=gltf.scene.clone(true);
-          model.name="CC0OpenedRadioModel";
+          model.name="CC0FieldRadioModel";
           model.traverse(node=>{
             if(!node.isMesh)return;
             node.castShadow=true;
             node.receiveShadow=true;
           });
-          placeModelOnFloor(model,{scale:1.5});
+          placeModelOnFloor(model,{scale:0.72});
           model.position.y+=0.16; // sit on top of the relay pedestal
           device.root.add(model);
-          device.root.userData.modelAsset="opened-radio-cc0";
+          device.root.userData.modelAsset="field-radio-cc0";
         }).catch(()=>{});
       }
       this.relayCards.push(this._addSign(station, {

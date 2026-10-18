@@ -198,12 +198,13 @@ export class Player {
         e.code === "KeyS" ||
         e.code === "KeyD" ||
         e.code === "ControlLeft" ||
-        e.code === "ControlRight"
+        e.code === "ControlRight" ||
+        (e.code === "Space" && this.adminFlyMode)
       ) {
         e.preventDefault();
       }
       if(e.repeat && (e.code === "ControlLeft" || e.code === "ControlRight" || e.code === "Space")) return;
-      if((e.code === "ControlLeft" || e.code === "ControlRight") && this.movementActive){
+      if((e.code === "ControlLeft" || e.code === "ControlRight") && this.movementActive && !this.adminFlyMode){
         if(!this.sliding && this.isRunning && Math.hypot(this.vel.x,this.vel.z)>3.0){
           this.sliding=true;
           this.slideTimer=.62;

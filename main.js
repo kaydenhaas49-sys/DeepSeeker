@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261017-ceilingradius1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261017-norandomrooms1";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261017-flashlightfix3";
+import { Player } from "./player.js?v=20261017-flyfix1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -17,7 +17,7 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
-import { StoryMissionWorld } from "./storyMission.js?v=20261017-radiomodel1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261017-radiomodel2";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -155,6 +155,7 @@ const adminAdminCloseButton=document.getElementById("adminAdminCloseButton");
 const adminLockButton=document.getElementById("adminLockButton");
 const adminFlyButton=document.getElementById("adminFlyButton");
 const adminTeleportExitButton=document.getElementById("adminTeleportExitButton");
+const adminTeleportRadioButton=document.getElementById("adminTeleportRadioButton");
 const adminWaterGunButton=document.getElementById("adminWaterGunButton");
 const adminWaterRpgButton=document.getElementById("adminWaterRpgButton");
 const adminClearWaterButton=document.getElementById("adminClearWaterButton");
@@ -8914,6 +8915,98 @@ function teleportAdminToExit(){
   setTimeout(()=>{eventText.style.opacity="0";},2200);
 }
 
+
+
+function teleportAdminToRadio(){
+  if(!adminUnlocked)return;
+  if(!gameStarted||gameEnded){
+    setAdminStatus("START A GAME BEFORE TELEPORTING");
+    return;
+  }
+  if(poolroomsActive||levelRunActive){
+    setAdminStatus("RETURN TO THE BACKROOMS FIRST");
+    return;
+  }
+  if(houseMode)setHouseMode(false,{announceFall:false});
+  setAdminFlyEnabled(false);
+  if(!storyMissionWorld){
+    setAdminStatus("RADIO RELAY IS NOT READY");
+    return;
+  }
+
+  // Build the mission markers if needed, then load the chunks around the first relay.
+  void storyMissionWorld.build();
+  const relay=storyMissionWorld.getRelayLocations().find(item=>item.id===0);
+  if(!relay){
+    setAdminStatus("FIELD RADIO LOCATION NOT FOUND");
+    return;
+  }
+  const centerCX=Math.floor(relay.x/CHUNK_SIZE);
+  const centerCZ=Math.floor(relay.z/CHUNK_SIZE);
+  for(let cx=centerCX-1;cx<=centerCX+1;cx++){
+    for(let cz=centerCZ-1;cz<=centerCZ+1;cz++){
+      if(!world.chunks.has(cx+","+cz))world.spawnChunk(cx,cz);
+    }
+  }
+
+  world.root.visible=true;
+  houseRoot.visible=false;
+  if(levelRunState.group)levelRunState.group.visible=false;
+  storyMissionWorld.syncState(missionState,{
+    tutorialActive:false,poolroomsActive:false,missionVisible:true
+  });
+
+  // Find a clear spot facing the radio so the teleport never lands inside a wall.
+  let spawn=null;
+  for(let radius=3.25;radius<=14.0&&!spawn;radius+=1.25){
+    for(let step=0;step<32;step++){
+      const angle=step/32*Math.PI*2;
+      const x=relay.x+Math.cos(angle)*radius;
+      const z=relay.z+Math.sin(angle)*radius;
+      if(!player.isWallBlocked(x,z)){spawn={x,z};break;}
+    }
+  }
+  if(!spawn){
+    setAdminStatus("NO CLEAR SPACE NEAR RADIO — TRY AGAIN");
+    return;
+  }
+
+  player.pos.set(spawn.x,EYE,spawn.z);
+  player.yaw=Math.atan2(-(relay.x-spawn.x),-(relay.z-spawn.z));
+  player.pitch=0;
+  player.vel.set(0,0,0);
+  player.keys.clear();
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  player.crouched=false;
+  player.sliding=false;
+  player.slideTimer=0;
+  player.ignoreWorldCollision=false;
+
+  spiderSpawnPending=false;
+  spiderActive=false;
+  spiderJumpscareTimer=0;
+  normalSpiderHunter.hide();
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
+  clearSpiderPath();
+
+  world.update(player.pos.x,player.pos.z);
+  closeAdminAccess();
+  if(phoneOpen){
+    phoneOpen=false;
+    deepseekerAppOpen=false;
+    phone.classList.remove("open","app-open");
+    phone.setAttribute("aria-hidden","true");
+  }
+  crosshair.style.display="none";
+  player.lock();
+  eventText.textContent="ADMIN TELEPORT · FIELD RADIO AHEAD";
+  eventText.style.opacity="1";
+  setTimeout(()=>{if(eventText.textContent==="ADMIN TELEPORT · FIELD RADIO AHEAD")eventText.style.opacity="0";},2200);
+}
+
 function togglePhone(){
   phoneOpen=!phoneOpen;
   deepseekerAppOpen=false;
@@ -9063,9 +9156,22 @@ adminPasswordInput.addEventListener("keydown",e=>{ if(e.code==="Enter"){ e.preve
 adminLockButton.addEventListener("click",lockAdminAccess);
 adminFlyButton.addEventListener("click",()=>{
   if(!adminUnlocked) return;
-  setAdminFlyEnabled(!adminFlyEnabled);
+  const enabling=!adminFlyEnabled;
+  if(!setAdminFlyEnabled(enabling)||!enabling)return;
+  // The phone disables player.inputEnabled. Close it immediately after flight
+  // is enabled so keyboard movement actually reaches Player.update().
+  closeAdminAccess();
+  if(phoneOpen){
+    phoneOpen=false;
+    deepseekerAppOpen=false;
+    phone.classList.remove("open","app-open");
+    phone.setAttribute("aria-hidden","true");
+  }
+  crosshair.style.display="none";
+  player.lock();
 });
 adminTeleportExitButton.addEventListener("click",teleportAdminToExit);
+adminTeleportRadioButton.addEventListener("click",teleportAdminToRadio);
 adminWaterGunButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterGun"); });
 adminWaterRpgButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterRpg"); });
 adminClearWaterButton.addEventListener("click",()=>{ if(adminUnlocked){ clearAdminProjectiles(); adminPanelStatus.textContent="WATER CLEARED"; } });

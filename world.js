@@ -77,36 +77,16 @@ export function generateChunk(cx, cz, seed) {
   const walls = [];
   const cells = new Set();
   const spawnClear = cx === 0 && cz === 0;
+  // Random enclosed side rooms are intentionally disabled; keep the main maze open.
   const rooms = [];
-  const roomRng=mulberry32(hashSeed(cx,cz,seed ^ 0x5eeda11));
 
-  // Seeded room rolls make discoveries consistent across players and reloads.
-  if(!spawnClear && !(cx===OUTER_ROOM_DOOR.cx && cz===OUTER_ROOM_DOOR.cz) && roomRng()<0.24){
-    for(let attempt=0;attempt<8 && rooms.length===0;attempt++){
-      const w=3+(roomRng()<0.22?1:0);
-      const h=3+(roomRng()<0.22?1:0);
-      const x0=2+Math.floor(roomRng()*Math.max(1,CHUNK_CELLS-w-4));
-      const z0=2+Math.floor(roomRng()*Math.max(1,CHUNK_CELLS-h-4));
-      let safe=true;
-      for(let x=x0-1;x<=x0+w && safe;x++){
-        for(let z=z0-1;z<=z0+h;z++){
-          const gx=cx*CHUNK_CELLS+x, gz=cz*CHUNK_CELLS+z;
-          if(isProtectedRouteCell(gx,gz)){safe=false;break;}
-        }
-      }
-      if(safe)rooms.push({x0,z0,w,h,kind:"door"});
-    }
-  }
 
   // Reserve the spawn corridor and the approach to the new maintenance-room door.
   const inClear = (x, z) => {
     if (spawnClear && x >= 5 && x <= 10 && z >= 5 && z <= 10) return true;
     const gx=cx*CHUNK_CELLS+x, gz=cz*CHUNK_CELLS+z;
     if(isProtectedRouteCell(gx,gz)) return true;
-    return rooms.some(room=>
-      x>=room.x0-1 && x<=room.x0+room.w &&
-      z>=room.z0-1 && z<=room.z0+room.h
-    );
+    return false;
   };
 
   const tryAdd = (lx, lz, len, horiz) => {
