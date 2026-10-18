@@ -1,14 +1,13 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
-// Optional CC0 models served directly from 3DAssets.dev's immutable GLB CDN.
-// These never participate in the initial loading gate: interaction markers work
-// even if a decorative model request fails.
+// Optional CC0 models. They never participate in the initial loading gate:
+// interaction markers still work if a decorative model request fails.
 const ASSETS = Object.freeze({
   stairwell: "https://cdn.3dassets.dev/assets/25338/v1/model.glb",
   fireDoor: "https://cdn.3dassets.dev/assets/25820/v1/model.glb",
   poolroom: "https://cdn.3dassets.dev/assets/25335/v1/model.glb",
-  fieldRadio: "https://cdn.3dassets.dev/assets/28236/v1/model.glb",
+  radio: "https://www.innerscene.com/api/library/radio-22ce1be9/download",
 });
 
 const RELAYS = Object.freeze([
@@ -378,9 +377,9 @@ export class StoryMissionWorld {
       const device=buildRelayDevice(station,relay,darkMetal);
       this.relayDevices.push(device);
       if(relay.device==="radio"){
-        this.loadModel("fieldRadio").then(gltf=>{
+        this.loadModel("radio").then(gltf=>{
           const model=gltf.scene.clone(true);
-          model.name="CC0FieldRadioModel";
+          model.name="CC0GenericRadioModel";
           model.traverse(node=>{
             if(!node.isMesh)return;
             node.castShadow=true;
@@ -389,7 +388,7 @@ export class StoryMissionWorld {
           placeModelOnFloor(model,{scale:0.72});
           model.position.y+=0.16; // sit on top of the relay pedestal
           device.root.add(model);
-          device.root.userData.modelAsset="field-radio-cc0";
+          device.root.userData.modelAsset="generic-radio-cc0";
         }).catch(()=>{});
       }
       this.relayCards.push(this._addSign(station, {
