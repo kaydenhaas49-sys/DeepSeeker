@@ -9222,7 +9222,7 @@ function animate(){
   }else if(poolroomsActive){
     player.ignoreWorldCollision=true;
     player.extraCollisionBoxes=storyMissionWorld?.getPoolroomsCollisionBoxes()||[];
-  }else if(!tutorialOpenRoomActive ){
+  }else if(!tutorialOpenRoomActive){
     player.ignoreWorldCollision=false;
     player.extraCollisionBoxes=[];
   }
@@ -9237,12 +9237,12 @@ function animate(){
     !phoneOpen &&
     !controlsOpen &&
     !chatOpen &&
-        !securityCameras.active &&
+    !securityCameras.active &&
     !adminOverlay.classList.contains("open") &&
     !computerSystem.openState
   );
   player.update(dt);
-    updateTutorialOpenRoomLights(dt);
+  updateTutorialOpenRoomLights(dt);
   updateAdminFly(dt);
   updateAdminProjectiles(dt);
 
