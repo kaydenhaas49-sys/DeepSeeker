@@ -17,7 +17,7 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
-import { StoryMissionWorld } from "./storyMission.js?v=20261017-radiomodel3";
+import { StoryMissionWorld } from "./storyMission.js?v=20261017-radiopickup1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -100,6 +100,7 @@ const batteryBar=document.getElementById("batteryBar");
 const batteryValue=document.getElementById("batteryValue");
 const eventText=document.getElementById("event");
 const objective=document.getElementById("objective");
+const equipmentStatus=document.getElementById("equipmentStatus");
 const hudRight=document.getElementById("hudRight");
 
 const tutorialGuide=document.createElement("div");
@@ -1426,6 +1427,131 @@ function mountFlashlightOnHeldProp(mount){
 }
 mountFlashlightOnHeldProp(player.proceduralArmFlashlight);
 
+// A held radio viewmodel and a small, live radar screen are created locally.
+// The handheld prop never depends on a downloaded model or texture.
+const radioViewmodel = new THREE.Group();
+radioViewmodel.name = "HandheldSignalRadio";
+radioViewmodel.position.set(0.22,-0.31,-0.70);
+radioViewmodel.rotation.set(-0.07,-0.11,-0.045);
+radioViewmodel.visible = false;
+player.hands.add(radioViewmodel);
+
+const radioCaseMaterial = new THREE.MeshBasicMaterial({
+  color:0x30382f, toneMapped:false, depthTest:false, depthWrite:false
+});
+const radioEdgeMaterial = new THREE.MeshBasicMaterial({
+  color:0x858b76, toneMapped:false, depthTest:false, depthWrite:false
+});
+const radioPanelMaterial = new THREE.MeshBasicMaterial({
+  color:0x151b16, toneMapped:false, depthTest:false, depthWrite:false
+});
+const radioAccentMaterial = new THREE.MeshBasicMaterial({
+  color:0x6b8b70, toneMapped:false, depthTest:false, depthWrite:false
+});
+const radioRadarCanvas=document.createElement("canvas");
+radioRadarCanvas.width=256;
+radioRadarCanvas.height=256;
+const radioRadarContext=radioRadarCanvas.getContext("2d");
+radioRadarContext.fillStyle="#06100b";
+radioRadarContext.fillRect(0,0,256,256);
+radioRadarContext.strokeStyle="#294d36";
+radioRadarContext.lineWidth=2;
+radioRadarContext.strokeRect(5,5,246,246);
+radioRadarContext.fillStyle="#8ac59b";
+radioRadarContext.font="bold 18px monospace";
+radioRadarContext.textAlign="center";
+radioRadarContext.fillText("SIGNAL RADIO",128,126);
+const radioRadarTexture=new THREE.CanvasTexture(radioRadarCanvas);
+radioRadarTexture.colorSpace=THREE.SRGBColorSpace;
+radioRadarTexture.anisotropy=4;
+const radioRadarMaterial=new THREE.MeshBasicMaterial({
+  map:radioRadarTexture, toneMapped:false, depthTest:false, depthWrite:false
+});
+
+function addRadioViewPart(geometry,material,name,x=0,y=0,z=0,rotation=[0,0,0]){
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.name=name;
+  mesh.position.set(x,y,z);
+  mesh.rotation.set(rotation[0],rotation[1],rotation[2]);
+  mesh.renderOrder=3001;
+  mesh.frustumCulled=false;
+  mesh.castShadow=false;
+  mesh.receiveShadow=false;
+  radioViewmodel.add(mesh);
+  return mesh;
+}
+addRadioViewPart(new THREE.BoxGeometry(0.235,0.32,0.075),radioCaseMaterial,"HandheldRadioCasing");
+addRadioViewPart(new THREE.BoxGeometry(0.207,0.288,0.009),radioPanelMaterial,"HandheldRadioFront",-0.004,0,0.042);
+addRadioViewPart(new THREE.BoxGeometry(0.157,0.122,0.012),radioEdgeMaterial,"HandheldRadioScreenFrame",-0.025,0.075,0.050);
+addRadioViewPart(new THREE.PlaneGeometry(0.142,0.107),radioRadarMaterial,"HandheldRadioRadarScreen",-0.025,0.075,0.057);
+addRadioViewPart(new THREE.BoxGeometry(0.085,0.052,0.008),radioEdgeMaterial,"HandheldRadioSpeaker",-0.035,-0.088,0.050);
+for(let i=0;i<5;i++){
+  addRadioViewPart(new THREE.BoxGeometry(0.006,0.035,0.004),radioPanelMaterial,
+    "HandheldRadioSpeakerSlot"+i,-0.065+i*0.015,-0.088,0.056);
+}
+for(const [index,y] of [0.105,0.045].entries()){
+  addRadioViewPart(new THREE.CylinderGeometry(0.016,0.016,0.022,12),radioEdgeMaterial,
+    "HandheldRadioKnob"+index,0.082,y,0.052,[Math.PI/2,0,0]);
+}
+addRadioViewPart(new THREE.BoxGeometry(0.024,0.025,0.012),radioAccentMaterial,
+  "HandheldRadioStatusLight",0.078,-0.035,0.053);
+addRadioViewPart(new THREE.CylinderGeometry(0.004,0.006,0.235,8),radioEdgeMaterial,
+  "HandheldRadioAntenna",0.078,0.257,-0.005,[0,0,-0.06]);
+addRadioViewPart(new THREE.CylinderGeometry(0.016,0.02,0.028,12),radioCaseMaterial,
+  "HandheldRadioAntennaBase",0.078,0.151,-0.005);
+
+let radioRadarLastDraw=0;
+function drawHandheldRadioRadar(force=false){
+  if(!radioCollected || equippedTool!=="radio" || !radioRadarContext) return;
+  const now=performance.now();
+  if(!force && now-radioRadarLastDraw<110) return;
+  radioRadarLastDraw=now;
+  const ctx=radioRadarContext;
+  const w=radioRadarCanvas.width,h=radioRadarCanvas.height;
+  const cx=w*0.5,cy=h*0.49,r=88;
+  ctx.fillStyle="#06100b";
+  ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle="#3c7450";
+  ctx.lineWidth=2;
+  ctx.strokeRect(5,5,w-10,h-10);
+  for(const ring of [28,56,84]){
+    ctx.beginPath();ctx.arc(cx,cy,ring,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);
+  ctx.moveTo(cx,cy-r);ctx.lineTo(cx,cy+r);ctx.stroke();
+  const sweep=now*0.0016;
+  ctx.strokeStyle="rgba(111,231,150,.75)";
+  ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(cx,cy);
+  ctx.lineTo(cx+Math.sin(sweep)*r,cy-Math.cos(sweep)*r);ctx.stroke();
+
+  const target=getMissionTarget();
+  const dx=Number(target?.x)-player.pos.x;
+  const dz=Number(target?.z)-player.pos.z;
+  const distance=Math.hypot(dx,dz);
+  if(Number.isFinite(distance)&&distance>0.01){
+    const right=(dx*Math.cos(player.yaw))-(dz*Math.sin(player.yaw));
+    const forward=(-dx*Math.sin(player.yaw))-(dz*Math.cos(player.yaw));
+    const pointRadius=Math.min(r-12,Math.max(10,(distance/110)*(r-12)));
+    const px=cx+(right/distance)*pointRadius;
+    const py=cy-(forward/distance)*pointRadius;
+    const pulse=0.72+0.28*Math.sin(now*0.006);
+    ctx.fillStyle="rgba(103,245,157,"+pulse+")";
+    ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="rgba(103,245,157,.7)";
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(px,py,12,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.fillStyle="#a6d4ac";
+  ctx.font="bold 15px monospace";
+  ctx.textAlign="center";
+  ctx.fillText(distance<1000 ? "LOCK "+Math.round(distance)+" M" : "NO SIGNAL",cx,242);
+  ctx.fillStyle="#527e5d";
+  ctx.font="12px monospace";
+  ctx.fillText(String(target?.title||"NEXT OBJECTIVE").toUpperCase().slice(0,22),cx,21);
+  radioRadarTexture.needsUpdate=true;
+}
+
 const audio=new HorrorAudio();
 
 player.onBreath=(intensity=.65)=>audio.breath(intensity);
@@ -1456,6 +1582,8 @@ const levelRunState={
   returnPosition:new THREE.Vector3(32,EYE,32),
   target:{pos:new THREE.Vector3(0,EYE,0),eyeY:EYE,crouched:false,flashlight:false}
 };
+let radioCollected=false;
+let equippedTool="flashlight";
 let missionState={
   relays:[false,false,false],
   breakerSolved:false,
@@ -1493,6 +1621,7 @@ function refreshMissionState({broadcast=false}={}){
     poolroomsActive,
     missionVisible:!levelRunActive
   });
+  if(missionState.relays[0]) syncRadioPickupFromMission();
   updateMissionObjective();
   if(broadcast&&multiplayer.isWorldAuthority()){
     multiplayer.broadcastWorldEvent("mission_state","campaign",missionStateSnapshot());
@@ -1523,6 +1652,11 @@ function resetMissionState(){
     poolroomsExitReached:false,
     log:[]
   };
+  radioCollected=false;
+  equippedTool="flashlight";
+  radioViewmodel.visible=false;
+  player.proceduralArmFlashlight.visible=true;
+  updateEquipmentStatus();
   refreshMissionState({broadcast:false});
 }
 
@@ -8714,9 +8848,57 @@ function updateStoryProgress(){
   }
 }
 
+function updateEquipmentStatus(){
+  if(!equipmentStatus)return;
+  const available=Boolean(gameStarted&&radioCollected);
+  equipmentStatus.hidden=!available;
+  if(!available)return;
+  equipmentStatus.textContent=equippedTool==="radio"
+    ?"SIGNAL RADIO · Q TO SWITCH TO FLASHLIGHT"
+    :"FLASHLIGHT · Q TO SWITCH TO RADIO";
+}
+
+function setEquippedTool(tool,{turnOnFlashlight=true}={}){
+  if(tool==="radio"&&!radioCollected)return false;
+  equippedTool=tool==="radio"?"radio":"flashlight";
+  if(equippedTool==="radio"){
+    const wasOn=flashlightOn;
+    flashlightOn=false;
+    player.setFlashlightVisual(false);
+    player.proceduralArmFlashlight.visible=false;
+    radioViewmodel.visible=true;
+    flashlight.intensity=0;
+    flashlight.visible=false;
+    if(wasOn)multiplayer.sendState(true);
+  }else{
+    radioViewmodel.visible=false;
+    player.proceduralArmFlashlight.visible=true;
+    if(turnOnFlashlight&&battery>0)flashlightOn=true;
+    player.setFlashlightVisual(flashlightOn);
+    flashlight.visible=flashlightOn&&battery>0;
+    if(turnOnFlashlight)multiplayer.sendState(true);
+  }
+  drawHandheldRadioRadar(true);
+  updateEquipmentStatus();
+  return true;
+}
+
+function syncRadioPickupFromMission(){
+  if(!missionState.relays[0])return;
+  if(!radioCollected){
+    radioCollected=true;
+    if(gameStarted)setEquippedTool("radio",{turnOnFlashlight:false});
+    else updateEquipmentStatus();
+  }else updateEquipmentStatus();
+}
+
 function toggleFlashlight(){
   flashlightOn=!flashlightOn;
+  player.proceduralArmFlashlight.visible=true;
+  radioViewmodel.visible=false;
+  equippedTool="flashlight";
   player.setFlashlightVisual(flashlightOn);
+  updateEquipmentStatus();
   multiplayer.sendState(true);
 
   if(!houseMode && gameStarted && houseTutorialStage===5 && flashlightOn){
@@ -9340,8 +9522,15 @@ document.addEventListener("keydown",e=>{
     if(interaction.interact()){
       return;
     }
-  }else if(e.code==="KeyF" && gameStarted && !phoneOpen && !controlsOpen) toggleFlashlight();
-  else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
+  }else if(e.code==="KeyF" && gameStarted && !phoneOpen && !controlsOpen){
+    if(equippedTool==="radio")setEquippedTool("flashlight",{turnOnFlashlight:false});
+    toggleFlashlight();
+  }else if(e.code==="KeyQ" && !e.repeat && gameStarted && !phoneOpen && !controlsOpen){
+    if(radioCollected){
+      e.preventDefault();
+      setEquippedTool(equippedTool==="radio"?"flashlight":"radio");
+    }
+  }else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !e.repeat){
     if(gameStarted && !phoneOpen && !controlsOpen){
       e.preventDefault();
@@ -9792,6 +9981,7 @@ function animate(){
       : Infinity
   });
 
+  drawHandheldRadioRadar();
   if(flashlightOn && battery>0){
     battery=Math.max(0,battery-dt*.30);
   }else{
