@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261017-norandomrooms1";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js?v=20261017-flyfix1";
@@ -17,7 +18,7 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
-import { StoryMissionWorld } from "./storyMission.js?v=20261017-radiopickup1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261017-radiodetail1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -1480,25 +1481,47 @@ function addRadioViewPart(geometry,material,name,x=0,y=0,z=0,rotation=[0,0,0]){
   radioViewmodel.add(mesh);
   return mesh;
 }
-addRadioViewPart(new THREE.BoxGeometry(0.235,0.32,0.075),radioCaseMaterial,"HandheldRadioCasing");
-addRadioViewPart(new THREE.BoxGeometry(0.207,0.288,0.009),radioPanelMaterial,"HandheldRadioFront",-0.004,0,0.042);
-addRadioViewPart(new THREE.BoxGeometry(0.157,0.122,0.012),radioEdgeMaterial,"HandheldRadioScreenFrame",-0.025,0.075,0.050);
-addRadioViewPart(new THREE.PlaneGeometry(0.142,0.107),radioRadarMaterial,"HandheldRadioRadarScreen",-0.025,0.075,0.057);
-addRadioViewPart(new THREE.BoxGeometry(0.085,0.052,0.008),radioEdgeMaterial,"HandheldRadioSpeaker",-0.035,-0.088,0.050);
-for(let i=0;i<5;i++){
-  addRadioViewPart(new THREE.BoxGeometry(0.006,0.035,0.004),radioPanelMaterial,
-    "HandheldRadioSpeakerSlot"+i,-0.065+i*0.015,-0.088,0.056);
+addRadioViewPart(new RoundedBoxGeometry(0.25,0.335,0.084,7,0.016),radioCaseMaterial,"HandheldRadioCasing");
+addRadioViewPart(new RoundedBoxGeometry(0.229,0.309,0.012,6,0.009),radioEdgeMaterial,"HandheldRadioBezel",-0.003,0,0.039);
+addRadioViewPart(new RoundedBoxGeometry(0.207,0.288,0.012,6,0.008),radioPanelMaterial,"HandheldRadioFront",-0.003,0,0.047);
+addRadioViewPart(new RoundedBoxGeometry(0.17,0.135,0.012,5,0.006),radioEdgeMaterial,"HandheldRadioScreenFrame",-0.027,0.079,0.054);
+addRadioViewPart(new RoundedBoxGeometry(0.151,0.117,0.008,4,0.003),radioPanelMaterial,"HandheldRadioScreenGasket",-0.027,0.079,0.062);
+addRadioViewPart(new THREE.PlaneGeometry(0.142,0.107),radioRadarMaterial,"HandheldRadioRadarScreen",-0.027,0.079,0.068);
+addRadioViewPart(new RoundedBoxGeometry(0.102,0.062,0.010,4,0.004),radioEdgeMaterial,"HandheldRadioSpeaker",-0.039,-0.091,0.058);
+for(let row=0;row<4;row++){
+  for(let col=0;col<6;col++){
+    addRadioViewPart(new THREE.SphereGeometry(0.0028,6,4),radioPanelMaterial,
+      "HandheldRadioSpeakerPort"+row+"x"+col,-0.077+col*0.014,-0.111+row*0.013,0.065);
+  }
 }
-for(const [index,y] of [0.105,0.045].entries()){
-  addRadioViewPart(new THREE.CylinderGeometry(0.016,0.016,0.022,12),radioEdgeMaterial,
-    "HandheldRadioKnob"+index,0.082,y,0.052,[Math.PI/2,0,0]);
+for(const [index,y] of [0.108,0.052].entries()){
+  addRadioViewPart(new THREE.TorusGeometry(0.020,0.0035,6,14),radioEdgeMaterial,
+    "HandheldRadioKnobRing"+index,0.079,y,0.055,[Math.PI/2,0,0]);
+  addRadioViewPart(new THREE.CylinderGeometry(0.014,0.018,0.026,16),radioEdgeMaterial,
+    "HandheldRadioKnob"+index,0.079,y,0.064,[Math.PI/2,0,0]);
+  addRadioViewPart(new THREE.BoxGeometry(0.003,0.010,0.003),radioPanelMaterial,
+    "HandheldRadioKnobMark"+index,0.079,y+0.010,0.078);
 }
-addRadioViewPart(new THREE.BoxGeometry(0.024,0.025,0.012),radioAccentMaterial,
-  "HandheldRadioStatusLight",0.078,-0.035,0.053);
-addRadioViewPart(new THREE.CylinderGeometry(0.004,0.006,0.235,8),radioEdgeMaterial,
-  "HandheldRadioAntenna",0.078,0.257,-0.005,[0,0,-0.06]);
-addRadioViewPart(new THREE.CylinderGeometry(0.016,0.02,0.028,12),radioCaseMaterial,
-  "HandheldRadioAntennaBase",0.078,0.151,-0.005);
+for(const [sx,sy] of [[-.091,.139],[.088,.139],[-.091,-.137],[.088,-.137]]){
+  addRadioViewPart(new THREE.CylinderGeometry(0.0035,0.0035,0.004,8),radioEdgeMaterial,
+    "HandheldRadioCaseScrew",sx,sy,0.055,[Math.PI/2,0,0]);
+  addRadioViewPart(new THREE.BoxGeometry(0.006,0.0015,0.0015),radioPanelMaterial,
+    "HandheldRadioScrewSlot",sx,sy,0.058);
+}
+addRadioViewPart(new RoundedBoxGeometry(0.024,0.025,0.012,3,0.003),radioAccentMaterial,
+  "HandheldRadioStatusLight",0.079,-0.037,0.063);
+addRadioViewPart(new THREE.BoxGeometry(0.025,0.014,0.012),radioEdgeMaterial,
+  "HandheldRadioFunctionKey",0.040,-0.037,0.063);
+addRadioViewPart(new THREE.CylinderGeometry(0.006,0.008,0.245,10),radioEdgeMaterial,
+  "HandheldRadioAntenna",0.086,0.258,-0.007,[0,0,-0.055]);
+addRadioViewPart(new THREE.CylinderGeometry(0.018,0.021,0.031,12),radioCaseMaterial,
+  "HandheldRadioAntennaBase",0.086,0.151,-0.007);
+for(let i=0;i<4;i++){
+  addRadioViewPart(new THREE.TorusGeometry(0.013,0.003,6,12),radioEdgeMaterial,
+    "HandheldRadioAntennaCoil",0.086,0.178+i*0.013,-0.007,[Math.PI/2,0,0]);
+}
+addRadioViewPart(new THREE.TorusGeometry(0.055,0.006,7,18),radioEdgeMaterial,
+  "HandheldRadioShoulderStrapLoop",-0.045,0.185,-0.020,[Math.PI/2,0,0]);
 
 let radioRadarLastDraw=0;
 function drawHandheldRadioRadar(force=false){
@@ -1688,8 +1711,8 @@ function getMissionTarget(){
   }
   if(!missionState.levelRunCleared){
     const entries=storyMissionWorld?.getStairwellEntries?.()||[
-      {id:"north",x:-80,z:-164,title:"LEVEL RUN ACCESS A"},
-      {id:"deep",x:-80,z:-326,title:"LEVEL RUN ACCESS B"}
+      {id:"north",x:-80,z:-164,title:"STAIRWELL A"},
+      {id:"deep",x:-80,z:-326,title:"STAIRWELL B"}
     ];
     const nearest=entries.slice().sort((a,b)=>
       Math.hypot(player.pos.x-a.x,player.pos.z-a.z)-

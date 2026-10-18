@@ -16,8 +16,8 @@ const RELAYS = Object.freeze([
 ]);
 
 const STAIRWELLS = Object.freeze([
-  { id: "north", x: -80, z: -164, title: "LEVEL RUN ACCESS A" },
-  { id: "deep", x: -80, z: -326, title: "LEVEL RUN ACCESS B" },
+  { id: "north", x: -80, z: -164, title: "STAIRWELL A" },
+  { id: "deep", x: -80, z: -326, title: "STAIRWELL B" },
 ]);
 
 function makeBox(parent, name, w, h, d, x, y, z, material) {
@@ -135,36 +135,70 @@ function buildRelayDevice(station, relay, baseMaterial) {
   if(relay.device==="radio"){
     // Self-contained field radio: no network model request, so it cannot
     // silently disappear when a third-party asset host blocks a GLB download.
-    addDeviceMesh(root,"RadioHousing",new RoundedBoxGeometry(0.76,0.68,0.34,6,0.05),
+    addDeviceMesh(root,"RadioCradle",new RoundedBoxGeometry(0.88,0.075,0.49,5,0.018),
+      trim,0,0.205,0.01);
+    addDeviceMesh(root,"RadioHousing",new RoundedBoxGeometry(0.76,0.68,0.34,8,0.055),
       housing,0,0.53,0.01);
-    addDeviceMesh(root,"RadioFrontPanel",new RoundedBoxGeometry(0.69,0.60,0.025,5,0.018),
-      panelMat,0,0.53,0.187);
-    addDeviceMesh(root,"RadioScreenFrame",new RoundedBoxGeometry(0.38,0.20,0.022,4,0.008),
-      edgeMetal,-0.085,0.665,0.207);
-    addDeviceMesh(root,"RadioSignalScreen",new THREE.PlaneGeometry(0.345,0.155),
-      screenMat,-0.085,0.665,0.221);
-    addDeviceMesh(root,"RadioSpeakerPlate",new RoundedBoxGeometry(0.29,0.10,0.012,3,0.004),
-      rubber,-0.105,0.385,0.207);
-    for(let row=0;row<3;row++){
-      for(let col=0;col<5;col++){
-        addDeviceMesh(root,"RadioSpeakerSlot",new RoundedBoxGeometry(0.027,0.009,0.006,2,0.002),
-          edgeMetal,-0.205+col*0.05,0.355+row*0.027,0.218);
+    addDeviceMesh(root,"RadioFrontBezel",new RoundedBoxGeometry(0.708,0.622,0.028,7,0.022),
+      trim,0,0.53,0.184);
+    addDeviceMesh(root,"RadioFrontPanel",new RoundedBoxGeometry(0.674,0.589,0.026,7,0.022),
+      panelMat,0,0.53,0.203);
+    for(const x of [-0.37,0.37]){
+      addDeviceMesh(root,"RadioRubberSideGrip",new RoundedBoxGeometry(0.048,0.45,0.055,5,0.012),
+        rubber,x,0.52,0.035);
+      for(let i=0;i<5;i++){
+        addDeviceMesh(root,"RadioGripRidge",new RoundedBoxGeometry(0.012,0.035,0.009,2,0.003),
+          trim,x,0.36+i*0.075,0.065);
       }
     }
-    addDeviceMesh(root,"RadioTuningKnob",new THREE.CylinderGeometry(0.046,0.046,0.04,18),
-      trim,0.235,0.705,0.215,[Math.PI/2,0,0]);
-    addDeviceMesh(root,"RadioVolumeKnob",new THREE.CylinderGeometry(0.038,0.038,0.04,16),
-      edgeMetal,0.235,0.535,0.215,[Math.PI/2,0,0]);
-    addDeviceMesh(root,"RadioAntennaFoot",new THREE.CylinderGeometry(0.038,0.045,0.045,12),
+    addDeviceMesh(root,"RadioScreenFrame",new RoundedBoxGeometry(0.405,0.225,0.025,5,0.012),
+      edgeMetal,-0.085,0.665,0.225);
+    addDeviceMesh(root,"RadioScreenGasket",new RoundedBoxGeometry(0.375,0.195,0.013,4,0.006),
+      rubber,-0.085,0.665,0.244);
+    addDeviceMesh(root,"RadioSignalScreen",new THREE.PlaneGeometry(0.345,0.155),
+      screenMat,-0.085,0.665,0.253);
+    addDeviceMesh(root,"RadioSpeakerPlate",new RoundedBoxGeometry(0.30,0.115,0.016,4,0.006),
+      rubber,-0.105,0.385,0.229);
+    for(let row=0;row<4;row++){
+      for(let col=0;col<7;col++){
+        addDeviceMesh(root,"RadioSpeakerSlot",new RoundedBoxGeometry(0.021,0.006,0.005,2,0.001),
+          edgeMetal,-0.198+col*0.031,0.347+row*0.025,0.239);
+      }
+    }
+    for(const [sx,sy] of [[-.29,.775],[.29,.775],[-.29,.285],[.29,.285]]){
+      addDeviceMesh(root,"RadioCaseScrew",new THREE.CylinderGeometry(0.012,0.012,0.009,10),
+        edgeMetal,sx,sy,0.239,[Math.PI/2,0,0]);
+      addDeviceMesh(root,"RadioScrewSlot",new THREE.BoxGeometry(0.012,0.002,0.002),
+        rubber,sx,sy,0.245);
+    }
+    addDeviceMesh(root,"RadioTuningKnobRing",new THREE.TorusGeometry(0.052,0.007,6,18),
+      edgeMetal,0.235,0.705,0.232,[Math.PI/2,0,0]);
+    addDeviceMesh(root,"RadioTuningKnob",new THREE.CylinderGeometry(0.043,0.047,0.042,20),
+      trim,0.235,0.705,0.248,[Math.PI/2,0,0]);
+    addDeviceMesh(root,"RadioVolumeKnobRing",new THREE.TorusGeometry(0.045,0.006,6,18),
+      edgeMetal,0.235,0.535,0.232,[Math.PI/2,0,0]);
+    addDeviceMesh(root,"RadioVolumeKnob",new THREE.CylinderGeometry(0.034,0.039,0.042,18),
+      edgeMetal,0.235,0.535,0.248,[Math.PI/2,0,0]);
+    addDeviceMesh(root,"RadioTuningIndex",new THREE.BoxGeometry(0.004,0.015,0.004),
+      amberLed,0.235,0.736,0.273);
+    addDeviceMesh(root,"RadioAntennaFoot",new THREE.CylinderGeometry(0.042,0.05,0.052,14),
       trim,0.285,0.88,-0.085);
-    addDeviceMesh(root,"RadioAntenna",new THREE.CylinderGeometry(0.007,0.012,0.39,10),
-      edgeMetal,0.285,1.095,-0.085);
-    addDeviceMesh(root,"RadioHandle",new THREE.TorusGeometry(0.135,0.016,8,24),
-      trim,-0.06,0.90,-0.075);
+    for(let i=0;i<4;i++){
+      addDeviceMesh(root,"RadioAntennaCoil",new THREE.TorusGeometry(0.021,0.0045,6,14),
+        edgeMetal,0.285,0.915+i*0.018,-0.085,[Math.PI/2,0,0]);
+    }
+    addDeviceMesh(root,"RadioAntenna",new THREE.CylinderGeometry(0.006,0.011,0.37,12),
+      edgeMetal,0.285,1.105,-0.085,[0,0,-0.035]);
+    addDeviceMesh(root,"RadioHandleBase",new THREE.CylinderGeometry(0.018,0.02,0.055,12),
+      trim,-0.06,0.87,-0.075);
+    addDeviceMesh(root,"RadioHandle",new THREE.TorusGeometry(0.145,0.018,8,28),
+      trim,-0.06,0.91,-0.075);
     statusLed=addDeviceMesh(root,"RadioLinkStatusLED",new THREE.SphereGeometry(0.026,14,10),
-      redLed,0.20,0.79,0.222);
+      redLed,0.19,0.79,0.273);
     addDeviceMesh(root,"RadioStatusButton",new THREE.SphereGeometry(0.024,12,8),
-      amberLed,0.16,0.405,0.222);
+      amberLed,0.16,0.405,0.272);
+    addDeviceMesh(root,"RadioChannelButton",new THREE.CylinderGeometry(0.016,0.016,0.018,12),
+      rubber,0.18,0.45,0.259,[Math.PI/2,0,0]);
   }else{
     addDeviceMesh(root,"TransmitterCabinet",new RoundedBoxGeometry(0.91,1.10,0.49,5,0.045),
       housing,0,0.76,0);
@@ -424,20 +458,48 @@ export class StoryMissionWorld {
       }
     }).catch(() => {});
 
+    const stairFrameMaterial=new THREE.MeshStandardMaterial({color:0x4d554d,roughness:0.72,metalness:0.32});
+    const stairDoorMaterial=new THREE.MeshStandardMaterial({color:0x252d28,roughness:0.82,metalness:0.18});
+    const stairInsetMaterial=new THREE.MeshStandardMaterial({color:0x333b34,roughness:0.7,metalness:0.24});
+    const stairHandleMaterial=new THREE.MeshStandardMaterial({color:0x8b8c78,roughness:0.4,metalness:0.7});
+    const stairLampMaterial=new THREE.MeshStandardMaterial({color:0x9a5c32,emissive:0x6c260c,emissiveIntensity:0.8,roughness:0.32});
     for (const stair of STAIRWELLS) {
       const landmark = new THREE.Group();
       landmark.name = "Stairwell_" + stair.id;
       landmark.position.set(stair.x, 0, stair.z);
       this.root.add(landmark);
-      this.levelRunEntrances.push(this._addSign(landmark, {
-        x: 0, y: 1.9, z: 2.25, width: 2.0, height: 0.82,
-        title: stair.title, subtitle: "DESCEND / PRESS E", status: "READY",
-        interactable: {
-          type: "levelRunEntry", entryId: stair.id,
-          entryDoor: { centerX: stair.x, wallZ: stair.z, face: 1 },
-          prompt: "Enter " + stair.title,
-        },
-      }));
+
+      // An unlabelled service door replaces the floating access sign.
+      // Press E on the door itself to enter the run.
+      const entryDoor = { centerX: stair.x, wallZ: stair.z, face: 1 };
+      makeBox(landmark,"StairwellDoorFrameLeft",0.12,2.55,0.24,-0.79,1.27,2.25,stairFrameMaterial);
+      makeBox(landmark,"StairwellDoorFrameRight",0.12,2.55,0.24,0.79,1.27,2.25,stairFrameMaterial);
+      makeBox(landmark,"StairwellDoorFrameHeader",1.70,0.13,0.24,0,2.48,2.25,stairFrameMaterial);
+      const door=new THREE.Mesh(new RoundedBoxGeometry(1.43,2.42,0.105,6,0.025),stairDoorMaterial);
+      door.name="StairwellDoorInteractable";
+      door.position.set(0,1.22,2.25);
+      door.castShadow=true;door.receiveShadow=true;
+      door.userData.interactable={
+        type:"levelRunEntry",entryId:stair.id,entryDoor,
+        prompt:"Enter stairwell"
+      };
+      landmark.add(door);
+      const inset=new THREE.Mesh(new RoundedBoxGeometry(1.20,2.17,0.025,5,0.012),stairInsetMaterial);
+      inset.name="StairwellDoorInset";
+      inset.position.set(0,1.22,2.315);
+      landmark.add(inset);
+      for(const x of [-0.52,0.52]){
+        makeBox(landmark,"StairwellDoorRib",0.035,1.78,0.022,x,1.26,2.342,stairFrameMaterial);
+      }
+      makeBox(landmark,"StairwellDoorKickPlate",0.78,0.12,0.018,0,0.31,2.342,stairFrameMaterial);
+      addDeviceMesh(landmark,"StairwellDoorHandlePlate",new RoundedBoxGeometry(0.105,0.32,0.025,4,0.008),
+        stairFrameMaterial,0.48,1.15,2.352);
+      addDeviceMesh(landmark,"StairwellDoorHandle",new THREE.CylinderGeometry(0.018,0.018,0.105,12),
+        stairHandleMaterial,0.45,1.15,2.375,[Math.PI/2,0,0]);
+      addDeviceMesh(landmark,"StairwellDoorStatusLamp",new THREE.SphereGeometry(0.045,12,10),
+        stairLampMaterial,-0.55,2.0,2.36);
+      this.levelRunEntrances.push(door);
+      this.interactables.push(door);
     }
 
     const gate = new THREE.Group();
