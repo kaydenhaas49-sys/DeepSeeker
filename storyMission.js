@@ -7,7 +7,6 @@ const ASSETS = Object.freeze({
   stairwell: "https://cdn.3dassets.dev/assets/25338/v1/model.glb",
   fireDoor: "https://cdn.3dassets.dev/assets/25820/v1/model.glb",
   poolroom: "https://cdn.3dassets.dev/assets/25335/v1/model.glb",
-  radio: "https://www.innerscene.com/api/library/radio-22ce1be9/download",
 });
 
 const RELAYS = Object.freeze([
@@ -118,7 +117,7 @@ function buildRelayDevice(station, relay, baseMaterial) {
   const edgeMetal=new THREE.MeshStandardMaterial({color:0x73776b,roughness:0.42,metalness:0.66});
   const panelMat=new THREE.MeshStandardMaterial({color:0x171c19,roughness:0.48,metalness:0.32});
   const rubber=new THREE.MeshStandardMaterial({color:0x101512,roughness:0.94,metalness:0.02});
-  let screenTexture=relay.device==="radio" ? null : makeRelayDisplayTexture(relay);
+  let screenTexture=makeRelayDisplayTexture(relay);
   const screenMat=screenTexture ? new THREE.MeshBasicMaterial({map:screenTexture,toneMapped:false}) : null;
   const redLed=new THREE.MeshStandardMaterial({color:0xb33a27,emissive:0x601005,emissiveIntensity:0.8,roughness:0.3});
   const greenLed=new THREE.MeshStandardMaterial({color:0x58b87e,emissive:0x087432,emissiveIntensity:1.05,roughness:0.24});
@@ -134,11 +133,38 @@ function buildRelayDevice(station, relay, baseMaterial) {
 
   let statusLed;
   if(relay.device==="radio"){
-    // The visible radio comes from a real CC0 GLB loaded by StoryMissionWorld.
-    // Keep only an online/offline indicator here so the relay still responds
-    // to campaign state without recreating the old blocky radio from primitives.
-    statusLed=addDeviceMesh(root,"RadioLinkStatusLED",new THREE.SphereGeometry(0.033,14,10),
-      redLed,0.24,0.62,0.15);
+    // Self-contained field radio: no network model request, so it cannot
+    // silently disappear when a third-party asset host blocks a GLB download.
+    addDeviceMesh(root,"RadioHousing",new RoundedBoxGeometry(0.76,0.68,0.34,6,0.05),
+      housing,0,0.53,0.01);
+    addDeviceMesh(root,"RadioFrontPanel",new RoundedBoxGeometry(0.69,0.60,0.025,5,0.018),
+      panelMat,0,0.53,0.187);
+    addDeviceMesh(root,"RadioScreenFrame",new RoundedBoxGeometry(0.38,0.20,0.022,4,0.008),
+      edgeMetal,-0.085,0.665,0.207);
+    addDeviceMesh(root,"RadioSignalScreen",new THREE.PlaneGeometry(0.345,0.155),
+      screenMat,-0.085,0.665,0.221);
+    addDeviceMesh(root,"RadioSpeakerPlate",new RoundedBoxGeometry(0.29,0.10,0.012,3,0.004),
+      rubber,-0.105,0.385,0.207);
+    for(let row=0;row<3;row++){
+      for(let col=0;col<5;col++){
+        addDeviceMesh(root,"RadioSpeakerSlot",new RoundedBoxGeometry(0.027,0.009,0.006,2,0.002),
+          edgeMetal,-0.205+col*0.05,0.355+row*0.027,0.218);
+      }
+    }
+    addDeviceMesh(root,"RadioTuningKnob",new THREE.CylinderGeometry(0.046,0.046,0.04,18),
+      trim,0.235,0.705,0.215,[Math.PI/2,0,0]);
+    addDeviceMesh(root,"RadioVolumeKnob",new THREE.CylinderGeometry(0.038,0.038,0.04,16),
+      edgeMetal,0.235,0.535,0.215,[Math.PI/2,0,0]);
+    addDeviceMesh(root,"RadioAntennaFoot",new THREE.CylinderGeometry(0.038,0.045,0.045,12),
+      trim,0.285,0.88,-0.085);
+    addDeviceMesh(root,"RadioAntenna",new THREE.CylinderGeometry(0.007,0.012,0.39,10),
+      edgeMetal,0.285,1.095,-0.085);
+    addDeviceMesh(root,"RadioHandle",new THREE.TorusGeometry(0.135,0.016,8,24),
+      trim,-0.06,0.90,-0.075);
+    statusLed=addDeviceMesh(root,"RadioLinkStatusLED",new THREE.SphereGeometry(0.026,14,10),
+      redLed,0.20,0.79,0.222);
+    addDeviceMesh(root,"RadioStatusButton",new THREE.SphereGeometry(0.024,12,8),
+      amberLed,0.16,0.405,0.222);
   }else{
     addDeviceMesh(root,"TransmitterCabinet",new RoundedBoxGeometry(0.91,1.10,0.49,5,0.045),
       housing,0,0.76,0);
@@ -376,26 +402,13 @@ export class StoryMissionWorld {
       this.root.add(station);
       const device=buildRelayDevice(station,relay,darkMetal);
       this.relayDevices.push(device);
-      if(relay.device==="radio"){
-        this.loadModel("radio").then(gltf=>{
-          const model=gltf.scene.clone(true);
-          model.name="CC0GenericRadioModel";
-          model.traverse(node=>{
-            if(!node.isMesh)return;
-            node.castShadow=true;
-            node.receiveShadow=true;
-          });
-          placeModelOnFloor(model,{scale:0.72});
-          model.position.y+=0.16; // sit on top of the relay pedestal
-          device.root.add(model);
-          device.root.userData.modelAsset="generic-radio-cc0";
-        }).catch(()=>{});
-      }
-      this.relayCards.push(this._addSign(station, {
-        x: 0, y: 2.28, z: 0.78, width: 1.65, height: 0.72,
-        title: relay.title, subtitle: "PRESS E TO RESTORE", status: "OFFLINE",
-        interactable: { type: "storyRelay", relayIndex: relay.id, prompt: "Restore " + relay.title },
-      }));
+      device.root.userData.interactable = {
+        type: "storyRelay",
+        relayIndex: relay.id,
+        prompt: relay.id === 0 ? "Pick up the field radio" : "Tune " + relay.title,
+      };
+      // Raycast the actual device meshes; the overhead sign is no longer needed.
+      this.interactables.push(device.root);
     }
 
     this.loadModel("stairwell").then(gltf => {
@@ -519,15 +532,18 @@ export class StoryMissionWorld {
       (relays.length >= 3 && relays.slice(0, 3).every(Boolean) &&
         state?.breakerSolved && state?.levelRunCleared)
     );
-    for (let i = 0; i < this.relayCards.length; i++) {
+    for (let i = 0; i < this.relayDevices.length; i++) {
       const active = Boolean(relays[i]);
-      this.relayDevices[i]?.setActive(active);
-      this._updateCard(this.relayCards[i], RELAYS[i].title,
-        active ? "SIGNAL RESTORED" : "PRESS E TO RESTORE",
-        active ? "ONLINE" : "OFFLINE");
-      this.relayCards[i].mesh.userData.interactable.prompt = active
-        ? RELAYS[i].title + " is already online"
-        : "Restore " + RELAYS[i].title;
+      const device = this.relayDevices[i];
+      device?.setActive(active);
+      const interactable = device?.root?.userData?.interactable;
+      if (interactable) {
+        interactable.prompt = active
+          ? (i === 0 ? "Field radio already collected" : RELAYS[i].title + " already online")
+          : (i === 0 ? "Pick up the field radio" : "Tune " + RELAYS[i].title);
+      }
+      // Picking up the first radio removes its whole pedestal from the world.
+      if (i === 0 && device?.root?.parent) device.root.parent.visible = !active;
     }
     if (this.poolroomsDoorCard) {
       this._updateCard(this.poolroomsDoorCard, "POOLROOMS",
