@@ -18,7 +18,7 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261015-warningperf1";
-import { StoryMissionWorld } from "./storyMission.js?v=20261017-radiodetail1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261017-nolevelrun1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -1591,26 +1591,11 @@ const HOUSE_TARGET_HEIGHT=3.0;
 let houseModel=null;
 let houseLoaded=false;
 let houseMode=false;
-const LEVEL_RUN_ENABLED=true; // Level Run is a core campaign objective.
-let levelRunActive=false;
-const LEVEL_RUN_ORIGIN_X=96;
-const LEVEL_RUN_ORIGIN_Z=96;
-const levelRunState={
-  active:false,group:null,code:"0000",round:1,runnerId:null,
-  successfulRuns:0,cluesFound:[false,false,false,false],clueCards:[],cluePositions:[],
-  collisionBoxes:[],occluders:[],interactables:[],
-  keypad:null,keypadInput:null,keypadMessage:null,
-  screenContext:null,screenTexture:null,
-  previousSceneBackground:null,previousFogColor:null,previousFogNear:null,previousFogFar:null,
-  returnPosition:new THREE.Vector3(32,EYE,32),
-  target:{pos:new THREE.Vector3(0,EYE,0),eyeY:EYE,crouched:false,flashlight:false}
-};
 let radioCollected=false;
 let equippedTool="flashlight";
 let missionState={
   relays:[false,false,false],
   breakerSolved:false,
-  levelRunCleared:false,
   poolroomsUnlocked:false,
   poolroomsExitReached:false,
   log:[]
@@ -1623,9 +1608,8 @@ function missionStateSnapshot(){
   return {
     relays:missionState.relays.slice(0,3).map(Boolean),
     breakerSolved:Boolean(missionState.breakerSolved||world.maintenanceDoor?.unlocked),
-    levelRunCleared:Boolean(missionState.levelRunCleared),
     poolroomsUnlocked:Boolean(missionState.relays.every(Boolean)&&
-      (missionState.breakerSolved||world.maintenanceDoor?.unlocked)&&missionState.levelRunCleared),
+      (missionState.breakerSolved||world.maintenanceDoor?.unlocked)),
     poolroomsExitReached:Boolean(missionState.poolroomsExitReached),
     log:missionState.log.slice(-12).map(item=>({
       title:String(item?.title||"FIELD NOTE").slice(0,48),
@@ -1637,12 +1621,12 @@ function missionStateSnapshot(){
 function refreshMissionState({broadcast=false}={}){
   missionState.breakerSolved=Boolean(missionState.breakerSolved||world.maintenanceDoor?.unlocked);
   missionState.poolroomsUnlocked=Boolean(
-    missionState.relays.every(Boolean)&&missionState.breakerSolved&&missionState.levelRunCleared
+    missionState.relays.every(Boolean)&&missionState.breakerSolved
   );
   storyMissionWorld?.syncState(missionState,{
     tutorialActive:Boolean(tutorialOpenRoomActive||(gameStarted&&houseTutorialStage>0&&houseTutorialStage<10)),
     poolroomsActive,
-    missionVisible:!levelRunActive
+    missionVisible:true
   });
   if(missionState.relays[0]) syncRadioPickupFromMission();
   updateMissionObjective();
@@ -1655,7 +1639,6 @@ function restoreMissionState(data={}){
   missionState={
     relays:Array.isArray(data?.relays)?[0,1,2].map(i=>Boolean(data.relays[i])):[false,false,false],
     breakerSolved:Boolean(data?.breakerSolved||world.maintenanceDoor?.unlocked),
-    levelRunCleared:Boolean(data?.levelRunCleared),
     poolroomsUnlocked:Boolean(data?.poolroomsUnlocked),
     poolroomsExitReached:Boolean(data?.poolroomsExitReached),
     log:Array.isArray(data?.log)?data.log.slice(-12).map(item=>({
@@ -1670,7 +1653,6 @@ function resetMissionState(){
   missionState={
     relays:[false,false,false],
     breakerSolved:false,
-    levelRunCleared:false,
     poolroomsUnlocked:false,
     poolroomsExitReached:false,
     log:[]
@@ -1709,22 +1691,11 @@ function getMissionTarget(){
       hint:"ALL RELAYS ONLINE · FIND THE MAINTENANCE ROOM AND SOLVE THE EIGHT BREAKERS"
     };
   }
-  if(!missionState.levelRunCleared){
-    const entries=storyMissionWorld?.getStairwellEntries?.()||[
-      {id:"north",x:-80,z:-164,title:"STAIRWELL A"},
-      {id:"deep",x:-80,z:-326,title:"STAIRWELL B"}
-    ];
-    const nearest=entries.slice().sort((a,b)=>
-      Math.hypot(player.pos.x-a.x,player.pos.z-a.z)-
-      Math.hypot(player.pos.x-b.x,player.pos.z-b.z)
-    )[0];
-    return {...nearest,hint:"POWER RESTORED · ENTER "+nearest.title+" AND SURVIVE THE RUN"};
-  }
-  return {x:-80,z:-472,hint:"MISSION COMPLETE · RETURN TO THE POOLROOMS DOOR"};
+  return {x:-80,z:-472,title:"POOLROOMS DOOR",hint:"POWER RESTORED · RETURN TO THE POOLROOMS DOOR"};
 }
 
 function updateMissionObjective(){
-  if(!gameStarted||gameEnded||houseMode||levelRunActive||poolroomsActive||tutorialOpenRoomActive)return;
+  if(!gameStarted||gameEnded||houseMode||poolroomsActive||tutorialOpenRoomActive)return;
   if(houseTutorialStage>0&&houseTutorialStage<10)return;
   const target=getMissionTarget();
   const dx=target.x-player.pos.x,dz=target.z-player.pos.z;
@@ -1792,8 +1763,7 @@ async function enterPoolroomsLevel({broadcast=true}={}){
   clearSpiderPath();
   world.root.visible=false;
   houseRoot.visible=false;
-  if(levelRunState.group)levelRunState.group.visible=false;
-  player.ignoreWorldCollision=true;
+    player.ignoreWorldCollision=true;
   player.extraCollisionBoxes=storyMissionWorld.getPoolroomsCollisionBoxes();
   player.pos.set(0,EYE,-3.0);
   player.vel.set(0,0,0);
@@ -2949,8 +2919,8 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
     saveType:roomCode ? "MULTIPLAYER" : "SOLO",
     roomCode:roomCode || null,
     playerName,
-    x:Number(levelRunActive?levelRunState.returnPosition.x:player.pos.x),
-    z:Number(levelRunActive?levelRunState.returnPosition.z:player.pos.z),
+    x:Number(player.pos.x),
+    z:Number(player.pos.z),
     yaw:Number(player.yaw),
     pitch:Number(player.pitch),
     storyStage,
@@ -3042,7 +3012,6 @@ function applySavedGame(data){
   restoreMissionState(data.missionState||{
     relays:[false,false,false],
     breakerSolved:Boolean(data.maintenanceDoorUnlocked),
-    levelRunCleared:false,
     poolroomsUnlocked:false,
     log:[]
   });
@@ -3325,11 +3294,7 @@ function resetForNewGame(slot=selectedSaveSlot,{skipConfirm=false}={}){
 
   // Reset the level state without relying on the previous run's state.
   houseMode=false;
-  levelRunActive=false;
-  levelRunState.active=false;
-  if(levelRunState.group)levelRunState.group.visible=false;
-  if(levelRunState.keypad)closeLevelRunKeypad(false);
-  disableTutorialOpenRoom();
+    disableTutorialOpenRoom();
   world.root.visible=true;
   houseRoot.visible=false;
   player.ignoreWorldCollision=false;
@@ -3439,7 +3404,6 @@ const multiplayer=new Multiplayer({
       beginVictoryEnding({broadcast:false});
       return;
     }
-    if(!LEVEL_RUN_ENABLED && String(event?.type||"").startsWith("level_run_")) return;
     if(event?.type==="mission_state"){
       if(!multiplayer.isWorldAuthority())restoreMissionState(event.payload||{});
       return;
@@ -3453,49 +3417,6 @@ const multiplayer=new Multiplayer({
       if(relay&&state&&Math.hypot(Number(state.x)-relay.x,Number(state.z)-relay.z)<5.0){
         activateMissionRelay(index,{broadcast:true});
       }
-      return;
-    }
-    if(event?.type==="level_run_entry_attempt"){
-      if(!multiplayer.isWorldAuthority()||levelRunActive||!missionState.relays.every(Boolean)||!missionState.breakerSolved)return;
-      const payload=event.payload||{};
-      const remote=multiplayer.players.get(String(event.playerId||""));
-      const state=remote?.current||remote?.target;
-      const entry=storyMissionWorld?.getStairwellEntries?.().find(item=>item.id===String(payload.entryId||""));
-      if(!entry||!state||Math.hypot(Number(state.x)-entry.x,Number(state.z)-entry.z)>5.0)return;
-      startLevelRun({
-        runnerId:String(event.playerId),
-        returnX:Number(payload.returnX),
-        returnZ:Number(payload.returnZ)
-      },{
-        entryDoor:payload.entryDoor||{centerX:entry.x,wallZ:entry.z,face:1}
-      });
-      return;
-    }
-    if(event?.type==="level_run_clue_found"){
-      if(!multiplayer.isWorldAuthority()||!levelRunActive)return;
-      if(String(event.playerId||"")!==String(levelRunState.runnerId||""))return;
-      const payload=event.payload||{};
-      if(Number(payload.round)!==levelRunState.round)return;
-      const index=Number(payload.clueIndex);
-      if(Number.isInteger(index)&&index>=0&&index<4&&!levelRunState.cluesFound[index]){
-        levelRunState.cluesFound[index]=true;
-        drawLevelRunClueCards();
-        drawLevelRunCodeScreen();
-        multiplayer.broadcastWorldEvent("level_run_clue_state","level-run",{
-          round:levelRunState.round,cluesFound:levelRunState.cluesFound.slice()
-        });
-      }
-      return;
-    }
-    if(event?.type==="level_run_clue_state"){
-      if(multiplayer.isWorldAuthority()||!levelRunActive)return;
-      const payload=event.payload||{};
-      if(Number(payload.round)!==levelRunState.round)return;
-      levelRunState.cluesFound=Array.isArray(payload.cluesFound)
-        ?[0,1,2,3].map(i=>Boolean(payload.cluesFound[i]))
-        :[false,false,false,false];
-      drawLevelRunClueCards();
-      drawLevelRunCodeScreen();
       return;
     }
     if(event?.type==="demo_complete_attempt"||event?.type==="poolrooms_enter_attempt"){
@@ -3517,37 +3438,6 @@ const multiplayer=new Multiplayer({
         restoreMissionState(event.payload||{});
         beginGameEnding();
       }
-      return;
-    }
-    if(event?.type==="level_run_complete"){
-      if(!multiplayer.isWorldAuthority()){
-        restoreMissionState(event.payload?.missionState||{});
-        if(levelRunActive)leaveLevelRun(false);
-      }
-      return;
-    }
-    if(event?.type==="level_run_enter"){
-      if(!levelRunActive && !houseMode && !tutorialOpenRoomActive && !poolroomsActive) {
-        startLevelRun(event.payload||{},{broadcast:false});
-      }
-      return;
-    }
-    if(event?.type==="level_run_round_state"){
-      applyLevelRunRoundState(event.payload||{});
-      return;
-    }
-    if(event?.type==="level_run_safe_opened"){
-      const payload=event.payload||{};
-      if(
-        multiplayer.isWorldAuthority() &&
-        levelRunActive &&
-        String(event.playerId||"")===String(levelRunState.runnerId||"") &&
-        Number(payload.round)===levelRunState.round
-      ) advanceLevelRunRound({success:true});
-      return;
-    }
-    if(event?.type==="level_run_exit"){
-      if(levelRunActive) leaveLevelRun(false);
       return;
     }
     if(event?.type==="spider_snapshot"){
@@ -3643,7 +3533,7 @@ const multiplayer=new Multiplayer({
 
 const navigation=new NavigationSystem({
   player,
-  getLevelName:()=>levelRunActive ? "LEVEL RUN" : poolroomsActive ? "POOLROOMS" : houseMode ? "APARTMENT" : "BACKROOMS"
+  getLevelName:()=>poolroomsActive ? "POOLROOMS" : houseMode ? "APARTMENT" : "BACKROOMS"
 });
 
 const securityCameras=new SecurityCameraSystem({
@@ -3676,9 +3566,7 @@ storyMissionWorld=new StoryMissionWorld({scene,world,loader:gltfLoader});
 const interaction=new InteractionSystem({
   camera,
   domElement:renderer.domElement,
-  getCandidates:()=>levelRunActive
-    ? levelRunState.interactables
-    : poolroomsActive
+  getCandidates:()=>poolroomsActive
       ? [storyMissionWorld?.getPoolroomsExitInteractable()]
       : houseMode||tutorialOpenRoomActive
         ? []
@@ -3742,29 +3630,9 @@ const interaction=new InteractionSystem({
       }
       return true;
     }
-    if(target.type==="levelRunEntry"){
-      if(!missionState.relays.every(Boolean)||!missionState.breakerSolved){
-        eventText.textContent="RESTORE ALL THREE RELAYS AND SOLVE THE MAINTENANCE BREAKERS FIRST.";
-        eventText.style.opacity="1";
-        return true;
-      }
-      if(multiplayer.isWorldAuthority()){
-        startLevelRun({}, {entryDoor:target.entryDoor});
-      }else{
-        multiplayer.broadcastWorldEvent("level_run_entry_attempt","campaign",{
-          entryId:String(target.entryId||"north"),
-          entryDoor:target.entryDoor,
-          returnX:player.pos.x,
-          returnZ:player.pos.z
-        });
-        eventText.textContent="REQUESTING ACCESS TO LEVEL RUN.";
-        eventText.style.opacity="1";
-      }
-      return true;
-    }
     if(target.type==="poolroomsDoor"){
       if(!missionState.poolroomsUnlocked){
-        eventText.textContent="THE DOOR HAS NO POWER · RESTORE THE RELAYS, BREAKERS, AND LEVEL RUN.";
+        eventText.textContent="THE DOOR HAS NO POWER · RESTORE ALL THREE RELAYS AND SOLVE THE EIGHT BREAKERS.";
         eventText.style.opacity="1";
         return true;
       }
@@ -3781,563 +3649,10 @@ const interaction=new InteractionSystem({
       else multiplayer.broadcastWorldEvent("mission_ending_attempt","campaign",{});
       return true;
     }
-    if(target.type==="levelRunClue"){
-      collectLevelRunClue(Number(target.clueIndex));
-      return true;
-    }
-    if(target.type==="levelRunSafe"){
-      openLevelRunSafe();
-      return true;
-    }
-    if(target.type==="levelRunExit"){
-      leaveLevelRun(true);
-      return true;
-    }
     return false;
   }
 });
 
-
-function getLevelRunLocalId(){return String(multiplayer.playerId||"solo");}
-
-function getLevelRunParticipantIds(){
-  const localId=getLevelRunLocalId(),ids=[];
-  const add=id=>{
-    const value=String(id||"");
-    if(!value||ids.includes(value)) return;
-    if(value===localId){ids.push(value);return;}
-    const remote=multiplayer.players.get(value);
-    if(remote && remote.current?.level!=="house" && remote.target?.level!=="house") ids.push(value);
-  };
-  for(const id of (multiplayer.roomPlayerOrder||[])) add(id);
-  if(localId!=="solo") add(localId);
-  for(const id of multiplayer.players.keys()) add(id);
-  return ids.length?ids:["solo"];
-}
-
-function getLevelRunRunnerName(id=levelRunState.runnerId){
-  const value=String(id||"");
-  if(value===getLevelRunLocalId()||value==="solo") return "YOU";
-  const remote=multiplayer.players.get(value);
-  return remote?.name?String(remote.name).slice(0,20):"PLAYER";
-}
-
-function isLocalLevelRunRunner(){
-  return String(levelRunState.runnerId||"")===getLevelRunLocalId() ||
-    (levelRunState.runnerId==="solo"&&getLevelRunParticipantIds().length===1);
-}
-
-function makeLevelRunCode(){return String(Math.floor(1000+Math.random()*9000));}
-
-function getLevelRunSpawnFor(id){
-  const ids=getLevelRunParticipantIds();
-  const index=Math.max(0,ids.indexOf(String(id||"")));
-  const lane=index%5;
-  const row=Math.floor(index/5);
-  return {
-    x:LEVEL_RUN_ORIGIN_X-6+lane*3,
-    z:LEVEL_RUN_ORIGIN_Z-31+row*3.4
-  };
-}
-
-function isInsideLevelRun(x,z){
-  // LEVEL RUN is a long, straight corridor; keep the hunter and remote targets
-  // inside its walls rather than allowing them to spawn in the old maze area.
-  return Number.isFinite(x)&&Number.isFinite(z)&&
-    x>=LEVEL_RUN_ORIGIN_X-8.15&&x<=LEVEL_RUN_ORIGIN_X+8.15&&
-    z>=LEVEL_RUN_ORIGIN_Z-37&&z<=LEVEL_RUN_ORIGIN_Z+37;
-}
-
-function updateLevelRunHUD(){
-  if(!levelRunActive) return;
-  const role=isLocalLevelRunRunner()?"YOU ARE THE RUNNER":"RUNNER: "+getLevelRunRunnerName();
-  const fragments=levelRunState.cluesFound.filter(Boolean).length;
-  const text="LEVEL RUN · ROUND "+levelRunState.round+" · "+role+
-    " · FRAGMENTS "+fragments+"/4 · UNLOCK THE SAFE";
-  if(objective.textContent!==text) objective.textContent=text;
-}
-
-function drawLevelRunCodeScreen(){
-  const ctx=levelRunState.screenContext;
-  if(!ctx)return;
-  const canvas=ctx.canvas;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="#08120e";ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.strokeStyle="#3b9873";ctx.lineWidth=5;ctx.strokeRect(12,12,canvas.width-24,canvas.height-24);
-  ctx.textAlign="center";ctx.fillStyle="#70e2ac";ctx.font="bold 25px monospace";
-  ctx.fillText("SECURE CACHE",canvas.width/2,55);
-  ctx.fillStyle="#9cb8a8";ctx.font="18px monospace";
-  ctx.fillText("SIGNAL CORRUPTED",canvas.width/2,102);
-  ctx.fillStyle="#d4ffdf";ctx.font="bold 33px monospace";
-  ctx.fillText("FRAGMENTS "+levelRunState.cluesFound.filter(Boolean).length+"/4",canvas.width/2,166);
-  ctx.fillStyle="#67917b";ctx.font="14px monospace";
-  ctx.fillText("SEARCH SIDE PANELS · E TO SCAN",canvas.width/2,216);
-  if(levelRunState.screenTexture)levelRunState.screenTexture.needsUpdate=true;
-}
-
-function drawLevelRunClueCards(){
-  for(const card of levelRunState.clueCards){
-    const ctx=card.context;
-    if(!ctx)continue;
-    const canvas=ctx.canvas;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle="#0a100d";ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle=levelRunState.cluesFound[card.index]?"#73d6a0":"#764b4e";
-    ctx.lineWidth=5;ctx.strokeRect(12,12,canvas.width-24,canvas.height-24);
-    ctx.textAlign="center";
-    ctx.fillStyle="#b3c8b9";ctx.font="bold 20px monospace";
-    ctx.fillText("FRAGMENT "+(card.index+1),canvas.width/2,62);
-    ctx.fillStyle=levelRunState.cluesFound[card.index]?"#d5ffe0":"#c0aaa9";
-    ctx.font="bold 62px monospace";
-    ctx.fillText(levelRunState.cluesFound[card.index]?levelRunState.code[card.index]:"?",canvas.width/2,145);
-    ctx.fillStyle=levelRunState.cluesFound[card.index]?"#73d6a0":"#de777b";
-    ctx.font="bold 16px monospace";
-    ctx.fillText(levelRunState.cluesFound[card.index]?"FRAGMENT RECOVERED":"PRESS E TO SCAN",canvas.width/2,202);
-    card.texture.needsUpdate=true;
-  }
-}
-
-function collectLevelRunClue(index){
-  if(!levelRunActive||!Number.isInteger(index)||index<0||index>=4)return false;
-  if(!isLocalLevelRunRunner()){
-    eventText.textContent="THE RUNNER HAS TO SCAN THE FRAGMENTS.";
-    eventText.style.opacity="1";
-    return true;
-  }
-  if(levelRunState.cluesFound[index]){
-    eventText.textContent="FRAGMENT ALREADY RECOVERED.";
-    eventText.style.opacity="1";
-    return true;
-  }
-  if(!multiplayer.isWorldAuthority()){
-    multiplayer.broadcastWorldEvent("level_run_clue_found","level-run",{
-      clueIndex:index,round:levelRunState.round
-    });
-    eventText.textContent="SCANNING FRAGMENT…";
-    eventText.style.opacity="1";
-    return true;
-  }
-  levelRunState.cluesFound[index]=true;
-  drawLevelRunClueCards();
-  drawLevelRunCodeScreen();
-  eventText.textContent="FRAGMENT "+(index+1)+" RECOVERED.";
-  eventText.style.opacity="1";
-  multiplayer.broadcastWorldEvent("level_run_clue_state","level-run",{
-    round:levelRunState.round,cluesFound:levelRunState.cluesFound.slice()
-  });
-  return true;
-}
-
-function ensureLevelRunBuilt(){
-  if(levelRunState.group) return;
-  const root=new THREE.Group();root.name="LevelRun_RedSignalCorridor";root.visible=false;scene.add(root);
-  levelRunState.group=root;
-  levelRunState.collisionBoxes.length=0;levelRunState.occluders.length=0;levelRunState.interactables.length=0;
-
-  const floorMat=new THREE.MeshStandardMaterial({
-    color:0x3b080b,roughness:.92,metalness:.10,
-    emissive:0x4a0306,emissiveIntensity:.48
-  });
-  const ceilingMat=new THREE.MeshStandardMaterial({
-    color:0x190407,roughness:.9,metalness:.08,
-    emissive:0x090001,emissiveIntensity:.45
-  });
-  const wallMat=new THREE.MeshStandardMaterial({
-    color:0x351014,roughness:.9,metalness:.08,
-    emissive:0x180205,emissiveIntensity:.42
-  });
-  const stripeMat=new THREE.MeshStandardMaterial({
-    color:0xb51a22,roughness:.62,metalness:.08,
-    emissive:0x6d0008,emissiveIntensity:.75
-  });
-  const propMat=new THREE.MeshStandardMaterial({color:0x313b35,roughness:.64,metalness:.42});
-  const metalMat=new THREE.MeshStandardMaterial({color:0x59645b,roughness:.42,metalness:.72});
-  const redMat=new THREE.MeshStandardMaterial({
-    color:0x411012,roughness:.48,metalness:.45,emissive:0x390006
-  });
-
-  const screenCanvas=document.createElement("canvas");screenCanvas.width=512;screenCanvas.height=256;
-  levelRunState.screenContext=screenCanvas.getContext("2d");
-  levelRunState.screenTexture=new THREE.CanvasTexture(screenCanvas);
-  levelRunState.screenTexture.colorSpace=THREE.SRGBColorSpace;
-
-  const addBox=(name,w,h,d,x,y,z,material,{collider=false,occluder=false}={})=>{
-    const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
-    mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;root.add(mesh);
-    if(collider) levelRunState.collisionBoxes.push({minX:x-w*.5,maxX:x+w*.5,minZ:z-d*.5,maxZ:z+d*.5});
-    if(occluder) levelRunState.occluders.push(mesh);
-    return mesh;
-  };
-  // A single 76m-long hallway. No interior partitions, turns, or maze branches.
-  addBox("LevelRUN_Floor",20,.24,76,LEVEL_RUN_ORIGIN_X,-.12,LEVEL_RUN_ORIGIN_Z,floorMat);
-  addBox("LevelRUN_Ceiling",20,.20,76,LEVEL_RUN_ORIGIN_X,6.2,LEVEL_RUN_ORIGIN_Z,ceilingMat);
-
-  const wallSegment=(axis,coordinate,start,end)=>{
-    if(end<=start) return;
-    const thickness=.78,height=5.9;
-    const x=axis==="x"?LEVEL_RUN_ORIGIN_X+coordinate:LEVEL_RUN_ORIGIN_X+(start+end)*.5;
-    const z=axis==="x"?LEVEL_RUN_ORIGIN_Z+(start+end)*.5:LEVEL_RUN_ORIGIN_Z+coordinate;
-    const w=axis==="x"?thickness:end-start,d=axis==="x"?end-start:thickness;
-    addBox("LevelRUN_CorridorWall",w,height,d,x,height*.5,z,wallMat,{collider:true,occluder:true});
-  };
-  // Two continuous side walls and two end walls.
-  wallSegment("x",-9.5,-38,38);
-  wallSegment("x",9.5,-38,38);
-  wallSegment("z",-38,-9.5,9.5);
-  wallSegment("z",38,-9.5,9.5);
-
-  // Red lane markings run the length of the corridor.
-  for(const offset of [-6,0,6]){
-    addBox("LevelRUN_RedFloorStripe",.14,.016,68,
-      LEVEL_RUN_ORIGIN_X+offset,.012,LEVEL_RUN_ORIGIN_Z,stripeMat);
-  }
-
-  // Code terminal at the entry end; the safe sits straight ahead at the far end.
-  const codeStationZ=LEVEL_RUN_ORIGIN_Z-23;
-  addBox("LevelRUN_CodeStation",2.4,2.35,1.5,
-    LEVEL_RUN_ORIGIN_X,1.175,codeStationZ,propMat,{collider:true,occluder:true});
-  const screenMaterial=new THREE.MeshBasicMaterial({map:levelRunState.screenTexture,side:THREE.DoubleSide,toneMapped:false});
-  const screen=new THREE.Mesh(new THREE.PlaneGeometry(2.15,1.08),screenMaterial);
-  screen.name="LevelRUN_RandomCodeDisplay";
-  screen.position.set(LEVEL_RUN_ORIGIN_X,2.52,codeStationZ-.80);
-  screen.rotation.y=Math.PI;
-  root.add(screen);
-
-  const safeZ=LEVEL_RUN_ORIGIN_Z+28;
-  addBox("LevelRUN_SafeBody",2.6,2.3,1.45,
-    LEVEL_RUN_ORIGIN_X,1.15,safeZ,metalMat,{collider:true,occluder:true});
-  const safePanel=new THREE.Mesh(new THREE.PlaneGeometry(.74,.74),
-    new THREE.MeshStandardMaterial({color:0x18231d,emissive:0x153c2b,emissiveIntensity:.55,side:THREE.DoubleSide}));
-  safePanel.name="LevelRUN_SafeKeypad";
-  safePanel.position.set(LEVEL_RUN_ORIGIN_X,1.42,safeZ-.76);
-  safePanel.rotation.y=Math.PI;
-  safePanel.userData.interactable={type:"levelRunSafe",prompt:"Enter the safe code"};
-  root.add(safePanel);levelRunState.interactables.push(safePanel);
-  addBox("LevelRUN_SafeWarningStripe",2.25,.13,.05,
-    LEVEL_RUN_ORIGIN_X,2.27,safeZ-.75,stripeMat);
-
-  // The emergency return panel is at the same end as the player spawn.
-  addBox("LevelRUN_ReturnDoor",3.5,4.2,.44,
-    LEVEL_RUN_ORIGIN_X,2.1,LEVEL_RUN_ORIGIN_Z-35.2,redMat,{occluder:true});
-  const exitPanel=new THREE.Mesh(new THREE.PlaneGeometry(2.1,2.8),
-    new THREE.MeshStandardMaterial({color:0x251014,emissive:0x7c0711,emissiveIntensity:.75,side:THREE.DoubleSide}));
-  exitPanel.name="LevelRUN_ReturnInteractable";
-  exitPanel.position.set(LEVEL_RUN_ORIGIN_X,2.1,LEVEL_RUN_ORIGIN_Z-34.92);
-  exitPanel.rotation.y=0;
-  exitPanel.userData.interactable={type:"levelRunExit",prompt:"Return to the Backrooms"};
-  root.add(exitPanel);levelRunState.interactables.push(exitPanel);
-
-  // Four side-mounted scan panels disclose one digit apiece. Each is paired
-  // with a real CC0 transmitter cabinet when the optional model is available.
-  levelRunState.clueCards=[];
-  levelRunState.cluePositions=[];
-  const clueOffsets=[-8,4,15,23];
-  for(let i=0;i<4;i++){
-    const side=i%2===0?-1:1;
-    const clueZ=LEVEL_RUN_ORIGIN_Z+clueOffsets[i];
-    const clueX=LEVEL_RUN_ORIGIN_X+side*7.55;
-    levelRunState.cluePositions.push({x:clueX,z:clueZ});
-    const canvas=document.createElement("canvas");canvas.width=256;canvas.height=256;
-    const ctx=canvas.getContext("2d");
-    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-    const material=new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false});
-    const panel=new THREE.Mesh(new THREE.PlaneGeometry(.92,.76),material);
-    panel.name="LevelRunCodeFragment_"+(i+1);
-    panel.position.set(clueX,1.82,clueZ);
-    panel.rotation.y=side<0?Math.PI/2:-Math.PI/2;
-    panel.userData.interactable={type:"levelRunClue",clueIndex:i,prompt:"Scan code fragment "+(i+1)};
-    root.add(panel);levelRunState.interactables.push(panel);
-    levelRunState.clueCards.push({index:i,context:ctx,texture,material,mesh:panel});
-  }
-  storyMissionWorld?.loadModel("transmitter").then(gltf=>{
-    for(const card of levelRunState.clueCards){
-      const position=levelRunState.cluePositions[card.index];
-      const side=card.index%2===0?-1:1;
-      const cabinet=gltf.scene.clone(true);
-      cabinet.name="LevelRunTransmitterClueCabinet";
-      cabinet.scale.setScalar(.78);
-      cabinet.rotation.y=side<0?Math.PI/2:-Math.PI/2;
-      cabinet.position.set(0,0,0);
-      cabinet.updateMatrixWorld(true);
-      const bounds=new THREE.Box3().setFromObject(cabinet);
-      const center=bounds.getCenter(new THREE.Vector3());
-      cabinet.position.set(
-        LEVEL_RUN_ORIGIN_X+side*8.35-center.x,
-        -bounds.min.y,
-        position.z-center.z
-      );
-      root.add(cabinet);
-    }
-  }).catch(()=>{});
-  drawLevelRunClueCards();
-
-  // Red fixtures add both visible glow and real red light. Emissive floor/walls
-  // keep the whole corridor red between fixtures without adding shadow cost.
-  const tubeMaterial=new THREE.MeshStandardMaterial({
-    color:0xff7777,emissive:0xff0808,emissiveIntensity:1.85,roughness:.38
-  });
-  for(const offset of [-25,-9,9,25]){
-    addBox("LevelRUN_RedFluorescentTube",10,.10,.24,
-      LEVEL_RUN_ORIGIN_X,5.82,LEVEL_RUN_ORIGIN_Z+offset,tubeMaterial);
-  }
-  for(const offset of [-24,0,24]){
-    const light=new THREE.PointLight(0xff1018,2.15,35,1.45);
-    light.position.set(LEVEL_RUN_ORIGIN_X,5.25,LEVEL_RUN_ORIGIN_Z+offset);
-    light.castShadow=false;
-    root.add(light);
-  }
-  drawLevelRunCodeScreen();
-}
-
-function ensureLevelRunKeypad(){
-  if(levelRunState.keypad) return;
-  const panel=document.createElement("div");
-  panel.id="levelRunKeypad";
-  panel.style.cssText=[
-    "position:fixed","inset:0","z-index:60","display:none",
-    "align-items:center","justify-content:center","padding:20px",
-    "box-sizing:border-box","background:rgba(0,0,0,.76)","backdrop-filter:blur(5px)",
-    "color:#d7e6d9","font-family:ui-monospace,SFMono-Regular,Menlo,monospace"
-  ].join(";");
-  panel.innerHTML=
-    '<form id="levelRunKeypadForm" style="width:min(420px,100%);padding:28px;box-sizing:border-box;background:linear-gradient(180deg,#1c2420,#080d0b);border:1px solid #54735f;box-shadow:0 25px 100px #000">'+
-      '<div style="font-size:10px;letter-spacing:4px;color:#90b7a0">LEVEL RUN / SECURE CACHE</div>'+
-      '<h2 style="margin:14px 0 8px;font-size:22px;letter-spacing:2px">SAFE ACCESS</h2>'+
-      '<p id="levelRunKeypadMessage" style="font-size:12px;line-height:1.6;color:#a6b7ad">ENTER THE FOUR-DIGIT CODE.</p>'+
-      '<input id="levelRunKeypadInput" type="text" inputmode="numeric" autocomplete="off" maxlength="4" pattern="[0-9]{4}" placeholder="0000" aria-label="Four digit safe code" required style="display:block;width:100%;box-sizing:border-box;margin:20px 0 14px;padding:14px;background:#050907;border:1px solid #557866;color:#dcffe8;font:24px monospace;letter-spacing:10px;text-align:center;outline:none">'+
-      '<div style="display:flex;gap:10px"><button type="submit" style="flex:1;padding:12px;background:#244735;border:1px solid #72a287;color:#e5fff0;font:12px monospace;letter-spacing:2px;cursor:pointer">UNLOCK</button><button id="levelRunKeypadCancel" type="button" style="padding:12px 16px;background:#171d19;border:1px solid #3d4c42;color:#bdc9c0;font:12px monospace;cursor:pointer">CLOSE</button></div>'+
-    '</form>';
-  document.body.appendChild(panel);
-  levelRunState.keypad=panel;
-  levelRunState.keypadInput=panel.querySelector("#levelRunKeypadInput");
-  levelRunState.keypadMessage=panel.querySelector("#levelRunKeypadMessage");
-  panel.querySelector("#levelRunKeypadCancel").addEventListener("click",()=>closeLevelRunKeypad(true));
-  panel.addEventListener("pointerdown",event=>{if(event.target===panel)closeLevelRunKeypad(true);});
-  panel.querySelector("#levelRunKeypadForm").addEventListener("submit",event=>{
-    event.preventDefault();
-    if(!levelRunActive)return closeLevelRunKeypad(false);
-    if(!levelRunState.cluesFound.every(Boolean)){
-      levelRunState.keypadMessage.textContent="THE SAFE NEEDS ALL FOUR FRAGMENTS. SCAN EVERY SIDE PANEL FIRST.";
-      return;
-    }
-    if(!isLocalLevelRunRunner()){
-      levelRunState.keypadMessage.textContent="YOU ARE THE DECOY THIS ROUND. WAIT FOR THE ROLE SWITCH.";
-      return;
-    }
-    if(levelRunState.keypadInput.value.trim()!==levelRunState.code){
-      levelRunState.keypadMessage.textContent="ACCESS DENIED. THE LOCK RESETS AFTER A ROLE SWITCH.";
-      levelRunState.keypadInput.value="";levelRunState.keypadInput.focus();return;
-    }
-    const payload={runnerId:getLevelRunLocalId(),round:levelRunState.round};
-    closeLevelRunKeypad(true);
-    if(multiplayer.isWorldAuthority()) advanceLevelRunRound({success:true});
-    else multiplayer.broadcastWorldEvent("level_run_safe_opened","level-run",payload);
-  });
-}
-
-function openLevelRunSafe(){
-  if(!levelRunActive)return;
-  ensureLevelRunKeypad();
-  levelRunState.keypadMessage.textContent=!isLocalLevelRunRunner()
-    ?"YOU ARE THE DECOY THIS ROUND. WAIT FOR THE ROLE SWITCH."
-    :!levelRunState.cluesFound.every(Boolean)
-      ?"FIND AND SCAN ALL FOUR SIDE FRAGMENTS BEFORE ENTERING THE CODE."
-      :"ENTER THE FOUR-DIGIT CODE YOU RECOVERED FROM THE SIDE FRAGMENTS.";
-  levelRunState.keypadInput.value="";
-  levelRunState.keypad.classList.add("open");
-  levelRunState.keypad.style.display="flex";
-  player.keys.clear();player.vel.set(0,0,0);
-  document.exitPointerLock?.();
-  levelRunState.keypadInput.focus();
-}
-
-function closeLevelRunKeypad(restoreFocus=true){
-  if(!levelRunState.keypad)return;
-  levelRunState.keypad.classList.remove("open");
-  levelRunState.keypad.style.display="none";
-  if(restoreFocus&&gameStarted&&levelRunActive)player.lock();
-}
-
-function getLevelRunHunterTargetInfo(){
-  if(!levelRunActive||isLocalLevelRunRunner()){
-    return {target:player,sprinting:Boolean(player.isRunning),flashlightOn:Boolean(flashlightOn),crouched:Boolean(player.crouched)};
-  }
-  const runnerId=String(levelRunState.runnerId||"");
-  const remote=multiplayer.players.get(runnerId);
-  let current=remote?.current||remote?.target||{};
-  let x=Number(current.x),z=Number(current.z);
-  if(!isInsideLevelRun(x,z)){current=remote?.target||{};x=Number(current.x);z=Number(current.z);}
-  if(!remote||!isInsideLevelRun(x,z)){const spawn=getLevelRunSpawnFor(runnerId);x=spawn.x;z=spawn.z;current={};}
-  levelRunState.target.pos.set(x,EYE,z);
-  levelRunState.target.eyeY=current.crouched?1.1:EYE;
-  levelRunState.target.crouched=Boolean(current.crouched);
-  levelRunState.target.flashlight=Boolean(current.flashlight);
-  return {target:levelRunState.target,sprinting:false,flashlightOn:levelRunState.target.flashlight,crouched:levelRunState.target.crouched};
-}
-
-function resetLevelRunSpider(){
-  if(!levelRunActive)return;
-  spiderActive=true;
-  if(!multiplayer.isWorldAuthority()){
-    spiderEntity.visible=true;if(spiderModel)spiderModel.visible=!arachnophobiaMode;return;
-  }
-  if(!spiderLoaded||!spiderModel){ensureSpiderLoading();spiderEntity.visible=false;return;}
-  normalSpiderHunter.hide();
-  spiderEntity.scale.setScalar(1);spiderEntity.rotation.x=0;spiderEntity.rotation.z=0;spiderEntity.position.y=SPIDER_GROUND_OFFSET;
-  const target=getLevelRunHunterTargetInfo().target.pos;
-  let spawn=null;
-  for(let attempt=0;attempt<96;attempt++){
-    const angle=Math.random()*Math.PI*2,distance=8+Math.random()*11;
-    const x=target.x+Math.cos(angle)*distance,z=target.z+Math.sin(angle)*distance;
-    if(!isInsideLevelRun(x,z)||isSpiderBlocked(x,z))continue;
-    spawn={x,z};break;
-  }
-  if(!spawn){
-    for(let x=-34;x<=34&&!spawn;x+=3)for(let z=-34;z<=34;z+=3){
-      const candidateX=LEVEL_RUN_ORIGIN_X+x,candidateZ=LEVEL_RUN_ORIGIN_Z+z;
-      if(isInsideLevelRun(candidateX,candidateZ)&&
-        Math.hypot(target.x-candidateX,target.z-candidateZ)>=8&&
-        !isSpiderBlocked(candidateX,candidateZ)){spawn={x:candidateX,z:candidateZ};break;}
-    }
-  }
-  if(!spawn){spiderActive=false;spiderEntity.visible=false;return;}
-  normalSpiderHunter.startRoaming(new THREE.Vector3(spawn.x,SPIDER_GROUND_OFFSET,spawn.z));
-  normalSpiderHunter.lastKnownTarget.set(target.x,0,target.z);
-  normalSpiderHunter.lastSeenTime=clock.elapsedTime;
-  normalSpiderHunter.setMode("hunt");
-  normalSpiderHunter.visualRig.root.visible=false;spiderEntity.visible=true;
-  if(spiderModel)spiderModel.visible=!arachnophobiaMode;
-  spiderRevealLight.visible=false;spiderRevealLight.intensity=0;spiderBehaviorState="chase";spiderBehaviorTime=0;
-  clearSpiderPath();setSpiderAnimation("chase");
-}
-
-function startLevelRun(payload={}, {broadcast=true,entryDoor=null}={}){
-  if(!LEVEL_RUN_ENABLED||levelRunActive||houseMode||tutorialOpenRoomActive||poolroomsActive)return false;
-  ensureLevelRunBuilt();
-  const participants=getLevelRunParticipantIds(),localId=getLevelRunLocalId();
-  const runnerId=String(payload.runnerId||participants[Math.floor(Math.random()*participants.length)]||localId);
-  const code=String(payload.code||makeLevelRunCode());
-  levelRunState.active=true;levelRunActive=true;levelRunState.runnerId=runnerId;
-  levelRunState.previousSceneBackground=scene.background?.clone?.()??scene.background??null;
-  levelRunState.previousFogColor=scene.fog?.color?.clone?.()??null;
-  levelRunState.previousFogNear=scene.fog?.near??null;
-  levelRunState.previousFogFar=scene.fog?.far??null;
-  if(scene.background?.isColor)scene.background.set(0x170004);
-  else scene.background=new THREE.Color(0x170004);
-  if(scene.fog){
-    scene.fog.color.set(0x260006);
-    scene.fog.near=8;
-    scene.fog.far=58;
-  }
-  levelRunState.code=/^[0-9]{4}$/.test(code)?code:makeLevelRunCode();
-  levelRunState.round=Math.max(1,Math.floor(Number(payload.round)||1));
-  levelRunState.successfulRuns=0;
-  levelRunState.cluesFound=[false,false,false,false];
-  if(Number.isFinite(Number(payload.returnX))&&Number.isFinite(Number(payload.returnZ))){
-    levelRunState.returnPosition.set(Number(payload.returnX),EYE,Number(payload.returnZ));
-  }else if(entryDoor){
-    levelRunState.returnPosition.set(entryDoor.centerX,EYE,entryDoor.wallZ+entryDoor.face*7.2);
-  }else levelRunState.returnPosition.set(player.pos.x,EYE,player.pos.z);
-
-  world.root.visible=false;houseRoot.visible=false;levelRunState.group.visible=true;
-  player.ignoreWorldCollision=true;player.extraCollisionBoxes=levelRunState.collisionBoxes;
-  const spawn=getLevelRunSpawnFor(localId);player.pos.set(spawn.x,EYE,spawn.z);
-  player.vel.set(0,0,0);player.keys.clear();player.jumpY=0;player.jumpVelocity=0;
-  player.yaw=Math.PI;player.pitch=0;player.crouched=false;player.sliding=false;player.slideTimer=0;
-  spiderActive=false;normalSpiderHunter.hide();spiderEntity.visible=false;spiderRevealLight.visible=false;
-  drawLevelRunClueCards();drawLevelRunCodeScreen();resetLevelRunSpider();updateLevelRunHUD();
-  if(broadcast)multiplayer.broadcastWorldEvent("level_run_enter","level-run",{
-    runnerId:levelRunState.runnerId,code:levelRunState.code,round:levelRunState.round,
-    returnX:levelRunState.returnPosition.x,returnZ:levelRunState.returnPosition.z
-  });
-  showSpiderScareMessage("FIND THE CODE. OPEN THE SAFE.",2200);
-  return true;
-}
-
-function applyLevelRunRoundState(payload={}){
-  if(!levelRunActive)return;
-  levelRunState.runnerId=String(payload.runnerId||levelRunState.runnerId||getLevelRunLocalId());
-  levelRunState.round=Math.max(levelRunState.round+1,Math.floor(Number(payload.round)||1));
-  const code=String(payload.code||makeLevelRunCode());
-  levelRunState.code=/^[0-9]{4}$/.test(code)?code:makeLevelRunCode();
-  levelRunState.successfulRuns=Math.max(0,Math.floor(Number(payload.successfulRuns)||0));
-  levelRunState.cluesFound=[false,false,false,false];
-  const spawn=getLevelRunSpawnFor(getLevelRunLocalId());
-  player.pos.set(spawn.x,EYE,spawn.z);
-  player.vel.set(0,0,0);player.keys.clear();player.jumpY=0;player.jumpVelocity=0;
-  player.yaw=Math.PI;player.pitch=0;
-  drawLevelRunClueCards();drawLevelRunCodeScreen();updateLevelRunHUD();
-  if(multiplayer.isWorldAuthority())resetLevelRunSpider();
-  else{spiderActive=true;spiderEntity.visible=true;}
-}
-
-function completeLevelRun(){
-  if(!levelRunActive||!multiplayer.isWorldAuthority())return;
-  missionState.levelRunCleared=true;
-  recordMissionLog("LEVEL RUN CLEARED","The secure cache opened. The Poolrooms door has a source to follow.");
-  refreshMissionState({broadcast:false});
-  leaveLevelRun(false);
-  if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
-  multiplayer.broadcastWorldEvent("level_run_complete","level-run",{
-    missionState:missionStateSnapshot()
-  });
-  eventText.textContent="LEVEL RUN CLEARED · THE POOLROOMS DOOR IS NOW POWERED.";
-  eventText.style.opacity="1";
-}
-
-function advanceLevelRunRound({success=false}={}){
-  if(!levelRunActive||!multiplayer.isWorldAuthority())return;
-  if(success){
-    levelRunState.successfulRuns++;
-    const requiredRuns=getLevelRunParticipantIds().length>1?2:1;
-    if(levelRunState.successfulRuns>=requiredRuns){
-      completeLevelRun();
-      return;
-    }
-  }
-  const ids=getLevelRunParticipantIds(),current=String(levelRunState.runnerId||getLevelRunLocalId());
-  const currentIndex=ids.indexOf(current);
-  const nextRunner=ids.length>1?ids[((currentIndex<0?0:currentIndex)+1)%ids.length]:current;
-  const payload={
-    runnerId:nextRunner,code:makeLevelRunCode(),round:levelRunState.round+1,
-    successfulRuns:levelRunState.successfulRuns
-  };
-  applyLevelRunRoundState(payload);
-  multiplayer.broadcastWorldEvent("level_run_round_state","level-run",payload);
-  showSpiderScareMessage(success
-    ?"SAFE OPENED · RUNNER SWITCHED · ROUND "+payload.round
-    :"CAUGHT · NEW RUNNER · ROUND "+payload.round,1500);
-}
-
-function leaveLevelRun(broadcast=true){
-  if(!levelRunActive)return;
-  if(levelRunState.keypad)closeLevelRunKeypad(false);
-  if(levelRunState.previousSceneBackground?.isColor&&scene.background?.isColor){
-    scene.background.copy(levelRunState.previousSceneBackground);
-  }else{
-    scene.background=levelRunState.previousSceneBackground;
-  }
-  if(scene.fog&&levelRunState.previousFogColor){
-    scene.fog.color.copy(levelRunState.previousFogColor);
-    scene.fog.near=levelRunState.previousFogNear;
-    scene.fog.far=levelRunState.previousFogFar;
-  }
-  levelRunState.previousSceneBackground=null;
-  levelRunState.previousFogColor=null;
-  levelRunState.previousFogNear=null;
-  levelRunState.previousFogFar=null;
-  levelRunActive=false;levelRunState.active=false;
-  if(levelRunState.group)levelRunState.group.visible=false;
-  world.root.visible=true;houseRoot.visible=false;player.ignoreWorldCollision=false;player.extraCollisionBoxes=[];
-  player.pos.copy(levelRunState.returnPosition);player.vel.set(0,0,0);player.keys.clear();
-  player.jumpY=0;player.jumpVelocity=0;player.yaw=0;player.pitch=0;
-  spiderActive=false;normalSpiderHunter.hide();spiderEntity.visible=false;spiderRevealLight.visible=false;
-  levelRunState.runnerId=null;clearSpiderPath();
-  objective.textContent="Find a way deeper. Stay in the light.";
-  refreshMissionState({broadcast:false});
-  if(broadcast)multiplayer.broadcastWorldEvent("level_run_exit","level-run",{});
-  showSpiderScareMessage("BACK IN THE BACKROOMS.",1500);
-}
 
 function toggleArachnophobia(){
   arachnophobiaMode=setArachnophobiaMode(!arachnophobiaMode);
@@ -5732,7 +5047,7 @@ const normalSpiderHunter=new SpiderHunter({
   player,
   visualRig:normalSpiderHiddenRig,
   isBlocked:(x,z)=>isSpiderBlocked(x,z),
-  getOccluders:()=>levelRunActive ? levelRunState.occluders : world.wallOccluders,
+  getOccluders:()=>world.wallOccluders,
   // Enlarged contact radius catches the body sooner; articulated legs stay visual-only.
   getVisualHitboxDistance:(x,z)=>Math.max(
     0,
@@ -6308,14 +5623,7 @@ function isSpiderSpawnInsideMap(x,z,padding=SPIDER_RADIUS+.5){
 }
 
 function isSpiderBlocked(x,z){
-  const walls=levelRunActive
-    ? levelRunState.collisionBoxes.filter(wall=>
-        wall.maxX>=x-SPIDER_RADIUS-.22 &&
-        wall.minX<=x+SPIDER_RADIUS+.22 &&
-        wall.maxZ>=z-SPIDER_RADIUS-.22 &&
-        wall.minZ<=z+SPIDER_RADIUS+.22
-      )
-    : world.getNearbyWallBounds(x,z,SPIDER_RADIUS+.22);
+  const walls=world.getNearbyWallBounds(x,z,SPIDER_RADIUS+.22);
   for(const wall of walls){
     const nx=Math.max(wall.minX,Math.min(x,wall.maxX));
     const nz=Math.max(wall.minZ,Math.min(z,wall.maxZ));
@@ -6379,9 +5687,7 @@ function playerHasLineOfSightToSpider(entity=spiderEntity){
   // occlusion depend on Backrooms walls and tutorial room blockers explicitly.
   const occluders=tutorialOpenRoomActive
     ? tutorialOpenRoomOccluders
-    : levelRunActive
-      ? levelRunState.occluders
-      : (world.wallOccluders?.length ? world.wallOccluders : world.root.children);
+    : (world.wallOccluders?.length ? world.wallOccluders : world.root.children);
   const hits=spiderSightRaycaster.intersectObjects(occluders,true);
   return hits.length===0;
 }
@@ -8847,7 +8153,7 @@ function applyStoryStage(index, announce=true){
 }
 
 function updateStoryProgress(){
-  if(poolroomsActive||levelRunActive||houseMode)return;
+  if(poolroomsActive||houseMode)return;
   const dx=player.pos.x-32;
   const dz=player.pos.z-32;
   maxStoryDistance=Math.max(maxStoryDistance,Math.hypot(dx,dz));
@@ -9128,7 +8434,7 @@ function teleportAdminToRadio(){
     setAdminStatus("START A GAME BEFORE TELEPORTING");
     return;
   }
-  if(poolroomsActive||levelRunActive){
+  if(poolroomsActive){
     setAdminStatus("RETURN TO THE BACKROOMS FIRST");
     return;
   }
@@ -9156,8 +8462,7 @@ function teleportAdminToRadio(){
 
   world.root.visible=true;
   houseRoot.visible=false;
-  if(levelRunState.group)levelRunState.group.visible=false;
-  storyMissionWorld.syncState(missionState,{
+    storyMissionWorld.syncState(missionState,{
     tutorialActive:false,poolroomsActive:false,missionVisible:true
   });
 
@@ -9447,7 +8752,7 @@ document.addEventListener("pointerlockchange",()=>{
     return;
   }
 
-  if(!controlsOpen && !phoneOpen && !chatOpen && !levelRunState.keypad?.classList.contains("open")){
+  if(!controlsOpen && !phoneOpen && !chatOpen){
     if(locked){
       overlay.classList.add("hidden");
     }else if(gameStarted && !gameEnded){
@@ -9492,10 +8797,6 @@ document.addEventListener("keydown",e=>{
   }
 
   if(adminOverlay?.classList.contains("open")) return;
-  if(levelRunState.keypad?.classList.contains("open")){
-    if(e.code==="Escape"){e.preventDefault();closeLevelRunKeypad(true);}
-    return;
-  }
   if(gameEnded) return;
 
   if(securityCameras.active){
@@ -9921,7 +9222,7 @@ function animate(){
   }else if(poolroomsActive){
     player.ignoreWorldCollision=true;
     player.extraCollisionBoxes=storyMissionWorld?.getPoolroomsCollisionBoxes()||[];
-  }else if(!tutorialOpenRoomActive && !levelRunActive){
+  }else if(!tutorialOpenRoomActive){
     player.ignoreWorldCollision=false;
     player.extraCollisionBoxes=[];
   }
@@ -9936,13 +9237,11 @@ function animate(){
     !phoneOpen &&
     !controlsOpen &&
     !chatOpen &&
-    !levelRunState.keypad?.classList.contains("open") &&
     !securityCameras.active &&
     !adminOverlay.classList.contains("open") &&
     !computerSystem.openState
   );
   player.update(dt);
-  if(levelRunActive) updateLevelRunHUD();
   updateTutorialOpenRoomLights(dt);
   updateAdminFly(dt);
   updateAdminProjectiles(dt);
@@ -9964,7 +9263,7 @@ function animate(){
   }
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
-    if(!houseMode && !levelRunActive && !poolroomsActive && storyRefreshElapsed>=(
+    if(!houseMode  && !poolroomsActive && storyRefreshElapsed>=(
     LOW_END_PERFORMANCE?.08:.02
   )){
     storyRefreshElapsed=0;
@@ -9978,7 +9277,7 @@ function animate(){
     }
   }
 
-  if(!houseMode && !levelRunActive && !poolroomsActive){
+  if(!houseMode  && !poolroomsActive){
     if(!gameStarted){
       // Keep the title-screen camera centered on a known open section of
       // chunk 0,0 while the game remains on the menu.
@@ -10151,9 +9450,7 @@ function animate(){
             resetPlayerAfterSpiderCatch();
           }
         }else{
-          const huntInfo=levelRunActive
-            ? getLevelRunHunterTargetInfo()
-            : {target:player,sprinting:player.isRunning,flashlightOn,crouched:player.crouched};
+          const huntInfo={target:player,sprinting:player.isRunning,flashlightOn,crouched:player.crouched};
           normalSpiderHunter.updateHunter(dt,t,huntInfo.target,{
             sprinting:huntInfo.sprinting,
             flashlightOn:huntInfo.flashlightOn,
@@ -10164,10 +9461,9 @@ function animate(){
           const caughtX=huntInfo.target.pos.x;
           const caughtZ=huntInfo.target.pos.z;
           if(normalSpiderHunter.distanceToHitbox(caughtX,caughtZ)<=.06){
-            if(levelRunActive) advanceLevelRunRound({success:false});
-            else startSpiderCatchFreeze();
+            startSpiderCatchFreeze();
           }else if(
-            !levelRunActive && spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
+            spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
           ){
             spiderActive=false;
             spiderBehaviorState="idle";
@@ -10255,7 +9551,7 @@ function animate(){
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
-  if(!houseMode && !levelRunActive && !poolroomsActive && !tutorialOpenRoomActive && !spiderActive &&
+  if(!houseMode  && !poolroomsActive && !tutorialOpenRoomActive && !spiderActive &&
      eventCooldown<=0 && t>nextEvent){
     triggerEvent();
     nextEvent=t+28+Math.random()*35;

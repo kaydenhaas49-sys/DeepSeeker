@@ -4,7 +4,6 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 // Optional CC0 models. They never participate in the initial loading gate:
 // interaction markers still work if a decorative model request fails.
 const ASSETS = Object.freeze({
-  stairwell: "https://cdn.3dassets.dev/assets/25338/v1/model.glb",
   fireDoor: "https://cdn.3dassets.dev/assets/25820/v1/model.glb",
   poolroom: "https://cdn.3dassets.dev/assets/25335/v1/model.glb",
 });
@@ -13,11 +12,6 @@ const RELAYS = Object.freeze([
   { id: 0, title: "FIELD RADIO", x: -80, z: -92, device: "radio" },
   { id: 1, title: "SIGNAL RELAY 02", x: -80, z: -238, device: "transmitter" },
   { id: 2, title: "SIGNAL RELAY 03", x: -80, z: -394, device: "transmitter" },
-]);
-
-const STAIRWELLS = Object.freeze([
-  { id: "north", x: -80, z: -164, title: "STAIRWELL A" },
-  { id: "deep", x: -80, z: -326, title: "STAIRWELL B" },
 ]);
 
 function makeBox(parent, name, w, h, d, x, y, z, material) {
@@ -302,7 +296,6 @@ export class StoryMissionWorld {
     this.interactables = [];
     this.relayCards = [];
     this.relayDevices = [];
-    this.levelRunEntrances = [];
     this.poolroomsDoorCard = null;
     this.poolroomsExitCard = null;
     this.poolroomsLoaded = false;
@@ -445,63 +438,6 @@ export class StoryMissionWorld {
       this.interactables.push(device.root);
     }
 
-    this.loadModel("stairwell").then(gltf => {
-      for (const stair of STAIRWELLS) {
-        const landmark = this.root.getObjectByName("Stairwell_" + stair.id);
-        if (!landmark) continue;
-        const instance = gltf.scene.clone(true);
-        instance.name = "GarageToStairwellModel";
-        // Put a normalized, floor-aligned model just off the protected line;
-        // it must not wall off the approach to the interactable marker.
-        placeModelOnFloor(instance, { x: 5.1, z: -0.35, scale: 1.12 });
-        landmark.add(instance);
-      }
-    }).catch(() => {});
-
-    const stairFrameMaterial=new THREE.MeshStandardMaterial({color:0x4d554d,roughness:0.72,metalness:0.32});
-    const stairDoorMaterial=new THREE.MeshStandardMaterial({color:0x252d28,roughness:0.82,metalness:0.18});
-    const stairInsetMaterial=new THREE.MeshStandardMaterial({color:0x333b34,roughness:0.7,metalness:0.24});
-    const stairHandleMaterial=new THREE.MeshStandardMaterial({color:0x8b8c78,roughness:0.4,metalness:0.7});
-    const stairLampMaterial=new THREE.MeshStandardMaterial({color:0x9a5c32,emissive:0x6c260c,emissiveIntensity:0.8,roughness:0.32});
-    for (const stair of STAIRWELLS) {
-      const landmark = new THREE.Group();
-      landmark.name = "Stairwell_" + stair.id;
-      landmark.position.set(stair.x, 0, stair.z);
-      this.root.add(landmark);
-
-      // An unlabelled service door replaces the floating access sign.
-      // Press E on the door itself to enter the run.
-      const entryDoor = { centerX: stair.x, wallZ: stair.z, face: 1 };
-      makeBox(landmark,"StairwellDoorFrameLeft",0.12,2.55,0.24,-0.79,1.27,2.25,stairFrameMaterial);
-      makeBox(landmark,"StairwellDoorFrameRight",0.12,2.55,0.24,0.79,1.27,2.25,stairFrameMaterial);
-      makeBox(landmark,"StairwellDoorFrameHeader",1.70,0.13,0.24,0,2.48,2.25,stairFrameMaterial);
-      const door=new THREE.Mesh(new RoundedBoxGeometry(1.43,2.42,0.105,6,0.025),stairDoorMaterial);
-      door.name="StairwellDoorInteractable";
-      door.position.set(0,1.22,2.25);
-      door.castShadow=true;door.receiveShadow=true;
-      door.userData.interactable={
-        type:"levelRunEntry",entryId:stair.id,entryDoor,
-        prompt:"Enter stairwell"
-      };
-      landmark.add(door);
-      const inset=new THREE.Mesh(new RoundedBoxGeometry(1.20,2.17,0.025,5,0.012),stairInsetMaterial);
-      inset.name="StairwellDoorInset";
-      inset.position.set(0,1.22,2.315);
-      landmark.add(inset);
-      for(const x of [-0.52,0.52]){
-        makeBox(landmark,"StairwellDoorRib",0.035,1.78,0.022,x,1.26,2.342,stairFrameMaterial);
-      }
-      makeBox(landmark,"StairwellDoorKickPlate",0.78,0.12,0.018,0,0.31,2.342,stairFrameMaterial);
-      addDeviceMesh(landmark,"StairwellDoorHandlePlate",new RoundedBoxGeometry(0.105,0.32,0.025,4,0.008),
-        stairFrameMaterial,0.48,1.15,2.352);
-      addDeviceMesh(landmark,"StairwellDoorHandle",new THREE.CylinderGeometry(0.018,0.018,0.105,12),
-        stairHandleMaterial,0.45,1.15,2.375,[Math.PI/2,0,0]);
-      addDeviceMesh(landmark,"StairwellDoorStatusLamp",new THREE.SphereGeometry(0.045,12,10),
-        stairLampMaterial,-0.55,2.0,2.36);
-      this.levelRunEntrances.push(door);
-      this.interactables.push(door);
-    }
-
     const gate = new THREE.Group();
     gate.name = "PoolroomsLockedDoor";
     gate.position.set(-80, 0, -472);
@@ -548,7 +484,7 @@ export class StoryMissionWorld {
     }).catch(() => {});
 
     this._buildPoolroomsArchitecture();
-    this.syncState({ relays: [false, false, false], levelRunCleared: false, breakerSolved: false });
+    this.syncState({ relays: [false, false, false], breakerSolved: false });
   }
 
   _buildPoolroomsArchitecture() {
@@ -592,7 +528,7 @@ export class StoryMissionWorld {
     const unlocked = Boolean(
       state?.poolroomsUnlocked ||
       (relays.length >= 3 && relays.slice(0, 3).every(Boolean) &&
-        state?.breakerSolved && state?.levelRunCleared)
+        state?.breakerSolved)
     );
     for (let i = 0; i < this.relayDevices.length; i++) {
       const active = Boolean(relays[i]);
@@ -640,10 +576,6 @@ export class StoryMissionWorld {
       }
       return true;
     });
-  }
-
-  getStairwellEntries() {
-    return STAIRWELLS.map(item => ({ id: item.id, x: item.x, z: item.z, title: item.title }));
   }
 
   getRelayLocations() {

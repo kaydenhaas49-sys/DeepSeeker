@@ -21,12 +21,11 @@ The old Godot prototype and unrelated reference-project files are not part of th
 
 ## Campaign progression
 
-The classroom/playtest demo follows players through three signal relays,
-the eight-breaker maintenance puzzle, and the red-lit Level Run. Four
-side-mounted clue panels reveal the safe code during the chase. Completing
-those objectives unlocks the sealed Poolrooms gate and triggers the confetti
-"DEMO COMPLETE" screen. The Poolrooms themselves are intentionally reserved
-for a future update and are not accessible in this build.
+The classroom/playtest demo follows players through three signal relays
+and the eight-breaker maintenance puzzle. Restoring all three relays and
+solving the breakers powers the sealed Poolrooms gate and triggers the
+confetti "DEMO COMPLETE" screen. The Poolrooms themselves are intentionally
+reserved for a future update and are not accessible in this build.
 
 Decorative assets load automatically from 3DAssets.dev's CC0 CDN. They are
 optional during boot, so a failed prop request cannot block the main menu or
@@ -34,8 +33,7 @@ normal Backrooms gameplay.
 
 Models integrated:
 - [Poolroom hall](https://3dassets.dev/assets/liminal-spaces-kit-poolroom-hall-d800e372) — Poolrooms architecture
-- [Garage to stairwell](https://3dassets.dev/assets/liminal-spaces-kit-garage-stairwell-f8abafc9) — Level Run entrances
-- [Transmitter cabinet](https://3dassets.dev/assets/broadcast-tower-and-relay-station-broadcast-tower-and--fa1fb98a) — signal relays and code-fragment cabinets
+- [Transmitter cabinet](https://3dassets.dev/assets/broadcast-tower-and-relay-station-broadcast-tower-and--fa1fb98a) — signal relays
 - [Fire door module](https://3dassets.dev/assets/hotel-and-resort-operations-corridor-fire-door-module-95fdcb74) — Poolrooms entrance
 
 The assets are CC0 1.0 Universal and load directly as GLB files, so no manual
