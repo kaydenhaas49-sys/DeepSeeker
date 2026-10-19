@@ -3681,7 +3681,7 @@ function updateArachnophobiaWarningUI(){
 
 const BETA_TEST_SEEN_KEY="deepseeker-beta-test-notice-seen-v1";
 const ARACHNOPHOBIA_WARNING_SEEN_KEY="deepseeker-arachnophobia-warning-seen-v1";
-let betaTestAutoContinueTimer=null;
+let betaTestUnlockTimer=null;
 let betaTestCountdownTimer=null;
 let betaTestSecondsRemaining=5;
 
@@ -3694,9 +3694,9 @@ function acknowledgeNotice(key){
 }
 
 function clearBetaTestTimers(){
-  if(betaTestAutoContinueTimer!==null){
-    clearTimeout(betaTestAutoContinueTimer);
-    betaTestAutoContinueTimer=null;
+  if(betaTestUnlockTimer!==null){
+    clearTimeout(betaTestUnlockTimer);
+    betaTestUnlockTimer=null;
   }
   if(betaTestCountdownTimer!==null){
     clearInterval(betaTestCountdownTimer);
@@ -3707,8 +3707,13 @@ function clearBetaTestTimers(){
 function updateBetaTestCountdown(){
   const countdown=document.getElementById("betaTestCountdown");
   if(countdown){
-    countdown.textContent="Continuing automatically in "+betaTestSecondsRemaining+
-      (betaTestSecondsRemaining===1?" second…":" seconds…");
+    countdown.textContent=betaTestSecondsRemaining>0
+      ? "Continue available in "+betaTestSecondsRemaining+
+        (betaTestSecondsRemaining===1?" second…":" seconds…")
+      : "You can continue now.";
+  }
+  if(betaTestContinueButton){
+    betaTestContinueButton.disabled=betaTestSecondsRemaining>0;
   }
 }
 
@@ -3740,16 +3745,30 @@ function showBetaTestScreen(){
   betaTestScreen.setAttribute("aria-hidden","false");
 
   betaTestSecondsRemaining=5;
+  if(betaTestContinueButton) betaTestContinueButton.disabled=true;
   updateBetaTestCountdown();
   betaTestCountdownTimer=setInterval(()=>{
     betaTestSecondsRemaining=Math.max(0,betaTestSecondsRemaining-1);
     updateBetaTestCountdown();
+    if(betaTestSecondsRemaining===0 && betaTestCountdownTimer!==null){
+      clearInterval(betaTestCountdownTimer);
+      betaTestCountdownTimer=null;
+    }
   },1000);
-  betaTestAutoContinueTimer=setTimeout(continueFromBetaTestScreen,5000);
+  betaTestUnlockTimer=setTimeout(()=>{
+    betaTestUnlockTimer=null;
+    betaTestSecondsRemaining=0;
+    updateBetaTestCountdown();
+    if(betaTestCountdownTimer!==null){
+      clearInterval(betaTestCountdownTimer);
+      betaTestCountdownTimer=null;
+    }
+  },5000);
 }
 
 function continueFromBetaTestScreen(){
   if(!betaTestScreen || betaTestScreen.classList.contains("hidden")) return;
+  if(betaTestSecondsRemaining>0 || betaTestContinueButton?.disabled) return;
 
   clearBetaTestTimers();
   acknowledgeNotice(BETA_TEST_SEEN_KEY);
