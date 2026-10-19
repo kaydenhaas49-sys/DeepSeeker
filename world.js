@@ -206,7 +206,7 @@ export function generateChunk(cx, cz, seed) {
 // ---------------------------------------------------------------------------
 
 const QUALITY_PARAM=new URLSearchParams(location.search).get("quality");
-function detectLowEndWorldHardware(){
+function detectWorldHardware(){
  const cores=navigator.hardwareConcurrency||4,memory=navigator.deviceMemory||4;let gpu="";
  try{const canvas=document.createElement("canvas"),gl=canvas.getContext("webgl2")||canvas.getContext("webgl");
  const ext=gl?.getExtension("WEBGL_debug_renderer_info");
@@ -214,8 +214,11 @@ function detectLowEndWorldHardware(){
  gl?.getExtension("WEBGL_lose_context")?.loseContext();}catch{}
  const software=/swiftshader|llvmpipe|software rasterizer|microsoft basic render/i.test(gpu);
  const oldIntel=/intel(?:r)?\s+hd\s+graphics|mesa.*intel\s+hd/i.test(gpu);
- return software||oldIntel||(cores<=4&&memory<=4);
+ const weakCpu=cores<=4&&memory<=4;
+ const discreteGpu=/nvidia|geforce|radeon\s+rx|arc\s*[ab]\d+/i.test(gpu);
+ return {low:software||oldIntel||weakCpu,discreteGpu};
 }
+const WORLD_HARDWARE=detectWorldHardware();
 const WORLD_QUALITY_PROFILES={
  low:{lowEnd:true,generate:1,dispose:1,lightBudget:6,lightInterval:170,buildInterval:135,anisotropy:2},
  medium:{lowEnd:false,generate:1,dispose:2,lightBudget:10,lightInterval:125,buildInterval:90,anisotropy:4},
@@ -232,7 +235,7 @@ const FIXTURE_LOCAL_ON_RADIUS=32;
 let worldQualityPreset=readWorldQualityPreset(),LOW_END_DEVICE=false,R_GENERATE=2,R_DISPOSE=3,LIGHT_BUDGET=4,LIGHT_INTERVAL=100,CHUNK_BUILD_INTERVAL=65;
 function configureWorldQuality(preset){
  worldQualityPreset=["auto","low","medium","high","ultra"].includes(preset)?preset:"auto";
- const effective=worldQualityPreset==="auto"?(detectLowEndWorldHardware()?"low":"high"):worldQualityPreset;
+ const effective=worldQualityPreset==="auto"?(WORLD_HARDWARE.low?"low":WORLD_HARDWARE.discreteGpu?"high":"medium"):worldQualityPreset;
  const profile=WORLD_QUALITY_PROFILES[effective]||WORLD_QUALITY_PROFILES.high;
  LOW_END_DEVICE=profile.lowEnd;R_GENERATE=profile.generate;R_DISPOSE=profile.dispose;
  LIGHT_BUDGET=profile.lightBudget;LIGHT_INTERVAL=profile.lightInterval;CHUNK_BUILD_INTERVAL=profile.buildInterval;

@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261017-norandomrooms1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261019-perfautotier1";
 import { createTextures } from "./textures.js";
 import { Player } from "./player.js?v=20261017-flyfix1";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
-import { Multiplayer } from "./multiplayer.js";
+import { Multiplayer } from "./multiplayer.js?v=20261019-usernamefix1";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -57,7 +57,7 @@ const QUALITY_PROFILES={
 };
 let activeQualityPreset=readQualityPreset();
 function getQualitySettings(preset=activeQualityPreset){
- let effective=preset;if(effective==="auto")effective=PERFORMANCE_TIER.low?"low":"high";
+ let effective=preset;if(effective==="auto")effective=PERFORMANCE_TIER.low?"low":PERFORMANCE_TIER.discreteGpu?"high":"medium";
  const profile={...(QUALITY_PROFILES[effective]||QUALITY_PROFILES.high)};
  if(preset==="auto"&&effective==="high")profile.shadows=PERFORMANCE_TIER.discreteGpu;
  profile.preset=preset;profile.effectivePreset=effective;return profile;
@@ -1385,7 +1385,7 @@ const player=new Player(camera,renderer.domElement,world);
 
 
 const QUALITY_DESCRIPTIONS={
- auto:"Automatically picks a good preset for this device. The choice is saved in this browser.",
+ auto:"Chooses a conservative preset on integrated graphics, then adjusts resolution if performance drops.",
  low:"Lower resolution, shorter view distance, fewer active lights, and no dynamic flashlight shadows.",
  medium:"Balanced resolution and world detail for smoother gameplay on everyday laptops and tablets.",
  high:"Sharper rendering, farther visibility, more world detail, and dynamic flashlight shadows.",
@@ -9195,7 +9195,7 @@ function animate(){
       const maxRatio=houseMode ? HOUSE_PIXEL_RATIO : BASE_PIXEL_RATIO;
 
       if(fps<PERFORMANCE_TARGET_FPS-8){
-        nextRatio=Math.max(minRatio,baseRatio-(LOW_END_PERFORMANCE?.06:.08));
+        nextRatio=Math.max(minRatio,baseRatio-(fps < PERFORMANCE_TARGET_FPS - 18 ? .14 : (LOW_END_PERFORMANCE ? .06 : .08)));
       }else if(fps>PERFORMANCE_TARGET_FPS+12){
         nextRatio=Math.min(maxRatio,baseRatio+(LOW_END_PERFORMANCE?.035:.08));
       }
@@ -9208,7 +9208,7 @@ function animate(){
           currentPixelRatio=Number(nextRatio.toFixed(2));
           renderer.setPixelRatio(currentPixelRatio);
         }
-        perfCooldown=2.0;
+        perfCooldown=.9;
       }
     }
   }
