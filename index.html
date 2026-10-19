@@ -94,6 +94,21 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
   overflow:auto;
 }
 #arachnophobiaWarning.hidden{display:none}
+#betaTestScreen{
+  position:absolute;
+  inset:0;
+  z-index:22;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  box-sizing:border-box;
+  color:#ebe5c6;
+  text-align:center;
+  overflow:auto;
+}
+#betaTestScreen.hidden{display:none}
+.betaTestEyebrow{font-size:10px;letter-spacing:3px;color:#9d987f;margin-bottom:-8px}
 .arachWarningCard{
   display:flex;
   flex-direction:column;
@@ -418,6 +433,16 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
     <p class="prompt" id="prompt">LOADING WORLD… 0%</p>
   </div>
 
+  <div id="betaTestScreen" class="hidden" aria-hidden="true">
+    <div class="arachWarningCard">
+      <div class="betaTestEyebrow">TEST BUILD</div>
+      <h2 class="arachWarningTitle">BETA TEST</h2>
+      <p class="arachWarningText">DeepSeeker is still in beta, so some things might be buggy or not work the way they’re supposed to.</p>
+      <p class="arachWarningText">If something breaks or looks wrong, let me know so I can fix it.</p>
+      <button id="betaTestContinueButton" class="menuButton arachWarningContinue" type="button">GOT IT — CONTINUE</button>
+    </div>
+  </div>
+
   <div id="arachnophobiaWarning" class="hidden" aria-hidden="true">
     <div class="arachWarningCard">
       <h2 class="arachWarningTitle">ARACHNOPHOBIA WARNING</h2>
@@ -491,6 +516,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
   }
 }
 </script>
-<script type="module" src="./main.js?v=20261017-nolevelrun1"></script>
+<script type="module" src="./main.js?v=20261019-betatestscreen1"></script>
 </body>
 </html>
