@@ -298,6 +298,69 @@ html.deepseeker-low #vignette{transition:none;opacity:.68}
 html.deepseeker-low #controlsPanel,
 html.deepseeker-low #homeScreen,
 html.deepseeker-low #lobbyScreen{backdrop-filter:none}
+
+/* Multiplayer lobby redesign: opaque backdrop and responsive Chromebook layout. */
+#overlay #lobbyScreen{position:absolute;inset:0;z-index:8;display:block;width:100%;height:100%;min-height:100%;margin:0;padding:0;box-sizing:border-box;overflow:auto;overscroll-behavior:contain;border:0;border-radius:0;background:#080a07;box-shadow:none;backdrop-filter:none;color:#eee8d0;text-align:left;user-select:text}
+#overlay #lobbyScreen.hidden{display:none!important}
+#overlay #lobbyScreen::before{content:none!important}
+.lobbyEnvironment{position:absolute;inset:0;overflow:hidden;pointer-events:none;background:radial-gradient(ellipse at 76% 35%,rgba(208,194,119,.14),transparent 38%),linear-gradient(180deg,#171912 0%,#10130d 44%,#202017 68%,#090b08 100%)}
+.lobbyEnvironment::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 134px,rgba(207,198,143,.065) 135px 137px,transparent 138px 270px),repeating-linear-gradient(180deg,rgba(219,214,180,.045) 0 1px,transparent 2px 72px),linear-gradient(90deg,rgba(0,0,0,.45),transparent 34%,rgba(0,0,0,.20));opacity:.8}
+.lobbyEnvironment::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,transparent 52%,rgba(0,0,0,.16) 65%,rgba(0,0,0,.76) 100%),radial-gradient(ellipse at 50% 48%,transparent 0%,rgba(0,0,0,.10) 50%,rgba(0,0,0,.62) 100%)}
+.lobbyPage{position:relative;z-index:1;display:flex;flex-direction:column;width:min(1380px,100%);min-height:100%;margin:0 auto;padding:22px clamp(20px,4.2vw,62px) 18px;box-sizing:border-box}
+.lobbyTopbar{display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:58px;padding-bottom:16px;border-bottom:1px solid rgba(224,213,164,.16)}
+.lobbyBrand{display:flex;align-items:center;gap:12px;min-width:0}
+.lobbyBrandMark{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid rgba(224,206,128,.46);background:rgba(213,193,111,.09);color:#e6d7a2;font:600 13px/1 ui-monospace,monospace;letter-spacing:1px}
+.lobbyBrandText{display:flex;flex-direction:column;gap:4px;text-align:left}
+.lobbyBrandText span{font-size:9px;letter-spacing:3px;color:#bdb59a}
+.lobbyBrandText strong{font-size:14px;font-weight:600;letter-spacing:3px;color:#ece4c4}
+.lobbyTopStatus{display:flex;align-items:center;gap:9px;color:#aaa58e;font-size:9px;letter-spacing:2px;white-space:nowrap}
+.lobbyStatusDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#a9c18a;box-shadow:0 0 10px rgba(169,193,138,.25)}
+.lobbyContent{display:grid;grid-template-columns:minmax(0,1fr) minmax(390px,.9fr);align-items:center;gap:clamp(36px,6vw,92px);flex:1;padding:clamp(26px,5vh,54px) 0 28px}
+.lobbyIntro{max-width:570px;min-width:0}
+.lobbyEyebrow{display:flex;flex-wrap:wrap;gap:12px 22px;margin-bottom:20px;color:#aaa184;font-size:9px;letter-spacing:2.4px}
+.lobbyEyebrow span:first-child{color:#d9c47d}
+#overlay #lobbyScreen h1#lobbyModeTitle{margin:0;padding:0;border:0;font-size:clamp(38px,5.2vw,72px);font-weight:600;line-height:.98;letter-spacing:clamp(1px,.42vw,6px);color:#f0e8cc;text-shadow:0 4px 30px rgba(0,0,0,.36);overflow-wrap:anywhere}
+.lobbyIntroText{max-width:390px;margin:20px 0 28px;color:#b1ae9c;font-size:clamp(14px,1.2vw,17px);line-height:1.7;letter-spacing:.1px}
+.lobbyFeatureList{display:grid;gap:0;max-width:510px}
+.lobbyFeature{display:flex;align-items:flex-start;gap:15px;padding:14px 0;border-top:1px solid rgba(224,213,164,.11)}
+.lobbyFeatureNumber{flex:0 0 27px;color:#c7b571;font:11px/1.6 ui-monospace,monospace}
+.lobbyFeature strong{display:block;color:#ddd5b8;font-size:10px;font-weight:600;letter-spacing:2px}
+.lobbyFeature p{margin:5px 0 0;color:#928f7d;font-size:12px;line-height:1.5;letter-spacing:.2px}
+.lobbyBetaNote{display:flex;align-items:center;gap:9px;margin-top:28px;color:#928d75;font-size:8px;letter-spacing:1.8px;line-height:1.5}
+.lobbyBetaNote span{display:block;flex:0 0 6px;height:6px;border-radius:50%;background:#c3a967}
+#overlay #lobbyScreen .lobbyPanel{min-width:0;box-sizing:border-box;padding:clamp(18px,2.5vw,28px);border:1px solid rgba(221,209,158,.20);border-radius:8px;background:linear-gradient(145deg,rgba(18,21,15,.98),rgba(7,9,7,.99));box-shadow:0 24px 60px rgba(0,0,0,.35),inset 0 1px rgba(255,255,255,.035)}
+.lobbyPanelTop{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.lobbyPanelLabel{margin-bottom:8px;color:#9f987f;font-size:9px;letter-spacing:2.8px}
+#overlay #lobbyScreen .roomCodeSmall{font-size:clamp(25px,3vw,36px);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:600;line-height:1.1;letter-spacing:clamp(4px,.75vw,10px);color:#f2e5b7;text-shadow:0 0 20px rgba(214,190,90,.13);overflow-wrap:anywhere}
+#overlay #lobbyScreen .lobbyHostBadge{flex:0 0 auto;padding:8px 11px;border:1px solid rgba(199,177,113,.34);border-radius:3px;background:rgba(199,177,113,.07);color:#d4c28e;font-size:9px;letter-spacing:2px}
+.lobbyPanelDivider{height:1px;margin:20px 0;border:0;background:rgba(224,213,164,.12)}
+.lobbyInputLabel{display:block;margin-bottom:8px;color:#9f987f;font-size:9px;letter-spacing:2px}
+#overlay #lobbyScreen .lobbyNameInput{display:block;width:100%;min-height:43px;padding:10px 13px;box-sizing:border-box;border:1px solid rgba(224,213,164,.19);border-radius:4px;outline:none;background:#080a07;color:#e8dfc2;font:inherit;font-size:13px;letter-spacing:1px}
+#overlay #lobbyScreen .lobbyNameInput:focus{border-color:rgba(224,200,123,.60)}
+#overlay #lobbyScreen .lobbyNameInput::placeholder{color:#666657}
+#overlay #lobbyScreen .lobbySaveChoice{margin-top:8px;min-height:14px;color:#88846f;font-size:9px;letter-spacing:1px;line-height:1.4}
+.lobbyPlayersHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 10px;color:#aaa184;font-size:9px;letter-spacing:1.9px}
+.lobbyPlayersHeading strong{color:#d6cba9;font-size:9px;font-weight:500;letter-spacing:1px;white-space:nowrap}
+#overlay #lobbyScreen .lobbySlots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;max-height:clamp(150px,28vh,230px);min-height:72px;margin:0;padding:0 4px 0 0;box-sizing:border-box;overflow:auto;overscroll-behavior:contain;scrollbar-color:#514d3a #10120e;scrollbar-width:thin}
+#overlay #lobbyScreen .lobbySlot{min-width:0;min-height:51px;padding:9px 10px;border:1px solid rgba(224,213,164,.12);border-radius:4px;background:#11140f;box-shadow:none}
+#overlay #lobbyScreen .lobbySlot.empty{border-style:dashed;opacity:.64}
+#overlay #lobbyScreen .lobbySlotName{color:#e3ddc6;font-size:11px;letter-spacing:.5px}
+#overlay #lobbyScreen .lobbySlotStatus{color:#b8aa7b;font-size:8px;letter-spacing:1px}
+#overlay #lobbyScreen .lobbySlotEmpty{color:#777461;font-size:8px;letter-spacing:1.2px}
+#overlay #lobbyScreen .lobbyActions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px;width:100%;margin-top:17px}
+#overlay #lobbyScreen .menuButton{display:flex;align-items:center;justify-content:center;min-width:0;min-height:45px;width:100%;padding:11px 9px;box-sizing:border-box;border:1px solid rgba(218,202,142,.35);border-radius:4px;background:linear-gradient(180deg,#bba76a,#8b7845);color:#17180f;font:600 10px/1.4 system-ui,sans-serif;letter-spacing:1.2px;text-align:center;white-space:normal;overflow-wrap:anywhere;box-shadow:none}
+#overlay #lobbyScreen .menuButton:hover{background:linear-gradient(180deg,#d2c083,#a28c50);border-color:#e4d6a7;transform:translateY(-1px);box-shadow:none}
+#overlay #lobbyScreen .menuButton:disabled{background:#343429;color:#85816d;border-color:#49483a;opacity:1}
+#overlay #lobbyScreen .menuButton.secondary{background:#141710;color:#d2c8a8;border-color:rgba(224,213,164,.20)}
+#overlay #lobbyScreen .menuButton.secondary:hover{background:#202319;color:#f0e7c8;border-color:rgba(224,213,164,.42)}
+#overlay #lobbyScreen .lobbyLeaveButton{display:block;margin:15px auto 0;padding:8px 12px;border:0;background:transparent;color:#86816d;font:inherit;font-size:9px;letter-spacing:1.7px;cursor:pointer}
+#overlay #lobbyScreen .lobbyLeaveButton:hover{color:#e2d5ae}
+.lobbyBottomline{display:flex;justify-content:space-between;gap:12px;padding-top:12px;border-top:1px solid rgba(224,213,164,.11);color:#6f6d5e;font-size:8px;letter-spacing:2px}
+.lobbyBottomline i{color:#b6a065;font-style:normal}
+@media(max-width:820px){.lobbyPage{padding:16px 18px 12px}.lobbyContent{grid-template-columns:minmax(0,1fr);gap:22px;align-items:start;padding:28px 0 22px}.lobbyIntro{max-width:none}.lobbyEyebrow{margin-bottom:12px}#overlay #lobbyScreen h1#lobbyModeTitle{font-size:clamp(32px,8vw,48px)}.lobbyIntroText{margin:12px 0 16px;max-width:560px;font-size:14px}.lobbyFeatureList{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.lobbyFeature{gap:7px;padding:10px 0}.lobbyFeatureNumber{flex-basis:20px}.lobbyFeature strong{font-size:8px;letter-spacing:1px}.lobbyFeature p{font-size:10px}.lobbyBetaNote{margin-top:10px}#overlay #lobbyScreen .lobbyPanel{padding:18px}#overlay #lobbyScreen .lobbySlots{max-height:200px}}
+@media(max-width:560px){.lobbyTopStatus{font-size:8px;letter-spacing:1px}.lobbyBrandMark{flex-basis:36px;width:36px;height:36px}.lobbyBrandText span{font-size:8px;letter-spacing:2px}.lobbyBrandText strong{font-size:11px;letter-spacing:2px}.lobbyFeatureList{grid-template-columns:minmax(0,1fr)}.lobbyFeature{padding:8px 0}.lobbyFeature p{font-size:11px}#overlay #lobbyScreen .lobbySlots{grid-template-columns:minmax(0,1fr)}#overlay #lobbyScreen .lobbyActions{grid-template-columns:minmax(0,1fr)}.lobbyBottomline span:last-child{display:none}}
+@media(max-height:690px) and (min-width:821px){.lobbyPage{padding-top:12px;padding-bottom:10px}.lobbyTopbar{min-height:44px;padding-bottom:9px}.lobbyContent{padding:14px 0 12px;gap:30px}.lobbyIntroText{margin:12px 0 16px}.lobbyFeature{padding:9px 0}.lobbyBetaNote{margin-top:14px}#overlay #lobbyScreen .lobbyPanel{padding:16px}.lobbyPanelDivider{margin:12px 0}.lobbyPlayersHeading{margin:12px 0 8px}#overlay #lobbyScreen .lobbySlots{max-height:170px}#overlay #lobbyScreen .lobbyActions{margin-top:12px}#overlay #lobbyScreen .lobbyLeaveButton{margin-top:8px}}
+
 </style>
 </head>
 <body>
@@ -469,42 +532,48 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
     <div class="menuInfo" id="saveInfo">NO SAVE DATA</div>
   </div>
 
-  <div id="lobbyScreen" class="hidden">
-    <div class="menuTitle" id="lobbyModeTitle">CREATE LOBBY</div>
-
-    <div class="lobbyCard">
-      <div class="lobbyHeader">
-        <div>
-          <div class="lobbyHeaderValue">BACKROOMS: LOST SIGNAL</div>
-          <div class="usernameRow" style="width:min(340px,54vw);margin-top:8px">
-            <input id="lobbyUsernameInput" class="usernameInput" maxlength="20" autocomplete="nickname" placeholder="USERNAME">
+  <div id="lobbyScreen" class="hidden" aria-label="Multiplayer lobby">
+    <div class="lobbyEnvironment" aria-hidden="true"></div>
+    <div class="lobbyPage">
+      <header class="lobbyTopbar">
+        <div class="lobbyBrand">
+          <div class="lobbyBrandMark">LS</div>
+          <div class="lobbyBrandText"><span>BACKROOMS</span><strong>LOST SIGNAL</strong></div>
+        </div>
+        <div class="lobbyTopStatus"><span class="lobbyStatusDot"></span> MULTIPLAYER LOBBY</div>
+      </header>
+      <main class="lobbyContent">
+        <section class="lobbyIntro">
+          <div class="lobbyEyebrow"><span>CO-OP / 01</span><span>UP TO 10 PLAYERS</span></div>
+          <h1 id="lobbyModeTitle">CREATE LOBBY</h1>
+          <p class="lobbyIntroText">Get your group together before heading into the Backrooms.</p>
+          <div class="lobbyFeatureList">
+            <div class="lobbyFeature"><span class="lobbyFeatureNumber">01</span><div><strong>SHARE THE CODE</strong><p>Send the room code or link to your friends.</p></div></div>
+            <div class="lobbyFeature"><span class="lobbyFeatureNumber">02</span><div><strong>CHECK WHO'S HERE</strong><p>Everyone in the room will show up on the right.</p></div></div>
+            <div class="lobbyFeature"><span class="lobbyFeatureNumber">03</span><div><strong>HEAD IN TOGETHER</strong><p>The host can start once everyone's ready.</p></div></div>
           </div>
+          <div class="lobbyBetaNote"><span></span> BETA BUILD · TELL KAYDEN IF SOMETHING BREAKS</div>
+        </section>
+        <section class="lobbyPanel" aria-label="Room details">
+          <div class="lobbyPanelTop">
+            <div><div class="lobbyPanelLabel">YOUR ROOM CODE</div><div class="roomCodeSmall" id="roomCode">------</div></div>
+            <div class="lobbyHostBadge" id="lobbyHostBadge">HOST</div>
+          </div>
+          <div class="lobbyPanelDivider"></div>
+          <label class="lobbyInputLabel" for="lobbyUsernameInput">YOUR NAME</label>
+          <input id="lobbyUsernameInput" class="usernameInput lobbyNameInput" maxlength="20" autocomplete="nickname" placeholder="ENTER YOUR NAME">
           <div id="lobbySaveChoice" class="lobbySaveChoice"></div>
-        </div>
-        <div style="text-align:right">
-          <div class="lobbyHeaderLabel">ROOM CODE</div>
-          <div class="roomCodeSmall" id="roomCode">------</div>
-        </div>
-      </div>
-
-      <div class="lobbySlots" id="lobbySlots"></div>
-
-      <div class="lobbyDivider"></div>
-
-      <div class="lobbyFooter">
-        <div class="lobbyPlayerCount" id="lobbyPlayers">PLAYERS 1/10</div>
-        <div class="lobbyHostBadge" id="lobbyHostBadge">HOST</div>
-      </div>
+          <div class="lobbyPlayersHeading"><span>PLAYERS IN ROOM</span><strong id="lobbyPlayers">PLAYERS 1/10</strong></div>
+          <div class="lobbySlots" id="lobbySlots"></div>
+          <div class="lobbyActions">
+            <button id="startLobbyButton" class="menuButton lobbyStartButton" disabled>START GAME</button>
+            <button id="copyLobbyButton" class="menuButton secondary lobbyCopyButton">COPY ROOM LINK</button>
+          </div>
+          <button id="leaveLobbyButton" class="lobbyLeaveButton" type="button">← BACK TO MENU</button>
+        </section>
+      </main>
+      <footer class="lobbyBottomline"><span>LOST SIGNAL <i> / </i> BETA TEST</span><span>STAY TOGETHER. STAY IN THE LIGHT.</span></footer>
     </div>
-
-
-    <div class="menuInfo">Share the room link with your friends. Start when everyone's ready.</div>
-
-    <div class="lobbyActions">
-      <button id="startLobbyButton" class="menuButton" disabled>START GAME</button>
-      <button id="copyLobbyButton" class="menuButton secondary">COPY ROOM LINK</button>
-    </div>
-    <button id="leaveLobbyButton" class="menuButton secondary">LEAVE LOBBY</button>
   </div>
 </div>
 
