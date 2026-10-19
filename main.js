@@ -8692,13 +8692,18 @@ continueButton.addEventListener("click",()=>{
 });
 
 createLobbyButton.addEventListener("click",()=>{
+  // Save the name before navigating; the lobby page reconnects from session storage.
+  saveUsername(usernameInputs[0]?.value||"");
   const code=Math.random().toString(36).slice(2,8).toUpperCase();
   enterLobby(code,true);
 });
 
 joinLobbyButton.addEventListener("click",()=>{
   const code=window.prompt("Enter the lobby code:");
-  if(code) enterLobby(code,false);
+  if(code){
+    saveUsername(usernameInputs[0]?.value||"");
+    enterLobby(code,false);
+  }
 });
 
 startLobbyButton.addEventListener("click",()=>{
