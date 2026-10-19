@@ -361,6 +361,11 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
 @media(max-width:560px){.lobbyTopStatus{font-size:8px;letter-spacing:1px}.lobbyBrandMark{flex-basis:36px;width:36px;height:36px}.lobbyBrandText span{font-size:8px;letter-spacing:2px}.lobbyBrandText strong{font-size:11px;letter-spacing:2px}.lobbyFeatureList{grid-template-columns:minmax(0,1fr)}.lobbyFeature{padding:8px 0}.lobbyFeature p{font-size:11px}#overlay #lobbyScreen .lobbySlots{grid-template-columns:minmax(0,1fr)}#overlay #lobbyScreen .lobbyActions{grid-template-columns:minmax(0,1fr)}.lobbyBottomline span:last-child{display:none}}
 @media(max-height:690px) and (min-width:821px){.lobbyPage{padding-top:12px;padding-bottom:10px}.lobbyTopbar{min-height:44px;padding-bottom:9px}.lobbyContent{padding:14px 0 12px;gap:30px}.lobbyIntroText{margin:12px 0 16px}.lobbyFeature{padding:9px 0}.lobbyBetaNote{margin-top:14px}#overlay #lobbyScreen .lobbyPanel{padding:16px}.lobbyPanelDivider{margin:12px 0}.lobbyPlayersHeading{margin:12px 0 8px}#overlay #lobbyScreen .lobbySlots{max-height:170px}#overlay #lobbyScreen .lobbyActions{margin-top:12px}#overlay #lobbyScreen .lobbyLeaveButton{margin-top:8px}}
 
+
+#overlay #lobbyScreen .lobbyNameRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
+#overlay #lobbyScreen .lobbyNameSaveButton{width:auto;min-width:96px;min-height:43px;padding:10px 12px;font-size:9px;letter-spacing:1px;white-space:nowrap}
+#overlay #lobbyScreen .lobbyNameSaveButton:hover{transform:translateY(-1px)}
+@media(max-width:560px){#overlay #lobbyScreen .lobbyNameSaveButton{min-width:82px;padding:10px 8px;font-size:8px;letter-spacing:.5px}}
 </style>
 </head>
 <body>
@@ -561,7 +566,10 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
           </div>
           <div class="lobbyPanelDivider"></div>
           <label class="lobbyInputLabel" for="lobbyUsernameInput">YOUR NAME</label>
-          <input id="lobbyUsernameInput" class="usernameInput lobbyNameInput" maxlength="20" autocomplete="nickname" placeholder="ENTER YOUR NAME">
+          <div class="lobbyNameRow">
+            <input id="lobbyUsernameInput" class="usernameInput lobbyNameInput" maxlength="20" autocomplete="nickname" placeholder="ENTER YOUR NAME">
+            <button id="lobbyUsernameSaveButton" class="menuButton secondary lobbyNameSaveButton" type="button">SAVE NAME</button>
+          </div>
           <div id="lobbySaveChoice" class="lobbySaveChoice"></div>
           <div class="lobbyPlayersHeading"><span>PLAYERS IN ROOM</span><strong id="lobbyPlayers">PLAYERS 1/10</strong></div>
           <div class="lobbySlots" id="lobbySlots"></div>

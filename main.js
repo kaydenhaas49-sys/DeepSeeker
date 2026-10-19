@@ -3326,6 +3326,7 @@ const usernameInputs=[
   document.getElementById("lobbyUsernameInput")
 ].filter(Boolean);
 const usernameSaveButton=document.getElementById("usernameSaveButton");
+const lobbyUsernameSaveButton=document.getElementById("lobbyUsernameSaveButton");
 const chatPanel=document.getElementById("chatPanel");
 const chatMessages=document.getElementById("chatMessages");
 const chatInput=document.getElementById("chatInput");
@@ -3929,6 +3930,16 @@ function saveUsername(name){
   setTimeout(()=>{
     if(eventText.textContent==="USERNAME SAVED") eventText.style.opacity="0";
   },1200);
+}
+
+let lobbyNameSavedTimer=0;
+function flashLobbyNameSaved(){
+  if(!lobbyUsernameSaveButton) return;
+  clearTimeout(lobbyNameSavedTimer);
+  lobbyUsernameSaveButton.textContent="SAVED";
+  lobbyNameSavedTimer=setTimeout(()=>{
+    lobbyUsernameSaveButton.textContent="SAVE NAME";
+  },1300);
 }
 
 function openChat(){
@@ -8645,11 +8656,18 @@ if(usernameSaveButton){
     saveUsername(usernameInputs[0]?.value||"");
   });
 }
+if(lobbyUsernameSaveButton){
+  lobbyUsernameSaveButton.addEventListener("click",()=>{
+    saveUsername(document.getElementById("lobbyUsernameInput")?.value||"");
+    flashLobbyNameSaved();
+  });
+}
 usernameInputs.forEach(input=>{
   input.addEventListener("keydown",e=>{
     if(e.code==="Enter"){
       e.preventDefault();
       saveUsername(input.value);
+      if(input.id==="lobbyUsernameInput") flashLobbyNameSaved();
     }
   });
 });

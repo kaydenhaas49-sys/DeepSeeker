@@ -446,6 +446,7 @@ export class Multiplayer {
       sessionStorage.setItem("deepseeker-player-name-session",clean);
       if(this.playerId) localStorage.setItem("deepseeker-player-name-"+this.playerId,clean);
     }catch{}
+    this.updateCount();
     this.sendState(true);
     return clean;
   }
