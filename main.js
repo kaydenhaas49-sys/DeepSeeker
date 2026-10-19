@@ -2472,6 +2472,11 @@ function installMainMenuRedesign(){
 }
 .menuNavGroup{position:relative}
 .menuNavGroup + .menuNavGroup{margin-top:0}
+.menuNavGroup .usernameField{position:relative;z-index:5;width:100%;margin:0 0 9px;gap:6px}
+.menuNavGroup .usernameLabel{font-size:8px;letter-spacing:1.8px;color:#aaa185;text-shadow:0 2px 8px #000}
+.menuNavGroup .usernameRow{width:100%;gap:6px}
+.menuNavGroup .usernameInput{width:0;min-width:0;height:40px;padding:10px 11px;box-sizing:border-box;border-radius:4px;background:rgba(5,6,5,.94);font-size:11px;letter-spacing:1px}
+.menuNavGroup .usernameButton{flex:0 0 auto;min-height:40px;padding:0 10px;border-radius:4px;background:rgba(13,14,12,.78);font-size:9px;letter-spacing:.8px}
 .menuNavGroupLabel{
   display:flex;
   align-items:center;
@@ -2765,6 +2770,7 @@ function installMainMenuRedesign(){
   `;
   overlay.insertBefore(backdrop,homeScreen);
 
+  const usernameField=homeScreen.querySelector(".usernameField");
   homeScreen.innerHTML="";
   const layout=document.createElement("div");
   layout.className="menuHomeLayout";
@@ -2815,6 +2821,7 @@ function installMainMenuRedesign(){
   playGroup.append(continueButton,newGameButton);
 
   const multiplayerGroup=createNavGroup("MULTIPLAYER");
+  if(usernameField) multiplayerGroup.appendChild(usernameField);
   multiplayerGroup.append(createLobbyButton,joinLobbyButton);
 
   const systemGroup=createNavGroup("SYSTEM");
