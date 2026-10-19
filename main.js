@@ -71,6 +71,8 @@ const overlay=document.getElementById("overlay");
 const loadingScreen=document.getElementById("loadingScreen");
 const homeScreen=document.getElementById("homeScreen");
 const lobbyScreen=document.getElementById("lobbyScreen");
+const betaTestScreen=document.getElementById("betaTestScreen");
+const betaTestContinueButton=document.getElementById("betaTestContinueButton");
 const arachnophobiaWarning=document.getElementById("arachnophobiaWarning");
 const arachnophobiaModeButton=document.getElementById("arachnophobiaModeButton");
 const arachnophobiaContinueButton=document.getElementById("arachnophobiaContinueButton");
@@ -3676,6 +3678,29 @@ function updateArachnophobiaWarningUI(){
     : "ARACHNOPHOBIA MODE: OFF";
 }
 
+function showBetaTestScreen(){
+  if(!betaTestScreen){
+    showArachnophobiaWarning();
+    return;
+  }
+
+  loadingScreen.style.display="none";
+  homeScreen.classList.add("hidden");
+  lobbyScreen.classList.add("hidden");
+  arachnophobiaWarning.classList.add("hidden");
+  arachnophobiaWarning.setAttribute("aria-hidden","true");
+  betaTestScreen.classList.remove("hidden");
+  betaTestScreen.setAttribute("aria-hidden","false");
+}
+
+function continueFromBetaTestScreen(){
+  if(!betaTestScreen) return;
+
+  betaTestScreen.classList.add("hidden");
+  betaTestScreen.setAttribute("aria-hidden","true");
+  showArachnophobiaWarning();
+}
+
 function showArachnophobiaWarning(){
   if(!arachnophobiaWarning) return;
 
@@ -3724,6 +3749,7 @@ arachnophobiaModeButton?.addEventListener("click",()=>{
   updateArachnophobiaWarningUI();
 });
 
+betaTestContinueButton?.addEventListener("click",continueFromBetaTestScreen);
 arachnophobiaContinueButton?.addEventListener("click",continueFromArachnophobiaWarning);
 
 let multiplayerMapOpen=false;
@@ -4975,7 +5001,7 @@ function finishInitialLoading(){
     }
   }
 
-  showArachnophobiaWarning();
+  showBetaTestScreen();
 }
 
 function beginInitialLoading(){
