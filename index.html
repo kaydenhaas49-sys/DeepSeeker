@@ -108,6 +108,7 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
   overflow:auto;
 }
 #betaTestScreen.hidden{display:none}
+.betaTestCountdown{margin:-6px 0 0;color:#a9a187;font-size:10px;letter-spacing:1.2px;line-height:1.5}
 .betaTestEyebrow{font-size:10px;letter-spacing:3px;color:#9d987f;margin-bottom:-8px}
 .arachWarningCard{
   display:flex;
@@ -507,6 +508,7 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
       <h2 class="arachWarningTitle">BETA TEST</h2>
       <p class="arachWarningText">DeepSeeker is still in beta, so some things might be buggy or not work the way they’re supposed to.</p>
       <p class="arachWarningText">If something breaks or looks wrong, tell Kayden so he can fix it.</p>
+      <p id="betaTestCountdown" class="betaTestCountdown" aria-live="polite">Continuing automatically in 5 seconds…</p>
       <button id="betaTestContinueButton" class="menuButton arachWarningContinue" type="button">GOT IT — CONTINUE</button>
     </div>
   </div>
@@ -593,6 +595,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
   }
 }
 </script>
-<script type="module" src="./main.js?v=20261019-perfautotier1"></script>
+<script type="module" src="./main.js?v=20261019-warning-once1"></script>
 </body>
 </html>

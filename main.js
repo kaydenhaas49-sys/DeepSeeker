@@ -3679,12 +3679,58 @@ function updateArachnophobiaWarningUI(){
     : "ARACHNOPHOBIA MODE: OFF";
 }
 
+const BETA_TEST_SEEN_KEY="deepseeker-beta-test-notice-seen-v1";
+const ARACHNOPHOBIA_WARNING_SEEN_KEY="deepseeker-arachnophobia-warning-seen-v1";
+let betaTestAutoContinueTimer=null;
+let betaTestCountdownTimer=null;
+let betaTestSecondsRemaining=5;
+
+function hasAcknowledgedNotice(key){
+  try{return localStorage.getItem(key)==="1";}catch{return false;}
+}
+
+function acknowledgeNotice(key){
+  try{localStorage.setItem(key,"1");}catch{}
+}
+
+function clearBetaTestTimers(){
+  if(betaTestAutoContinueTimer!==null){
+    clearTimeout(betaTestAutoContinueTimer);
+    betaTestAutoContinueTimer=null;
+  }
+  if(betaTestCountdownTimer!==null){
+    clearInterval(betaTestCountdownTimer);
+    betaTestCountdownTimer=null;
+  }
+}
+
+function updateBetaTestCountdown(){
+  const countdown=document.getElementById("betaTestCountdown");
+  if(countdown){
+    countdown.textContent="Continuing automatically in "+betaTestSecondsRemaining+
+      (betaTestSecondsRemaining===1?" second…":" seconds…");
+  }
+}
+
+function showPostWarningScreen(){
+  if(new URLSearchParams(location.search).get("lobby")==="1"){
+    showLobbyScreen();
+  }else{
+    showHomeScreen();
+  }
+}
+
 function showBetaTestScreen(){
+  if(hasAcknowledgedNotice(BETA_TEST_SEEN_KEY)){
+    showArachnophobiaWarning();
+    return;
+  }
   if(!betaTestScreen){
     showArachnophobiaWarning();
     return;
   }
 
+  clearBetaTestTimers();
   loadingScreen.style.display="none";
   homeScreen.classList.add("hidden");
   lobbyScreen.classList.add("hidden");
@@ -3692,11 +3738,21 @@ function showBetaTestScreen(){
   arachnophobiaWarning.setAttribute("aria-hidden","true");
   betaTestScreen.classList.remove("hidden");
   betaTestScreen.setAttribute("aria-hidden","false");
+
+  betaTestSecondsRemaining=5;
+  updateBetaTestCountdown();
+  betaTestCountdownTimer=setInterval(()=>{
+    betaTestSecondsRemaining=Math.max(0,betaTestSecondsRemaining-1);
+    updateBetaTestCountdown();
+  },1000);
+  betaTestAutoContinueTimer=setTimeout(continueFromBetaTestScreen,5000);
 }
 
 function continueFromBetaTestScreen(){
-  if(!betaTestScreen) return;
+  if(!betaTestScreen || betaTestScreen.classList.contains("hidden")) return;
 
+  clearBetaTestTimers();
+  acknowledgeNotice(BETA_TEST_SEEN_KEY);
   betaTestScreen.classList.add("hidden");
   betaTestScreen.setAttribute("aria-hidden","true");
   showArachnophobiaWarning();
@@ -3705,25 +3761,30 @@ function continueFromBetaTestScreen(){
 function showArachnophobiaWarning(){
   if(!arachnophobiaWarning) return;
 
+  if(hasAcknowledgedNotice(ARACHNOPHOBIA_WARNING_SEEN_KEY)){
+    arachnophobiaWarning.classList.add("hidden");
+    arachnophobiaWarning.setAttribute("aria-hidden","true");
+    showPostWarningScreen();
+    return;
+  }
+
   loadingScreen.style.display="none";
   homeScreen.classList.add("hidden");
   lobbyScreen.classList.add("hidden");
+  betaTestScreen?.classList.add("hidden");
+  if(betaTestScreen) betaTestScreen.setAttribute("aria-hidden","true");
   arachnophobiaWarning.classList.remove("hidden");
   arachnophobiaWarning.setAttribute("aria-hidden","false");
   updateArachnophobiaWarningUI();
 }
 
 function continueFromArachnophobiaWarning(){
-  if(!arachnophobiaWarning) return;
+  if(!arachnophobiaWarning || arachnophobiaWarning.classList.contains("hidden")) return;
 
+  acknowledgeNotice(ARACHNOPHOBIA_WARNING_SEEN_KEY);
   arachnophobiaWarning.classList.add("hidden");
   arachnophobiaWarning.setAttribute("aria-hidden","true");
-
-  if(new URLSearchParams(location.search).get("lobby")==="1"){
-    showLobbyScreen();
-  }else{
-    showHomeScreen();
-  }
+  showPostWarningScreen();
 }
 
 function installArachnophobiaControl(){
