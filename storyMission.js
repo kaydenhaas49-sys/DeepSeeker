@@ -4,7 +4,6 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 // Optional CC0 models. They never participate in the initial loading gate:
 // interaction markers still work if a decorative model request fails.
 const ASSETS = Object.freeze({
-  fireDoor: "https://cdn.3dassets.dev/assets/25820/v1/model.glb",
   poolroom: "https://cdn.3dassets.dev/assets/25335/v1/model.glb",
 });
 
@@ -266,6 +265,130 @@ function buildRelayDevice(station, relay, baseMaterial) {
   };
 }
 
+
+function buildProceduralPoolroomsGateDoor(parent) {
+  const door=new THREE.Group();
+  door.name="PoolroomsProceduralGateDoor";
+  parent.add(door);
+
+  const frameMat=new THREE.MeshStandardMaterial({color:0x26302e,roughness:0.62,metalness:0.58});
+  const shellMat=new THREE.MeshStandardMaterial({color:0x52615a,roughness:0.72,metalness:0.38});
+  const insetMat=new THREE.MeshStandardMaterial({color:0x26332f,roughness:0.66,metalness:0.46});
+  const ribMat=new THREE.MeshStandardMaterial({color:0x78837a,roughness:0.48,metalness:0.66});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x0c1412,roughness:0.86,metalness:0.12});
+  const cautionMat=new THREE.MeshStandardMaterial({color:0xc39445,roughness:0.58,metalness:0.18});
+  const cyanMat=new THREE.MeshStandardMaterial({
+    color:0x44d2d5,emissive:0x168e9c,emissiveIntensity:1.3,roughness:0.28,metalness:0.12
+  });
+  const amberMat=new THREE.MeshStandardMaterial({
+    color:0xdca45a,emissive:0x65330b,emissiveIntensity:0.75,roughness:0.32
+  });
+  const add=(name,w,h,d,x,y,z,material,radius=0.015)=>
+    addDeviceMesh(door,name,
+      new RoundedBoxGeometry(w,h,d,4,Math.min(radius,Math.min(w,h,d)*0.22)),
+      material,x,y,z);
+
+  // A heavy, sealed double-leaf gate fitted to the original doorway opening.
+  add("GateFrameLeft",0.12,2.68,0.23,-0.99,1.37,0.11,frameMat,0.018);
+  add("GateFrameRight",0.12,2.68,0.23,0.99,1.37,0.11,frameMat,0.018);
+  add("GateFrameHeader",2.03,0.14,0.23,0,2.69,0.11,frameMat,0.018);
+  add("GateThreshold",1.98,0.09,0.30,0,0.045,0.10,frameMat,0.012);
+
+  for(const side of [-1,1]){
+    const x=side*0.435;
+    add("GateDoorLeaf",0.84,2.52,0.16,x,1.34,0.095,shellMat,0.026);
+    add("GateDoorInset",0.68,2.08,0.035,x,1.38,0.193,insetMat,0.014);
+    add("GateDoorInnerPlate",0.57,1.86,0.025,x,1.39,0.218,darkMat,0.009);
+    for(const y of [0.57,0.91,1.87,2.21]){
+      add("GateReinforcementRib",0.61,0.035,0.028,x,y,0.239,ribMat,0.008);
+    }
+    add("GateVerticalReinforcement",0.035,2.19,0.032,x+side*0.30,1.36,0.238,ribMat,0.007);
+    add("GateStatusLight",0.075,0.16,0.035,x,2.42,0.239,cyanMat,0.012);
+    add("GateLockHousing",0.095,0.37,0.075,x-side*0.11,1.29,0.235,frameMat,0.012);
+    add("GateLockHandle",0.035,0.22,0.035,x-side*0.11,1.29,0.281,ribMat,0.007);
+    for(const y of [0.39,2.29]){
+      addDeviceMesh(door,"GateRivet",new THREE.SphereGeometry(0.019,8,6),
+        ribMat,x-side*0.31,y,0.242);
+      addDeviceMesh(door,"GateRivet",new THREE.SphereGeometry(0.019,8,6),
+        ribMat,x+side*0.31,y,0.242);
+    }
+    for(let i=0;i<4;i++){
+      const stripe=addDeviceMesh(door,"GateHazardStripe",
+        new THREE.BoxGeometry(0.12,0.022,0.018),
+        i%2===0?cautionMat:darkMat,x-0.24+i*0.16,0.20,0.23);
+      stripe.rotation.z=-0.48;
+    }
+  }
+
+  add("GateCentreSeam",0.032,2.43,0.04,0,1.35,0.205,darkMat,0.006);
+  add("GateTopSignalPlate",0.52,0.12,0.04,0,2.48,0.232,frameMat,0.008);
+  for(const x of [-0.20,-0.10,0,0.10,0.20]){
+    add("GateTopSignalSegment",0.045,0.035,0.012,x,2.48,0.259,cyanMat,0.005);
+  }
+  for(const x of [-0.76,0.76]){
+    add("GateVerticalSignalStrip",0.024,2.20,0.025,x,1.36,0.228,cyanMat,0.006);
+    addDeviceMesh(door,"GateWarningLamp",new THREE.SphereGeometry(0.035,12,8),
+      amberMat,x,0.24,0.25);
+  }
+  door.userData.procedural=true;
+  return door;
+}
+
+function buildProceduralSignalPortal(parent,x,y,z,rotationY=Math.PI) {
+  const portal=new THREE.Group();
+  portal.name="ProceduralSignalExitPortal";
+  portal.position.set(x,y,z);
+  portal.rotation.y=rotationY;
+  parent.add(portal);
+
+  const frameMat=new THREE.MeshStandardMaterial({color:0x253330,roughness:0.56,metalness:0.62});
+  const trimMat=new THREE.MeshStandardMaterial({color:0x718a80,roughness:0.42,metalness:0.72});
+  const cyanMat=new THREE.MeshStandardMaterial({
+    color:0x4ddce8,emissive:0x1ab3c7,emissiveIntensity:1.1,roughness:0.24,metalness:0.1
+  });
+  const darkMat=new THREE.MeshBasicMaterial({color:0x02090c,toneMapped:false});
+  const add=(name,w,h,d,px,py,pz,material,radius=0.012)=>
+    addDeviceMesh(portal,name,
+      new RoundedBoxGeometry(w,h,d,4,Math.min(radius,Math.min(w,h,d)*0.22)),
+      material,px,py,pz);
+
+  add("SignalExitFrameLeft",0.15,2.78,0.28,-0.96,1.39,0,frameMat,0.025);
+  add("SignalExitFrameRight",0.15,2.78,0.28,0.96,1.39,0,frameMat,0.025);
+  add("SignalExitFrameHeader",2.06,0.16,0.28,0,2.70,0,frameMat,0.025);
+  add("SignalExitThreshold",1.98,0.10,0.34,0,0.05,0.02,frameMat,0.016);
+  addDeviceMesh(portal,"SignalExitVoid",new THREE.PlaneGeometry(1.70,2.48),
+    darkMat,0,1.24,0.08);
+  add("SignalExitInnerTrimLeft",0.035,2.42,0.04,-0.84,1.24,0.105,cyanMat,0.008);
+  add("SignalExitInnerTrimRight",0.035,2.42,0.04,0.84,1.24,0.105,cyanMat,0.008);
+  add("SignalExitInnerTrimTop",1.72,0.035,0.04,0,2.49,0.105,cyanMat,0.008);
+
+  const bars=[];
+  for(let i=0;i<11;i++){
+    const width=0.28+((i*7)%6)*0.16;
+    const x=Math.sin(i*1.71)*0.20;
+    const py=0.19+i*0.205;
+    const material=new THREE.MeshBasicMaterial({
+      color:i%3===0?0x7bf2ed:0x28a9c3,
+      transparent:true,opacity:0.42,depthWrite:false,toneMapped:false
+    });
+    const mesh=addDeviceMesh(portal,"SignalExitScanBar",
+      new RoundedBoxGeometry(width,0.014,0.014,3,0.005),
+      material,x,py,0.112);
+    bars.push({mesh,material,phase:i*0.71,baseX:x});
+  }
+
+  for(const x of [-0.67,-0.50,-0.33,0.33,0.50,0.67]){
+    add("SignalExitSideTick",0.025,0.055,0.018,x,
+      0.22+((Math.abs(x)*100)%4)*0.24,0.12,trimMat,0.005);
+  }
+  const light=new THREE.PointLight(0x39cfe3,0.85,6.5,2);
+  light.position.set(0,1.25,0.22);
+  light.castShadow=false;
+  portal.add(light);
+  portal.userData.procedural=true;
+  return {root:portal,bars,light};
+}
+
 function placeModelOnFloor(model, { x = 0, z = 0, scale = 1, rotationY = 0 } = {}) {
   model.scale.setScalar(scale);
   model.rotation.y = rotationY;
@@ -300,9 +423,10 @@ export class StoryMissionWorld {
     this.poolroomsExitCard = null;
     this.poolroomsLoaded = false;
     this.poolroomsLoadPromise = null;
-    this.poolDoorMixer = null;
-    this.poolDoorOpenAction = null;
-    this.poolDoorGroup = null;
+    this.poolroomsLoaded = false;
+    this.poolroomsLoadPromise = null;
+    this.poolroomsDoorCard = null;
+    this.poolroomsExitCard = null;
     this.lastGateUnlocked = false;
     this.templates = new Map();
     this.built = false;
@@ -442,7 +566,6 @@ export class StoryMissionWorld {
     gate.name = "PoolroomsLockedDoor";
     gate.position.set(-80, 0, -472);
     this.root.add(gate);
-    this.poolDoorGroup = gate;
 
     // A wall, jamb and lintel make the door a real threshold across the clear
     // route, instead of a freestanding prop that players can simply walk around.
@@ -460,28 +583,12 @@ export class StoryMissionWorld {
     };
     this.world.boundaryWallBounds.push(...this.gateSideBounds, this.gateDoorBounds);
 
+    buildProceduralPoolroomsGateDoor(gate);
     this.poolroomsDoorCard = this._addSign(gate, {
-      x: 0, y: 2.0, z: 0.235, width: 1.85, height: 0.78,
+      x: -1.86, y: 2.0, z: 0.235, width: 1.42, height: 0.78,
       title: "POOLROOMS", subtitle: "SIGNAL SOURCE", status: "LOCKED",
       interactable: { type: "poolroomsDoor", prompt: "Open the Poolrooms door" },
     });
-
-    this.loadModel("fireDoor").then(gltf => {
-      const instance = gltf.scene.clone(true);
-      instance.name = "PoolroomsFireDoorModel";
-      placeModelOnFloor(instance, { x: 0, z: 0, scale: 1.08 });
-      gate.add(instance);
-      if (gltf.animations?.length) {
-        this.poolDoorMixer = new THREE.AnimationMixer(instance);
-        const openClip = gltf.animations.find(clip => /open/i.test(clip.name));
-        if (openClip) {
-          this.poolDoorOpenAction = this.poolDoorMixer.clipAction(openClip);
-          this.poolDoorOpenAction.setLoop(THREE.LoopOnce, 1);
-          this.poolDoorOpenAction.clampWhenFinished = true;
-          // The Poolrooms gate remains shut in the demo build.
-        }
-      }
-    }).catch(() => {});
 
     this._buildPoolroomsArchitecture();
     this.syncState({ relays: [false, false, false], breakerSolved: false });
@@ -501,27 +608,86 @@ export class StoryMissionWorld {
     makeBox(root, "PoolroomsSouthWall", 28.8, 5.9, 0.36, 0, 2.9, 18.45, wall);
     makeBox(root, "PoolroomsWestWall", 0.36, 5.9, 23.0, -14.25, 2.9, 6.95, wall);
     makeBox(root, "PoolroomsEastWall", 0.36, 5.9, 23.0, 14.25, 2.9, 6.95, wall);
-    const cyanLight = new THREE.PointLight(0x68e5df, 2.1, 42, 1.35);
-    cyanLight.position.set(-10, 3.1, 3.5);
-    cyanLight.castShadow = false;
-    root.add(cyanLight);
-    const paleLight = new THREE.PointLight(0xb0fff0, 1.15, 34, 1.25);
-    paleLight.position.set(10, 3.0, 13);
-    paleLight.castShadow = false;
-    root.add(paleLight);
+    this._buildPoolroomSignalPath(root);
   }
 
-  _playOpenDoor() {
-    if (!this.poolDoorOpenAction) {
-      if (this.poolDoorGroup) {
-        const door = this.poolDoorGroup.getObjectByName("PoolroomsFireDoorModel");
-        if (door) door.visible = false;
+  _buildPoolroomSignalPath(root) {
+    const baseMat=new THREE.MeshStandardMaterial({color:0x26312f,roughness:0.65,metalness:0.48});
+    const trimMat=new THREE.MeshStandardMaterial({color:0x657971,roughness:0.42,metalness:0.68});
+    const mastMat=new THREE.MeshStandardMaterial({color:0x354540,roughness:0.52,metalness:0.56});
+    const trackMat=new THREE.MeshBasicMaterial({
+      color:0x277c89,transparent:true,opacity:0.48,toneMapped:false
+    });
+    this.signalTrackMaterial=trackMat;
+
+    // Beacons are generated along the crosswalk, then turn toward the exit deck.
+    const points=[
+      {x:5.82,z:-1.35},
+      {x:5.82,z:2.0},
+      {x:5.82,z:5.5},
+      {x:5.82,z:9.0},
+      {x:5.82,z:12.5},
+      {x:5.82,z:15.7},
+      {x:7.35,z:17.12},
+      {x:9.25,z:17.12},
+      {x:11.05,z:17.12},
+    ];
+    const add=(parent,name,geometry,material,x,y,z)=>{
+      const mesh=new THREE.Mesh(geometry,material);
+      mesh.name=name;
+      mesh.position.set(x,y,z);
+      mesh.castShadow=false;
+      mesh.receiveShadow=false;
+      parent.add(mesh);
+      return mesh;
+    };
+
+    points.forEach((point,index)=>{
+      const beacon=new THREE.Group();
+      beacon.name="ProceduralPoolroomSignalBeacon_"+String(index+1).padStart(2,"0");
+      beacon.position.set(point.x,-0.08,point.z);
+      root.add(beacon);
+      add(beacon,"SignalBeaconBase",new RoundedBoxGeometry(0.36,0.12,0.32,4,0.025),
+        baseMat,0,0.06,0);
+      add(beacon,"SignalBeaconMast",new THREE.CylinderGeometry(0.035,0.052,0.29,10),
+        mastMat,0,0.235,0);
+      add(beacon,"SignalBeaconCap",new THREE.CylinderGeometry(0.095,0.12,0.06,14),
+        trimMat,0,0.40,0);
+
+      const lensMaterial=new THREE.MeshStandardMaterial({
+        color:0x55e6ed,emissive:0x1aaabb,emissiveIntensity:1.1,
+        roughness:0.24,metalness:0.08
+      });
+      add(beacon,"SignalBeaconLens",new RoundedBoxGeometry(0.12,0.18,0.065,4,0.018),
+        lensMaterial,0,0.51,0.025);
+      for(const y of [0.16,0.34]){
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(0.105,0.009,6,18),lensMaterial);
+        ring.name="SignalBeaconRing";
+        ring.rotation.x=Math.PI/2;
+        ring.position.set(0,y,0);
+        ring.castShadow=false;
+        beacon.add(ring);
       }
-      return;
-    }
-    this.poolDoorOpenAction.reset();
-    this.poolDoorOpenAction.play();
+
+      let light=null;
+      if(index%2===0){
+        light=new THREE.PointLight(0x3bd5e8,0.30,4.6,2);
+        light.position.set(0,0.47,0);
+        light.castShadow=false;
+        beacon.add(light);
+      }
+      this.signalBeacons.push({lensMaterial,light,phase:index*0.82,baseIntensity:0.30});
+    });
+
+    const firstZ=-1.35,lastZ=15.7;
+    add(root,"ProceduralSignalTrackLong",new THREE.BoxGeometry(0.028,0.012,lastZ-firstZ),
+      trackMat,5.82,-0.071,(firstZ+lastZ)/2);
+    const trackStart=5.82,trackEnd=12.15;
+    add(root,"ProceduralSignalTrackTurn",new THREE.BoxGeometry(trackEnd-trackStart,0.012,0.028),
+      trackMat,(trackStart+trackEnd)/2,-0.071,17.12);
   }
+
+
 
   _syncGate(state) {
     const relays = Array.isArray(state?.relays) ? state.relays : [];
@@ -583,7 +749,26 @@ export class StoryMissionWorld {
   }
 
   update(dt) {
-    this.poolDoorMixer?.update(dt);
+    if(!Number.isFinite(dt)||dt<=0) return;
+    this.signalClock+=Math.min(dt,0.1);
+    if(!this.poolroomsRoot.visible) return;
+
+    for(const beacon of this.signalBeacons){
+      const wave=0.5+0.5*Math.sin(this.signalClock*2.15+beacon.phase);
+      beacon.lensMaterial.emissiveIntensity=0.75+1.3*wave;
+      if(beacon.light) beacon.light.intensity=beacon.baseIntensity*(0.55+0.85*wave);
+    }
+    for(const bar of this.portalSignalBars){
+      const wave=0.5+0.5*Math.sin(this.signalClock*2.4+bar.phase);
+      bar.material.opacity=0.20+0.68*wave;
+      bar.mesh.position.x=bar.baseX+Math.sin(this.signalClock*1.7+bar.phase)*0.025;
+    }
+    if(this.portalSignalLight){
+      this.portalSignalLight.intensity=0.55+0.45*(0.5+0.5*Math.sin(this.signalClock*1.85));
+    }
+    if(this.signalTrackMaterial){
+      this.signalTrackMaterial.opacity=0.30+0.24*(0.5+0.5*Math.sin(this.signalClock*1.4));
+    }
   }
 
   async enterPoolrooms() {
@@ -627,9 +812,12 @@ export class StoryMissionWorld {
       }
     }
 
+    const exitPortal=buildProceduralSignalPortal(group,12.15,-0.08,17.02,Math.PI);
+    this.portalSignalBars=exitPortal.bars;
+    this.portalSignalLight=exitPortal.light;
     this.poolroomsExitCard = this._addSign(group, {
-      x: 12.15, y: 1.8, z: 16.1, rotationY: Math.PI,
-      width: 2.0, height: 0.95,
+      x: 12.15, y: 3.18, z: 16.82, rotationY: Math.PI,
+      width: 2.0, height: 0.68,
       title: "SIGNAL EXIT", subtitle: "PRESS E TO FINISH", status: "OPEN",
       interactable: { type: "poolroomsExit", prompt: "Follow the signal to the exit" },
       register: false,
