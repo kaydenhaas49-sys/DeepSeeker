@@ -817,8 +817,8 @@ export class StoryMissionWorld {
     this.portalSignalBars=exitPortal.bars;
     this.portalSignalLight=exitPortal.light;
     this.poolroomsExitCard = this._addSign(group, {
-      x: 12.15, y: 3.18, z: 16.82, rotationY: Math.PI,
-      width: 2.0, height: 0.68,
+      x: 10.15, y: 1.8, z: 16.82, rotationY: Math.PI,
+      width: 1.4, height: 0.76,
       title: "SIGNAL EXIT", subtitle: "PRESS E TO FINISH", status: "OPEN",
       interactable: { type: "poolroomsExit", prompt: "Follow the signal to the exit" },
       register: false,
