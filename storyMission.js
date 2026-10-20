@@ -631,7 +631,7 @@ export class StoryMissionWorld {
       {x:5.82,z:15.7},
       {x:7.35,z:17.12},
       {x:9.25,z:17.12},
-      {x:11.05,z:17.12},
+      {x:10.55,z:17.12},
     ];
     const add=(parent,name,geometry,material,x,y,z)=>{
       const mesh=new THREE.Mesh(geometry,material);
