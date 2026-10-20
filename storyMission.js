@@ -423,10 +423,11 @@ export class StoryMissionWorld {
     this.poolroomsExitCard = null;
     this.poolroomsLoaded = false;
     this.poolroomsLoadPromise = null;
-    this.poolroomsLoaded = false;
-    this.poolroomsLoadPromise = null;
-    this.poolroomsDoorCard = null;
-    this.poolroomsExitCard = null;
+    this.signalBeacons = [];
+    this.signalClock = 0;
+    this.signalTrackMaterial = null;
+    this.portalSignalBars = [];
+    this.portalSignalLight = null;
     this.lastGateUnlocked = false;
     this.templates = new Map();
     this.built = false;
