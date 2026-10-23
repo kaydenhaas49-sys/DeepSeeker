@@ -2,7 +2,7 @@ name: Deploy browser demo to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: ["work/remove-level-run-20261017"]
   workflow_dispatch:
 
 permissions:
