@@ -3395,14 +3395,14 @@ let initialLoadingTimer=null;
 function updateInitialLoadingScreen(){
   if(initialLandingShown) return;
 
-  const saveReady=Boolean(window.__deepseekerSaveHydrationDone);
-  const resumeWaitingForHouse=Boolean(pendingHouseStart && !houseCollisionReady && !houseLoadFailed);
   const houseProgress=Number.isFinite(window.__deepseekerHouseLoadProgress)
     ? window.__deepseekerHouseLoadProgress
     : (houseCollisionReady ? 100 : houseLoaded ? 76 : houseLoadStarted ? 8 : 0);
-  const total=resumeWaitingForHouse
-    ? Math.max(0,Math.min(99,Math.round(houseProgress)))
-    : saveReady ? 100 : 0;
+  const spiderProgress=spiderLoaded ? 100 : spiderLoadStarted ? 18 : 0;
+  const saveProgress=window.__deepseekerSaveHydrationDone ? 100 : 0;
+  const total=Math.max(0,Math.min(100,Math.round(
+    houseProgress*.60 + spiderProgress*.35 + saveProgress*.05
+  )));
 
   const fill=document.getElementById("initialLoadFill");
   const percent=document.getElementById("initialLoadPercent");
@@ -3411,12 +3411,16 @@ function updateInitialLoadingScreen(){
   if(percent) percent.textContent=total+"%";
 
   if(status){
-    if(resumeWaitingForHouse){
-      status.textContent="LOADING SAVED APARTMENT…";
-    }else if(!saveReady){
-      status.textContent="LOADING SAVE DATA…";
+    if(houseCollisionReady && spiderLoaded && window.__deepseekerSaveHydrationDone){
+      status.textContent="WORLD READY — STARTING MAIN MENU.";
+    }else if(!houseLoaded){
+      status.textContent="LOADING APARTMENT ASSET…";
+    }else if(!houseCollisionReady){
+      status.textContent="BUILDING APARTMENT COLLISION…";
+    }else if(!spiderLoaded){
+      status.textContent="LOADING SPIDER-Psionic…";
     }else{
-      status.textContent="READY — OPENING MAIN MENU.";
+      status.textContent="FINALIZING SAVE DATA…";
     }
   }
 
@@ -3425,20 +3429,9 @@ function updateInitialLoadingScreen(){
 
 function finishInitialLoading(){
   if(initialLandingShown) return;
-  if(
-    !window.__deepseekerSaveHydrationDone ||
-    (pendingHouseStart && !houseCollisionReady && !houseLoadFailed)
-  ){
+  if(!houseCollisionReady || !spiderLoaded || !window.__deepseekerSaveHydrationDone){
     updateInitialLoadingScreen();
     return;
-  }
-
-  // If an automatic apartment resume failed, return to the menu instead of
-  // leaving the boot screen permanently locked.
-  if(pendingHouseStart && houseLoadFailed){
-    pendingHouseStart=false;
-    pendingSaveLoad=null;
-    pendingNewGameSlot=null;
   }
 
   initialLandingShown=true;
@@ -3465,10 +3458,14 @@ function beginInitialLoading(){
     window.__deepseekerSaveHydrationDone=true;
   });
 
-  // Apartment geometry/collision and the spider pack are deliberately lazy:
-  // starting the browser page should not parse two large 3D assets before the
-  // menu can appear. startGame()/setHouseMode() load them when the selected
-  // game path actually needs them.
+  if(!houseLoaded && !houseLoadStarted){
+    houseLoadStarted=true;
+    loadHouse();
+  }
+  if(!spiderLoaded && !spiderLoadStarted){
+    spiderLoadStarted=true;
+    loadSpiderFromPack();
+  }
 
   updateInitialLoadingScreen();
   initialLoadingTimer=setInterval(()=>{
