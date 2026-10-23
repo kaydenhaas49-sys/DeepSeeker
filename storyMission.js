@@ -440,16 +440,14 @@ export class StoryMissionWorld {
 
     // Collision meshes for the poolroom are deliberately separate from its
     // render models. They keep the nine shallow basins out of the walkable deck.
-    const outerMinX = -14.4, outerMaxX = 14.4;
+    const outerMinX = -14.25, outerMaxX = 14.25;
     const outerMinZ = -4.55, outerMaxZ = 18.45;
     const wallThickness = 0.55;
     this.poolroomsBounds.push(
       { minX: outerMinX - wallThickness, maxX: outerMinX, minZ: outerMinZ - wallThickness, maxZ: outerMaxZ + wallThickness },
       { minX: outerMaxX, maxX: outerMaxX + wallThickness, minZ: outerMinZ - wallThickness, maxZ: outerMaxZ + wallThickness },
       { minX: outerMinX, maxX: outerMaxX, minZ: outerMinZ - wallThickness, maxZ: outerMinZ },
-      // Leave the same exit aperture as the visible south wall.
-      { minX: outerMinX, maxX: 10.9, minZ: outerMaxZ, maxZ: outerMaxZ + wallThickness },
-      { minX: 13.4, maxX: outerMaxX, minZ: outerMaxZ, maxZ: outerMaxZ + wallThickness }
+      { minX: outerMinX, maxX: outerMaxX, minZ: outerMaxZ, maxZ: outerMaxZ + wallThickness }
     );
     for (let row = 0; row < 3; row++) {
       for (let column = 0; column < 3; column++) {
@@ -601,27 +599,16 @@ export class StoryMissionWorld {
     const root = this.poolroomsRoot;
     const wall = new THREE.MeshStandardMaterial({ color: 0x8eb9b7, roughness: 0.86 });
     const floor = new THREE.MeshStandardMaterial({ color: 0x8ca9a4, roughness: 0.56, metalness: 0.02 });
-    // This level is separate from the deliberately dark Backrooms lighting.
-    // Give the tiled surfaces a cool, soft fill so their materials read clearly.
-    const poolroomsFill = new THREE.HemisphereLight(0xcaf6f1, 0x183535, 0.72);
-    poolroomsFill.name = "PoolroomsAmbientFill";
-    root.add(poolroomsFill);
-    // Walkway tops sit exactly at y=0, the GLB modules' floor plane.
-    makeBox(root, "PoolroomsLeftDryWalkway", 1.7, 0.12, 23.0, -13.35, -0.06, 6.95, floor);
-    makeBox(root, "PoolroomsRightDryWalkway", 1.7, 0.12, 23.0, 13.35, -0.06, 6.95, floor);
-    makeBox(root, "PoolroomsEntryDeck", 28.8, 0.12, 1.9, 0, -0.06, -3.45, floor);
-    makeBox(root, "PoolroomsExitDeck", 28.8, 0.12, 1.7, 0, -0.06, 17.55, floor);
-    makeBox(root, "PoolroomsCrosswalkWest", 3.35, 0.12, 23.0, -4.8, -0.06, 6.95, floor);
-    makeBox(root, "PoolroomsCrosswalkEast", 3.35, 0.12, 23.0, 4.8, -0.06, 6.95, floor);
+    makeBox(root, "PoolroomsLeftDryWalkway", 1.7, 0.12, 23.0, -13.35, -0.14, 6.95, floor);
+    makeBox(root, "PoolroomsRightDryWalkway", 1.7, 0.12, 23.0, 13.35, -0.14, 6.95, floor);
+    makeBox(root, "PoolroomsEntryDeck", 28.8, 0.12, 1.9, 0, -0.14, -3.45, floor);
+    makeBox(root, "PoolroomsExitDeck", 28.8, 0.12, 1.7, 0, -0.14, 17.55, floor);
+    makeBox(root, "PoolroomsCrosswalkWest", 3.35, 0.12, 23.0, -4.8, -0.14, 6.95, floor);
+    makeBox(root, "PoolroomsCrosswalkEast", 3.35, 0.12, 23.0, 4.8, -0.14, 6.95, floor);
     makeBox(root, "PoolroomsNorthWall", 28.8, 5.9, 0.36, 0, 2.9, -4.55, wall);
-    // Cut a real doorway into the exit wall; the signal portal must not sit
-    // in front of a continuous wall or be clipped into the last GLB module.
-    makeBox(root, "PoolroomsSouthWallLeft", 25.3, 5.9, 0.36, -1.75, 2.9, 18.45, wall);
-    makeBox(root, "PoolroomsSouthWallRight", 1.0, 5.9, 0.36, 13.9, 2.9, 18.45, wall);
-    makeBox(root, "PoolroomsSouthWallLintel", 2.5, 3.0, 0.36, 12.15, 4.4, 18.45, wall);
-    // Keep perimeter walls just outside the modules instead of interpenetrating them.
-    makeBox(root, "PoolroomsWestWall", 0.36, 5.9, 23.0, -14.58, 2.9, 6.95, wall);
-    makeBox(root, "PoolroomsEastWall", 0.36, 5.9, 23.0, 14.58, 2.9, 6.95, wall);
+    makeBox(root, "PoolroomsSouthWall", 28.8, 5.9, 0.36, 0, 2.9, 18.45, wall);
+    makeBox(root, "PoolroomsWestWall", 0.36, 5.9, 23.0, -14.25, 2.9, 6.95, wall);
+    makeBox(root, "PoolroomsEastWall", 0.36, 5.9, 23.0, 14.25, 2.9, 6.95, wall);
     this._buildPoolroomSignalPath(root);
   }
 
@@ -642,9 +629,9 @@ export class StoryMissionWorld {
       {x:5.82,z:9.0},
       {x:5.82,z:12.5},
       {x:5.82,z:15.7},
-      {x:7.35,z:17.72},
-      {x:9.25,z:17.72},
-      {x:10.55,z:17.72},
+      {x:7.35,z:17.12},
+      {x:9.25,z:17.12},
+      {x:10.55,z:17.12},
     ];
     const add=(parent,name,geometry,material,x,y,z)=>{
       const mesh=new THREE.Mesh(geometry,material);
@@ -659,7 +646,7 @@ export class StoryMissionWorld {
     points.forEach((point,index)=>{
       const beacon=new THREE.Group();
       beacon.name="ProceduralPoolroomSignalBeacon_"+String(index+1).padStart(2,"0");
-      beacon.position.set(point.x,0,point.z);
+      beacon.position.set(point.x,-0.08,point.z);
       root.add(beacon);
       add(beacon,"SignalBeaconBase",new RoundedBoxGeometry(0.36,0.12,0.32,4,0.025),
         baseMat,0,0.06,0);
@@ -695,10 +682,10 @@ export class StoryMissionWorld {
 
     const firstZ=-1.35,lastZ=15.7;
     add(root,"ProceduralSignalTrackLong",new THREE.BoxGeometry(0.028,0.012,lastZ-firstZ),
-      trackMat,5.82,0.01,(firstZ+lastZ)/2);
+      trackMat,5.82,-0.071,(firstZ+lastZ)/2);
     const trackStart=5.82,trackEnd=12.15;
     add(root,"ProceduralSignalTrackTurn",new THREE.BoxGeometry(trackEnd-trackStart,0.012,0.028),
-      trackMat,(trackStart+trackEnd)/2,0.01,17.72);
+      trackMat,(trackStart+trackEnd)/2,-0.071,17.12);
   }
 
 
@@ -815,9 +802,7 @@ export class StoryMissionWorld {
       for (let column = 0; column < 3; column++) {
         const instance = source.clone(true);
         instance.name = "PoolroomHall_" + row + "_" + column;
-        // Keep each row consistently oriented; alternate row direction so
-        // the room reads as connected pool bays rather than a checkerboard.
-        const rotationY = row % 2 === 1 ? Math.PI : 0;
+        const rotationY = (row + column) % 2 === 1 ? Math.PI : 0;
         placeModelOnFloor(instance, {
           x: (column - 1) * stepX,
           z: row * stepZ + 1.0,
@@ -828,11 +813,11 @@ export class StoryMissionWorld {
       }
     }
 
-    const exitPortal=buildProceduralSignalPortal(group,12.15,0,17.78,Math.PI);
+    const exitPortal=buildProceduralSignalPortal(group,12.15,-0.08,17.02,Math.PI);
     this.portalSignalBars=exitPortal.bars;
     this.portalSignalLight=exitPortal.light;
     this.poolroomsExitCard = this._addSign(group, {
-      x: 10.15, y: 1.8, z: 17.48, rotationY: Math.PI,
+      x: 10.15, y: 1.8, z: 16.82, rotationY: Math.PI,
       width: 1.4, height: 0.76,
       title: "SIGNAL EXIT", subtitle: "PRESS E TO FINISH", status: "OPEN",
       interactable: { type: "poolroomsExit", prompt: "Follow the signal to the exit" },
