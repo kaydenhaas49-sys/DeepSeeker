@@ -9631,6 +9631,15 @@ function animate(){
             1.35
           );
           player.camera.rotation.z=Math.sin(drag*Math.PI)*.34;
+          // A short forward scale surge sells the lunge, followed by a fast,
+          // irregular body twitch while the camera is dragged away.
+          const lunge=0.20*Math.max(0,1-caughtProgress/.34);
+          const scramble=Math.sin(spiderCaughtElapsed*39)*.022;
+          spiderEntity.scale.setScalar(1+lunge+scramble);
+          spiderEntity.rotation.y=Math.atan2(
+            player.pos.x-spiderEntity.position.x,
+            player.pos.z-spiderEntity.position.z
+          )+Math.sin(spiderCaughtElapsed*31)*.11;
           if(spiderCaughtBlackout){
             spiderCaughtBlackout.style.opacity=String(
               THREE.MathUtils.smoothstep(caughtProgress,.68,1)
