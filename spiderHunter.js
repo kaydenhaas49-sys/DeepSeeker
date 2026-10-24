@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { SignalStalkerRig } from "./signalStalker.js?v=20261023-spider-dragfit1";
+import { SignalStalkerRig } from "./signalStalker.js?v=20261024-spider-gait-v2";
 
 /**
  * SpiderHunter
