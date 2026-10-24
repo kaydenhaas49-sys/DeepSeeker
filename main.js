@@ -499,13 +499,6 @@ function ensureTutorialOpenRoom(){
         ctx.fillStyle="rgba(238,222,171,.15)";
         ctx.fillRect(x+1,0,1,size);
       }
-      // Grime builds unevenly along the lower portion of the wall texture.
-      const lower=ctx.createLinearGradient(0,size*.72,0,size);
-      lower.addColorStop(0,"rgba(70,60,39,0)");
-      lower.addColorStop(.65,"rgba(70,60,39,.08)");
-      lower.addColorStop(1,"rgba(61,52,36,.18)");
-      ctx.fillStyle=lower;
-      ctx.fillRect(0,size*.72,size,size*.28);
     }else if(kind==="floor"){
       // A dingy olive-tan office carpet, dulled by years of traffic.
       ctx.fillStyle="#77705a";
@@ -553,15 +546,6 @@ function ensureTutorialOpenRoom(){
           ctx.beginPath();ctx.ellipse(px,py,r,r*.55,rand(),0,Math.PI*2);ctx.fill();
         });
       }
-      // A soft, uneven dirt shadow gathers at a few carpet edges, never as a
-      // perfect outline or checkerboard.
-      const edgeShade=ctx.createLinearGradient(0,0,0,size);
-      edgeShade.addColorStop(0,"rgba(47,42,30,.09)");
-      edgeShade.addColorStop(.12,"rgba(47,42,30,0)");
-      edgeShade.addColorStop(.86,"rgba(47,42,30,0)");
-      edgeShade.addColorStop(1,"rgba(47,42,30,.10)");
-      ctx.fillStyle=edgeShade;
-      ctx.fillRect(0,0,size,size);
     }else{
       // Yellowed acoustic ceiling panels with dusty seams and uneven ageing.
       ctx.fillStyle="#aaa99b";
