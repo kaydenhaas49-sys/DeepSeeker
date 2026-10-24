@@ -576,20 +576,24 @@ export class World {
       addBox("BreakerRoomCeilingCrossbrace",roomWidth-.35,.10,.12,centerX,3.68,z,this.roomDoorMetalMaterial);
       addBox("BreakerRoomFluorescentStrip",3.8,.06,.18,centerX,3.59,fixtureZ,this.breakerRoomLightMaterial);
 
-      // The breaker room is unlit behind its closed door. Two non-shadow-casting
-      // ceiling lights per row illuminate the wall-mounted breakers after entry.
-      for(const side of [-1,1]){
-        const light=new THREE.PointLight(0xffe7ad,0,18,1.45);
-        light.name="BreakerRoomOverheadLight";
-        light.position.set(centerX+side*6.35,3.35,fixtureZ);
-        light.visible=false;
-        light.castShadow=false;
-        group.add(light);
-        this.breakerRoomLights.push({
-          light,
-          baseIntensity:10,
-          phase:rib*.83+(side>0?.45:0)
-        });
+      // Keep the fluorescent strips across the ceiling, but use only four
+      // real point lights for the whole room. Ten overlapping point lights
+      // made every visible material expensive to shade on lower-end GPUs.
+      // Two lights on each of two rows still reach both breaker walls.
+      if(rib===0||rib===3){
+        for(const side of [-1,1]){
+          const light=new THREE.PointLight(0xffe7ad,0,26,1.45);
+          light.name="BreakerRoomOverheadLight";
+          light.position.set(centerX+side*6.35,3.35,fixtureZ);
+          light.visible=false;
+          light.castShadow=false;
+          group.add(light);
+          this.breakerRoomLights.push({
+            light,
+            baseIntensity:10,
+            phase:rib*.83+(side>0?.45:0)
+          });
+        }
       }
     }
     const boardZ=backZ+.24;
