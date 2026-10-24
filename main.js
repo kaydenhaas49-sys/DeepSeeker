@@ -335,6 +335,10 @@ function ensureTutorialOpenRoom(){
   // Give the tutorial its own aged materials instead of reusing the
   // cleaner shared world textures. This is strictly visual: room dimensions,
   // collisions, lesson triggers and lighting controls remain unchanged.
+  // Build a restrained, period-correct Level 0 material set: faded repeating
+  // wallpaper, tightly woven office carpet, and acoustic ceiling tiles.
+  // Wear is built into the surface textures rather than painted on as dark,
+  // rectangular overlay planes.
   const makeTutorialTexture=(kind,size=512)=>{
     const canvas=document.createElement("canvas");
     canvas.width=canvas.height=size;
@@ -345,78 +349,116 @@ function ensureTutorialOpenRoom(){
       return seed/4294967296;
     };
     const palettes={
-      wall:["#b4a66a","#a99a5f","#b9ac74","#a09258"],
-      floor:["#77735e","#696650","#817b65","#5f5b49"],
-      ceiling:["#b6b5a7","#a8a797","#c1c0b3","#96978a"]
+      wall:["#b7ae7e","#b0a775","#c0b88a","#a9a174"],
+      floor:["#81795f","#746e57","#8b8267","#6d6852"],
+      ceiling:["#c0c0b3","#b8b8aa","#c7c6b9","#aead9f"]
     };
     const colors=palettes[kind];
     ctx.fillStyle=colors[0];
     ctx.fillRect(0,0,size,size);
 
     if(kind==="wall"){
-      // Faded vinyl wallpaper with fine stipple, seams and damp blooms.
-      for(let i=0;i<18000;i++){
-        const x=rand()*size,y=rand()*size,r=.35+rand()*1.5;
-        ctx.globalAlpha=.025+rand()*.13;
+      // Soft, aged paper grain. Keep it subtle so the wallpaper pattern reads.
+      for(let i=0;i<5000;i++){
+        ctx.globalAlpha=.025+rand()*.045;
         ctx.fillStyle=colors[Math.floor(rand()*colors.length)];
-        ctx.fillRect(x,y,r,r);
+        const x=rand()*size,y=rand()*size;
+        ctx.fillRect(x,y,1+rand()*2,1+rand()*2);
       }
       ctx.globalAlpha=1;
+      // Repeating late-80s/90s vinyl wallpaper: narrow vertical stems and
+      // small paired leaf/teardrop motifs, deliberately low contrast.
+      for(let x=0;x<size;x+=64){
+        for(let y=-32;y<size+32;y+=96){
+          const cx=x+32, cy=y+48;
+          ctx.strokeStyle="rgba(102,111,72,.42)";
+          ctx.lineWidth=1.25;
+          ctx.beginPath();
+          ctx.moveTo(cx,cy-39);ctx.bezierCurveTo(cx-2,cy-18,cx+2,cy+18,cx,cy+39);
+          ctx.stroke();
+          for(const side of [-1,1]){
+            for(const offset of [-22,0,22]){
+              const lx=cx+side*8, ly=cy+offset;
+              ctx.fillStyle=side<0?"rgba(126,133,86,.48)":"rgba(137,139,91,.42)";
+              ctx.beginPath();
+              ctx.moveTo(cx,ly);
+              ctx.bezierCurveTo(cx+side*3,ly-8,cx+side*15,ly-10,cx+side*16,ly-2);
+              ctx.bezierCurveTo(cx+side*13,ly+5,cx+side*4,ly+5,cx,ly);
+              ctx.fill();
+            }
+          }
+          ctx.strokeStyle="rgba(224,215,171,.32)";
+          ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(cx-20,cy-31);ctx.lineTo(cx-20,cy+31);ctx.stroke();
+        }
+      }
+      // Old moisture discolouration gathers near ceiling/wall edges, not as
+      // scattered dots across the entire wall.
+      for(const edge of [0,size]){
+        for(let i=0;i<5;i++){
+          const x=rand()*size;
+          const width=22+rand()*58;
+          const depth=24+rand()*72;
+          const g=ctx.createLinearGradient(0,edge===0?0:size-depth,0,edge===0?depth:size);
+          g.addColorStop(0,"rgba(79,75,49,.16)");
+          g.addColorStop(1,"rgba(79,75,49,0)");
+          ctx.fillStyle=g;
+          ctx.fillRect(x-width*.5,edge===0?0:size-depth,width,depth);
+        }
+      }
+      // Fine seams every few repeats, like wallpaper rolls, not thick stripes.
       for(let x=0;x<=size;x+=128){
-        ctx.fillStyle="rgba(65,56,35,.22)";ctx.fillRect(x,0,2,size);
-        ctx.fillStyle="rgba(244,224,155,.12)";ctx.fillRect(x+2,0,2,size);
-      }
-      for(let i=0;i<34;i++){
-        const x=rand()*size,y=rand()*size,rx=14+rand()*64,ry=12+rand()*72;
-        const g=ctx.createRadialGradient(x,y,1,x,y,Math.max(rx,ry));
-        g.addColorStop(0,rand()>.5?"rgba(61,66,42,.23)":"rgba(91,71,38,.19)");
-        g.addColorStop(1,"rgba(91,71,38,0)");
-        ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x,y,rx,ry,rand()*.7,0,Math.PI*2);ctx.fill();
-      }
-      for(let i=0;i<1100;i++){
-        ctx.globalAlpha=.04+rand()*.07;
-        ctx.fillStyle=rand()>.5?"#e4d59a":"#4d482e";
-        ctx.fillRect(rand()*size,rand()*size,1+rand()*2,1+rand()*3);
+        ctx.fillStyle="rgba(86,78,52,.12)";ctx.fillRect(x,0,1,size);
+        ctx.fillStyle="rgba(239,228,183,.18)";ctx.fillRect(x+1,0,1,size);
       }
     }else if(kind==="floor"){
-      // Dense short carpet fibres, flattened traffic wear and dark stains.
-      for(let i=0;i<26000;i++){
+      // Dense, fine carpet loops in muted olive, tan and brown; no tile grid.
+      for(let i=0;i<42000;i++){
         const x=rand()*size,y=rand()*size;
-        ctx.globalAlpha=.07+rand()*.19;
+        ctx.globalAlpha=.12+rand()*.17;
         ctx.strokeStyle=colors[Math.floor(rand()*colors.length)];
-        ctx.lineWidth=.5+rand()*1.2;
-        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+(rand()-.5)*5,y+1+rand()*4);ctx.stroke();
-      }
-      for(let i=0;i<26;i++){
-        const x=rand()*size,y=rand()*size,r=10+rand()*48;
-        const g=ctx.createRadialGradient(x,y,1,x,y,r);
-        g.addColorStop(0,rand()>.5?"rgba(37,35,27,.38)":"rgba(169,153,108,.16)");
-        g.addColorStop(1,"rgba(37,35,27,0)");
-        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-      }
-      ctx.globalAlpha=.2;ctx.strokeStyle="#38372d";ctx.lineWidth=2;
-      for(let y=0;y<=size;y+=128){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(size,y);ctx.stroke();}
-    }else{
-      // Yellowed acoustic ceiling tiles with mineral stains and recessed grid.
-      for(let i=0;i<14000;i++){
-        ctx.globalAlpha=.025+rand()*.11;
-        ctx.fillStyle=colors[Math.floor(rand()*colors.length)];
-        ctx.fillRect(rand()*size,rand()*size,1+rand()*3,1+rand()*3);
-      }
-      for(let i=0;i<22;i++){
-        const x=rand()*size,y=rand()*size,r=10+rand()*52;
-        const g=ctx.createRadialGradient(x,y,1,x,y,r);
-        g.addColorStop(0,"rgba(71,68,52,.18)");
-        g.addColorStop(1,"rgba(71,68,52,0)");
-        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+        ctx.lineWidth=.45+rand()*.65;
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        ctx.lineTo(x+(rand()-.5)*2.2,y+.5+rand()*1.7);
+        ctx.stroke();
       }
       ctx.globalAlpha=1;
-      for(let p=0;p<=size;p+=128){
-        ctx.fillStyle="rgba(48,49,42,.3)";
-        ctx.fillRect(p,0,2,size);ctx.fillRect(0,p,size,2);
-        ctx.fillStyle="rgba(240,235,208,.22)";
-        ctx.fillRect(p+2,0,1,size);ctx.fillRect(0,p+2,size,1);
+      // A few diffuse, low-contrast worn areas blend into the carpet pile.
+      for(let i=0;i<7;i++){
+        const x=rand()*size,y=rand()*size,r=24+rand()*62;
+        const g=ctx.createRadialGradient(x,y,2,x,y,r);
+        g.addColorStop(0,rand()>.5?"rgba(52,47,35,.12)":"rgba(185,166,119,.10)");
+        g.addColorStop(1,"rgba(52,47,35,0)");
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
       }
+    }else{
+      // Standard suspended acoustic ceiling: individually readable panels,
+      // slight yellowing, and a narrow recessed grid.
+      for(let y=0;y<size;y+=128){
+        for(let x=0;x<size;x+=128){
+          const shade=colors[Math.floor(rand()*colors.length)];
+          ctx.fillStyle=shade;ctx.fillRect(x+2,y+2,124,124);
+          ctx.globalAlpha=.06;
+          for(let i=0;i<150;i++){
+            ctx.fillStyle=rand()>.5?"#777766":"#eeeeD9";
+            ctx.fillRect(x+rand()*124,y+rand()*124,1+rand()*2,1+rand()*2);
+          }
+          ctx.globalAlpha=1;
+          // Faint mineral marks on only a few tiles.
+          if(rand()>.62){
+            const cx=x+rand()*124,cy=y+rand()*124,r=12+rand()*24;
+            const g=ctx.createRadialGradient(cx,cy,1,cx,cy,r);
+            g.addColorStop(0,"rgba(93,88,68,.13)");
+            g.addColorStop(1,"rgba(93,88,68,0)");
+            ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+          }
+        }
+      }
+      ctx.fillStyle="rgba(73,74,65,.30)";
+      for(let p=0;p<=size;p+=128){ctx.fillRect(p,0,2,size);ctx.fillRect(0,p,size,2);}
+      ctx.fillStyle="rgba(244,241,218,.42)";
+      for(let p=2;p<=size;p+=128){ctx.fillRect(p,0,1,size);ctx.fillRect(0,p,size,1);}
     }
     ctx.globalAlpha=1;
     const texture=new THREE.CanvasTexture(canvas);
@@ -436,18 +478,18 @@ function ensureTutorialOpenRoom(){
 
   const wallMaterial=new THREE.MeshStandardMaterial({
     map:tutorialWallTexture,
-    color:0xd0c07a,
+    color:0xffffff,
     roughness:1
   });
   const floorMaterial=new THREE.MeshStandardMaterial({
     map:tutorialFloorTexture,
-    color:0xaaa184,
+    color:0xffffff,
     roughness:1,
     side:THREE.DoubleSide
   });
   const ceilingMaterial=new THREE.MeshStandardMaterial({
     map:tutorialCeilingTexture,
-    color:0xb8b7a8,
+    color:0xffffff,
     roughness:1,
     side:THREE.DoubleSide
   });
@@ -499,62 +541,9 @@ function ensureTutorialOpenRoom(){
     tutorialOpenRoomOccluders.push(mesh);
   }
 
-  // Layer in visible age and neglect: damp wall blooms, dirty floor patches,
-  // torn wallpaper edges, and scattered plaster fragments. These are visual
-  // details only, so they never change the tutorial's collision layout.
-  const addGrimePatch=(width,height,x,y,z,rotationY=0,opacity=.48)=>{
-    const material=new THREE.MeshBasicMaterial({
-      color:0x29281f,
-      transparent:true,
-      opacity,
-      depthWrite:false,
-      side:THREE.DoubleSide
-    });
-    const patch=addTutorialMesh(
-      new THREE.PlaneGeometry(width,height),
-      material,
-      new THREE.Vector3(x,y,z)
-    );
-    patch.rotation.y=rotationY;
-    patch.renderOrder=2;
-    return patch;
-  };
-
-  // Dirty, water-stained wallpaper at varied heights on all four walls.
-  const wallMarks=[
-    [8.5,2.1,13,2.5,min+t*.5+.012,0,.50],
-    [5.2,3.4,27,3.2,min+t*.5+.012,0,.32],
-    [7.4,2.6,47,2.4,min+t*.5+.012,0,.44],
-    [6.6,3.0,19,2.7,max-t*.5-.012,Math.PI,.46],
-    [4.8,2.0,42,4.0,max-t*.5-.012,Math.PI,.38],
-    [7.5,2.8,min+t*.5+.012,2.5,22,Math.PI/2,.48],
-    [5.0,2.4,min+t*.5+.012,3.1,45,Math.PI/2,.38],
-    [6.8,3.2,max-t*.5-.012,2.8,36,-Math.PI/2,.47],
-    [4.4,2.0,max-t*.5-.012,4.1,15,-Math.PI/2,.34]
-  ];
-  for(const [w,hh,x,y,z,rotation,opacity] of wallMarks){
-    addGrimePatch(w,hh,x,y,z,rotation,opacity);
-  }
-
-  // Faded, irregular grime on the carpet.
-  const floorGrime=[
-    [9,6,15,18,.48],[6,10,43,14,.36],[11,7,24,43,.42],
-    [7,5,48,39,.34],[5,8,12,47,.40],[8,4,37,29,.30]
-  ];
-  for(const [w,d,x,z,opacity] of floorGrime){
-    const material=new THREE.MeshBasicMaterial({
-      color:0x302d25,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide
-    });
-    const patch=addTutorialMesh(
-      new THREE.PlaneGeometry(w,d),
-      material,
-      new THREE.Vector3(x,.018,z)
-    );
-    patch.rotation.x=-Math.PI/2;
-    patch.rotation.z=(x+z)*.037;
-    patch.renderOrder=1;
-  }
-
+  // Surface aging is handled by the wallpaper, carpet and ceiling textures.
+  // Keep a small amount of physical plaster debris near wall edges below.
+  
   // A few broken plaster pieces and scraps near the edges of the room.
   const debrisMaterial=new THREE.MeshStandardMaterial({color:0x5a5546,roughness:1});
   const debris=[
