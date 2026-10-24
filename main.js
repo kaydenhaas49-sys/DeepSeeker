@@ -332,20 +332,122 @@ function ensureTutorialOpenRoom(){
   const h=WALL_H;
   const t=WALL_T;
 
+  // Give the tutorial its own aged materials instead of reusing the
+  // cleaner shared world textures. This is strictly visual: room dimensions,
+  // collisions, lesson triggers and lighting controls remain unchanged.
+  const makeTutorialTexture=(kind,size=512)=>{
+    const canvas=document.createElement("canvas");
+    canvas.width=canvas.height=size;
+    const ctx=canvas.getContext("2d");
+    let seed=kind==="wall"?841:kind==="floor"?2917:5039;
+    const rand=()=>{
+      seed=(seed*1664525+1013904223)>>>0;
+      return seed/4294967296;
+    };
+    const palettes={
+      wall:["#b4a66a","#a99a5f","#b9ac74","#a09258"],
+      floor:["#77735e","#696650","#817b65","#5f5b49"],
+      ceiling:["#b6b5a7","#a8a797","#c1c0b3","#96978a"]
+    };
+    const colors=palettes[kind];
+    ctx.fillStyle=colors[0];
+    ctx.fillRect(0,0,size,size);
+
+    if(kind==="wall"){
+      // Faded vinyl wallpaper with fine stipple, seams and damp blooms.
+      for(let i=0;i<18000;i++){
+        const x=rand()*size,y=rand()*size,r=.35+rand()*1.5;
+        ctx.globalAlpha=.025+rand()*.13;
+        ctx.fillStyle=colors[Math.floor(rand()*colors.length)];
+        ctx.fillRect(x,y,r,r);
+      }
+      ctx.globalAlpha=1;
+      for(let x=0;x<=size;x+=128){
+        ctx.fillStyle="rgba(65,56,35,.22)";ctx.fillRect(x,0,2,size);
+        ctx.fillStyle="rgba(244,224,155,.12)";ctx.fillRect(x+2,0,2,size);
+      }
+      for(let i=0;i<34;i++){
+        const x=rand()*size,y=rand()*size,rx=14+rand()*64,ry=12+rand()*72;
+        const g=ctx.createRadialGradient(x,y,1,x,y,Math.max(rx,ry));
+        g.addColorStop(0,rand()>.5?"rgba(61,66,42,.23)":"rgba(91,71,38,.19)");
+        g.addColorStop(1,"rgba(91,71,38,0)");
+        ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x,y,rx,ry,rand()*.7,0,Math.PI*2);ctx.fill();
+      }
+      for(let i=0;i<1100;i++){
+        ctx.globalAlpha=.04+rand()*.07;
+        ctx.fillStyle=rand()>.5?"#e4d59a":"#4d482e";
+        ctx.fillRect(rand()*size,rand()*size,1+rand()*2,1+rand()*3);
+      }
+    }else if(kind==="floor"){
+      // Dense short carpet fibres, flattened traffic wear and dark stains.
+      for(let i=0;i<26000;i++){
+        const x=rand()*size,y=rand()*size;
+        ctx.globalAlpha=.07+rand()*.19;
+        ctx.strokeStyle=colors[Math.floor(rand()*colors.length)];
+        ctx.lineWidth=.5+rand()*1.2;
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+(rand()-.5)*5,y+1+rand()*4);ctx.stroke();
+      }
+      for(let i=0;i<26;i++){
+        const x=rand()*size,y=rand()*size,r=10+rand()*48;
+        const g=ctx.createRadialGradient(x,y,1,x,y,r);
+        g.addColorStop(0,rand()>.5?"rgba(37,35,27,.38)":"rgba(169,153,108,.16)");
+        g.addColorStop(1,"rgba(37,35,27,0)");
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=.2;ctx.strokeStyle="#38372d";ctx.lineWidth=2;
+      for(let y=0;y<=size;y+=128){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(size,y);ctx.stroke();}
+    }else{
+      // Yellowed acoustic ceiling tiles with mineral stains and recessed grid.
+      for(let i=0;i<14000;i++){
+        ctx.globalAlpha=.025+rand()*.11;
+        ctx.fillStyle=colors[Math.floor(rand()*colors.length)];
+        ctx.fillRect(rand()*size,rand()*size,1+rand()*3,1+rand()*3);
+      }
+      for(let i=0;i<22;i++){
+        const x=rand()*size,y=rand()*size,r=10+rand()*52;
+        const g=ctx.createRadialGradient(x,y,1,x,y,r);
+        g.addColorStop(0,"rgba(71,68,52,.18)");
+        g.addColorStop(1,"rgba(71,68,52,0)");
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+      for(let p=0;p<=size;p+=128){
+        ctx.fillStyle="rgba(48,49,42,.3)";
+        ctx.fillRect(p,0,2,size);ctx.fillRect(0,p,size,2);
+        ctx.fillStyle="rgba(240,235,208,.22)";
+        ctx.fillRect(p+2,0,1,size);ctx.fillRect(0,p+2,size,1);
+      }
+    }
+    ctx.globalAlpha=1;
+    const texture=new THREE.CanvasTexture(canvas);
+    texture.colorSpace=THREE.SRGBColorSpace;
+    texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+    texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),4);
+    texture.needsUpdate=true;
+    return texture;
+  };
+
+  const tutorialWallTexture=makeTutorialTexture("wall");
+  tutorialWallTexture.repeat.set(7,2);
+  const tutorialFloorTexture=makeTutorialTexture("floor");
+  tutorialFloorTexture.repeat.set(14,14);
+  const tutorialCeilingTexture=makeTutorialTexture("ceiling");
+  tutorialCeilingTexture.repeat.set(14,14);
+
   const wallMaterial=new THREE.MeshStandardMaterial({
-    map:world.materials.wall.map,
-    color:0x95844d,
+    map:tutorialWallTexture,
+    color:0xd0c07a,
     roughness:1
   });
   const floorMaterial=new THREE.MeshStandardMaterial({
-    map:world.materials.floor.map,
-    color:0x716b58,
+    map:tutorialFloorTexture,
+    color:0xaaa184,
     roughness:1,
     side:THREE.DoubleSide
   });
   const ceilingMaterial=new THREE.MeshStandardMaterial({
-    map:world.materials.ceiling.map,
-    color:0x5b594d,
+    map:tutorialCeilingTexture,
+    color:0xb8b7a8,
     roughness:1,
     side:THREE.DoubleSide
   });
