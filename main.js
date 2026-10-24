@@ -5300,6 +5300,8 @@ let spiderCaughtStartYaw=0;
 let spiderCaughtStartPitch=0;
 let spiderCaughtFlashlightStartPosition=null;
 let spiderCaughtFlashlightStartRotation=null;
+let spiderCaughtHeadBone=null;
+let spiderCaughtHeadBaseRotation=null;
 let spiderCaughtBlackout=null;
 let spiderCaughtPlayerPosition=new THREE.Vector3();
 let spiderJumpscareStartY=0;
@@ -6902,6 +6904,21 @@ function normalSpiderHitboxTouchesPlayer(){
   return normalSpiderHitboxDistanceTo(player.pos.x,player.pos.z)<=SPIDER_HITBOX_PADDING;
 }
 
+function findSpiderCaughtHeadBone(){
+  if(!spiderModel) return null;
+  const candidates=[];
+  spiderModel.traverse(obj=>{
+    if(!obj.isBone) return;
+    const name=String(obj.name||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(/head|neck|cephalothorax|prosoma|maw|jaw/.test(name)){
+      const score=/head/.test(name)?0:/neck/.test(name)?1:/jaw|maw/.test(name)?2:3;
+      candidates.push({bone:obj,score});
+    }
+  });
+  candidates.sort((a,b)=>a.score-b.score);
+  return candidates[0]?.bone||null;
+}
+
 function startSpiderCatchFreeze(){
   spiderCaughtFreezeTimer=SPIDER_CAUGHT_FREEZE_TIME;
   spiderCaughtFlashlightWasOn=flashlightOn;
@@ -6919,6 +6936,8 @@ function startSpiderCatchFreeze(){
   spiderCaughtStartPitch=player.pitch;
   spiderCaughtFlashlightStartPosition=player.proceduralArmFlashlight.position.clone();
   spiderCaughtFlashlightStartRotation=player.proceduralArmFlashlight.rotation.clone();
+  spiderCaughtHeadBone=findSpiderCaughtHeadBone();
+  spiderCaughtHeadBaseRotation=spiderCaughtHeadBone ? spiderCaughtHeadBone.rotation.clone() : null;
   spiderCaughtPlayerPosition.copy(player.pos);
   if(!arachnophobiaMode){
     if(!spiderCaughtBlackout){
@@ -7009,6 +7028,11 @@ function resetPlayerAfterSpiderCatch(){
   }
   spiderCaughtFlashlightStartPosition=null;
   spiderCaughtFlashlightStartRotation=null;
+  if(spiderCaughtHeadBone && spiderCaughtHeadBaseRotation){
+    spiderCaughtHeadBone.rotation.copy(spiderCaughtHeadBaseRotation);
+  }
+  spiderCaughtHeadBone=null;
+  spiderCaughtHeadBaseRotation=null;
   if(spiderCaughtBlackout){
     const blackout=spiderCaughtBlackout;
     spiderCaughtBlackout=null;
@@ -9743,13 +9767,31 @@ function animate(){
           player.yaw=spiderCaughtStartYaw+yawDelta*drag+
             Math.sin(spiderCaughtElapsed*10)*.018*drag+
             tugPulse*.018+yank*.035;
+          // Keep the player looking forward at the spider instead of forcing
+          // their view down into the floor during the drag.
           player.pitch=THREE.MathUtils.clamp(
-            spiderCaughtStartPitch+drag*.98-biteHold*.05+
-              Math.sin(drag*Math.PI*2.1)*.045*drag+
-              tugPulse*.025+yank*.055,
+            spiderCaughtStartPitch+drag*.28-biteHold*.035+
+              Math.sin(drag*Math.PI*2.1)*.025*drag+
+              tugPulse*.012+yank*.025,
             -1.35,
             1.35
           );
+
+          // Let the spider's head/neck droop toward the player after the bite.
+          // The mixer updates first each frame, so apply this as a pose offset.
+          if(spiderCaughtHeadBone && spiderCaughtHeadBaseRotation){
+            const headDip=THREE.MathUtils.smoothstep(
+              (spiderCaughtElapsed-.48)/.5,0,1
+            )*.62+Math.sin(spiderCaughtElapsed*7.8)*.035*drag;
+            spiderCaughtHeadBone.rotation.copy(spiderCaughtHeadBaseRotation);
+            spiderCaughtHeadBone.rotation.x+=headDip;
+            spiderCaughtHeadBone.rotation.z+=Math.sin(spiderCaughtElapsed*5.8)*.045*drag;
+          }else{
+            // Safe fallback for models without a named head/neck bone.
+            spiderEntity.rotation.x=THREE.MathUtils.smoothstep(
+              (spiderCaughtElapsed-.48)/.5,0,1
+            )*.12;
+          }
           player.camera.rotation.z=Math.sin(drag*Math.PI)*.16+
             drag*.09+tugPulse*.045+
             Math.sin(spiderCaughtElapsed*8.3)*.018*drag+
