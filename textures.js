@@ -120,30 +120,24 @@ function makeCarpet() {
   g.fillStyle = "#cfc094";
   g.fillRect(0, 0, S, S);
 
-  // soft large-scale blotches
-  for (let i = 0; i < 26; i++) {
+  // Seamless, low-contrast wear: repeat each soft mark across tile edges so
+  // the carpet never forms obvious square patches at the texture boundaries.
+  for (let i = 0; i < 18; i++) {
     const x = rnd() * S;
     const y = rnd() * S;
-    const r = 20 + rnd() * 60;
-    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    const r = 14 + rnd() * 34;
     const light = rnd() > 0.5;
-    grad.addColorStop(0, light ? "rgba(233,224,186,0.16)" : "rgba(178,164,120,0.14)");
-    grad.addColorStop(1, "rgba(0,0,0,0)");
-    g.fillStyle = grad;
-    g.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-
-  // Soft, irregular wear where foot traffic has compressed the pile.
-  for (let i = 0; i < 7; i++) {
-    const x = 18 + rnd() * (S - 36);
-    const y = rnd() * S;
-    const width = 5 + rnd() * 15;
-    const grad = g.createLinearGradient(x - width, y, x + width, y + 12);
-    grad.addColorStop(0, "rgba(113,99,68,0)");
-    grad.addColorStop(0.5, "rgba(113,99,68,0.055)");
-    grad.addColorStop(1, "rgba(113,99,68,0)");
-    g.fillStyle = grad;
-    g.fillRect(x - width, y - 8, width * 2, 18);
+    for (const ox of [-S, 0, S]) {
+      for (const oy of [-S, 0, S]) {
+        const px = x + ox;
+        const py = y + oy;
+        const grad = g.createRadialGradient(px, py, 0, px, py, r);
+        grad.addColorStop(0, light ? "rgba(233,224,186,0.075)" : "rgba(178,164,120,0.065)");
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = grad;
+        g.fillRect(px - r, py - r, r * 2, r * 2);
+      }
+    }
   }
 
   // Short directional fibers catch light differently than flat digital noise.
