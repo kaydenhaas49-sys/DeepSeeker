@@ -6354,7 +6354,9 @@ function startBackroomsStalker(){
     spiderActive=false;spiderEntity.visible=false;return false;
   }
   spiderEntity.visible=true;
-  if(spiderModel)spiderModel.visible=false;
+  // The roaming encounter must render the real spider model even with the flashlight off.
+  // Hiding this model here made the spider appear to depend on flashlight state.
+  if(spiderModel)spiderModel.visible=true;
   spiderBehaviorState="peek";
   spiderVisibleToPlayer=false;
   setSpiderAnimation("stalk");
