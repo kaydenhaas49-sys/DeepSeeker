@@ -6954,8 +6954,11 @@ function resetPlayerAfterSpiderCatch(){
   spiderCaughtElapsed=0;
   player.camera.rotation.z=0;
   if(spiderCaughtBlackout){
-    spiderCaughtBlackout.remove();
+    const blackout=spiderCaughtBlackout;
     spiderCaughtBlackout=null;
+    blackout.style.transition="opacity 450ms ease-out";
+    blackout.style.opacity="0";
+    setTimeout(()=>blackout.remove(),500);
   }
   spiderBehaviorTime=0;
   spiderStuckTime=0;
