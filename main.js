@@ -7344,8 +7344,11 @@ function finishSpiderModel(model,animations,sourceName){
       const materials=Array.isArray(object.material)?object.material:[object.material];
       for(const material of materials){
         if(!material)continue;
-        if(material.emissive?.set)material.emissive.set(0x000000);
-        if("emissiveIntensity" in material)material.emissiveIntensity=0;
+        // Keep a very low, neutral self-lit floor so a spawned spider never
+        // vanishes completely outside the flashlight beam. This is deliberately
+        // dim: it preserves the dark silhouette without making the creature glow.
+        if(material.emissive?.set)material.emissive.set(0x17150f);
+        if("emissiveIntensity" in material)material.emissiveIntensity=0.32;
         material.needsUpdate=true;
       }
     });
