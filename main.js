@@ -5177,7 +5177,7 @@ const normalSpiderHunter=new SpiderHunter({
   getVisualHitboxDistance:(x,z)=>Math.max(
     0,
     Math.hypot(x-spiderEntity.position.x,z-spiderEntity.position.z)-
-      SPIDER_TARGET_SPAN*(2.0/SPIDER_BASE_TARGET_SPAN)
+      SPIDER_TARGET_SPAN*(2.0/SPIDER_BASE_TARGET_SPAN)-0.45
   ),
   onStateChange:(mode)=>{
     if(mode==="roam"){
@@ -5658,7 +5658,7 @@ function tutorialSpiderHitboxDistance(worldX,worldZ){
     return spiderHunter.visualRig.distanceToHitbox(worldX,worldZ);
   }
 
-  const bodyRadius=1.1;
+  const bodyRadius=1.5;
   const dx=worldX-tutorialSpiderEntity.position.x;
   const dz=worldZ-tutorialSpiderEntity.position.z;
   return Math.max(0,Math.hypot(dx,dz)-bodyRadius);
