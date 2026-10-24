@@ -515,12 +515,6 @@ function ensureTutorialOpenRoom(){
         ctx.fillStyle="rgba(240,223,174,.14)";
         ctx.fillRect(x+1,0,1,size);
       }
-      const lowerGrime=ctx.createLinearGradient(0,size*.77,0,size);
-      lowerGrime.addColorStop(0,"rgba(70,60,39,0)");
-      lowerGrime.addColorStop(.72,"rgba(70,60,39,.055)");
-      lowerGrime.addColorStop(1,"rgba(61,52,36,.12)");
-      ctx.fillStyle=lowerGrime;
-      ctx.fillRect(0,size*.77,size,size*.23);
     }else if(kind==="floor"){
       // Old office carpet: dirty taupe/olive pile with matted traffic and
       // soaked-in discoloration. The damage stays soft, not polka-dot shaped.
@@ -561,19 +555,28 @@ function ensureTutorialOpenRoom(){
       for(let i=0;i<23000;i++){
         const x=rand()*size,y=rand()*size;
         const shade=rand();
-        ctx.strokeStyle=shade>.69?"rgba(226,209,163,.19)":shade<.19?"rgba(48,43,31,.20)":"rgba(130,117,86,.23)";
-        ctx.lineWidth=.35+rand()*.55;
-        ctx.beginPath();
-        ctx.moveTo(x,y);
-        ctx.lineTo(x+(rand()-.5)*1.8,y+.7+rand()*2);
-        ctx.stroke();
+        const stroke=shade>.69?"rgba(226,209,163,.19)":shade<.19?"rgba(48,43,31,.20)":"rgba(130,117,86,.23)";
+        const lineWidth=.35+rand()*.55;
+        const dx=(rand()-.5)*1.8,dy=.7+rand()*2;
+        wrapDraw(x,y,3,(px,py)=>{
+          ctx.strokeStyle=stroke;
+          ctx.lineWidth=lineWidth;
+          ctx.beginPath();
+          ctx.moveTo(px,py);
+          ctx.lineTo(px+dx,py+dy);
+          ctx.stroke();
+        });
       }
       for(let i=0;i<260;i++){
         const x=rand()*size,y=rand()*size,r=.4+rand()*1.5;
-        ctx.fillStyle=rand()>.58?"rgba(45,40,29,.20)":"rgba(205,186,143,.16)";
-        ctx.beginPath();
-        ctx.ellipse(x,y,r,r*.55,rand(),0,Math.PI*2);
-        ctx.fill();
+        const fill=rand()>.58?"rgba(45,40,29,.20)":"rgba(205,186,143,.16)";
+        const angle=rand();
+        wrapDraw(x,y,r+1,(px,py)=>{
+          ctx.fillStyle=fill;
+          ctx.beginPath();
+          ctx.ellipse(px,py,r,r*.55,angle,0,Math.PI*2);
+          ctx.fill();
+        });
       }
     }else{
       // A suspended ceiling with yellowed mineral-fibre panels, water marks,
