@@ -593,7 +593,8 @@ export class SignalStalkerRig {
       );
       if (closest === 0) return 0;
     }
-    return closest * scale;
+    // Slightly generous contact margin so the visible legs/body register as a hit.
+    return Math.max(0, closest * scale - 0.42);
   }
 
   intersectsHitbox(worldX, worldZ, padding = 0) {
