@@ -5150,7 +5150,7 @@ spiderEntity.visible=false;
 // A very faint, sickly rim light catches the spider's silhouette nearby.
 // It is attached to the gameplay rig (never the menu) and casts no shadows, so
 // it adds atmosphere without the cost of another shadow map or a red glow.
-const spiderRimLight=new THREE.PointLight(0xd8d0ad,2.0,10.5,1.6);
+const spiderRimLight=new THREE.PointLight(0xc6c7a5,0.62,8.0,2);
 spiderRimLight.name="SpiderRimLight";
 spiderRimLight.position.set(0,3.0,-1.35);
 spiderRimLight.castShadow=false;
@@ -5473,7 +5473,7 @@ function installSpiderWallClipMaterial(material){
     // (including texture/vertex color), so the original model cannot wash white.
     const spiderAmbientFill=
       "\n// DeepSeeker spider visibility fill: preserve the authored albedo.\n"+
-      "outgoingLight += diffuseColor.rgb * 0.22;\n";
+      "outgoingLight = max(outgoingLight, diffuseColor.rgb * 0.22);\n";
     shader.fragmentShader=shader.fragmentShader.replace(
       opaqueFragmentMarker,
       clipFragment+spiderAmbientFill+opaqueFragmentMarker
@@ -9722,7 +9722,10 @@ function animate(){
           const scramble=(Math.sin(spiderCaughtElapsed*11)*.008)+
             (Math.sin(spiderCaughtElapsed*17)*.003);
           spiderEntity.scale.setScalar(1+lunge+scramble);
-          spiderEntity.rotation.y=mouthYaw+Math.sin(spiderCaughtElapsed*12)*.025;
+          // Camera yaw points from the player toward the spider. The spider's
+          // own forward axis must face the opposite direction (toward the player),
+          // otherwise the attack clip presents its rear during the drag.
+          spiderEntity.rotation.y=mouthYaw+Math.PI+Math.sin(spiderCaughtElapsed*12)*.025;
           if(spiderCaughtBlackout){
             spiderCaughtBlackout.style.opacity=String(
               THREE.MathUtils.smoothstep(caughtProgress,.76,1)
