@@ -6492,16 +6492,6 @@ function updateHouseTutorialSpider(dt){
     return;
   }
 
-  if(houseTutorialStage===3){
-    const sprintDistance=Math.hypot(
-      player.pos.x-houseTutorialStartX,
-      player.pos.z-houseTutorialStartZ
-    );
-    const sprinting=player.isRunning && Math.hypot(player.vel.x,player.vel.z)>2.0;
-    if(sprinting && sprintDistance>=4.0) setHouseTutorialStage(4);
-    return;
-  }
-
   if(houseTutorialStage<7) return;
 
   if(!houseTutorialSpiderPrepared && !prepareHouseTutorialSpider()){
