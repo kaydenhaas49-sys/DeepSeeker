@@ -334,19 +334,19 @@ function ensureTutorialOpenRoom(){
 
   const wallMaterial=new THREE.MeshStandardMaterial({
     map:world.materials.wall.map,
-    color:0xb6a13f,
-    roughness:.92
+    color:0x95844d,
+    roughness:1
   });
   const floorMaterial=new THREE.MeshStandardMaterial({
     map:world.materials.floor.map,
-    color:0x8f876f,
+    color:0x716b58,
     roughness:1,
     side:THREE.DoubleSide
   });
   const ceilingMaterial=new THREE.MeshStandardMaterial({
     map:world.materials.ceiling.map,
-    color:0x77725e,
-    roughness:.96,
+    color:0x5b594d,
+    roughness:1,
     side:THREE.DoubleSide
   });
   const fixtureMaterial=new THREE.MeshStandardMaterial({
@@ -395,6 +395,84 @@ function ensureTutorialOpenRoom(){
       new THREE.Vector3(...wall.position)
     );
     tutorialOpenRoomOccluders.push(mesh);
+  }
+
+  // Layer in visible age and neglect: damp wall blooms, dirty floor patches,
+  // torn wallpaper edges, and scattered plaster fragments. These are visual
+  // details only, so they never change the tutorial's collision layout.
+  const addGrimePatch=(width,height,x,y,z,rotationY=0,opacity=.48)=>{
+    const material=new THREE.MeshBasicMaterial({
+      color:0x29281f,
+      transparent:true,
+      opacity,
+      depthWrite:false,
+      side:THREE.DoubleSide
+    });
+    const patch=addTutorialMesh(
+      new THREE.PlaneGeometry(width,height),
+      material,
+      new THREE.Vector3(x,y,z)
+    );
+    patch.rotation.y=rotationY;
+    patch.renderOrder=2;
+    return patch;
+  };
+
+  // Dirty, water-stained wallpaper at varied heights on all four walls.
+  const wallMarks=[
+    [8.5,2.1,13,2.5,min+t*.5+.012,0,.50],
+    [5.2,3.4,27,3.2,min+t*.5+.012,0,.32],
+    [7.4,2.6,47,2.4,min+t*.5+.012,0,.44],
+    [6.6,3.0,19,2.7,max-t*.5-.012,Math.PI,.46],
+    [4.8,2.0,42,4.0,max-t*.5-.012,Math.PI,.38],
+    [7.5,2.8,min+t*.5+.012,2.5,22,Math.PI/2,.48],
+    [5.0,2.4,min+t*.5+.012,3.1,45,Math.PI/2,.38],
+    [6.8,3.2,max-t*.5-.012,2.8,36,-Math.PI/2,.47],
+    [4.4,2.0,max-t*.5-.012,4.1,15,-Math.PI/2,.34]
+  ];
+  for(const [w,hh,x,y,z,rotation,opacity] of wallMarks){
+    addGrimePatch(w,hh,x,y,z,rotation,opacity);
+  }
+
+  // Faded, irregular grime on the carpet.
+  const floorGrime=[
+    [9,6,15,18,.48],[6,10,43,14,.36],[11,7,24,43,.42],
+    [7,5,48,39,.34],[5,8,12,47,.40],[8,4,37,29,.30]
+  ];
+  for(const [w,d,x,z,opacity] of floorGrime){
+    const material=new THREE.MeshBasicMaterial({
+      color:0x302d25,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide
+    });
+    const patch=addTutorialMesh(
+      new THREE.PlaneGeometry(w,d),
+      material,
+      new THREE.Vector3(x,.018,z)
+    );
+    patch.rotation.x=-Math.PI/2;
+    patch.rotation.z=(x+z)*.037;
+    patch.renderOrder=1;
+  }
+
+  // A few broken plaster pieces and scraps near the edges of the room.
+  const debrisMaterial=new THREE.MeshStandardMaterial({color:0x5a5546,roughness:1});
+  const debris=[
+    [8.5,.08,9.0,.22,.10,.18],[10.2,.06,10.4,.16,.08,.12],
+    [51.4,.07,9.5,.24,.10,.16],[49.8,.05,11.0,.13,.07,.20],
+    [8.8,.06,49.6,.18,.07,.13],[11.0,.09,51.2,.28,.12,.18],
+    [49.4,.05,49.8,.18,.06,.15],[51.7,.08,47.9,.22,.10,.11],
+    [18.2,.04,7.3,.20,.06,.14],[39.6,.05,54.0,.26,.07,.12],
+    [6.8,.04,33.5,.15,.06,.10],[55.0,.06,27.0,.22,.08,.14]
+  ];
+  for(const [x,y,z,w,h2,d] of debris){
+    const piece=addTutorialMesh(
+      new THREE.BoxGeometry(w,h2,d),
+      debrisMaterial.clone(),
+      new THREE.Vector3(x,y,z)
+    );
+    piece.rotation.y=(x*1.7+z)*.11;
+    piece.rotation.z=(x+z)*.025;
+    piece.castShadow=true;
+    piece.receiveShadow=true;
   }
 
   // Four permanent fluorescent fixtures, one near each corner of the tutorial.
@@ -3212,17 +3290,22 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   if(save){
     applySavedGame(save);
   }else{
+    // Every fresh run starts in the Field Tutorial. The tutorial owns its
+    // room geometry and collision until lesson 10 hands the player off to
+    // the procedural Backrooms.
     houseMode=false;
-    // A fresh run starts in the real Backrooms. The Field Tutorial is a
-    // separate teaching space and must not replace the main game world here.
-    disableTutorialOpenRoom();
     resetMissionState();
+    ensureTutorialOpenRoom();
+    world.root.visible=false;
     player.pos.set(32,EYE,32);
+    player.yaw=0;
+    player.pitch=0;
     player.vel.set(0,0,0);
     player.jumpY=0;
     player.jumpVelocity=0;
     player.keys.clear();
     resetHouseTutorial();
+    setHouseTutorialStage(1);
   }
 
   player.lock();
