@@ -9810,7 +9810,7 @@ function animate(){
             Math.sin(spiderCaughtElapsed*10)*.018*drag+tugPulse*.018+yank*.035;
           const lookPitch=THREE.MathUtils.clamp(
             spiderCaughtStartPitch+Math.atan2(
-              spiderEntity.position.y-(player.pos.y+1.45),
+              spiderEntity.position.y-player.pos.y,
               Math.max(.25,Math.hypot(
                 spiderEntity.position.x-player.pos.x,
                 spiderEntity.position.z-player.pos.z
