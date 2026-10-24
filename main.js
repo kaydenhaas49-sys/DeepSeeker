@@ -5305,6 +5305,7 @@ let spiderCaughtHeadBone=null;
 let spiderCaughtHeadBaseRotation=null;
 let spiderCaughtBlackout=null;
 let spiderCaughtPlayerPosition=new THREE.Vector3();
+let spiderCaughtSpiderPosition=new THREE.Vector3();
 let spiderCaughtCameraStartY=0;
 let spiderCaughtRetreatDirection=new THREE.Vector3();
 let spiderJumpscareStartY=0;
@@ -6943,6 +6944,7 @@ function startSpiderCatchFreeze(){
   spiderCaughtHeadBone=findSpiderCaughtHeadBone();
   spiderCaughtHeadBaseRotation=spiderCaughtHeadBone ? spiderCaughtHeadBone.rotation.clone() : null;
   spiderCaughtPlayerPosition.copy(player.pos);
+  spiderCaughtSpiderPosition.copy(spiderEntity.position);
   spiderCaughtCameraStartY=player.camera.position.y;
   // Give the player a brief instinctive step backward, away from the spider,
   // before the bite lands. The retreat is animated from the captured position
@@ -9749,10 +9751,18 @@ function animate(){
 
         if(spiderCaughtFreezeTimer>0){
           player.movementFrozen=true;
-          const retreat=THREE.MathUtils.smoothstep(spiderCaughtElapsed,.12,.78)*1.45;
+          // The bite keeps the player anchored at the spider's mouth. Once
+          // the bite lands, move both together so the spider physically drags
+          // the player instead of pulling away and appearing to chew empty air.
+          const dragStart=THREE.MathUtils.smoothstep(spiderCaughtElapsed,.82,1.35);
+          const dragDistance=dragStart*(.25+drag*.95);
           player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
             spiderCaughtRetreatDirection,
-            retreat
+            dragDistance
+          );
+          spiderEntity.position.copy(spiderCaughtSpiderPosition).addScaledVector(
+            spiderCaughtRetreatDirection,
+            dragDistance
           );
           player.vel.set(0,0,0);
           player.keys.clear();
@@ -9772,9 +9782,7 @@ function animate(){
           );
           // The player recoils a step first; hold the bite animation long enough
           // to read clearly, then transition into a longer, slower drag pose.
-          if(spiderCaughtElapsed>=SPIDER_CAUGHT_BITE_TIME && spiderAnimationState!=="attack2"){
-            setSpiderAnimation("attack2");
-          }
+          // Stay in the initial bite pose during the pull; attack2 looked like chewing.
           const drag=THREE.MathUtils.smoothstep(
             (spiderCaughtElapsed-SPIDER_CAUGHT_BITE_TIME)/
               (SPIDER_CAUGHT_FREEZE_TIME-SPIDER_CAUGHT_BITE_TIME),
@@ -9791,9 +9799,9 @@ function animate(){
             Math.sin(mouthYaw-spiderCaughtStartYaw),
             Math.cos(mouthYaw-spiderCaughtStartYaw)
           );
-          // The bite lands before the pull begins. The camera then follows
-          // the spider's mouth, pitching down and turning into the grab while
-          // retaining the existing hand/torch drag motion.
+          // Keep the initial attack as a bite, then carry that bite through
+          // the drag. Switching to attack2 here reads as repeated chewing.
+          // The camera follows the mouth as the spider pulls the player along.
           const biteHold=1-biteProgress;
           // The catch is staged: bite impact, a hard first yank, an uneven
           // dragging struggle, then one final pull into the blackout.
