@@ -9718,18 +9718,25 @@ function animate(){
           // the spider's mouth, pitching down and turning into the grab while
           // retaining the existing hand/torch drag motion.
           const biteHold=1-biteProgress;
+          // A short, eased tug follows the bite instead of one constant camera
+          // rotation: the spider jerks, drags, then gives a final uneven pull.
+          const tugEnvelope=drag*(0.72+0.28*Math.sin(Math.PI*drag));
+          const tugPulse=(Math.sin(spiderCaughtElapsed*7.5)+
+            0.42*Math.sin(spiderCaughtElapsed*13.2))*tugEnvelope;
           player.yaw=spiderCaughtStartYaw+yawDelta*drag+
-            Math.sin(spiderCaughtElapsed*10)*.018*drag;
+            Math.sin(spiderCaughtElapsed*10)*.018*drag+
+            tugPulse*.012;
           player.pitch=THREE.MathUtils.clamp(
-            spiderCaughtStartPitch+drag*.98-biteHold*.05,
+            spiderCaughtStartPitch+drag*.98-biteHold*.05+
+              Math.sin(drag*Math.PI*2.1)*.035*drag+tugPulse*.018,
             -1.35,
             1.35
           );
           player.camera.rotation.z=Math.sin(drag*Math.PI)*.16+
-            drag*.09;
+            drag*.09+tugPulse*.035;
           const lunge=0.14*Math.max(0,1-caughtProgress/.38);
           const scramble=(Math.sin(spiderCaughtElapsed*11)*.008)+
-            (Math.sin(spiderCaughtElapsed*17)*.003);
+            (Math.sin(spiderCaughtElapsed*17)*.003)+tugPulse*.006;
           spiderEntity.scale.setScalar(1+lunge+scramble);
           // Camera yaw points from the player toward the spider. The spider's
           // own forward axis must face the opposite direction (toward the player),
