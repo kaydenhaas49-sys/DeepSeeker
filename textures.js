@@ -140,22 +140,35 @@ function makeCarpet() {
     }
   }
 
-  // Short directional fibers catch light differently than flat digital noise.
+  // Draw every fiber periodically across the texture edges. Without these
+  // wrapped copies, the canvas repeats cleanly in theory but hairline seams
+  // appear where randomly clipped strokes stop at the tile boundary.
   for (let i = 0; i < 5200; i++) {
     const x = rnd() * S;
     const y = rnd() * S;
+    const dx = (rnd() - 0.5) * 1.5;
+    const dy = 1 + rnd() * 2.5;
     const shade = rnd();
     g.strokeStyle = shade > 0.52
       ? "rgba(238,230,198,0.17)"
       : "rgba(111,98,68,0.13)";
     g.lineWidth = 0.35 + rnd() * 0.45;
-    g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x + (rnd() - 0.5) * 1.5, y + 1 + rnd() * 2.5);
-    g.stroke();
+    const xs = [0];
+    const ys = [0];
+    if (x < 2) xs.push(S);
+    if (x + dx > S - 2) xs.push(-S);
+    if (y < 4) ys.push(S);
+    if (y + dy > S - 1) ys.push(-S);
+    for (const ox of xs) for (const oy of ys) {
+      g.beginPath();
+      g.moveTo(x + ox, y + oy);
+      g.lineTo(x + dx + ox, y + dy + oy);
+      g.stroke();
+    }
   }
 
-  // Fine, uneven fibers rather than uniformly sized pixel specks.
+  // Fine, uneven fibers; tiny marks crossing an edge are copied to the
+  // opposite edge so adjacent repeats have no abrupt cut-off line.
   for (let i = 0; i < 4400; i++) {
     const v = rnd();
     g.fillStyle =
@@ -164,7 +177,12 @@ function makeCarpet() {
         : v > 0.33
           ? "rgba(196,182,138,0.16)"
           : "rgba(150,136,96,0.14)";
-    g.fillRect(rnd() * S, rnd() * S, 0.5 + rnd() * 1.5, 0.5 + rnd() * 1.3);
+    const x = rnd() * S, y = rnd() * S;
+    const w = 0.5 + rnd() * 1.5, h = 0.5 + rnd() * 1.3;
+    const xs = [0], ys = [0];
+    if (x + w > S) xs.push(-S);
+    if (y + h > S) ys.push(-S);
+    for (const ox of xs) for (const oy of ys) g.fillRect(x + ox, y + oy, w, h);
   }
   return c;
 }
