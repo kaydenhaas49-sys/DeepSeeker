@@ -3213,14 +3213,16 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
     applySavedGame(save);
   }else{
     houseMode=false;
-    ensureTutorialOpenRoom();
+    // A fresh run starts in the real Backrooms. The Field Tutorial is a
+    // separate teaching space and must not replace the main game world here.
+    disableTutorialOpenRoom();
     resetMissionState();
     player.pos.set(32,EYE,32);
     player.vel.set(0,0,0);
     player.jumpY=0;
     player.jumpVelocity=0;
     player.keys.clear();
-    setHouseTutorialStage(1);
+    resetHouseTutorial();
   }
 
   player.lock();
