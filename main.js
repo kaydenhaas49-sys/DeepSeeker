@@ -5283,6 +5283,10 @@ let remoteSpiderPositionInitialized=false;
 let spiderSpawnPending=false;
 let spiderJumpscareTimer=0;
 let spiderCaughtFreezeTimer=0;
+let spiderCaughtElapsed=0;
+let spiderCaughtStartYaw=0;
+let spiderCaughtStartPitch=0;
+let spiderCaughtBlackout=null;
 let spiderCaughtPlayerPosition=new THREE.Vector3();
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
@@ -6869,7 +6873,27 @@ function normalSpiderHitboxTouchesPlayer(){
 
 function startSpiderCatchFreeze(){
   spiderCaughtFreezeTimer=SPIDER_CAUGHT_FREEZE_TIME;
+  spiderCaughtElapsed=0;
+  spiderCaughtStartYaw=player.yaw;
+  spiderCaughtStartPitch=player.pitch;
   spiderCaughtPlayerPosition.copy(player.pos);
+  if(!arachnophobiaMode){
+    if(!spiderCaughtBlackout){
+      spiderCaughtBlackout=document.createElement("div");
+      spiderCaughtBlackout.id="spiderCaughtBlackout";
+      spiderCaughtBlackout.style.cssText=[
+        "position:fixed",
+        "inset:0",
+        "z-index:99998",
+        "pointer-events:none",
+        "background:#000",
+        "opacity:0",
+        "transition:none"
+      ].join(";");
+      document.body.appendChild(spiderCaughtBlackout);
+    }
+    spiderCaughtBlackout.style.opacity="0";
+  }
   player.movementFrozen=true;
   player.keys.clear();
   player.vel.set(0,0,0);
@@ -6927,6 +6951,12 @@ function resetPlayerAfterSpiderCatch(){
 
   spiderJumpscareTimer=0;
   spiderJumpscareScale=1;
+  spiderCaughtElapsed=0;
+  player.camera.rotation.z=0;
+  if(spiderCaughtBlackout){
+    spiderCaughtBlackout.remove();
+    spiderCaughtBlackout=null;
+  }
   spiderBehaviorTime=0;
   spiderStuckTime=0;
   spiderLastMoveX=NaN;
@@ -9580,7 +9610,29 @@ function animate(){
           player.keys.clear();
           player.jumpY=0;
           player.jumpVelocity=0;
+          spiderCaughtElapsed+=dt;
           spiderCaughtFreezeTimer=Math.max(0,spiderCaughtFreezeTimer-dt);
+          const caughtProgress=THREE.MathUtils.clamp(
+            spiderCaughtElapsed/SPIDER_CAUGHT_FREEZE_TIME,
+            0,
+            1
+          );
+          // The spider's attack yanks the player's view off balance before
+          // pulling it down and away. Player.update runs earlier in the frame,
+          // so apply the cinematic camera twist after it has updated the view.
+          const drag=THREE.MathUtils.smoothstep(caughtProgress,.08,.92);
+          player.yaw=spiderCaughtStartYaw+Math.sin(drag*Math.PI*.82)*.72;
+          player.pitch=THREE.MathUtils.clamp(
+            spiderCaughtStartPitch+drag*.95,
+            -1.35,
+            1.35
+          );
+          player.camera.rotation.z=Math.sin(drag*Math.PI)*.34;
+          if(spiderCaughtBlackout){
+            spiderCaughtBlackout.style.opacity=String(
+              THREE.MathUtils.smoothstep(caughtProgress,.68,1)
+            );
+          }
           if(spiderCaughtFreezeTimer<=0){
             player.movementFrozen=false;
             resetPlayerAfterSpiderCatch();
