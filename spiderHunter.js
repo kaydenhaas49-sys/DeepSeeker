@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { SignalStalkerRig } from "./signalStalker.js";
+import { SignalStalkerRig } from "./signalStalker.js?v=20261023-spider-motion2";
 
 /**
  * SpiderHunter
@@ -638,19 +638,51 @@ export class SpiderHunter {
   }
 
   followPath(dt,speed) {
-    while(this.path.length && this.pathIndex<this.path.length){
-      const [tx,tz]=this.path[this.pathIndex];
-      const dx=tx-this.position.x,dz=tz-this.position.z;
-      const distance=Math.hypot(dx,dz);
-      if(distance<.48){this.pathIndex++;continue;}
-      const step=Math.min(distance,Math.max(0,speed*dt));
-      const inv=1/Math.max(distance,.001);
-      if(!this.tryMove(dx*inv*step,dz*inv*step)){
-        this.path.length=0;this.pathIndex=0;this.hasPathTarget=false;this.speed=0;return false;
-      }
-      this.speed=speed;return true;
+    if(!this.path.length || this.pathIndex>=this.path.length){
+      this.speed=THREE.MathUtils.damp(this.speed,0,5,dt);
+      return false;
     }
-    this.speed=0;return false;
+
+    // Skip grid corners when the creature has a clear route to a later waypoint.
+    // This stops the pathfinder from making the spider zig-zag between cell centers.
+    const clearSegment=(x1,z1,x2,z2)=>{
+      const distance=Math.hypot(x2-x1,z2-z1);
+      const steps=Math.max(1,Math.ceil(distance/.28));
+      for(let i=1;i<=steps;i++){
+        const t=i/steps;
+        if(this.isBlocked(THREE.MathUtils.lerp(x1,x2,t),THREE.MathUtils.lerp(z1,z2,t))) return false;
+      }
+      return true;
+    };
+    let best=this.pathIndex;
+    for(let i=this.pathIndex+1;i<this.path.length;i++){
+      if(!clearSegment(this.position.x,this.position.z,this.path[i][0],this.path[i][1])) break;
+      best=i;
+    }
+    this.pathIndex=best;
+
+    const [tx,tz]=this.path[this.pathIndex];
+    const dx=tx-this.position.x,dz=tz-this.position.z;
+    const distance=Math.hypot(dx,dz);
+    if(distance<.24){
+      this.pathIndex++;
+      if(this.pathIndex>=this.path.length){
+        this.speed=THREE.MathUtils.damp(this.speed,0,5,dt);
+        return false;
+      }
+      return this.followPath(dt,speed);
+    }
+
+    // Ease into movement and turns instead of instantly changing speed each frame.
+    this.speed=THREE.MathUtils.damp(this.speed,speed,4.8,dt);
+    const step=Math.min(distance,Math.max(0,this.speed*dt));
+    const inv=1/Math.max(distance,.001);
+    if(!this.tryMove(dx*inv*step,dz*inv*step)){
+      this.path.length=0;this.pathIndex=0;this.hasPathTarget=false;
+      this.speed=THREE.MathUtils.damp(this.speed,0,8,dt);
+      return false;
+    }
+    return true;
   }
 
   tryDirectSteering(dt, targetX, targetZ, speed) {
