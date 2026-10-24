@@ -5329,12 +5329,12 @@ const SPIDER_CHASE_MAX_TIME=8.0;
 const SPIDER_CHASE_SPEED=3.8;
 const SPIDER_RUSH_SPEED=10.5;
 const SPIDER_RUSH_DURATION=1.35;
-const SPIDER_RADIUS=1.02;
+const SPIDER_RADIUS=1.55;
 const SPIDER_MIN_SPAWN_DISTANCE=13;
 const SPIDER_MAX_SPAWN_DISTANCE=21;
 const SPIDER_GROUND_OFFSET=.08;
 const SPIDER_BASE_TARGET_SPAN=8.2;
-const SPIDER_SCALE_MULTIPLIER=1.5;
+const SPIDER_SCALE_MULTIPLIER=0.62;
 const SPIDER_TARGET_SPAN=SPIDER_BASE_TARGET_SPAN*SPIDER_SCALE_MULTIPLIER;
 
 const SPIDER_PATH_CELL_SIZE=LOW_END_PERFORMANCE?1.8:1.35;
@@ -5714,11 +5714,11 @@ function setSpiderAnimation(name){
       if(key===actualName){
         item.reset();
         item.setEffectiveTimeScale(timeScale);
-        item.fadeIn(.06);
+        item.fadeIn(.16);
         item.play();
       }else{
         item.setEffectiveTimeScale(1);
-        item.fadeOut(.06);
+        item.fadeOut(.16);
       }
     }
   };
@@ -9639,22 +9639,23 @@ function animate(){
           // pulling it down and away. Player.update runs earlier in the frame,
           // so apply the cinematic camera twist after it has updated the view.
           const drag=THREE.MathUtils.smoothstep(caughtProgress,.08,.92);
-          player.yaw=spiderCaughtStartYaw+Math.sin(drag*Math.PI*.82)*.72;
+          player.yaw=spiderCaughtStartYaw+Math.sin(drag*Math.PI*.82)*.54;
           player.pitch=THREE.MathUtils.clamp(
-            spiderCaughtStartPitch+drag*.95,
+            spiderCaughtStartPitch+drag*.70,
             -1.35,
             1.35
           );
-          player.camera.rotation.z=Math.sin(drag*Math.PI)*.34;
+          player.camera.rotation.z=Math.sin(drag*Math.PI)*.22;
           // A short forward scale surge sells the lunge, followed by a fast,
           // irregular body twitch while the camera is dragged away.
-          const lunge=0.20*Math.max(0,1-caughtProgress/.34);
-          const scramble=Math.sin(spiderCaughtElapsed*39)*.022;
+          const lunge=0.14*Math.max(0,1-caughtProgress/.38);
+          const scramble=(Math.sin(spiderCaughtElapsed*11)*.008)+
+            (Math.sin(spiderCaughtElapsed*17)*.003);
           spiderEntity.scale.setScalar(1+lunge+scramble);
           spiderEntity.rotation.y=Math.atan2(
             player.pos.x-spiderEntity.position.x,
             player.pos.z-spiderEntity.position.z
-          )+Math.sin(spiderCaughtElapsed*31)*.11;
+          )+Math.sin(spiderCaughtElapsed*12)*.045;
           if(spiderCaughtBlackout){
             spiderCaughtBlackout.style.opacity=String(
               THREE.MathUtils.smoothstep(caughtProgress,.68,1)
