@@ -412,82 +412,139 @@ function ensureTutorialOpenRoom(){
     };
 
     if(kind==="wall"){
-      // Quiet, aged wallpaper: faded mustard paper and a very subtle repeating
-      // vertical motif. Damage is broad and sparse so it reads as material wear.
-      ctx.fillStyle="#bdb17b";
+      ctx.fillStyle="#b8ac77";
       ctx.fillRect(0,0,size,size);
 
-      for(let x=0;x<size;x+=32){
-        ctx.fillStyle="rgba(76,82,53,.075)";
-        ctx.fillRect(x,0,1,size);
-        ctx.fillStyle="rgba(238,224,178,.09)";
-        ctx.fillRect(x+1,0,1,size);
+      // Broad, soft paper fading instead of confetti-like speckling.
+      for(let i=0;i<11;i++){
+        const x=rand()*size,y=rand()*size,rx=45+rand()*100,ry=65+rand()*130;
+        softPatch(x,y,rx,ry,rand()>.5?"rgba(225,211,157,.13)":"rgba(72,60,38,.10)");
       }
-      for(let y=0;y<size;y+=32){
-        for(let x=0;x<size;x+=32){
-          const cx=x+16,cy=y+16;
-          ctx.strokeStyle="rgba(83,91,59,.16)";
-          ctx.lineWidth=.8;
+
+      // Faded small botanical print, intentionally low contrast.
+      const repeat=38;
+      for(let y=-repeat;y<size+repeat;y+=repeat){
+        for(let x=-repeat;x<size+repeat;x+=repeat){
+          const px=x+repeat*.5+(rand()-.5)*3,py=y+repeat*.5+(rand()-.5)*3;
+          const ink=.075+rand()*.055;
+          ctx.strokeStyle="rgba(78,83,53,"+ink+")";
+          ctx.lineWidth=.75+rand()*.25;
           ctx.beginPath();
-          ctx.moveTo(cx,cy-5);
-          ctx.quadraticCurveTo(cx-4,cy-1,cx,cy+5);
-          ctx.quadraticCurveTo(cx+4,cy-1,cx,cy-5);
+          ctx.moveTo(px,py-6);
+          ctx.bezierCurveTo(px-6,py-2,px-4,py+3,px,py+6);
+          ctx.bezierCurveTo(px+4,py+3,px+6,py-2,px,py-6);
+          ctx.stroke();
+          ctx.strokeStyle="rgba(231,219,171,"+(ink*.9)+")";
+          ctx.beginPath();
+          ctx.moveTo(px-2,py-1);
+          ctx.lineTo(px+2,py+2);
           ctx.stroke();
         }
       }
 
-      // Soft irregular stains, with no dark outlines or scattered polka dots.
-      for(let i=0;i<5;i++){
-        const x=rand()*size,y=rand()*size;
-        const rx=38+rand()*70,ry=45+rand()*100;
-        softPatch(x,y,rx,ry,
-          rand()>.5?"rgba(82,67,41,.12)":"rgba(120,108,69,.10)");
-        stainBlob(x,y,rx*.72,ry*.75,"rgba(91,73,44,.045)");
-      }
-
-      // A couple of larger tears in the paper, not lots of tiny decals.
-      for(let i=0;i<2;i++){
-        const cx=75+rand()*(size-150),cy=75+rand()*(size-150);
-        const rx=18+rand()*22,ry=30+rand()*34;
-        const points=[];
-        for(let j=0;j<12;j++){
-          const a=j/12*Math.PI*2,r=.76+rand()*.4;
-          points.push([cx+Math.cos(a)*rx*r,cy+Math.sin(a)*ry*r]);
-        }
-        polygon(points,"rgba(77,70,52,.22)",null);
-        const inner=points.map(([x,y])=>[cx+(x-cx)*.88,cy+(y-cy)*.88]);
-        polygon(inner,"rgba(132,126,98,.82)","rgba(73,66,48,.38)",.8);
-        ctx.strokeStyle="rgba(224,210,164,.45)";
-        ctx.lineWidth=1.1;
+      // Water tracks bloom near the ceiling and taper down the wall.
+      for(let i=0;i<6;i++){
+        const x=rand()*size,top=rand()*size*.38;
+        const width=12+rand()*36,length=65+rand()*180;
+        softPatch(x,top+12,width*1.8,22+rand()*24,"rgba(72,57,35,.18)");
+        const g=ctx.createLinearGradient(x,top,x+(rand()-.5)*12,top+length);
+        g.addColorStop(0,"rgba(75,59,36,.19)");
+        g.addColorStop(.25,"rgba(83,66,42,.105)");
+        g.addColorStop(.7,"rgba(83,66,42,.045)");
+        g.addColorStop(1,"rgba(83,66,42,0)");
+        ctx.fillStyle=g;
         ctx.beginPath();
-        ctx.moveTo(cx-rx*.45,cy-ry*.18);
-        ctx.lineTo(cx-rx*.08,cy-ry*.56);
-        ctx.lineTo(cx+rx*.26,cy-ry*.27);
-        ctx.stroke();
+        ctx.moveTo(x-width*.5,top);
+        ctx.bezierCurveTo(x-width*.3,top+length*.25,x-width*.7,top+length*.55,x-width*.25,top+length);
+        ctx.lineTo(x+width*.22,top+length*.88);
+        ctx.bezierCurveTo(x+width*.65,top+length*.48,x+width*.25,top+length*.23,x+width*.5,top);
+        ctx.closePath();
+        ctx.fill();
       }
 
-      // Old wallpaper seams are faint; they should not form a visible grid.
-      for(let x=0;x<=size;x+=128){
-        ctx.fillStyle="rgba(74,65,42,.065)";
-        ctx.fillRect(x,0,1,size);
-      }
-    }else if(kind==="floor"){
-      // Muted old office carpet with broad ingrained dirt and fine short fibres.
-      ctx.fillStyle="#81765a";
-      ctx.fillRect(0,0,size,size);
+      // Peeling paper has a dirty shadow, exposed plaster and a curled flap.
       for(let i=0;i<7;i++){
-        const x=rand()*size,y=rand()*size;
-        const rx=45+rand()*85,ry=30+rand()*65;
-        softPatch(x,y,rx,ry,
-          rand()>.5?"rgba(43,39,29,.14)":"rgba(191,169,120,.09)");
-        stainBlob(x,y,rx*.8,ry*.75,"rgba(53,47,33,.045)");
+        const cx=35+rand()*(size-70),cy=35+rand()*(size-70);
+        const rx=17+rand()*31,ry=23+rand()*47;
+        const points=[],count=10+Math.floor(rand()*5);
+        for(let j=0;j<count;j++){
+          const a=j/count*Math.PI*2,r=.72+rand()*.5;
+          points.push([Math.cos(a)*rx*r,Math.sin(a)*ry*r]);
+        }
+        wrapDraw(cx,cy,Math.max(rx,ry)+8,(x,y)=>{
+          ctx.save();
+          ctx.translate(x,y);
+          polygon(points.map(([px,py])=>[px+3,py+4]),"rgba(49,42,29,.30)",null);
+          polygon(points,"rgba(139,132,105,.96)","rgba(66,57,39,.55)",1.2);
+          polygon(points.map(([px,py])=>[px*.72,py*.72]),"rgba(174,164,128,.82)","rgba(211,198,151,.52)",.8);
+          const flap=[[-rx*.35,-ry*.35],[-rx*.08,-ry*.82],[rx*.28,-ry*.66],[rx*.18,-ry*.35],[-rx*.02,-ry*.17]];
+          polygon(flap,"rgba(219,204,151,.92)","rgba(92,76,45,.56)",1);
+          ctx.strokeStyle="rgba(244,226,172,.64)";
+          ctx.lineWidth=1.2;
+          ctx.beginPath();
+          ctx.moveTo(-rx*.28,-ry*.42);
+          ctx.quadraticCurveTo(-rx*.04,-ry*.58,rx*.18,-ry*.46);
+          ctx.stroke();
+          ctx.strokeStyle="rgba(65,56,38,.30)";
+          ctx.lineWidth=.7;
+          for(let k=1;k<points.length;k+=3){
+            ctx.beginPath();
+            ctx.moveTo(points[k][0]*.86,points[k][1]*.86);
+            ctx.lineTo(points[k][0]*1.03,points[k][1]*1.03);
+            ctx.stroke();
+          }
+          ctx.restore();
+        });
       }
-      for(let i=0;i<12000;i++){
-        const x=rand()*size,y=rand()*size;
-        const v=rand();
-        ctx.strokeStyle=v>.72?"rgba(221,204,158,.13)":v<.2?"rgba(42,39,30,.15)":"rgba(132,119,88,.15)";
-        ctx.lineWidth=.4+rand()*.45;
-        const dx=(rand()-.5)*1.3,dy=.8+rand()*1.5;
+
+      // Faint wallpaper joins and accumulated grime at the skirting.
+      for(let x=0;x<=size;x+=128){
+        ctx.fillStyle="rgba(71,61,39,.09)";
+        ctx.fillRect(x,0,1,size);
+        ctx.fillStyle="rgba(235,219,169,.10)";
+        ctx.fillRect(x+1,0,1,size);
+      }
+      const base=ctx.createLinearGradient(0,size*.72,0,size);
+      base.addColorStop(0,"rgba(77,62,39,0)");
+      base.addColorStop(.55,"rgba(77,62,39,.07)");
+      base.addColorStop(1,"rgba(58,48,33,.20)");
+      ctx.fillStyle=base;
+      ctx.fillRect(0,size*.72,size,size*.28);
+    }else if(kind==="floor"){
+      ctx.fillStyle="#82785e";
+      ctx.fillRect(0,0,size,size);
+
+      // Low-frequency dirt and faded areas.
+      for(let i=0;i<17;i++){
+        const x=rand()*size,y=rand()*size,rx=35+rand()*105,ry=28+rand()*80;
+        softPatch(x,y,rx,ry,rand()>.48?"rgba(40,36,27,.13)":"rgba(198,178,132,.10)");
+      }
+
+      // Flattened traffic lanes, with edges that fade into the pile.
+      for(let i=0;i<5;i++){
+        const x=rand()*size,y=rand()*size,len=110+rand()*170,w=12+rand()*27;
+        ctx.save();
+        ctx.translate(x,y);
+        ctx.rotate((rand()-.5)*.34);
+        const g=ctx.createLinearGradient(-len/2,0,len/2,0);
+        g.addColorStop(0,"rgba(53,46,33,0)");
+        g.addColorStop(.22,"rgba(53,46,33,.045)");
+        g.addColorStop(.5,"rgba(53,46,33,.12)");
+        g.addColorStop(.8,"rgba(53,46,33,.04)");
+        g.addColorStop(1,"rgba(53,46,33,0)");
+        ctx.fillStyle=g;
+        ctx.beginPath();
+        ctx.ellipse(0,0,len/2,w/2,0,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Short carpet pile; enough detail to read as fibres, not visual noise.
+      for(let i=0;i<15000;i++){
+        const x=rand()*size,y=rand()*size,v=rand();
+        ctx.strokeStyle=v>.74?"rgba(221,207,169,.19)":v<.20?"rgba(43,39,29,.19)":"rgba(135,122,91,.19)";
+        ctx.lineWidth=.45+rand()*.5;
+        const dx=(rand()-.5)*1.5,dy=.8+rand()*2.2;
         wrapDraw(x,y,3,(px,py)=>{
           ctx.beginPath();
           ctx.moveTo(px,py);
@@ -495,26 +552,13 @@ function ensureTutorialOpenRoom(){
           ctx.stroke();
         });
       }
-      // A few longer matted tracks break up the carpet without a checkerboard.
-      for(let i=0;i<3;i++){
-        const x=rand()*size,y=rand()*size,len=85+rand()*110,w=18+rand()*22;
-        ctx.save();
-        ctx.translate(x,y);
-        ctx.rotate((rand()-.5)*.45);
-        const g=ctx.createLinearGradient(-len/2,0,len/2,0);
-        g.addColorStop(0,"rgba(181,160,116,0)");
-        g.addColorStop(.45,"rgba(58,51,36,.08)");
-        g.addColorStop(1,"rgba(181,160,116,0)");
-        ctx.fillStyle=g;
-        ctx.beginPath();
-        ctx.ellipse(0,0,len/2,w/2,0,0,Math.PI*2);
-        ctx.fill();
-        ctx.restore();
+      for(let i=0;i<4;i++){
+        const x=rand()*size,y=rand()*size,rx=10+rand()*22,ry=7+rand()*14;
+        softPatch(x,y,rx,ry,"rgba(49,44,32,.19)","rgba(49,44,32,0)");
+        stainBlob(x,y,rx*.72,ry*.7,"rgba(191,172,128,.12)");
       }
     }else{
-      // Realistic suspended mineral-fibre panels: calm grey-beige base,
-      // restrained water damage, and thin recessed seams.
-      ctx.fillStyle="#aaa99a";
+      ctx.fillStyle="#9f9f92";
       ctx.fillRect(0,0,size,size);
       const tile=size/4;
       for(let ty=0;ty<4;ty++){
@@ -524,37 +568,49 @@ function ensureTutorialOpenRoom(){
           ctx.fillStyle=shade;
           ctx.fillRect(x+2,y+2,tile-4,tile-4);
 
-          if(rand()>.52){
-            const cx=x+tile*(.25+rand()*.5),cy=y+tile*(.25+rand()*.5);
-            const rx=18+rand()*26,ry=14+rand()*24;
+          // Mineral-fibre surface texture.
+          for(let n=0;n<180;n++){
+            const px=x+5+rand()*(tile-10),py=y+5+rand()*(tile-10);
+            ctx.strokeStyle=rand()>.5?"rgba(238,235,215,.09)":"rgba(75,74,64,.045)";
+            ctx.lineWidth=.4;
+            ctx.beginPath();
+            ctx.moveTo(px,py);
+            ctx.lineTo(px+1+rand()*4,py+(rand()-.5)*1.5);
+            ctx.stroke();
+          }
+
+          if(rand()>.30){
+            const cx=x+tile*(.18+rand()*.64),cy=y+tile*(.18+rand()*.64);
+            const rx=16+rand()*33,ry=12+rand()*28;
             const g=ctx.createRadialGradient(cx,cy,2,cx,cy,Math.max(rx,ry));
-            g.addColorStop(0,"rgba(112,83,51,.035)");
-            g.addColorStop(.55,"rgba(112,83,51,.12)");
-            g.addColorStop(1,"rgba(112,83,51,0)");
+            g.addColorStop(0,"rgba(105,76,47,.16)");
+            g.addColorStop(.5,"rgba(123,91,57,.10)");
+            g.addColorStop(1,"rgba(123,91,57,0)");
             ctx.fillStyle=g;
             ctx.beginPath();
-            ctx.ellipse(cx,cy,rx,ry,rand()*.4,0,Math.PI*2);
+            ctx.ellipse(cx,cy,rx,ry,rand()*.6,0,Math.PI*2);
             ctx.fill();
           }
 
-          if(rand()>.86){
-            const cx=x+tile*(.2+rand()*.6),cy=y+tile*(.2+rand()*.6);
-            ctx.strokeStyle="rgba(66,64,53,.34)";
-            ctx.lineWidth=.8;
+          if(rand()>.78){
+            const cx=x+tile*(.15+rand()*.55),cy=y+tile*(.2+rand()*.55);
+            ctx.strokeStyle="rgba(66,62,51,.48)";
+            ctx.lineWidth=.9;
             ctx.beginPath();
             ctx.moveTo(cx,cy);
-            ctx.lineTo(cx+5+rand()*10,cy-4-rand()*8);
-            ctx.lineTo(cx+9+rand()*10,cy-11-rand()*8);
+            ctx.lineTo(cx+5+rand()*9,cy-4-rand()*8);
+            ctx.lineTo(cx+10+rand()*10,cy-12-rand()*8);
+            ctx.lineTo(cx+16+rand()*6,cy-14-rand()*12);
             ctx.stroke();
           }
         }
       }
-      ctx.fillStyle="rgba(59,59,51,.28)";
+      ctx.fillStyle="rgba(48,48,41,.40)";
       for(let p=0;p<=size;p+=tile){
-        ctx.fillRect(p,0,1.5,size);
-        ctx.fillRect(0,p,size,1.5);
+        ctx.fillRect(p,0,1.8,size);
+        ctx.fillRect(0,p,size,1.8);
       }
-      ctx.fillStyle="rgba(232,230,211,.18)";
+      ctx.fillStyle="rgba(236,232,210,.24)";
       for(let p=2;p<=size;p+=tile){
         ctx.fillRect(p,0,1,size);
         ctx.fillRect(0,p,size,1);
