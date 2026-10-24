@@ -7457,7 +7457,20 @@ function finishSpiderModel(model,animations,sourceName){
     // prevents partial/invalid animation paths from deforming the spider.
     let validTrackCount=0;
     stable.tracks=stable.tracks.filter(track=>{
-      if(track.name.endsWith(".morphTargetInfluences")) return false;
+      const trackName=String(track?.name||"");
+      if(trackName.endsWith(".morphTargetInfluences")) return false;
+
+      // Visibility belongs to gameplay, not the animation asset. Some imported
+      // clips key mesh/group.visible, which can make the spider vanish in its
+      // idle/stalk state and reappear when flashlight perception switches clips.
+      let propertyName="";
+      try{
+        propertyName=THREE.PropertyBinding.parseTrackName(trackName)?.propertyName||"";
+      }catch(_error){}
+      if(propertyName==="visible" || /\.visible(?:\[[^\]]*\])?$/i.test(trackName)){
+        return false;
+      }
+
       const targets=trackTargetNames(track);
       const valid=targets.some(target=>animatedNodeNames.has(target));
       if(valid) validTrackCount++;
