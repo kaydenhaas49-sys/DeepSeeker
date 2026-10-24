@@ -5150,7 +5150,7 @@ spiderEntity.visible=false;
 // A very faint, sickly rim light catches the spider's silhouette nearby.
 // It is attached to the gameplay rig (never the menu) and casts no shadows, so
 // it adds atmosphere without the cost of another shadow map or a red glow.
-const spiderRimLight=new THREE.PointLight(0xc6c7a5,0.62,8.0,2);
+const spiderRimLight=new THREE.PointLight(0xc6c7a5,0.10,4.8,2);
 spiderRimLight.name="SpiderRimLight";
 spiderRimLight.position.set(0,3.0,-1.35);
 spiderRimLight.castShadow=false;
@@ -5447,7 +5447,7 @@ function installSpiderWallClipMaterial(material){
     );
     shader.vertexShader=shader.vertexShader.replace(
       worldPositionMarker,
-      worldPositionMarker+"\nvDeepseekerSpiderWorldPosition = worldPosition.xyz;"
+      worldPositionMarker+"\nvDeepseekerSpiderWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;"
     );
     shader.fragmentShader=shader.fragmentShader.replace(
       "#include <common>",
@@ -5468,12 +5468,11 @@ function installSpiderWallClipMaterial(material){
       "    vDeepseekerSpiderWorldPosition.y<="+SPIDER_WALL_CLIP_HEIGHT.toFixed(3)+";\n"+
       "  if(deepseekerInsideWall) discard;\n"+
       "}\n";
-    // Add a small albedo-based ambient floor for the spider only. Unlike
-    // emissive material overrides, this uses the already sampled diffuse color
-    // (including texture/vertex color), so the original model cannot wash white.
+    // Add only a restrained albedo-based visibility floor to dark fragments.
+    // It preserves the sampled texture and does not brighten normal lit areas.
     const spiderAmbientFill=
       "\n// DeepSeeker spider visibility fill: preserve the authored albedo.\n"+
-      "outgoingLight = max(outgoingLight, max(diffuseColor.rgb, vec3(0.22)) * 0.42);\n";
+      "outgoingLight = max(outgoingLight, diffuseColor.rgb * 0.12);\n";
     shader.fragmentShader=shader.fragmentShader.replace(
       opaqueFragmentMarker,
       clipFragment+spiderAmbientFill+opaqueFragmentMarker
@@ -5495,13 +5494,6 @@ function updateSpiderWallClipBounds(dt){
     originX=tutorialSpiderEntity.position.x;
     originZ=tutorialSpiderEntity.position.z;
     wallBounds=tutorialOpenRoomCollisionBoxes;
-  }else if(spiderActive && spiderModel?.visible){
-    originX=spiderEntity.position.x;
-    originZ=spiderEntity.position.z;
-    // Clip only the nearby wall rectangles against the spider's actual
-    // world-space fragments. This stops animated leg meshes showing through
-    // a wall even when the spider's center remains on the open side.
-    wallBounds=world.getNearbyWallBounds(originX,originZ,SPIDER_TARGET_SPAN*.58+.5);
   }
   const reach=SPIDER_TARGET_SPAN*.58+.5;
   const nearby=[...wallBounds].filter(wall=>{
@@ -7307,9 +7299,11 @@ function finishSpiderModel(model,animations,sourceName){
   // the model's authored proportions or skeleton.
   // Match the tutorial spider exactly: preserve its authored colors/maps and
   // apply only the tutorial's copied-material/shadow setup.
-  // Apply the same world-space wall clipping used by the tutorial so animated
-  // legs are hidden where they intersect procedural wall geometry.
-  applyTutorialSpiderMaterialPass(model,{darken:false,wallClip:true});
+  // Do not apply the tutorial's AABB fragment-discard shader to the large
+  // imported gameplay rig. Overlapping wall bounds can discard its full body.
+  // The normal depth buffer still hides geometry behind walls; custom clipping
+  // remains limited to the small scripted tutorial spider and its room blockers.
+  applyTutorialSpiderMaterialPass(model,{darken:false,wallClip:false});
   fitSpiderModel(model);
 
   // Stop both rigs before replacing the current model tree.
