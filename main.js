@@ -5285,6 +5285,9 @@ let spiderSpawnPending=false;
 let spiderJumpscareTimer=0;
 let spiderCaughtFreezeTimer=0;
 let spiderCaughtElapsed=0;
+let spiderCaughtFlashlightOverride=false;
+let spiderCaughtFlashlightWasOn=false;
+let spiderCaughtPreviousTool="flashlight";
 let spiderCaughtStartYaw=0;
 let spiderCaughtStartPitch=0;
 let spiderCaughtBlackout=null;
@@ -5322,14 +5325,14 @@ const SPIDER_POUNCE_DURATION=.58;
 const SPIDER_POUNCE_HEIGHT=1.15;
 const SPIDER_SPEED=2.65;
 const SPIDER_ATTACK_RANGE=2.5;
-const SPIDER_HITBOX_PADDING=1.10;
+const SPIDER_HITBOX_PADDING=1.55;
 const SPIDER_CAUGHT_FREEZE_TIME=1.35;
 const SPIDER_CHASE_MIN_TIME=5.0;
 const SPIDER_CHASE_MAX_TIME=8.0;
 const SPIDER_CHASE_SPEED=3.8;
 const SPIDER_RUSH_SPEED=10.5;
 const SPIDER_RUSH_DURATION=1.35;
-const SPIDER_RADIUS=1.55;
+const SPIDER_RADIUS=1.85;
 const SPIDER_MIN_SPAWN_DISTANCE=13;
 const SPIDER_MAX_SPAWN_DISTANCE=21;
 const SPIDER_GROUND_OFFSET=.08;
@@ -6874,6 +6877,16 @@ function normalSpiderHitboxTouchesPlayer(){
 
 function startSpiderCatchFreeze(){
   spiderCaughtFreezeTimer=SPIDER_CAUGHT_FREEZE_TIME;
+  spiderCaughtFlashlightWasOn=flashlightOn;
+  spiderCaughtPreviousTool=equippedTool;
+  spiderCaughtFlashlightOverride=true;
+  // Keep the torch in the foreground and its beam on the spider for the
+  // short drag sequence, even if the player had switched to the radio.
+  flashlightOn=true;
+  equippedTool="flashlight";
+  radioViewmodel.visible=false;
+  player.proceduralArmFlashlight.visible=true;
+  player.setFlashlightVisual(true);
   spiderCaughtElapsed=0;
   spiderCaughtStartYaw=player.yaw;
   spiderCaughtStartPitch=player.pitch;
@@ -6918,6 +6931,13 @@ function startSpiderCatchFreeze(){
 function resetPlayerAfterSpiderCatch(){
   player.movementFrozen=false;
   spiderCaughtFreezeTimer=0;
+  spiderCaughtFlashlightOverride=false;
+  flashlightOn=spiderCaughtFlashlightWasOn;
+  equippedTool=spiderCaughtPreviousTool;
+  radioViewmodel.visible=equippedTool==="radio";
+  player.proceduralArmFlashlight.visible=equippedTool!=="radio";
+  player.setFlashlightVisual(equippedTool!=="radio" && flashlightOn);
+  flashlight.visible=equippedTool!=="radio" && flashlightOn && battery>0;
   const teammate=multiplayer.getClosestBackroomsPlayerPosition(
     player.pos.x,
     player.pos.z
@@ -9545,8 +9565,14 @@ function animate(){
     }
   }
 
-  flashlight.intensity=flashlightOn ? flashlightStrength : 0;
-  flashlight.visible=flashlightOn && battery>0;
+  flashlight.intensity=(flashlightOn || spiderCaughtFlashlightOverride)
+    ? Math.max(flashlightStrength,spiderCaughtFlashlightOverride?6:0)
+    : 0;
+  flashlight.visible=(flashlightOn && battery>0) || spiderCaughtFlashlightOverride;
+  if(spiderCaughtFlashlightOverride){
+    player.proceduralArmFlashlight.visible=true;
+    radioViewmodel.visible=false;
+  }
   // The beam now follows the hand-held torch rather than a camera-center fill.
   // Keep beam range and aim stable. Wall-hit occlusion was changing the
   // spotlight target dozens of times per second and could make surfaces snap
