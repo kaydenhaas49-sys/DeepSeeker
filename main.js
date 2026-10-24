@@ -285,6 +285,7 @@ const tutorialOpenRoomOccluders=[];
 let tutorialLightsOutState="on";
 let tutorialLightsOutElapsed=0;
 let tutorialCeilingLightsOn=true;
+let tutorialFlickerAverage=1;
 let tutorialOpenRoomLightLastUpdate=0;
 const tutorialOpenRoomLightOrigin=new THREE.Vector3();
 const tutorialOpenRoomLightDirection=new THREE.Vector3();
@@ -387,168 +388,197 @@ function ensureTutorialOpenRoom(){
       if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lineWidth;ctx.stroke();}
     };
 
-    if(kind==="wall"){
-      // Old yellow-beige paper with olive undertones and gentle age variation.
-      ctx.fillStyle="#b8ad7c";
-      ctx.fillRect(0,0,size,size);
-      for(let i=0;i<24;i++){
-        const x=rand()*size,y=rand()*size;
-        softPatch(x,y,38+rand()*90,24+rand()*86,
-          rand()>.45?"rgba(76,68,43,.075)":"rgba(237,220,166,.075)");
+    const stainBlob=(cx,cy,rx,ry,fill,stroke=null)=>{
+      const points=[];
+      const count=18;
+      for(let i=0;i<count;i++){
+        const angle=i/count*Math.PI*2;
+        const radius=.73+rand()*.48;
+        points.push([Math.cos(angle)*rx*radius,Math.sin(angle)*ry*radius]);
       }
-      // Paper fibre and faded pigment; avoid a sharp, digital-looking print.
-      for(let i=0;i<14500;i++){
-        const v=rand();
-        ctx.fillStyle=v>.76?"rgba(238,224,173,.10)":v<.24?"rgba(60,54,34,.085)":"rgba(143,132,86,.045)";
-        const x=rand()*size,y=rand()*size;
-        ctx.fillRect(x,y,.5+rand()*1.6,.5+rand()*1.4);
-      }
-      // A small, muted vintage leaf print. Its spacing divides evenly into the
-      // texture dimensions so it stays seamless when the wallpaper repeats.
-      for(let x=-32;x<=size+32;x+=64){
-        for(let y=-32;y<=size+32;y+=64){
-          const cx=x+32,cy=y+32;
-          ctx.strokeStyle="rgba(91,99,62,.36)";
+      wrapDraw(cx,cy,Math.max(rx,ry)+4,(x,y)=>{
+        ctx.beginPath();
+        ctx.moveTo(x+points[0][0],y+points[0][1]);
+        for(let i=1;i<points.length;i++)ctx.lineTo(x+points[i][0],y+points[i][1]);
+        ctx.closePath();
+        ctx.fillStyle=fill;
+        ctx.fill();
+        if(stroke){
+          ctx.strokeStyle=stroke;
           ctx.lineWidth=1.15;
-          ctx.beginPath();
-          ctx.moveTo(cx,cy-19);
-          ctx.bezierCurveTo(cx-3,cy-7,cx+3,cy+7,cx,cy+20);
-          ctx.stroke();
-          for(const side of [-1,1]){
-            for(const offset of [-12,5,17]){
-              const lx=cx+side*6,ly=cy+offset;
-              ctx.fillStyle=side<0?"rgba(111,120,76,.38)":"rgba(143,139,88,.32)";
-              ctx.beginPath();
-              ctx.moveTo(cx,ly);
-              ctx.bezierCurveTo(cx+side*4,ly-6,cx+side*13,ly-8,cx+side*14,ly-1);
-              ctx.bezierCurveTo(cx+side*11,ly+5,cx+side*4,ly+4,cx,ly);
-              ctx.fill();
-            }
-          }
-          ctx.strokeStyle="rgba(235,224,183,.19)";
-          ctx.lineWidth=.8;
-          ctx.beginPath();
-          ctx.moveTo(cx-15,cy-14);
-          ctx.lineTo(cx-15,cy+14);
           ctx.stroke();
         }
-      }
-      // Uneven moisture trails, old smoke-darkened patches and rubbed areas.
-      for(let i=0;i<28;i++){
-        const x=rand()*size,y=rand()*size;
-        softPatch(x,y,12+rand()*45,18+rand()*82,
-          rand()>.28?"rgba(72,64,42,.12)":"rgba(76,77,48,.10)");
-      }
-      for(let i=0;i<19;i++){
-        const x=rand()*size;
-        const w=2+rand()*17;
-        const len=28+rand()*150;
-        const fromTop=rand()>.5;
-        const y=fromTop?0:size-len;
-        wrapDraw(x,y+len*.5,w+3,(px,py)=>{
-          const gradient=ctx.createLinearGradient(px,py-len*.5,px,py+len*.5);
-          gradient.addColorStop(0,"rgba(64,57,37,0)");
-          gradient.addColorStop(.18,"rgba(67,60,39,.12)");
-          gradient.addColorStop(.72,"rgba(67,60,39,.075)");
-          gradient.addColorStop(1,"rgba(64,57,37,0)");
-          ctx.fillStyle=gradient;
-          ctx.beginPath();
-          ctx.moveTo(px-w*.5,py-len*.5);
-          ctx.bezierCurveTo(px-w*.2,py-len*.1,px-w*.8,py+len*.15,px-w*.3,py+len*.5);
-          ctx.lineTo(px+w*.35,py+len*.5);
-          ctx.bezierCurveTo(px+w*.1,py+len*.12,px+w*.7,py-len*.15,px+w*.5,py-len*.5);
-          ctx.closePath();
-          ctx.fill();
-        });
-      }
-      // Torn wallpaper reveals a darker, dirty paper layer. Ragged edges and
-      // a thin curled-paper highlight make the damage look physical, not like
-      // a clean rectangular decal. These marks are texture-only.
-      for(let tear=0;tear<5;tear++){
-        const cx=24+rand()*(size-48),cy=24+rand()*(size-48);
-        const w=24+rand()*48,h=32+rand()*74;
-        const points=[];
-        const count=11;
-        for(let i=0;i<count;i++){
-          const a=i/count*Math.PI*2;
-          const r=.72+rand()*.42;
-          points.push([Math.cos(a)*w*.5*r,Math.sin(a)*h*.5*r]);
-        }
-        wrapDraw(cx,cy,Math.max(w,h)+4,(px,py)=>{
-          const shifted=points.map(p=>[px+p[0],py+p[1]]);
-          polygon(shifted,"rgba(65,58,39,.53)","rgba(54,48,32,.34)",1.3);
-          const fold=[
-            [px-w*.30,py-h*.09],[px-w*.19,py-h*.38],
-            [px+w*.02,py-h*.31],[px+w*.18,py-h*.16],
-            [px+w*.03,py+h*.02],[px-w*.11,py+h*.11]
-          ];
-          polygon(fold,"rgba(213,198,146,.45)","rgba(239,224,178,.40)",1);
-          ctx.strokeStyle="rgba(48,43,30,.38)";
-          ctx.lineWidth=1;
-          ctx.beginPath();
-          ctx.moveTo(px-w*.08,py+h*.12);
-          ctx.lineTo(px-w*.12,py+h*.28);
-          ctx.lineTo(px-w*.02,py+h*.38);
-          ctx.stroke();
-        });
-      }
-      // Narrow roll seams and rubbed edges, kept low contrast.
-      for(let x=0;x<=size;x+=128){
-        ctx.fillStyle="rgba(77,69,45,.12)";
-        ctx.fillRect(x,0,1,size);
-        ctx.fillStyle="rgba(238,222,171,.15)";
-        ctx.fillRect(x+1,0,1,size);
-      }
-    }else if(kind==="floor"){
-      // A dingy olive-tan office carpet, dulled by years of traffic.
-      ctx.fillStyle="#77705a";
+      });
+    };
+
+    if(kind==="wall"){
+      // Yellowed paper: slightly uneven pigment, a fine small-scale vintage print,
+      // and a few larger, irregular marks where damp has travelled through it.
+      ctx.fillStyle="#c4b77f";
       ctx.fillRect(0,0,size,size);
-      for(let i=0;i<28;i++){
+      for(let i=0;i<8500;i++){
+        const v=rand();
+        ctx.fillStyle=v>.82?"rgba(246,231,181,.10)":v<.18?"rgba(65,57,35,.075)":"rgba(147,132,83,.04)";
         const x=rand()*size,y=rand()*size;
-        softPatch(x,y,16+rand()*60,12+rand()*52,
-          rand()>.45?"rgba(41,38,29,.17)":"rgba(185,163,113,.13)");
+        ctx.fillRect(x,y,.6+rand()*1.5,.6+rand()*1.5);
       }
-      // Matted foot traffic and irregularly faded paths, without a tiled grid.
+
+      // A small, faded botanical/diamond repeat rather than oversized leaves.
+      // At the texture's world scale each repeat is roughly 15 cm across.
+      const step=16;
+      for(let y=0;y<size;y+=step){
+        for(let x=0;x<size;x+=step){
+          const cx=x+step*.5,cy=y+step*.5;
+          ctx.strokeStyle="rgba(91,99,64,.21)";
+          ctx.lineWidth=.65;
+          ctx.beginPath();
+          ctx.moveTo(cx,cy-4.5);
+          ctx.quadraticCurveTo(cx-3.5,cy-1.5,cx,cy+4.5);
+          ctx.quadraticCurveTo(cx+3.5,cy+1.5,cx,cy-4.5);
+          ctx.stroke();
+          ctx.strokeStyle="rgba(231,220,176,.17)";
+          ctx.beginPath();
+          ctx.moveTo(cx-5,cy);
+          ctx.lineTo(cx,cy-5);
+          ctx.lineTo(cx+5,cy);
+          ctx.stroke();
+        }
+      }
+
+      // Uneven damp discolouration with soft edges and non-circular boundaries.
       for(let i=0;i<9;i++){
         const x=rand()*size,y=rand()*size;
-        const length=28+rand()*100,width=7+rand()*23;
-        wrapDraw(x,y,Math.max(length,width)+2,(px,py)=>{
-          ctx.save();
-          ctx.translate(px,py);
-          ctx.rotate((rand()-.5)*.45);
-          const gradient=ctx.createLinearGradient(-length/2,0,length/2,0);
-          gradient.addColorStop(0,"rgba(177,157,111,0)");
-          gradient.addColorStop(.5,"rgba(190,173,130,.11)");
-          gradient.addColorStop(1,"rgba(177,157,111,0)");
-          ctx.fillStyle=gradient;
-          ctx.beginPath();
-          ctx.ellipse(0,0,length/2,width/2,0,0,Math.PI*2);
-          ctx.fill();
-          ctx.restore();
-        });
+        const rx=24+rand()*75,ry=22+rand()*76;
+        softPatch(x,y,rx,ry,rand()>.35?"rgba(76,63,39,.13)":"rgba(104,96,61,.10)");
+        stainBlob(x,y,rx*.82,ry*.78,
+          rand()>.5?"rgba(80,65,40,.075)":"rgba(101,93,60,.07)",
+          "rgba(91,72,42,.055)");
       }
-      // Dense random fibres with a slight directional nap.
-      for(let i=0;i<34000;i++){
+
+      // Long, tapered moisture trails. The ends fade instead of looking like
+      // perfectly straight dark lines painted over the wallpaper.
+      for(let i=0;i<5;i++){
+        const x=36+rand()*(size-72);
+        const y=rand()*(size-190);
+        const len=75+rand()*135;
+        const w=2.5+rand()*5;
+        const gradient=ctx.createLinearGradient(x,y,x,y+len);
+        gradient.addColorStop(0,"rgba(78,65,42,0)");
+        gradient.addColorStop(.16,"rgba(78,65,42,.11)");
+        gradient.addColorStop(.78,"rgba(78,65,42,.075)");
+        gradient.addColorStop(1,"rgba(78,65,42,0)");
+        ctx.fillStyle=gradient;
+        ctx.beginPath();
+        ctx.moveTo(x-w*.4,y);
+        ctx.bezierCurveTo(x-w*.7,y+len*.25,x+w*.5,y+len*.65,x-w*.15,y+len);
+        ctx.lineTo(x+w*.38,y+len);
+        ctx.bezierCurveTo(x+w*.85,y+len*.6,x-w*.25,y+len*.28,x+w*.45,y);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // A small number of actual peeled patches expose dull plaster underneath.
+      // Ragged contours and partial curled edges avoid the sticker-like look.
+      const tearCount=rand()>.52?2:1;
+      for(let tear=0;tear<tearCount;tear++){
+        const cx=100+rand()*(size-200),cy=100+rand()*(size-200);
+        const rx=28+rand()*37,ry=38+rand()*48;
+        const points=[];
+        for(let i=0;i<17;i++){
+          const a=i/17*Math.PI*2;
+          const r=.68+rand()*.48;
+          points.push([Math.cos(a)*rx*r,Math.sin(a)*ry*r]);
+        }
+        const shiftedPoints=(px,py,dx=0,dy=0)=>points.map(p=>[px+p[0]+dx,py+p[1]+dy]);
+        polygon(shiftedPoints(cx,cy,2,3),"rgba(56,48,32,.22)",null);
+        polygon(shiftedPoints(cx,cy),"rgba(118,111,83,.78)","rgba(75,65,43,.54)",1.1);
+
+        // Thin curled paper remnants catch light along one broken edge.
+        const fold=[
+          [cx-rx*.48,cy-ry*.22],[cx-rx*.24,cy-ry*.64],
+          [cx+rx*.06,cy-ry*.43],[cx+rx*.31,cy-ry*.16],
+          [cx+rx*.03,cy+ry*.03],[cx-rx*.17,cy-ry*.04]
+        ];
+        polygon(fold,"rgba(224,210,158,.53)","rgba(240,225,178,.30)",.8);
+        for(let i=0;i<13;i++){
+          const px=cx+(rand()-.5)*rx*1.8;
+          const py=cy+(rand()-.5)*ry*1.8;
+          ctx.fillStyle=rand()>.5?"rgba(68,61,43,.26)":"rgba(221,210,170,.31)";
+          ctx.fillRect(px,py,.7+rand()*1.2,.7+rand()*1.2);
+        }
+      }
+
+      // Faint roll seams and dirty handling near the lower edge.
+      for(let x=0;x<=size;x+=128){
+        ctx.fillStyle="rgba(80,70,44,.085)";
+        ctx.fillRect(x,0,1,size);
+        ctx.fillStyle="rgba(240,223,174,.14)";
+        ctx.fillRect(x+1,0,1,size);
+      }
+      const lowerGrime=ctx.createLinearGradient(0,size*.77,0,size);
+      lowerGrime.addColorStop(0,"rgba(70,60,39,0)");
+      lowerGrime.addColorStop(.72,"rgba(70,60,39,.055)");
+      lowerGrime.addColorStop(1,"rgba(61,52,36,.12)");
+      ctx.fillStyle=lowerGrime;
+      ctx.fillRect(0,size*.77,size,size*.23);
+    }else if(kind==="floor"){
+      // Old office carpet: dirty taupe/olive pile with matted traffic and
+      // soaked-in discoloration. The damage stays soft, not polka-dot shaped.
+      ctx.fillStyle="#897d60";
+      ctx.fillRect(0,0,size,size);
+
+      for(let i=0;i<11;i++){
+        const x=rand()*size,y=rand()*size;
+        const rx=24+rand()*65,ry=18+rand()*52;
+        softPatch(x,y,rx,ry,
+          rand()>.46?"rgba(48,43,31,.14)":"rgba(206,184,132,.12)");
+        stainBlob(x,y,rx*.86,ry*.80,
+          rand()>.55?"rgba(53,47,33,.075)":"rgba(112,97,65,.065)",
+          "rgba(57,49,33,.05)");
+      }
+
+      // Four broad, soft flattened areas suggest years of foot traffic.
+      for(let i=0;i<4;i++){
+        const x=50+rand()*(size-100),y=40+rand()*(size-80);
+        const length=90+rand()*100,width=24+rand()*35;
+        const angle=(rand()-.5)*.7;
+        ctx.save();
+        ctx.translate(x,y);
+        ctx.rotate(angle);
+        const gradient=ctx.createLinearGradient(-length*.5,0,length*.5,0);
+        gradient.addColorStop(0,"rgba(190,170,125,0)");
+        gradient.addColorStop(.35,"rgba(195,175,132,.09)");
+        gradient.addColorStop(.7,"rgba(67,58,39,.07)");
+        gradient.addColorStop(1,"rgba(190,170,125,0)");
+        ctx.fillStyle=gradient;
+        ctx.beginPath();
+        ctx.ellipse(0,0,length*.5,width*.5,0,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Short, dense fibres give the carpet texture without a visible square grid.
+      for(let i=0;i<23000;i++){
         const x=rand()*size,y=rand()*size;
         const shade=rand();
-        ctx.strokeStyle=shade>.68?"rgba(219,202,156,.19)":shade<.18?"rgba(45,42,32,.22)":"rgba(133,122,91,.26)";
+        ctx.strokeStyle=shade>.69?"rgba(226,209,163,.19)":shade<.19?"rgba(48,43,31,.20)":"rgba(130,117,86,.23)";
         ctx.lineWidth=.35+rand()*.55;
         ctx.beginPath();
         ctx.moveTo(x,y);
         ctx.lineTo(x+(rand()-.5)*1.8,y+.7+rand()*2);
         ctx.stroke();
       }
-      // Little dark flecks and compressed, slightly shiny fibres in worn spots.
-      for(let i=0;i<430;i++){
-        const x=rand()*size,y=rand()*size,r=.35+rand()*1.3;
-        wrapDraw(x,y,r+1,(px,py)=>{
-          ctx.fillStyle=rand()>.57?"rgba(43,39,28,.25)":"rgba(210,190,143,.18)";
-          ctx.beginPath();ctx.ellipse(px,py,r,r*.55,rand(),0,Math.PI*2);ctx.fill();
-        });
+      for(let i=0;i<260;i++){
+        const x=rand()*size,y=rand()*size,r=.4+rand()*1.5;
+        ctx.fillStyle=rand()>.58?"rgba(45,40,29,.20)":"rgba(205,186,143,.16)";
+        ctx.beginPath();
+        ctx.ellipse(x,y,r,r*.55,rand(),0,Math.PI*2);
+        ctx.fill();
       }
     }else{
-      // Yellowed acoustic ceiling panels with dusty seams and uneven ageing.
-      ctx.fillStyle="#aaa99b";
+      // A suspended ceiling with yellowed mineral-fibre panels, water marks,
+      // dusty seams and a few cracked/chipped edges.
+      ctx.fillStyle="#b2b09f";
       ctx.fillRect(0,0,size,size);
       const tile=size/4;
       for(let ty=0;ty<4;ty++){
@@ -557,62 +587,71 @@ function ensureTutorialOpenRoom(){
           const shade=ceilingColors[Math.floor(rand()*ceilingColors.length)];
           ctx.fillStyle=shade;
           ctx.fillRect(x+2,y+2,tile-4,tile-4);
-          // Pressed mineral fibres and very slight panel-to-panel variation.
-          for(let i=0;i<620;i++){
+
+          for(let i=0;i<260;i++){
             const v=rand();
-            ctx.fillStyle=v>.62?"rgba(241,239,218,.13)":v<.20?"rgba(78,76,62,.10)":"rgba(147,145,126,.07)";
+            ctx.fillStyle=v>.65?"rgba(241,239,218,.13)":v<.20?"rgba(75,73,59,.11)":"rgba(147,145,126,.065)";
             ctx.fillRect(x+rand()*(tile-4)+2,y+rand()*(tile-4)+2,.5+rand()*1.2,.5+rand()*1.2);
           }
-          // A few old leaks leave broad brown-grey rings and a diffuse centre.
-          if(rand()>.58){
-            const cx=x+18+rand()*(tile-36),cy=y+18+rand()*(tile-36);
-            const r=12+rand()*25;
-            const gradient=ctx.createRadialGradient(cx,cy,2,cx,cy,r);
-            gradient.addColorStop(0,"rgba(107,91,61,.025)");
-            gradient.addColorStop(.58,"rgba(119,94,59,.105)");
-            gradient.addColorStop(.82,"rgba(91,77,54,.15)");
-            gradient.addColorStop(1,"rgba(91,77,54,0)");
+
+          // Some panels have concentrated leak rings with dirty centres.
+          if(rand()>.66){
+            const cx=x+17+rand()*(tile-34),cy=y+17+rand()*(tile-34);
+            const rx=16+rand()*25,ry=13+rand()*21;
+            const gradient=ctx.createRadialGradient(cx,cy,2,cx,cy,Math.max(rx,ry));
+            gradient.addColorStop(0,"rgba(102,78,48,.055)");
+            gradient.addColorStop(.45,"rgba(123,94,59,.14)");
+            gradient.addColorStop(.72,"rgba(92,75,52,.17)");
+            gradient.addColorStop(1,"rgba(92,75,52,0)");
             ctx.fillStyle=gradient;
-            ctx.beginPath();ctx.ellipse(cx,cy,r,r*(.55+rand()*.5),rand()*.5,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx,cy,rx,ry,rand()*.6,0,Math.PI*2);
+            ctx.fill();
           }
-          // Some tiles have a chipped corner or a hairline crack.
-          if(rand()>.78){
+
+          // Chipped panel corners are sparse and irregular, not decorative grids.
+          if(rand()>.82){
             const corner=Math.floor(rand()*4);
-            const sx=corner===1||corner===2?x+tile-4:x+4;
-            const sy=corner>=2?y+tile-4:y+4;
+            const sx=corner===1||corner===2?x+tile-3:x+3;
+            const sy=corner>=2?y+tile-3:y+3;
             const signX=sx>x+tile/2?-1:1,signY=sy>y+tile/2?-1:1;
             polygon([
-              [sx,sy],[sx+signX*(5+rand()*7),sy],
-              [sx+signX*(7+rand()*8),sy+signY*(5+rand()*9)],
-              [sx,sy+signY*(9+rand()*9)]
-            ],"rgba(71,69,58,.28)","rgba(235,231,207,.28)",.8);
-          }else if(rand()>.74){
+              [sx,sy],
+              [sx+signX*(7+rand()*12),sy+signY*2],
+              [sx+signX*(9+rand()*15),sy+signY*(8+rand()*13)],
+              [sx+signX*2,sy+signY*(13+rand()*12)]
+            ],"rgba(69,65,53,.34)","rgba(230,226,205,.24)",.9);
+          }else if(rand()>.86){
             const cx=x+tile*(.25+rand()*.5),cy=y+tile*(.25+rand()*.5);
-            ctx.strokeStyle="rgba(79,76,64,.38)";
-            ctx.lineWidth=.8;
+            ctx.strokeStyle="rgba(70,68,57,.42)";
+            ctx.lineWidth=1;
             ctx.beginPath();
             ctx.moveTo(cx,cy);
-            ctx.lineTo(cx+4+rand()*8,cy-5-rand()*7);
-            ctx.lineTo(cx+2+rand()*8,cy-12-rand()*8);
+            ctx.lineTo(cx+7+rand()*12,cy-6-rand()*8);
+            ctx.lineTo(cx+12+rand()*10,cy-15-rand()*8);
             ctx.stroke();
           }
         }
       }
-      // Narrow recessed grid with a dusty dark edge and old chalky highlights.
-      ctx.fillStyle="rgba(65,65,57,.42)";
+
+      // Larger stains occasionally cross tile borders, so the ceiling does not
+      // read as sixteen unrelated, freshly generated squares.
+      for(let i=0;i<5;i++){
+        const x=rand()*size,y=rand()*size;
+        const rx=15+rand()*36,ry=13+rand()*31;
+        softPatch(x,y,rx,ry,"rgba(93,72,47,.11)");
+        stainBlob(x,y,rx*.84,ry*.78,"rgba(111,83,52,.055)","rgba(93,72,47,.06)");
+      }
+
+      ctx.fillStyle="rgba(63,63,54,.40)";
       for(let p=0;p<=size;p+=tile){
         ctx.fillRect(p,0,2,size);
         ctx.fillRect(0,p,size,2);
       }
-      ctx.fillStyle="rgba(235,232,210,.24)";
+      ctx.fillStyle="rgba(235,232,210,.22)";
       for(let p=2;p<=size;p+=tile){
         ctx.fillRect(p,0,1,size);
         ctx.fillRect(0,p,size,1);
-      }
-      // A few ceiling stains straddle panel boundaries naturally.
-      for(let i=0;i<7;i++){
-        const x=rand()*size,y=rand()*size,r=9+rand()*22;
-        softPatch(x,y,r,r*(.55+rand()*.7),"rgba(104,83,55,.09)");
       }
     }
     ctx.globalAlpha=1;
@@ -625,11 +664,11 @@ function ensureTutorialOpenRoom(){
   };
 
   const tutorialWallTexture=makeTutorialTexture("wall");
-  tutorialWallTexture.repeat.set(7,2);
+  tutorialWallTexture.repeat.set((max-min)/4,h/4);
   const tutorialFloorTexture=makeTutorialTexture("floor");
-  tutorialFloorTexture.repeat.set(14,14);
+  tutorialFloorTexture.repeat.set((max-min)/3.2,(max-min)/3.2);
   const tutorialCeilingTexture=makeTutorialTexture("ceiling");
-  tutorialCeilingTexture.repeat.set(14,14);
+  tutorialCeilingTexture.repeat.set((max-min)/2.4,(max-min)/2.4);
 
   const wallMaterial=new THREE.MeshStandardMaterial({
     map:tutorialWallTexture,
@@ -783,46 +822,83 @@ function updateTutorialOpenRoomLights(dt=0){
 
   if(tutorialLightsOutState==="flickering"){
     tutorialLightsOutElapsed+=Math.min(Math.max(dt,0),.1);
-    const t=tutorialLightsOutElapsed;
-    // Keep the pulses slow and uneven, but end the tutorial blackout sequence sooner.
-    const litWindows=[[0,.34],[.70,.91],[1.34,1.60],[2.03,2.25]];
-    tutorialCeilingLightsOn=litWindows.some(([start,end])=>t>=start&&t<end);
-    if(t>=2.60){
+    if(tutorialLightsOutElapsed>=3.05){
       tutorialLightsOutState="off";
-      tutorialCeilingLightsOn=false;
     }
-  }else{
-    tutorialCeilingLightsOn=tutorialLightsOutState==="on";
   }
 
-  const lightsOn=tutorialCeilingLightsOn;
+  const flickering=tutorialLightsOutState==="flickering";
+  const t=tutorialLightsOutElapsed;
+  let totalLevel=0;
+
   for(const item of tutorialOpenRoomLights){
-    item.light.visible=lightsOn;
-    item.light.intensity=lightsOn?item.baseIntensity:0;
+    let level=tutorialLightsOutState==="on"?1:0;
+
+    if(flickering){
+      // Each tube fails at a slightly different moment. The staggered short
+      // dropouts feel like bad ballasts, not four lights tied to one switch.
+      const phase=((item.phase/(Math.PI*2))+1)%1;
+      level=.96;
+      const pulses=[
+        [.12+phase*.06,.075,.12],
+        [.56+(1-phase)*.11,.045,0],
+        [.64+phase*.12,.12,.28],
+        [1.08+(1-phase)*.17,.04,0],
+        [1.16+phase*.13,.07,.17],
+        [1.63+(1-phase)*.16,.11,0],
+        [1.84+phase*.13,.065,.18],
+        [2.18+(1-phase)*.11,.045,0],
+        [2.25+phase*.13,.13,.30]
+      ];
+      for(const [start,duration,output] of pulses){
+        if(t>=start && t<start+duration) level=Math.min(level,output);
+      }
+      // One final uneven sputter, then each fixture stays dead.
+      if(t>=2.72+phase*.18)level=0;
+    }
+
+    level=THREE.MathUtils.clamp(level,0,1);
+    totalLevel+=level;
+    item.light.visible=level>.012;
+    item.light.intensity=item.baseIntensity*level;
+
     const material=item.mesh?.material;
     if(material?.emissiveIntensity!==undefined){
-      material.color.setHex(lightsOn?0xffedbd:0x514b39);
-      material.emissive.setHex(lightsOn?0xffe7ad:0x000000);
-      material.emissiveIntensity=lightsOn?2.1:0;
+      if(level>.42){
+        material.color.setHex(0xffedbd);
+        material.emissive.setHex(0xffd990);
+        material.emissiveIntensity=1.8*level;
+      }else if(level>.012){
+        material.color.setHex(0xb99e68);
+        material.emissive.setHex(0xffbd62);
+        material.emissiveIntensity=.95*level;
+      }else{
+        material.color.setHex(0x514b39);
+        material.emissive.setHex(0x000000);
+        material.emissiveIntensity=0;
+      }
     }
   }
+
+  tutorialFlickerAverage=totalLevel/tutorialOpenRoomLights.length;
+  tutorialCeilingLightsOn=tutorialLightsOutState==="on"||
+    (flickering&&tutorialFlickerAverage>.22);
 
   const fillScale=tutorialLightsOutState==="on"
     ?1
     :tutorialLightsOutState==="off"
       ?.12
-      :lightsOn
-        ?.72
-        :.18;
+      :.10+.48*tutorialFlickerAverage;
   for(const item of tutorialFillLights){
     item.light.intensity=item.baseIntensity*fillScale;
   }
 }
 
 function getTutorialAmbientScale(){
-  if(!tutorialOpenRoomActive||tutorialLightsOutState==="on")return 1;
+  if(!tutorialOpenRoomActive)return 1;
+  if(tutorialLightsOutState==="on")return 1;
   if(tutorialLightsOutState==="off")return .14;
-  return tutorialCeilingLightsOn?.72:.20;
+  return .14+.58*tutorialFlickerAverage;
 }
 
 function disableTutorialOpenRoom(){
@@ -6350,12 +6426,14 @@ function setHouseTutorialStage(stage){
     tutorialLightsOutState="on";
     tutorialLightsOutElapsed=0;
     tutorialCeilingLightsOn=true;
+    tutorialFlickerAverage=1;
   }else if(stage===5){
     // The room is bright for the movement lessons, then the fluorescents fail
     // right as the player is asked to turn on the flashlight.
     tutorialLightsOutState="flickering";
     tutorialLightsOutElapsed=0;
     tutorialCeilingLightsOn=true;
+    tutorialFlickerAverage=1;
   }
 
   // Hard-reset the normal director for every tutorial stage. This covers stale
