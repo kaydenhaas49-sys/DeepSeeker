@@ -5150,7 +5150,7 @@ spiderEntity.visible=false;
 // A very faint, sickly rim light catches the spider's silhouette nearby.
 // It is attached to the gameplay rig (never the menu) and casts no shadows, so
 // it adds atmosphere without the cost of another shadow map or a red glow.
-const spiderRimLight=new THREE.PointLight(0xe2dfb8,1.25,8.5,1.7);
+const spiderRimLight=new THREE.PointLight(0xd8d0ad,2.0,10.5,1.6);
 spiderRimLight.name="SpiderRimLight";
 spiderRimLight.position.set(0,3.0,-1.35);
 spiderRimLight.castShadow=false;
@@ -5468,10 +5468,19 @@ function installSpiderWallClipMaterial(material){
       "    vDeepseekerSpiderWorldPosition.y<="+SPIDER_WALL_CLIP_HEIGHT.toFixed(3)+";\n"+
       "  if(deepseekerInsideWall) discard;\n"+
       "}\n";
-    shader.fragmentShader=shader.fragmentShader.replace(opaqueFragmentMarker,clipFragment+opaqueFragmentMarker);
+    // Add a small albedo-based ambient floor for the spider only. Unlike
+    // emissive material overrides, this uses the already sampled diffuse color
+    // (including texture/vertex color), so the original model cannot wash white.
+    const spiderAmbientFill=
+      "\n// DeepSeeker spider visibility fill: preserve the authored albedo.\n"+
+      "outgoingLight += diffuseColor.rgb * 0.22;\n";
+    shader.fragmentShader=shader.fragmentShader.replace(
+      opaqueFragmentMarker,
+      clipFragment+spiderAmbientFill+opaqueFragmentMarker
+    );
   };
   const previousProgramCacheKey=material.customProgramCacheKey.bind(material);
-  material.customProgramCacheKey=()=>previousProgramCacheKey()+"|deepseeker-spider-wall-clip-v1";
+  material.customProgramCacheKey=()=>previousProgramCacheKey()+"|deepseeker-spider-wall-clip-v2-albedo-fill";
   material.needsUpdate=true;
 }
 
@@ -7338,22 +7347,9 @@ function finishSpiderModel(model,animations,sourceName){
     -placedCenter.z
   );
 
-  function stripSpiderEmission(root){
-    root?.traverse?.(object=>{
-      if(!object.isMesh)return;
-      const materials=Array.isArray(object.material)?object.material:[object.material];
-      for(const material of materials){
-        if(!material)continue;
-        // Keep a very low, neutral self-lit floor so a spawned spider never
-        // vanishes completely outside the flashlight beam. This is deliberately
-        // dim: it preserves the dark silhouette without making the creature glow.
-        if(material.emissive?.set)material.emissive.set(0x45402f);
-        if("emissiveIntensity" in material)material.emissiveIntensity=0.82;
-        material.needsUpdate=true;
-      }
-    });
-  }
-  stripSpiderEmission(visualRoot);
+  // Do not override the imported materials' emissive/color values. The
+  // texture-aware shader fill above keeps the spider visible without flattening
+  // its authored colors or making every material pale.
   spiderModel=visualRoot;
   spiderOriginalModel=visualRoot;
   spiderEntity.add(visualRoot);
