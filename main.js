@@ -5298,6 +5298,8 @@ let spiderCaughtFlashlightWasOn=false;
 let spiderCaughtPreviousTool="flashlight";
 let spiderCaughtStartYaw=0;
 let spiderCaughtStartPitch=0;
+let spiderCaughtFlashlightStartPosition=null;
+let spiderCaughtFlashlightStartRotation=null;
 let spiderCaughtBlackout=null;
 let spiderCaughtPlayerPosition=new THREE.Vector3();
 let spiderJumpscareStartY=0;
@@ -6915,6 +6917,8 @@ function startSpiderCatchFreeze(){
   spiderCaughtElapsed=0;
   spiderCaughtStartYaw=player.yaw;
   spiderCaughtStartPitch=player.pitch;
+  spiderCaughtFlashlightStartPosition=player.proceduralArmFlashlight.position.clone();
+  spiderCaughtFlashlightStartRotation=player.proceduralArmFlashlight.rotation.clone();
   spiderCaughtPlayerPosition.copy(player.pos);
   if(!arachnophobiaMode){
     if(!spiderCaughtBlackout){
@@ -6999,6 +7003,12 @@ function resetPlayerAfterSpiderCatch(){
   spiderJumpscareScale=1;
   spiderCaughtElapsed=0;
   player.camera.rotation.z=0;
+  if(player.proceduralArmFlashlight && spiderCaughtFlashlightStartPosition && spiderCaughtFlashlightStartRotation){
+    player.proceduralArmFlashlight.position.copy(spiderCaughtFlashlightStartPosition);
+    player.proceduralArmFlashlight.rotation.copy(spiderCaughtFlashlightStartRotation);
+  }
+  spiderCaughtFlashlightStartPosition=null;
+  spiderCaughtFlashlightStartRotation=null;
   if(spiderCaughtBlackout){
     const blackout=spiderCaughtBlackout;
     spiderCaughtBlackout=null;
@@ -9718,25 +9728,58 @@ function animate(){
           // the spider's mouth, pitching down and turning into the grab while
           // retaining the existing hand/torch drag motion.
           const biteHold=1-biteProgress;
-          // A short, eased tug follows the bite instead of one constant camera
-          // rotation: the spider jerks, drags, then gives a final uneven pull.
+          // The catch is staged: bite impact, a hard first yank, an uneven
+          // dragging struggle, then one final pull into the blackout.
           const tugEnvelope=drag*(0.72+0.28*Math.sin(Math.PI*drag));
           const tugPulse=(Math.sin(spiderCaughtElapsed*7.5)+
             0.42*Math.sin(spiderCaughtElapsed*13.2))*tugEnvelope;
+          const impact=(time,spread)=>Math.exp(-Math.pow(
+            (spiderCaughtElapsed-time)/spread,2
+          ));
+          const firstYank=impact(.91,.105);
+          const secondYank=impact(1.62,.145);
+          const finalYank=impact(2.23,.09);
+          const yank=firstYank*.9+secondYank*.68+finalYank*1.15;
           player.yaw=spiderCaughtStartYaw+yawDelta*drag+
             Math.sin(spiderCaughtElapsed*10)*.018*drag+
-            tugPulse*.012;
+            tugPulse*.018+yank*.035;
           player.pitch=THREE.MathUtils.clamp(
             spiderCaughtStartPitch+drag*.98-biteHold*.05+
-              Math.sin(drag*Math.PI*2.1)*.035*drag+tugPulse*.018,
+              Math.sin(drag*Math.PI*2.1)*.045*drag+
+              tugPulse*.025+yank*.055,
             -1.35,
             1.35
           );
           player.camera.rotation.z=Math.sin(drag*Math.PI)*.16+
-            drag*.09+tugPulse*.035;
+            drag*.09+tugPulse*.045+
+            Math.sin(spiderCaughtElapsed*8.3)*.018*drag+
+            (firstYank-secondYank+finalYank)*.07;
+
+          // Let the torch lag behind the player's head, swing out during each
+          // yank, then dip toward the floor as the spider drags them down.
+          // Its original camera-local pose is restored when the catch ends.
+          const torch=player.proceduralArmFlashlight;
+          if(torch && spiderCaughtFlashlightStartPosition && spiderCaughtFlashlightStartRotation){
+            const torchSide=Math.sin(spiderCaughtElapsed*8.8)*.045*drag+
+              (firstYank-secondYank+finalYank)*.095;
+            const torchDip=drag*.105+finalYank*.075+
+              Math.max(0,Math.sin(spiderCaughtElapsed*6.4))*.025*drag;
+            torch.position.set(
+              spiderCaughtFlashlightStartPosition.x+torchSide,
+              spiderCaughtFlashlightStartPosition.y-torchDip,
+              spiderCaughtFlashlightStartPosition.z+drag*.045+yank*.035
+            );
+            torch.rotation.set(
+              spiderCaughtFlashlightStartRotation.x+drag*.16+yank*.22,
+              spiderCaughtFlashlightStartRotation.y+torchSide*1.8,
+              spiderCaughtFlashlightStartRotation.z+
+                Math.sin(spiderCaughtElapsed*8.8)*.09*drag+
+                (firstYank-secondYank+finalYank)*.16
+            );
+          }
           const lunge=0.14*Math.max(0,1-caughtProgress/.38);
           const scramble=(Math.sin(spiderCaughtElapsed*11)*.008)+
-            (Math.sin(spiderCaughtElapsed*17)*.003)+tugPulse*.006;
+            (Math.sin(spiderCaughtElapsed*17)*.003)+tugPulse*.008+yank*.012;
           spiderEntity.scale.setScalar(1+lunge+scramble);
           // Camera yaw points from the player toward the spider. The spider's
           // own forward axis must face the opposite direction (toward the player),
