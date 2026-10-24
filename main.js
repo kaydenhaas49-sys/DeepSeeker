@@ -9884,10 +9884,10 @@ function animate(){
           const scramble=(Math.sin(spiderCaughtElapsed*7.2)*.005)+
             (Math.sin(spiderCaughtElapsed*10.5)*.002)+tugPulse*.005+yank*.008;
           spiderEntity.scale.setScalar(1+lunge+scramble);
-          // Camera yaw points from the player toward the spider. The spider's
-          // own forward axis must face the opposite direction (toward the player),
-          // otherwise the attack clip presents its rear during the drag.
-          spiderEntity.rotation.y=mouthYaw+Math.PI+Math.sin(spiderCaughtElapsed*12)*.025;
+          // Use the same facing convention as the normal chase and pounce:
+          // atan2(player - spider) points the spider's front toward the player.
+          // Adding PI here turned the model around and dragged the player behind it.
+          spiderEntity.rotation.y=mouthYaw+Math.sin(spiderCaughtElapsed*12)*.025;
 
           if(spiderCaughtBlackout){
             spiderCaughtBlackout.style.opacity=String(
