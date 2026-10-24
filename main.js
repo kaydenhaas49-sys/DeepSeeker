@@ -5150,7 +5150,7 @@ spiderEntity.visible=false;
 // A very faint, sickly rim light catches the spider's silhouette nearby.
 // It is attached to the gameplay rig (never the menu) and casts no shadows, so
 // it adds atmosphere without the cost of another shadow map or a red glow.
-const spiderRimLight=new THREE.PointLight(0xc5c7a0,0.34,5.2,2);
+const spiderRimLight=new THREE.PointLight(0xe2dfb8,1.25,8.5,1.7);
 spiderRimLight.name="SpiderRimLight";
 spiderRimLight.position.set(0,3.0,-1.35);
 spiderRimLight.castShadow=false;
@@ -5334,8 +5334,8 @@ const SPIDER_POUNCE_HEIGHT=1.15;
 const SPIDER_SPEED=2.65;
 const SPIDER_ATTACK_RANGE=2.5;
 const SPIDER_HITBOX_PADDING=1.55;
-const SPIDER_CAUGHT_FREEZE_TIME=1.75;
-const SPIDER_CAUGHT_BITE_TIME=.34;
+const SPIDER_CAUGHT_FREEZE_TIME=2.65;
+const SPIDER_CAUGHT_BITE_TIME=.62;
 const SPIDER_CHASE_MIN_TIME=5.0;
 const SPIDER_CHASE_MAX_TIME=8.0;
 const SPIDER_CHASE_SPEED=3.8;
@@ -5733,7 +5733,7 @@ function setSpiderAnimation(name){
 
   if(!action || !actualName || spiderAnimationState===actualName) return;
 
-  const timeScale=name==="runby" ? 1.8 : name==="chase" ? 1.12 : 1;
+  const timeScale=name==="runby" ? 1.25 : name==="chase" ? 0.78 : (actualName==="attack1" || actualName==="attack2") ? 0.62 : 0.78;
   const transitionActions=(actions)=>{
     for(const [key,item] of actions){
       if(key===actualName){
@@ -7347,8 +7347,8 @@ function finishSpiderModel(model,animations,sourceName){
         // Keep a very low, neutral self-lit floor so a spawned spider never
         // vanishes completely outside the flashlight beam. This is deliberately
         // dim: it preserves the dark silhouette without making the creature glow.
-        if(material.emissive?.set)material.emissive.set(0x17150f);
-        if("emissiveIntensity" in material)material.emissiveIntensity=0.32;
+        if(material.emissive?.set)material.emissive.set(0x45402f);
+        if("emissiveIntensity" in material)material.emissiveIntensity=0.82;
         material.needsUpdate=true;
       }
     });
