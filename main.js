@@ -161,6 +161,7 @@ const adminFlyButton=document.getElementById("adminFlyButton");
 const adminTeleportExitButton=document.getElementById("adminTeleportExitButton");
 const adminTeleportRadioButton=document.getElementById("adminTeleportRadioButton");
 const adminSpiderChaseButton=document.getElementById("adminSpiderChaseButton");
+const adminSpiderFrontButton=document.getElementById("adminSpiderFrontButton");
 const adminWaterGunButton=document.getElementById("adminWaterGunButton");
 const adminWaterRpgButton=document.getElementById("adminWaterRpgButton");
 const adminClearWaterButton=document.getElementById("adminClearWaterButton");
@@ -6394,12 +6395,13 @@ function showSpiderScareMessage(message,duration=900){
   },duration);
 }
 
-function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15){
+function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15,requireVisibleSpawn=false){
   if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return false;
 
-  const spawn=
-    findSpiderVisibleSpawnPosition(minDistance,maxDistance) ||
-    findSpiderSpawnPosition(minDistance,maxDistance);
+  const spawn=requireVisibleSpawn
+    ? findSpiderVisibleSpawnPosition(minDistance,maxDistance)
+    : (findSpiderVisibleSpawnPosition(minDistance,maxDistance) ||
+       findSpiderSpawnPosition(minDistance,maxDistance));
   if(!spawn) return false;
 
   const position=new THREE.Vector3(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
@@ -8960,6 +8962,21 @@ adminSpiderChaseButton.addEventListener("click",()=>{
     adminPanelStatus.textContent="SPIDER LOADING — TRY AGAIN IN A MOMENT";
   }else{
     adminPanelStatus.textContent="COULD NOT SPAWN SPIDER — TRY A CLEARER AREA";
+  }
+});
+adminSpiderFrontButton.addEventListener("click",()=>{
+  if(!adminUnlocked)return;
+  if(!gameStarted){adminPanelStatus.textContent="START A GAME FIRST";return;}
+  if(houseMode||tutorialOpenRoomActive||poolroomsActive){
+    adminPanelStatus.textContent="FRONT SPAWN ONLY WORKS IN THE MAIN BACKROOMS";return;
+  }
+  if(!multiplayer.isWorldAuthority()){adminPanelStatus.textContent="ONLY THE HOST CAN SPAWN THE SPIDER";return;}
+  if(spiderActive){adminPanelStatus.textContent="SPIDER IS ALREADY ACTIVE";return;}
+  if(!spiderLoaded){ensureSpiderLoading();adminPanelStatus.textContent="SPIDER LOADING — TRY AGAIN IN A MOMENT";return;}
+  if(startTutorialStyleBackroomsSpider(5,7,true)){
+    adminPanelStatus.textContent="SPIDER SPAWNED IN FRONT OF YOU";
+  }else{
+    adminPanelStatus.textContent="NO CLEAR SPAWN IN FRONT — MOVE AWAY FROM THE WALL AND RETRY";
   }
 });
 adminWaterGunButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterGun"); });
