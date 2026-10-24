@@ -9761,18 +9761,28 @@ function animate(){
           const biteProgressForMotion=THREE.MathUtils.smoothstep(
             spiderCaughtElapsed,.58,SPIDER_CAUGHT_BITE_TIME
           );
-          const spiderLungeDistance=biteProgressForMotion*2.15;
+          // Stop the lunge just short of the player instead of letting the
+          // spider pass them. The player has already recoiled, so calculate
+          // the closing distance from that new position.
+          const biteGap=Math.max(
+            0,
+            spiderCaughtPlayerPosition.distanceTo(spiderCaughtSpiderPosition)+diveDistance-.78
+          );
+          const spiderLungeDistance=biteProgressForMotion*Math.min(biteGap,2.8);
           const dragStart=THREE.MathUtils.smoothstep(
             spiderCaughtElapsed,SPIDER_CAUGHT_BITE_TIME,1.72
           );
           const dragDistance=dragStart*2.0;
+          // After the bite, pull both back toward the original spider position.
+          // This keeps its head/mouth between the camera and its body, rather
+          // than letting it run ahead and appear to tow the player by its rear.
           player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
             spiderCaughtRetreatDirection,
-            diveDistance+dragDistance
+            diveDistance-dragDistance
           );
           spiderEntity.position.copy(spiderCaughtSpiderPosition).addScaledVector(
             spiderCaughtRetreatDirection,
-            spiderLungeDistance+dragDistance
+            spiderLungeDistance-dragDistance
           );
           player.vel.set(0,0,0);
           player.keys.clear();
