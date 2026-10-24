@@ -5345,7 +5345,7 @@ const SPIDER_SPEED=2.65;
 const SPIDER_ATTACK_RANGE=2.5;
 const SPIDER_HITBOX_PADDING=1.55;
 const SPIDER_CAUGHT_FREEZE_TIME=4.8;
-const SPIDER_CAUGHT_BITE_TIME=.95;
+const SPIDER_CAUGHT_BITE_TIME=2.55;
 const SPIDER_CHASE_MIN_TIME=5.0;
 const SPIDER_CHASE_MAX_TIME=8.0;
 const SPIDER_CHASE_SPEED=3.8;
@@ -9753,29 +9753,29 @@ function animate(){
 
         if(spiderCaughtFreezeTimer>0){
           player.movementFrozen=true;
-          // Stage the catch in three readable beats: the player dives back
-          // while watching the spider, the spider lunges in to land the bite,
-          // then both move together with the spider still at the player's front.
-          const diveProgress=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.62);
-          const diveDistance=diveProgress*1.25;
-          const biteProgressForMotion=THREE.MathUtils.smoothstep(
-            spiderCaughtElapsed,.58,SPIDER_CAUGHT_BITE_TIME
+          // Three distinct beats: the player scrambles far backward, the
+          // spider deliberately walks them down, then bites and drags them in
+          // several uneven pulls. Keep the mouth in front throughout the drag.
+          const diveProgress=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.78);
+          const diveDistance=diveProgress*3.6;
+          const approachProgress=THREE.MathUtils.smoothstep(
+            spiderCaughtElapsed,.78,2.38
           );
-          // Stop the lunge just short of the player instead of letting the
-          // spider pass them. The player has already recoiled, so calculate
-          // the closing distance from that new position.
-          const biteGap=Math.max(
-            0,
-            spiderCaughtPlayerPosition.distanceTo(spiderCaughtSpiderPosition)+diveDistance-.78
-          );
-          const spiderLungeDistance=biteProgressForMotion*Math.min(biteGap,2.8);
+          const startingGap=spiderCaughtPlayerPosition.distanceTo(spiderCaughtSpiderPosition);
+          const approachDistance=Math.max(0,startingGap+diveDistance-.82);
+          const spiderLungeDistance=approachProgress*approachDistance;
           const dragStart=THREE.MathUtils.smoothstep(
-            spiderCaughtElapsed,SPIDER_CAUGHT_BITE_TIME,1.72
+            spiderCaughtElapsed,SPIDER_CAUGHT_BITE_TIME,2.82
           );
-          const dragDistance=dragStart*2.0;
-          // After the bite, pull both back toward the original spider position.
-          // This keeps its head/mouth between the camera and its body, rather
-          // than letting it run ahead and appear to tow the player by its rear.
+          // Several short, cumulative tugs move the player in visible stages
+          // instead of making the camera shake while the body stays still.
+          const dragDistance=
+            .48*THREE.MathUtils.smoothstep(spiderCaughtElapsed,2.62,2.92)+
+            .82*THREE.MathUtils.smoothstep(spiderCaughtElapsed,3.08,3.38)+
+            .76*THREE.MathUtils.smoothstep(spiderCaughtElapsed,3.62,3.92)+
+            .72*THREE.MathUtils.smoothstep(spiderCaughtElapsed,4.18,4.48);
+          // The same backward travel is applied to spider and player after
+          // the bite, preserving a close mouth-to-player gap while dragging.
           player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
             spiderCaughtRetreatDirection,
             diveDistance-dragDistance
@@ -9831,14 +9831,14 @@ function animate(){
           const impact=(time,spread)=>Math.exp(-Math.pow(
             (spiderCaughtElapsed-time)/spread,2
           ));
-          const firstYank=impact(1.35,.13);
-          const secondYank=impact(2.55,.18);
-          const finalYank=impact(3.92,.13);
+          const firstYank=impact(2.78,.13);
+          const secondYank=impact(3.48,.18);
+          const finalYank=impact(4.32,.13);
           const yank=firstYank*.9+secondYank*.68+finalYank*1.15;
           // Keep the camera locked on the spider through the backward dive; the
           // head drops only after the bite lands and the drag begins.
           const lookAtSpider=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.28);
-          const fall=THREE.MathUtils.smoothstep(spiderCaughtElapsed,1.05,1.72);
+          const fall=THREE.MathUtils.smoothstep(spiderCaughtElapsed,2.55,3.35);
           const aimYaw=spiderCaughtStartYaw+yawDelta;
           player.yaw=spiderCaughtStartYaw+
             Math.atan2(Math.sin(aimYaw-spiderCaughtStartYaw),Math.cos(aimYaw-spiderCaughtStartYaw))*lookAtSpider+
@@ -9869,7 +9869,7 @@ function animate(){
           // The mixer updates first each frame, so apply this as a pose offset.
           if(spiderCaughtHeadBone && spiderCaughtHeadBaseRotation){
             const headDip=THREE.MathUtils.smoothstep(
-              (spiderCaughtElapsed-.48)/.5,0,1
+              (spiderCaughtElapsed-2.25)/.48,0,1
             )*.62+Math.sin(spiderCaughtElapsed*7.8)*.035*drag;
             spiderCaughtHeadBone.rotation.copy(spiderCaughtHeadBaseRotation);
             spiderCaughtHeadBone.rotation.x+=headDip;
@@ -9878,7 +9878,7 @@ function animate(){
           }else{
             // Safe fallback for models without a named head/neck bone.
             spiderEntity.rotation.x=THREE.MathUtils.smoothstep(
-              (spiderCaughtElapsed-.48)/.5,0,1
+              (spiderCaughtElapsed-2.25)/.48,0,1
             )*.12;
           }
           player.camera.rotation.z=Math.sin(drag*Math.PI)*.16+
@@ -9908,7 +9908,7 @@ function animate(){
                 (firstYank-secondYank+finalYank)*.16
             );
           }
-          const lunge=0.18*Math.max(0,1-Math.abs(spiderCaughtElapsed-.88)/.30);
+          const lunge=0.18*Math.max(0,1-Math.abs(spiderCaughtElapsed-2.55)/.30);
           const scramble=(Math.sin(spiderCaughtElapsed*7.2)*.005)+
             (Math.sin(spiderCaughtElapsed*10.5)*.002)+tugPulse*.005+yank*.008;
           spiderEntity.scale.setScalar(1+lunge+scramble);
