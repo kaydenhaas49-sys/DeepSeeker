@@ -348,117 +348,288 @@ function ensureTutorialOpenRoom(){
       seed=(seed*1664525+1013904223)>>>0;
       return seed/4294967296;
     };
-    const palettes={
-      wall:["#b7ae7e","#b0a775","#c0b88a","#a9a174"],
-      floor:["#81795f","#746e57","#8b8267","#6d6852"],
-      ceiling:["#c0c0b3","#b8b8aa","#c7c6b9","#aead9f"]
+    const wallColors=["#b7ad7b","#b1a675","#c0b789","#a7a071"];
+    const floorColors=["#77705a","#6d6750","#827960","#69644f"];
+    const ceilingColors=["#bcbcae","#b2b2a4","#c5c3b4","#aaa99b"];
+    const colors=kind==="wall"?wallColors:kind==="floor"?floorColors:ceilingColors;
+
+    // Copy a mark over texture edges when needed, so worn spots tile cleanly.
+    const wrapDraw=(x,y,margin,draw)=>{
+      const xs=[0],ys=[0];
+      if(x<margin)xs.push(size);
+      if(x>size-margin)xs.push(-size);
+      if(y<margin)ys.push(size);
+      if(y>size-margin)ys.push(-size);
+      for(const ox of xs)for(const oy of ys)draw(x+ox,y+oy);
     };
-    const colors=palettes[kind];
-    ctx.fillStyle=colors[0];
-    ctx.fillRect(0,0,size,size);
+    const softPatch=(cx,cy,rx,ry,inner,outer="rgba(45,40,28,0)")=>{
+      wrapDraw(cx,cy,Math.max(rx,ry)+2,(x,y)=>{
+        ctx.save();
+        ctx.translate(x,y);
+        ctx.scale(rx,ry);
+        const gradient=ctx.createRadialGradient(0,0,0,0,0,1);
+        gradient.addColorStop(0,inner);
+        gradient.addColorStop(.58,inner);
+        gradient.addColorStop(1,outer);
+        ctx.fillStyle=gradient;
+        ctx.beginPath();
+        ctx.arc(0,0,1,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      });
+    };
+    const polygon=(points,fill,stroke,lineWidth=1)=>{
+      ctx.beginPath();
+      ctx.moveTo(points[0][0],points[0][1]);
+      for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);
+      ctx.closePath();
+      if(fill){ctx.fillStyle=fill;ctx.fill();}
+      if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lineWidth;ctx.stroke();}
+    };
 
     if(kind==="wall"){
-      // Soft, aged paper grain. Keep it subtle so the wallpaper pattern reads.
-      for(let i=0;i<5000;i++){
-        ctx.globalAlpha=.025+rand()*.045;
-        ctx.fillStyle=colors[Math.floor(rand()*colors.length)];
+      // Old yellow-beige paper with olive undertones and gentle age variation.
+      ctx.fillStyle="#b8ad7c";
+      ctx.fillRect(0,0,size,size);
+      for(let i=0;i<24;i++){
         const x=rand()*size,y=rand()*size;
-        ctx.fillRect(x,y,1+rand()*2,1+rand()*2);
+        softPatch(x,y,38+rand()*90,24+rand()*86,
+          rand()>.45?"rgba(76,68,43,.075)":"rgba(237,220,166,.075)");
       }
-      ctx.globalAlpha=1;
-      // Repeating late-80s/90s vinyl wallpaper: narrow vertical stems and
-      // small paired leaf/teardrop motifs, deliberately low contrast.
-      for(let x=0;x<size;x+=64){
-        for(let y=-32;y<size+32;y+=96){
-          const cx=x+32, cy=y+48;
-          ctx.strokeStyle="rgba(102,111,72,.42)";
-          ctx.lineWidth=1.25;
+      // Paper fibre and faded pigment; avoid a sharp, digital-looking print.
+      for(let i=0;i<14500;i++){
+        const v=rand();
+        ctx.fillStyle=v>.76?"rgba(238,224,173,.10)":v<.24?"rgba(60,54,34,.085)":"rgba(143,132,86,.045)";
+        const x=rand()*size,y=rand()*size;
+        ctx.fillRect(x,y,.5+rand()*1.6,.5+rand()*1.4);
+      }
+      // A small, muted vintage leaf print. Its spacing divides evenly into the
+      // texture dimensions so it stays seamless when the wallpaper repeats.
+      for(let x=-32;x<=size+32;x+=64){
+        for(let y=-32;y<=size+32;y+=64){
+          const cx=x+32,cy=y+32;
+          ctx.strokeStyle="rgba(91,99,62,.36)";
+          ctx.lineWidth=1.15;
           ctx.beginPath();
-          ctx.moveTo(cx,cy-39);ctx.bezierCurveTo(cx-2,cy-18,cx+2,cy+18,cx,cy+39);
+          ctx.moveTo(cx,cy-19);
+          ctx.bezierCurveTo(cx-3,cy-7,cx+3,cy+7,cx,cy+20);
           ctx.stroke();
           for(const side of [-1,1]){
-            for(const offset of [-22,0,22]){
-              const lx=cx+side*8, ly=cy+offset;
-              ctx.fillStyle=side<0?"rgba(126,133,86,.48)":"rgba(137,139,91,.42)";
+            for(const offset of [-12,5,17]){
+              const lx=cx+side*6,ly=cy+offset;
+              ctx.fillStyle=side<0?"rgba(111,120,76,.38)":"rgba(143,139,88,.32)";
               ctx.beginPath();
               ctx.moveTo(cx,ly);
-              ctx.bezierCurveTo(cx+side*3,ly-8,cx+side*15,ly-10,cx+side*16,ly-2);
-              ctx.bezierCurveTo(cx+side*13,ly+5,cx+side*4,ly+5,cx,ly);
+              ctx.bezierCurveTo(cx+side*4,ly-6,cx+side*13,ly-8,cx+side*14,ly-1);
+              ctx.bezierCurveTo(cx+side*11,ly+5,cx+side*4,ly+4,cx,ly);
               ctx.fill();
             }
           }
-          ctx.strokeStyle="rgba(224,215,171,.32)";
-          ctx.lineWidth=1;
-          ctx.beginPath();ctx.moveTo(cx-20,cy-31);ctx.lineTo(cx-20,cy+31);ctx.stroke();
+          ctx.strokeStyle="rgba(235,224,183,.19)";
+          ctx.lineWidth=.8;
+          ctx.beginPath();
+          ctx.moveTo(cx-15,cy-14);
+          ctx.lineTo(cx-15,cy+14);
+          ctx.stroke();
         }
       }
-      // Old moisture discolouration gathers near ceiling/wall edges, not as
-      // scattered dots across the entire wall.
-      for(const edge of [0,size]){
-        for(let i=0;i<5;i++){
-          const x=rand()*size;
-          const width=22+rand()*58;
-          const depth=24+rand()*72;
-          const g=ctx.createLinearGradient(0,edge===0?0:size-depth,0,edge===0?depth:size);
-          g.addColorStop(0,"rgba(79,75,49,.16)");
-          g.addColorStop(1,"rgba(79,75,49,0)");
-          ctx.fillStyle=g;
-          ctx.fillRect(x-width*.5,edge===0?0:size-depth,width,depth);
-        }
-      }
-      // Fine seams every few repeats, like wallpaper rolls, not thick stripes.
-      for(let x=0;x<=size;x+=128){
-        ctx.fillStyle="rgba(86,78,52,.12)";ctx.fillRect(x,0,1,size);
-        ctx.fillStyle="rgba(239,228,183,.18)";ctx.fillRect(x+1,0,1,size);
-      }
-    }else if(kind==="floor"){
-      // Dense, fine carpet loops in muted olive, tan and brown; no tile grid.
-      for(let i=0;i<42000;i++){
+      // Uneven moisture trails, old smoke-darkened patches and rubbed areas.
+      for(let i=0;i<28;i++){
         const x=rand()*size,y=rand()*size;
-        ctx.globalAlpha=.12+rand()*.17;
-        ctx.strokeStyle=colors[Math.floor(rand()*colors.length)];
-        ctx.lineWidth=.45+rand()*.65;
+        softPatch(x,y,12+rand()*45,18+rand()*82,
+          rand()>.28?"rgba(72,64,42,.12)":"rgba(76,77,48,.10)");
+      }
+      for(let i=0;i<19;i++){
+        const x=rand()*size;
+        const w=2+rand()*17;
+        const len=28+rand()*150;
+        const fromTop=rand()>.5;
+        const y=fromTop?0:size-len;
+        wrapDraw(x,y+len*.5,w+3,(px,py)=>{
+          const gradient=ctx.createLinearGradient(px,py-len*.5,px,py+len*.5);
+          gradient.addColorStop(0,"rgba(64,57,37,0)");
+          gradient.addColorStop(.18,"rgba(67,60,39,.12)");
+          gradient.addColorStop(.72,"rgba(67,60,39,.075)");
+          gradient.addColorStop(1,"rgba(64,57,37,0)");
+          ctx.fillStyle=gradient;
+          ctx.beginPath();
+          ctx.moveTo(px-w*.5,py-len*.5);
+          ctx.bezierCurveTo(px-w*.2,py-len*.1,px-w*.8,py+len*.15,px-w*.3,py+len*.5);
+          ctx.lineTo(px+w*.35,py+len*.5);
+          ctx.bezierCurveTo(px+w*.1,py+len*.12,px+w*.7,py-len*.15,px+w*.5,py-len*.5);
+          ctx.closePath();
+          ctx.fill();
+        });
+      }
+      // Torn wallpaper reveals a darker, dirty paper layer. Ragged edges and
+      // a thin curled-paper highlight make the damage look physical, not like
+      // a clean rectangular decal. These marks are texture-only.
+      for(let tear=0;tear<5;tear++){
+        const cx=24+rand()*(size-48),cy=24+rand()*(size-48);
+        const w=24+rand()*48,h=32+rand()*74;
+        const points=[];
+        const count=11;
+        for(let i=0;i<count;i++){
+          const a=i/count*Math.PI*2;
+          const r=.72+rand()*.42;
+          points.push([Math.cos(a)*w*.5*r,Math.sin(a)*h*.5*r]);
+        }
+        wrapDraw(cx,cy,Math.max(w,h)+4,(px,py)=>{
+          const shifted=points.map(p=>[px+p[0],py+p[1]]);
+          polygon(shifted,"rgba(65,58,39,.53)","rgba(54,48,32,.34)",1.3);
+          const fold=[
+            [px-w*.30,py-h*.09],[px-w*.19,py-h*.38],
+            [px+w*.02,py-h*.31],[px+w*.18,py-h*.16],
+            [px+w*.03,py+h*.02],[px-w*.11,py+h*.11]
+          ];
+          polygon(fold,"rgba(213,198,146,.45)","rgba(239,224,178,.40)",1);
+          ctx.strokeStyle="rgba(48,43,30,.38)";
+          ctx.lineWidth=1;
+          ctx.beginPath();
+          ctx.moveTo(px-w*.08,py+h*.12);
+          ctx.lineTo(px-w*.12,py+h*.28);
+          ctx.lineTo(px-w*.02,py+h*.38);
+          ctx.stroke();
+        });
+      }
+      // Narrow roll seams and rubbed edges, kept low contrast.
+      for(let x=0;x<=size;x+=128){
+        ctx.fillStyle="rgba(77,69,45,.12)";
+        ctx.fillRect(x,0,1,size);
+        ctx.fillStyle="rgba(238,222,171,.15)";
+        ctx.fillRect(x+1,0,1,size);
+      }
+      // Grime builds unevenly along the lower portion of the wall texture.
+      const lower=ctx.createLinearGradient(0,size*.72,0,size);
+      lower.addColorStop(0,"rgba(70,60,39,0)");
+      lower.addColorStop(.65,"rgba(70,60,39,.08)");
+      lower.addColorStop(1,"rgba(61,52,36,.18)");
+      ctx.fillStyle=lower;
+      ctx.fillRect(0,size*.72,size,size*.28);
+    }else if(kind==="floor"){
+      // A dingy olive-tan office carpet, dulled by years of traffic.
+      ctx.fillStyle="#77705a";
+      ctx.fillRect(0,0,size,size);
+      for(let i=0;i<28;i++){
+        const x=rand()*size,y=rand()*size;
+        softPatch(x,y,16+rand()*60,12+rand()*52,
+          rand()>.45?"rgba(41,38,29,.17)":"rgba(185,163,113,.13)");
+      }
+      // Matted foot traffic and irregularly faded paths, without a tiled grid.
+      for(let i=0;i<9;i++){
+        const x=rand()*size,y=rand()*size;
+        const length=28+rand()*100,width=7+rand()*23;
+        wrapDraw(x,y,Math.max(length,width)+2,(px,py)=>{
+          ctx.save();
+          ctx.translate(px,py);
+          ctx.rotate((rand()-.5)*.45);
+          const gradient=ctx.createLinearGradient(-length/2,0,length/2,0);
+          gradient.addColorStop(0,"rgba(177,157,111,0)");
+          gradient.addColorStop(.5,"rgba(190,173,130,.11)");
+          gradient.addColorStop(1,"rgba(177,157,111,0)");
+          ctx.fillStyle=gradient;
+          ctx.beginPath();
+          ctx.ellipse(0,0,length/2,width/2,0,0,Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+      // Dense random fibres with a slight directional nap.
+      for(let i=0;i<34000;i++){
+        const x=rand()*size,y=rand()*size;
+        const shade=rand();
+        ctx.strokeStyle=shade>.68?"rgba(219,202,156,.19)":shade<.18?"rgba(45,42,32,.22)":"rgba(133,122,91,.26)";
+        ctx.lineWidth=.35+rand()*.55;
         ctx.beginPath();
         ctx.moveTo(x,y);
-        ctx.lineTo(x+(rand()-.5)*2.2,y+.5+rand()*1.7);
+        ctx.lineTo(x+(rand()-.5)*1.8,y+.7+rand()*2);
         ctx.stroke();
       }
-      ctx.globalAlpha=1;
-      // A few diffuse, low-contrast worn areas blend into the carpet pile.
-      for(let i=0;i<7;i++){
-        const x=rand()*size,y=rand()*size,r=24+rand()*62;
-        const g=ctx.createRadialGradient(x,y,2,x,y,r);
-        g.addColorStop(0,rand()>.5?"rgba(52,47,35,.12)":"rgba(185,166,119,.10)");
-        g.addColorStop(1,"rgba(52,47,35,0)");
-        ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+      // Little dark flecks and compressed, slightly shiny fibres in worn spots.
+      for(let i=0;i<430;i++){
+        const x=rand()*size,y=rand()*size,r=.35+rand()*1.3;
+        wrapDraw(x,y,r+1,(px,py)=>{
+          ctx.fillStyle=rand()>.57?"rgba(43,39,28,.25)":"rgba(210,190,143,.18)";
+          ctx.beginPath();ctx.ellipse(px,py,r,r*.55,rand(),0,Math.PI*2);ctx.fill();
+        });
       }
+      // A soft, uneven dirt shadow gathers at a few carpet edges, never as a
+      // perfect outline or checkerboard.
+      const edgeShade=ctx.createLinearGradient(0,0,0,size);
+      edgeShade.addColorStop(0,"rgba(47,42,30,.09)");
+      edgeShade.addColorStop(.12,"rgba(47,42,30,0)");
+      edgeShade.addColorStop(.86,"rgba(47,42,30,0)");
+      edgeShade.addColorStop(1,"rgba(47,42,30,.10)");
+      ctx.fillStyle=edgeShade;
+      ctx.fillRect(0,0,size,size);
     }else{
-      // Standard suspended acoustic ceiling: individually readable panels,
-      // slight yellowing, and a narrow recessed grid.
-      for(let y=0;y<size;y+=128){
-        for(let x=0;x<size;x+=128){
-          const shade=colors[Math.floor(rand()*colors.length)];
-          ctx.fillStyle=shade;ctx.fillRect(x+2,y+2,124,124);
-          ctx.globalAlpha=.06;
-          for(let i=0;i<150;i++){
-            ctx.fillStyle=rand()>.5?"#777766":"#eeeeD9";
-            ctx.fillRect(x+rand()*124,y+rand()*124,1+rand()*2,1+rand()*2);
+      // Yellowed acoustic ceiling panels with dusty seams and uneven ageing.
+      ctx.fillStyle="#aaa99b";
+      ctx.fillRect(0,0,size,size);
+      const tile=size/4;
+      for(let ty=0;ty<4;ty++){
+        for(let tx=0;tx<4;tx++){
+          const x=tx*tile,y=ty*tile;
+          const shade=ceilingColors[Math.floor(rand()*ceilingColors.length)];
+          ctx.fillStyle=shade;
+          ctx.fillRect(x+2,y+2,tile-4,tile-4);
+          // Pressed mineral fibres and very slight panel-to-panel variation.
+          for(let i=0;i<620;i++){
+            const v=rand();
+            ctx.fillStyle=v>.62?"rgba(241,239,218,.13)":v<.20?"rgba(78,76,62,.10)":"rgba(147,145,126,.07)";
+            ctx.fillRect(x+rand()*(tile-4)+2,y+rand()*(tile-4)+2,.5+rand()*1.2,.5+rand()*1.2);
           }
-          ctx.globalAlpha=1;
-          // Faint mineral marks on only a few tiles.
-          if(rand()>.62){
-            const cx=x+rand()*124,cy=y+rand()*124,r=12+rand()*24;
-            const g=ctx.createRadialGradient(cx,cy,1,cx,cy,r);
-            g.addColorStop(0,"rgba(93,88,68,.13)");
-            g.addColorStop(1,"rgba(93,88,68,0)");
-            ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+          // A few old leaks leave broad brown-grey rings and a diffuse centre.
+          if(rand()>.58){
+            const cx=x+18+rand()*(tile-36),cy=y+18+rand()*(tile-36);
+            const r=12+rand()*25;
+            const gradient=ctx.createRadialGradient(cx,cy,2,cx,cy,r);
+            gradient.addColorStop(0,"rgba(107,91,61,.025)");
+            gradient.addColorStop(.58,"rgba(119,94,59,.105)");
+            gradient.addColorStop(.82,"rgba(91,77,54,.15)");
+            gradient.addColorStop(1,"rgba(91,77,54,0)");
+            ctx.fillStyle=gradient;
+            ctx.beginPath();ctx.ellipse(cx,cy,r,r*(.55+rand()*.5),rand()*.5,0,Math.PI*2);ctx.fill();
+          }
+          // Some tiles have a chipped corner or a hairline crack.
+          if(rand()>.78){
+            const corner=Math.floor(rand()*4);
+            const sx=corner===1||corner===2?x+tile-4:x+4;
+            const sy=corner>=2?y+tile-4:y+4;
+            const signX=sx>x+tile/2?-1:1,signY=sy>y+tile/2?-1:1;
+            polygon([
+              [sx,sy],[sx+signX*(5+rand()*7),sy],
+              [sx+signX*(7+rand()*8),sy+signY*(5+rand()*9)],
+              [sx,sy+signY*(9+rand()*9)]
+            ],"rgba(71,69,58,.28)","rgba(235,231,207,.28)",.8);
+          }else if(rand()>.74){
+            const cx=x+tile*(.25+rand()*.5),cy=y+tile*(.25+rand()*.5);
+            ctx.strokeStyle="rgba(79,76,64,.38)";
+            ctx.lineWidth=.8;
+            ctx.beginPath();
+            ctx.moveTo(cx,cy);
+            ctx.lineTo(cx+4+rand()*8,cy-5-rand()*7);
+            ctx.lineTo(cx+2+rand()*8,cy-12-rand()*8);
+            ctx.stroke();
           }
         }
       }
-      ctx.fillStyle="rgba(73,74,65,.30)";
-      for(let p=0;p<=size;p+=128){ctx.fillRect(p,0,2,size);ctx.fillRect(0,p,size,2);}
-      ctx.fillStyle="rgba(244,241,218,.42)";
-      for(let p=2;p<=size;p+=128){ctx.fillRect(p,0,1,size);ctx.fillRect(0,p,size,1);}
+      // Narrow recessed grid with a dusty dark edge and old chalky highlights.
+      ctx.fillStyle="rgba(65,65,57,.42)";
+      for(let p=0;p<=size;p+=tile){
+        ctx.fillRect(p,0,2,size);
+        ctx.fillRect(0,p,size,2);
+      }
+      ctx.fillStyle="rgba(235,232,210,.24)";
+      for(let p=2;p<=size;p+=tile){
+        ctx.fillRect(p,0,1,size);
+        ctx.fillRect(0,p,size,1);
+      }
+      // A few ceiling stains straddle panel boundaries naturally.
+      for(let i=0;i<7;i++){
+        const x=rand()*size,y=rand()*size,r=9+rand()*22;
+        softPatch(x,y,r,r*(.55+rand()*.7),"rgba(104,83,55,.09)");
+      }
     }
     ctx.globalAlpha=1;
     const texture=new THREE.CanvasTexture(canvas);
