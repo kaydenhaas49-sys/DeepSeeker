@@ -412,176 +412,109 @@ function ensureTutorialOpenRoom(){
     };
 
     if(kind==="wall"){
-      // Yellowed paper: slightly uneven pigment, a fine small-scale vintage print,
-      // and a few larger, irregular marks where damp has travelled through it.
-      ctx.fillStyle="#c4b77f";
+      // Quiet, aged wallpaper: faded mustard paper and a very subtle repeating
+      // vertical motif. Damage is broad and sparse so it reads as material wear.
+      ctx.fillStyle="#bdb17b";
       ctx.fillRect(0,0,size,size);
-      for(let i=0;i<8500;i++){
-        const v=rand();
-        ctx.fillStyle=v>.82?"rgba(246,231,181,.10)":v<.18?"rgba(65,57,35,.075)":"rgba(147,132,83,.04)";
-        const x=rand()*size,y=rand()*size;
-        ctx.fillRect(x,y,.6+rand()*1.5,.6+rand()*1.5);
-      }
 
-      // A small, faded botanical/diamond repeat rather than oversized leaves.
-      // At the texture's world scale each repeat is roughly 15 cm across.
-      const step=16;
-      for(let y=0;y<size;y+=step){
-        for(let x=0;x<size;x+=step){
-          const cx=x+step*.5,cy=y+step*.5;
-          ctx.strokeStyle="rgba(91,99,64,.21)";
-          ctx.lineWidth=.65;
-          ctx.beginPath();
-          ctx.moveTo(cx,cy-4.5);
-          ctx.quadraticCurveTo(cx-3.5,cy-1.5,cx,cy+4.5);
-          ctx.quadraticCurveTo(cx+3.5,cy+1.5,cx,cy-4.5);
-          ctx.stroke();
-          ctx.strokeStyle="rgba(231,220,176,.17)";
-          ctx.beginPath();
-          ctx.moveTo(cx-5,cy);
-          ctx.lineTo(cx,cy-5);
-          ctx.lineTo(cx+5,cy);
-          ctx.stroke();
-        }
-      }
-
-      // Uneven damp discolouration with soft edges and non-circular boundaries.
-      for(let i=0;i<9;i++){
-        const x=rand()*size,y=rand()*size;
-        const rx=24+rand()*75,ry=22+rand()*76;
-        softPatch(x,y,rx,ry,rand()>.35?"rgba(76,63,39,.13)":"rgba(104,96,61,.10)");
-        stainBlob(x,y,rx*.82,ry*.78,
-          rand()>.5?"rgba(80,65,40,.075)":"rgba(101,93,60,.07)",
-          "rgba(91,72,42,.055)");
-      }
-
-      // Long, tapered moisture trails. The ends fade instead of looking like
-      // perfectly straight dark lines painted over the wallpaper.
-      for(let i=0;i<5;i++){
-        const x=36+rand()*(size-72);
-        const y=rand()*(size-190);
-        const len=75+rand()*135;
-        const w=2.5+rand()*5;
-        const gradient=ctx.createLinearGradient(x,y,x,y+len);
-        gradient.addColorStop(0,"rgba(78,65,42,0)");
-        gradient.addColorStop(.16,"rgba(78,65,42,.11)");
-        gradient.addColorStop(.78,"rgba(78,65,42,.075)");
-        gradient.addColorStop(1,"rgba(78,65,42,0)");
-        ctx.fillStyle=gradient;
-        ctx.beginPath();
-        ctx.moveTo(x-w*.4,y);
-        ctx.bezierCurveTo(x-w*.7,y+len*.25,x+w*.5,y+len*.65,x-w*.15,y+len);
-        ctx.lineTo(x+w*.38,y+len);
-        ctx.bezierCurveTo(x+w*.85,y+len*.6,x-w*.25,y+len*.28,x+w*.45,y);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // A small number of actual peeled patches expose dull plaster underneath.
-      // Ragged contours and partial curled edges avoid the sticker-like look.
-      const tearCount=rand()>.52?2:1;
-      for(let tear=0;tear<tearCount;tear++){
-        const cx=100+rand()*(size-200),cy=100+rand()*(size-200);
-        const rx=28+rand()*37,ry=38+rand()*48;
-        const points=[];
-        for(let i=0;i<17;i++){
-          const a=i/17*Math.PI*2;
-          const r=.68+rand()*.48;
-          points.push([Math.cos(a)*rx*r,Math.sin(a)*ry*r]);
-        }
-        const shiftedPoints=(px,py,dx=0,dy=0)=>points.map(p=>[px+p[0]+dx,py+p[1]+dy]);
-        polygon(shiftedPoints(cx,cy,2,3),"rgba(56,48,32,.22)",null);
-        polygon(shiftedPoints(cx,cy),"rgba(118,111,83,.78)","rgba(75,65,43,.54)",1.1);
-
-        // Thin curled paper remnants catch light along one broken edge.
-        const fold=[
-          [cx-rx*.48,cy-ry*.22],[cx-rx*.24,cy-ry*.64],
-          [cx+rx*.06,cy-ry*.43],[cx+rx*.31,cy-ry*.16],
-          [cx+rx*.03,cy+ry*.03],[cx-rx*.17,cy-ry*.04]
-        ];
-        polygon(fold,"rgba(224,210,158,.53)","rgba(240,225,178,.30)",.8);
-        for(let i=0;i<13;i++){
-          const px=cx+(rand()-.5)*rx*1.8;
-          const py=cy+(rand()-.5)*ry*1.8;
-          ctx.fillStyle=rand()>.5?"rgba(68,61,43,.26)":"rgba(221,210,170,.31)";
-          ctx.fillRect(px,py,.7+rand()*1.2,.7+rand()*1.2);
-        }
-      }
-
-      // Faint roll seams and dirty handling near the lower edge.
-      for(let x=0;x<=size;x+=128){
-        ctx.fillStyle="rgba(80,70,44,.085)";
+      for(let x=0;x<size;x+=32){
+        ctx.fillStyle="rgba(76,82,53,.075)";
         ctx.fillRect(x,0,1,size);
-        ctx.fillStyle="rgba(240,223,174,.14)";
+        ctx.fillStyle="rgba(238,224,178,.09)";
         ctx.fillRect(x+1,0,1,size);
       }
-    }else if(kind==="floor"){
-      // Old office carpet: dirty taupe/olive pile with matted traffic and
-      // soaked-in discoloration. The damage stays soft, not polka-dot shaped.
-      ctx.fillStyle="#897d60";
-      ctx.fillRect(0,0,size,size);
+      for(let y=0;y<size;y+=32){
+        for(let x=0;x<size;x+=32){
+          const cx=x+16,cy=y+16;
+          ctx.strokeStyle="rgba(83,91,59,.16)";
+          ctx.lineWidth=.8;
+          ctx.beginPath();
+          ctx.moveTo(cx,cy-5);
+          ctx.quadraticCurveTo(cx-4,cy-1,cx,cy+5);
+          ctx.quadraticCurveTo(cx+4,cy-1,cx,cy-5);
+          ctx.stroke();
+        }
+      }
 
-      for(let i=0;i<11;i++){
+      // Soft irregular stains, with no dark outlines or scattered polka dots.
+      for(let i=0;i<5;i++){
         const x=rand()*size,y=rand()*size;
-        const rx=24+rand()*65,ry=18+rand()*52;
+        const rx=38+rand()*70,ry=45+rand()*100;
         softPatch(x,y,rx,ry,
-          rand()>.46?"rgba(48,43,31,.14)":"rgba(206,184,132,.12)");
-        stainBlob(x,y,rx*.86,ry*.80,
-          rand()>.55?"rgba(53,47,33,.075)":"rgba(112,97,65,.065)",
-          "rgba(57,49,33,.05)");
+          rand()>.5?"rgba(82,67,41,.12)":"rgba(120,108,69,.10)");
+        stainBlob(x,y,rx*.72,ry*.75,"rgba(91,73,44,.045)");
       }
 
-      // Four broad, soft flattened areas suggest years of foot traffic.
-      for(let i=0;i<4;i++){
-        const x=50+rand()*(size-100),y=40+rand()*(size-80);
-        const length=90+rand()*100,width=24+rand()*35;
-        const angle=(rand()-.5)*.7;
-        ctx.save();
-        ctx.translate(x,y);
-        ctx.rotate(angle);
-        const gradient=ctx.createLinearGradient(-length*.5,0,length*.5,0);
-        gradient.addColorStop(0,"rgba(190,170,125,0)");
-        gradient.addColorStop(.35,"rgba(195,175,132,.09)");
-        gradient.addColorStop(.7,"rgba(67,58,39,.07)");
-        gradient.addColorStop(1,"rgba(190,170,125,0)");
-        ctx.fillStyle=gradient;
+      // A couple of larger tears in the paper, not lots of tiny decals.
+      for(let i=0;i<2;i++){
+        const cx=75+rand()*(size-150),cy=75+rand()*(size-150);
+        const rx=18+rand()*22,ry=30+rand()*34;
+        const points=[];
+        for(let j=0;j<12;j++){
+          const a=j/12*Math.PI*2,r=.76+rand()*.4;
+          points.push([cx+Math.cos(a)*rx*r,cy+Math.sin(a)*ry*r]);
+        }
+        polygon(points,"rgba(77,70,52,.22)",null);
+        const inner=points.map(([x,y])=>[cx+(x-cx)*.88,cy+(y-cy)*.88]);
+        polygon(inner,"rgba(132,126,98,.82)","rgba(73,66,48,.38)",.8);
+        ctx.strokeStyle="rgba(224,210,164,.45)";
+        ctx.lineWidth=1.1;
         ctx.beginPath();
-        ctx.ellipse(0,0,length*.5,width*.5,0,0,Math.PI*2);
-        ctx.fill();
-        ctx.restore();
+        ctx.moveTo(cx-rx*.45,cy-ry*.18);
+        ctx.lineTo(cx-rx*.08,cy-ry*.56);
+        ctx.lineTo(cx+rx*.26,cy-ry*.27);
+        ctx.stroke();
       }
 
-      // Short, dense fibres give the carpet texture without a visible square grid.
-      for(let i=0;i<23000;i++){
+      // Old wallpaper seams are faint; they should not form a visible grid.
+      for(let x=0;x<=size;x+=128){
+        ctx.fillStyle="rgba(74,65,42,.065)";
+        ctx.fillRect(x,0,1,size);
+      }
+    }else if(kind==="floor"){
+      // Muted old office carpet with broad ingrained dirt and fine short fibres.
+      ctx.fillStyle="#81765a";
+      ctx.fillRect(0,0,size,size);
+      for(let i=0;i<7;i++){
         const x=rand()*size,y=rand()*size;
-        const shade=rand();
-        const stroke=shade>.69?"rgba(226,209,163,.19)":shade<.19?"rgba(48,43,31,.20)":"rgba(130,117,86,.23)";
-        const lineWidth=.35+rand()*.55;
-        const dx=(rand()-.5)*1.8,dy=.7+rand()*2;
+        const rx=45+rand()*85,ry=30+rand()*65;
+        softPatch(x,y,rx,ry,
+          rand()>.5?"rgba(43,39,29,.14)":"rgba(191,169,120,.09)");
+        stainBlob(x,y,rx*.8,ry*.75,"rgba(53,47,33,.045)");
+      }
+      for(let i=0;i<12000;i++){
+        const x=rand()*size,y=rand()*size;
+        const v=rand();
+        ctx.strokeStyle=v>.72?"rgba(221,204,158,.13)":v<.2?"rgba(42,39,30,.15)":"rgba(132,119,88,.15)";
+        ctx.lineWidth=.4+rand()*.45;
+        const dx=(rand()-.5)*1.3,dy=.8+rand()*1.5;
         wrapDraw(x,y,3,(px,py)=>{
-          ctx.strokeStyle=stroke;
-          ctx.lineWidth=lineWidth;
           ctx.beginPath();
           ctx.moveTo(px,py);
           ctx.lineTo(px+dx,py+dy);
           ctx.stroke();
         });
       }
-      for(let i=0;i<260;i++){
-        const x=rand()*size,y=rand()*size,r=.4+rand()*1.5;
-        const fill=rand()>.58?"rgba(45,40,29,.20)":"rgba(205,186,143,.16)";
-        const angle=rand();
-        wrapDraw(x,y,r+1,(px,py)=>{
-          ctx.fillStyle=fill;
-          ctx.beginPath();
-          ctx.ellipse(px,py,r,r*.55,angle,0,Math.PI*2);
-          ctx.fill();
-        });
+      // A few longer matted tracks break up the carpet without a checkerboard.
+      for(let i=0;i<3;i++){
+        const x=rand()*size,y=rand()*size,len=85+rand()*110,w=18+rand()*22;
+        ctx.save();
+        ctx.translate(x,y);
+        ctx.rotate((rand()-.5)*.45);
+        const g=ctx.createLinearGradient(-len/2,0,len/2,0);
+        g.addColorStop(0,"rgba(181,160,116,0)");
+        g.addColorStop(.45,"rgba(58,51,36,.08)");
+        g.addColorStop(1,"rgba(181,160,116,0)");
+        ctx.fillStyle=g;
+        ctx.beginPath();
+        ctx.ellipse(0,0,len/2,w/2,0,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
       }
     }else{
-      // A suspended ceiling with yellowed mineral-fibre panels, water marks,
-      // dusty seams and a few cracked/chipped edges.
-      ctx.fillStyle="#b2b09f";
+      // Realistic suspended mineral-fibre panels: calm grey-beige base,
+      // restrained water damage, and thin recessed seams.
+      ctx.fillStyle="#aaa99a";
       ctx.fillRect(0,0,size,size);
       const tile=size/4;
       for(let ty=0;ty<4;ty++){
@@ -591,67 +524,37 @@ function ensureTutorialOpenRoom(){
           ctx.fillStyle=shade;
           ctx.fillRect(x+2,y+2,tile-4,tile-4);
 
-          for(let i=0;i<260;i++){
-            const v=rand();
-            ctx.fillStyle=v>.65?"rgba(241,239,218,.13)":v<.20?"rgba(75,73,59,.11)":"rgba(147,145,126,.065)";
-            ctx.fillRect(x+rand()*(tile-4)+2,y+rand()*(tile-4)+2,.5+rand()*1.2,.5+rand()*1.2);
-          }
-
-          // Some panels have concentrated leak rings with dirty centres.
-          if(rand()>.66){
-            const cx=x+17+rand()*(tile-34),cy=y+17+rand()*(tile-34);
-            const rx=16+rand()*25,ry=13+rand()*21;
-            const gradient=ctx.createRadialGradient(cx,cy,2,cx,cy,Math.max(rx,ry));
-            gradient.addColorStop(0,"rgba(102,78,48,.055)");
-            gradient.addColorStop(.45,"rgba(123,94,59,.14)");
-            gradient.addColorStop(.72,"rgba(92,75,52,.17)");
-            gradient.addColorStop(1,"rgba(92,75,52,0)");
-            ctx.fillStyle=gradient;
+          if(rand()>.52){
+            const cx=x+tile*(.25+rand()*.5),cy=y+tile*(.25+rand()*.5);
+            const rx=18+rand()*26,ry=14+rand()*24;
+            const g=ctx.createRadialGradient(cx,cy,2,cx,cy,Math.max(rx,ry));
+            g.addColorStop(0,"rgba(112,83,51,.035)");
+            g.addColorStop(.55,"rgba(112,83,51,.12)");
+            g.addColorStop(1,"rgba(112,83,51,0)");
+            ctx.fillStyle=g;
             ctx.beginPath();
-            ctx.ellipse(cx,cy,rx,ry,rand()*.6,0,Math.PI*2);
+            ctx.ellipse(cx,cy,rx,ry,rand()*.4,0,Math.PI*2);
             ctx.fill();
           }
 
-          // Chipped panel corners are sparse and irregular, not decorative grids.
-          if(rand()>.82){
-            const corner=Math.floor(rand()*4);
-            const sx=corner===1||corner===2?x+tile-3:x+3;
-            const sy=corner>=2?y+tile-3:y+3;
-            const signX=sx>x+tile/2?-1:1,signY=sy>y+tile/2?-1:1;
-            polygon([
-              [sx,sy],
-              [sx+signX*(7+rand()*12),sy+signY*2],
-              [sx+signX*(9+rand()*15),sy+signY*(8+rand()*13)],
-              [sx+signX*2,sy+signY*(13+rand()*12)]
-            ],"rgba(69,65,53,.34)","rgba(230,226,205,.24)",.9);
-          }else if(rand()>.86){
-            const cx=x+tile*(.25+rand()*.5),cy=y+tile*(.25+rand()*.5);
-            ctx.strokeStyle="rgba(70,68,57,.42)";
-            ctx.lineWidth=1;
+          if(rand()>.86){
+            const cx=x+tile*(.2+rand()*.6),cy=y+tile*(.2+rand()*.6);
+            ctx.strokeStyle="rgba(66,64,53,.34)";
+            ctx.lineWidth=.8;
             ctx.beginPath();
             ctx.moveTo(cx,cy);
-            ctx.lineTo(cx+7+rand()*12,cy-6-rand()*8);
-            ctx.lineTo(cx+12+rand()*10,cy-15-rand()*8);
+            ctx.lineTo(cx+5+rand()*10,cy-4-rand()*8);
+            ctx.lineTo(cx+9+rand()*10,cy-11-rand()*8);
             ctx.stroke();
           }
         }
       }
-
-      // Larger stains occasionally cross tile borders, so the ceiling does not
-      // read as sixteen unrelated, freshly generated squares.
-      for(let i=0;i<5;i++){
-        const x=rand()*size,y=rand()*size;
-        const rx=15+rand()*36,ry=13+rand()*31;
-        softPatch(x,y,rx,ry,"rgba(93,72,47,.11)");
-        stainBlob(x,y,rx*.84,ry*.78,"rgba(111,83,52,.055)","rgba(93,72,47,.06)");
-      }
-
-      ctx.fillStyle="rgba(63,63,54,.40)";
+      ctx.fillStyle="rgba(59,59,51,.28)";
       for(let p=0;p<=size;p+=tile){
-        ctx.fillRect(p,0,2,size);
-        ctx.fillRect(0,p,size,2);
+        ctx.fillRect(p,0,1.5,size);
+        ctx.fillRect(0,p,size,1.5);
       }
-      ctx.fillStyle="rgba(235,232,210,.22)";
+      ctx.fillStyle="rgba(232,230,211,.18)";
       for(let p=2;p<=size;p+=tile){
         ctx.fillRect(p,0,1,size);
         ctx.fillRect(0,p,size,1);
@@ -2017,7 +1920,7 @@ function refreshMissionState({broadcast=false}={}){
     missionState.relays.every(Boolean)&&missionState.breakerSolved
   );
   storyMissionWorld?.syncState(missionState,{
-    tutorialActive:Boolean(tutorialOpenRoomActive||(gameStarted&&houseTutorialStage>0&&houseTutorialStage<10)),
+    tutorialActive:Boolean(tutorialOpenRoomActive||(gameStarted&&houseTutorialStage>0&&houseTutorialStage<9)),
     poolroomsActive,
     missionVisible:true
   });
@@ -4972,7 +4875,7 @@ function placeHouseMagazineTeleporter(root){
 function useHouseReturnTeleporter(){
   if(!houseMode || backroomsFallTimer>0) return false;
 
-  if(houseTutorialStage<5){
+  if(houseTutorialStage<4){
     eventText.textContent=houseTutorialStage>=3
       ? "IT IS NOT SAFE YET."
       : "EXPLORE THE ROOM FIRST.";
@@ -6391,7 +6294,7 @@ function prepareHouseTutorialSpider(){
 }
 
 function updateTutorialGuide(){
-  if(!tutorialGuide || !gameStarted || houseMode || houseTutorialStage<=0 || houseTutorialStage>=10){
+  if(!tutorialGuide || !gameStarted || houseMode || houseTutorialStage<=0 || houseTutorialStage>=9){
     tutorialGuide.style.opacity="0";
     tutorialGuide.style.transform="translateX(-50%) translateY(10px)";
     return;
@@ -6399,14 +6302,13 @@ function updateTutorialGuide(){
 
   const lessons={
     1:["MOVE","W A S D","Move around a bit."],
-    2:["JUMP","SPACE","Press SPACE."],
-    3:["CROUCH","CTRL","Hold CTRL."],
-    4:["SPRINT","SHIFT","Hold SHIFT to run."],
-    5:["FLASHLIGHT","F","Press F."],
-    6:["PHONE","P","Press P to open your phone."],
-    7:["MESSAGE","P","Read M's note, then close the phone."],
-    8:["APPROACH","W A S D","Go toward the figure."],
-    9:["RUN","SHIFT","Run. Don't stop."]
+    2:["CROUCH","CTRL","Hold CTRL."],
+    3:["SPRINT","SHIFT","Hold SHIFT to run."],
+    4:["FLASHLIGHT","F","Press F."],
+    5:["PHONE","P","Press P to open your phone."],
+    6:["MESSAGE","P","Read M's note, then close the phone."],
+    7:["APPROACH","W A S D","Go toward the figure."],
+    8:["RUN","SHIFT","Run. Don't stop."]
   };
   const lesson=lessons[houseTutorialStage];
   if(!lesson){
@@ -6414,7 +6316,7 @@ function updateTutorialGuide(){
     return;
   }
 
-  tutorialGuideStep.textContent=String(houseTutorialStage).padStart(2,"0")+"/09";
+  tutorialGuideStep.textContent=String(houseTutorialStage).padStart(2,"0")+"/08";
   tutorialGuideAction.textContent=lesson[0]+" · "+lesson[1];
   tutorialGuideHint.textContent=lesson[2];
   tutorialGuide.style.opacity="1";
@@ -6430,7 +6332,7 @@ function setHouseTutorialStage(stage){
     tutorialLightsOutElapsed=0;
     tutorialCeilingLightsOn=true;
     tutorialFlickerAverage=1;
-  }else if(stage===5){
+  }else if(stage===4){
     // The room is bright for the movement lessons, then the fluorescents fail
     // right as the player is asked to turn on the flashlight.
     tutorialLightsOutState="flickering";
@@ -6441,7 +6343,7 @@ function setHouseTutorialStage(stage){
 
   // Hard-reset the normal director for every tutorial stage. This covers stale
   // chases, pounces, pending asset loads, and timers from a previous run.
-  if(stage>=1 && stage<=9){
+  if(stage>=1 && stage<=8){
     spiderActive=false;
     spiderSpawnPending=false;
     spiderJumpscareTimer=0;
@@ -6467,32 +6369,29 @@ function setHouseTutorialStage(stage){
     objective.textContent="MOVE AROUND THE ROOM · W A S D";
     showHouseTutorialMessage("W A S D · MOVE",1500);
   }else if(stage===2){
-    objective.textContent="JUMP OVER THE FLOOR MARK · SPACE";
-    showHouseTutorialMessage("SPACE · JUMP",1500);
-  }else if(stage===3){
     objective.textContent="CROUCH DOWN AND STAY LOW · CTRL";
     showHouseTutorialMessage("CTRL · CROUCH",1500);
-  }else if(stage===4){
+  }else if(stage===3){
     houseTutorialStartX=player.pos.x;
     houseTutorialStartZ=player.pos.z;
     objective.textContent="SPRINT ACROSS THE ROOM · HOLD SHIFT";
     showHouseTutorialMessage("SHIFT · SPRINT",1500);
-  }else if(stage===5){
+  }else if(stage===4){
     flashlightOn=false;
     player.setFlashlightVisual(false);
     flashlight.visible=false;
     flashlight.intensity=0;
     objective.textContent="TURN THE FLASHLIGHT ON · F";
     showHouseTutorialMessage("F · FLASHLIGHT",1500);
-  }else if(stage===6){
+  }else if(stage===5){
     objective.textContent="OPEN THE DEEPSEEKER PHONE · P";
     showHouseTutorialMessage("P · OPEN PHONE",1500);
     eventText.textContent="BADGE AI ONLINE";
     eventText.style.opacity="1";
-  }else if(stage===7){
+  }else if(stage===6){
     objective.textContent="READ M'S MESSAGE, THEN CLOSE THE PHONE · P";
     showHouseTutorialMessage("CHECK THE DEEPSEEKER.",1700);
-  }else if(stage===8){
+  }else if(stage===7){
     objective.textContent="MOVE TOWARD THE FIGURE AT THE END OF THE ROOM.";
     if(!houseTutorialSpiderPrepared){
       prepareHouseTutorialSpider();
@@ -6501,13 +6400,13 @@ function setHouseTutorialStage(stage){
       arachnophobiaMode ? "THERE IS A DUCK AHEAD." : "SOMETHING IS WAITING AHEAD.",
       1900
     );
-  }else if(stage===9){
+  }else if(stage===8){
     objective.textContent="RUN. HOLD SHIFT AND GET AWAY FROM IT.";
     showHouseTutorialMessage(
       arachnophobiaMode ? "THE DUCK IS CHASING YOU." : "IT MOVED. RUN.",
       1600
     );
-  }else if(stage===10){
+  }else if(stage===9){
     objective.textContent="TUTORIAL COMPLETE · FOLLOW THE SIGNAL DEEPER.";
     showHouseTutorialMessage(
       arachnophobiaMode ? "YOU LOST THE DUCK." : "IT STOPPED.",
@@ -6528,7 +6427,7 @@ function setHouseTutorialStage(stage){
 function startHouseTutorialSpiderChase(){
   if(houseTutorialSpiderState!=="static") return;
 
-  setHouseTutorialStage(9);
+  setHouseTutorialStage(8);
   houseTutorialSpiderState="chase";
   houseTutorialSpiderTime=0;
   houseTutorialSpiderStuckTime=0;
@@ -6555,8 +6454,8 @@ function startHouseTutorialSpiderChase(){
 function finishHouseTutorialSpiderChase(){
   hideHouseTutorialSpider();
 
-  if(!houseMode && houseTutorialStage===9){
-    setHouseTutorialStage(10);
+  if(!houseMode && houseTutorialStage===8){
+    setHouseTutorialStage(9);
   }
 }
 
@@ -6582,26 +6481,28 @@ function updateHouseTutorialSpider(dt){
   }
 
   if(houseTutorialStage===2){
-    if(player.jumpY>.25 || player.jumpVelocity>1.2) setHouseTutorialStage(3);
+    if(player.crouched) setHouseTutorialStage(3);
     return;
   }
 
   if(houseTutorialStage===3){
-    if(player.crouched) setHouseTutorialStage(4);
+    const sprintDistance=Math.hypot(player.pos.x-houseTutorialStartX,player.pos.z-houseTutorialStartZ);
+    const sprinting=player.isRunning && Math.hypot(player.vel.x,player.vel.z)>2.0;
+    if(sprinting && sprintDistance>=4.0) setHouseTutorialStage(4);
     return;
   }
 
-  if(houseTutorialStage===4){
+  if(houseTutorialStage===3){
     const sprintDistance=Math.hypot(
       player.pos.x-houseTutorialStartX,
       player.pos.z-houseTutorialStartZ
     );
     const sprinting=player.isRunning && Math.hypot(player.vel.x,player.vel.z)>2.0;
-    if(sprinting && sprintDistance>=4.0) setHouseTutorialStage(5);
+    if(sprinting && sprintDistance>=4.0) setHouseTutorialStage(4);
     return;
   }
 
-  if(houseTutorialStage<8) return;
+  if(houseTutorialStage<7) return;
 
   if(!houseTutorialSpiderPrepared && !prepareHouseTutorialSpider()){
     return;
@@ -6610,12 +6511,12 @@ function updateHouseTutorialSpider(dt){
   houseTutorialSpiderTime+=dt;
   const result=spiderHunter.updateTutorial(dt,player);
 
-  if(houseTutorialStage===8 && result.triggered){
+  if(houseTutorialStage===7 && result.triggered){
     startHouseTutorialSpiderChase();
     return;
   }
 
-  if(houseTutorialStage===9 && result.finished){
+  if(houseTutorialStage===8 && result.finished){
     finishHouseTutorialSpiderChase();
     return;
   }
@@ -8885,8 +8786,8 @@ function toggleFlashlight(){
   updateEquipmentStatus();
   multiplayer.sendState(true);
 
-  if(!houseMode && gameStarted && houseTutorialStage===5 && flashlightOn){
-    setHouseTutorialStage(6);
+  if(!houseMode && gameStarted && houseTutorialStage===4 && flashlightOn){
+    setHouseTutorialStage(5);
   }
 }
 function refreshPhoneContent(){
@@ -9184,8 +9085,8 @@ function togglePhone(){
     crosshair.style.display="none";
     refreshPhoneContent();
 
-    if(!houseMode && gameStarted && houseTutorialStage===6){
-      setHouseTutorialStage(7);
+    if(!houseMode && gameStarted && houseTutorialStage===5){
+      setHouseTutorialStage(6);
     }
   }else{
     adminOverlay.classList.remove("open");
@@ -9194,8 +9095,8 @@ function togglePhone(){
     if(!houseMode && gameStarted){
       if(houseTutorialStage===0){
         setHouseTutorialStage(1);
-      }else if(houseTutorialStage===7){
-        setHouseTutorialStage(8);
+      }else if(houseTutorialStage===6){
+        setHouseTutorialStage(7);
       }
     }
 
