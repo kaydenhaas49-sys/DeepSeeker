@@ -9787,25 +9787,6 @@ function animate(){
             spiderCaughtHeadBone.rotation.x+=headDip;
             spiderCaughtHeadBone.rotation.z+=Math.sin(spiderCaughtElapsed*5.8)*.045*drag;
 
-            // The bite should meet the centre of the player's view, not pass
-            // over the top of the camera. Ease the head into the view during
-            // the initial bite only, then let the hanging-head drag pose play.
-            if(spiderCaughtElapsed<.62){
-              spiderEntity.updateMatrixWorld(true);
-              camera.updateMatrixWorld(true);
-              const headWorld=spiderCaughtHeadBone.getWorldPosition(new THREE.Vector3());
-              const cameraWorld=camera.getWorldPosition(new THREE.Vector3());
-              const cameraForward=camera.getWorldDirection(new THREE.Vector3());
-              const biteTarget=cameraWorld.addScaledVector(cameraForward,.78);
-              const biteCorrection=biteTarget.sub(headWorld);
-              const biteAlign=1-THREE.MathUtils.smoothstep(
-                spiderCaughtElapsed/.62,0,1
-              );
-              spiderEntity.position.addScaledVector(
-                biteCorrection,
-                Math.min(1,dt*7.5)*biteAlign
-              );
-            }
           }else{
             // Safe fallback for models without a named head/neck bone.
             spiderEntity.rotation.x=THREE.MathUtils.smoothstep(
@@ -9847,6 +9828,22 @@ function animate(){
           // own forward axis must face the opposite direction (toward the player),
           // otherwise the attack clip presents its rear during the drag.
           spiderEntity.rotation.y=mouthYaw+Math.PI+Math.sin(spiderCaughtElapsed*12)*.025;
+
+          // Align after setting the final facing rotation. The previous version
+          // corrected the head first, then rotated the spider afterward, which
+          // moved the bite back above the camera. Snap the head point onto the
+          // camera's forward line throughout the bite beat, then stop correcting
+          // so the spider can hang its head naturally during the drag.
+          if(spiderCaughtHeadBone && spiderCaughtElapsed<.62){
+            spiderEntity.updateMatrixWorld(true);
+            camera.updateMatrixWorld(true);
+            const headWorld=spiderCaughtHeadBone.getWorldPosition(new THREE.Vector3());
+            const cameraWorld=camera.getWorldPosition(new THREE.Vector3());
+            const cameraForward=camera.getWorldDirection(new THREE.Vector3());
+            const biteTarget=cameraWorld.addScaledVector(cameraForward,.62);
+            spiderEntity.position.add(biteTarget.sub(headWorld));
+          }
+
           if(spiderCaughtBlackout){
             spiderCaughtBlackout.style.opacity=String(
               THREE.MathUtils.smoothstep(caughtProgress,.76,1)
