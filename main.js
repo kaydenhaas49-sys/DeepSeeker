@@ -9829,21 +9829,6 @@ function animate(){
           // otherwise the attack clip presents its rear during the drag.
           spiderEntity.rotation.y=mouthYaw+Math.PI+Math.sin(spiderCaughtElapsed*12)*.025;
 
-          // Align after setting the final facing rotation. The previous version
-          // corrected the head first, then rotated the spider afterward, which
-          // moved the bite back above the camera. Snap the head point onto the
-          // camera's forward line throughout the bite beat, then stop correcting
-          // so the spider can hang its head naturally during the drag.
-          if(spiderCaughtHeadBone && spiderCaughtElapsed<.62){
-            spiderEntity.updateMatrixWorld(true);
-            camera.updateMatrixWorld(true);
-            const headWorld=spiderCaughtHeadBone.getWorldPosition(new THREE.Vector3());
-            const cameraWorld=camera.getWorldPosition(new THREE.Vector3());
-            const cameraForward=camera.getWorldDirection(new THREE.Vector3());
-            const biteTarget=cameraWorld.addScaledVector(cameraForward,.62);
-            spiderEntity.position.add(biteTarget.sub(headWorld));
-          }
-
           if(spiderCaughtBlackout){
             spiderCaughtBlackout.style.opacity=String(
               THREE.MathUtils.smoothstep(caughtProgress,.76,1)
