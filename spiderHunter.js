@@ -77,8 +77,8 @@ export class SpiderHunter {
     this.pathReplan = Math.max(0.35,pathReplan);
     this.catchDistance = 0.90;
     this.activationDistance = 7.5;
-    this.sightRange = 21;
-    this.sightFov = Math.PI * 0.60;
+    this.sightRange = 28;
+    this.sightFov = Math.PI * 0.72;
     this.hearFlashlightRange = 9;
 
     this.visualRig = visualRig || new SignalStalkerRig();
@@ -162,9 +162,9 @@ export class SpiderHunter {
     const dx=sourceX-this.position.x,dz=sourceZ-this.position.z;
     const distance=Math.hypot(dx,dz);
     const loudness=THREE.MathUtils.clamp(Number(intensity)||0,0,1);
-    let range=crouched ? 3.8+loudness*3.5
-      : running ? 19+loudness*7
-      : 8.5+loudness*5.5;
+    let range=crouched ? 4.8+loudness*4.2
+      : running ? 23+loudness*8
+      : 10+loudness*6.5;
     // Walls soften a sound instead of relaying exact player coordinates.
     if(this.isSoundOccluded(sourceX,sourceZ)) range*=.58;
     if(distance>range) return false;
@@ -315,15 +315,17 @@ export class SpiderHunter {
       this.lastSeenTime=time;
       this.lastKnownTarget.set(target.pos.x,0,target.pos.z);
       if(this.mode==="roam" || this.mode==="investigate"){
-        this.setMode(distance<7?"enrage":"hunt");
+        this.setMode(distance<10?"enrage":"hunt");
+      }else if(this.mode==="hunt" && distance<10){
+        this.setMode("enrage");
       }
-    }else if((this.mode==="hunt" || this.mode==="enrage") && time-this.lastSeenTime>.72){
+    }else if((this.mode==="hunt" || this.mode==="enrage") && time-this.lastSeenTime>1.25){
       // Follow the last seen point, not the live player position through a wall.
       this.setMode("investigate");
     }
 
     const lastClueTime=Math.max(this.lastSeenTime,this.lastHeardTime);
-    if(this.mode==="investigate" && time-lastClueTime>8.5) this.setMode("roam");
+    if(this.mode==="investigate" && time-lastClueTime>12) this.setMode("roam");
 
     if(this.mode==="roam"){
       this.updateRoaming(dt);
@@ -336,7 +338,7 @@ export class SpiderHunter {
       return;
     }
 
-    const speed=this.mode==="enrage"?6.2:4.4;
+    const speed=this.mode==="enrage"?7.2:5.1;
     this.updatePath(dt,this.lastKnownTarget.x,this.lastKnownTarget.z);
     const moved=this.followPath(dt,speed);
     if(!moved && !this.path.length) this.speed=THREE.MathUtils.damp(this.speed,0,8,dt);
@@ -453,7 +455,7 @@ export class SpiderHunter {
       return;
     }
     this.updatePath(dt,this.investigateTarget.x,this.investigateTarget.z);
-    const moved=this.followPath(dt,2.8);
+    const moved=this.followPath(dt,3.4);
     if(!moved && !this.path.length) this.speed=THREE.MathUtils.damp(this.speed,0,8,dt);
     const waypoint=this.path[this.pathIndex];
     if(waypoint) this.faceToward({x:waypoint[0],z:waypoint[1]},7);
