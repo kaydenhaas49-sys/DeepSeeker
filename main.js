@@ -1992,7 +1992,7 @@ function getMissionTarget(){
 
 function updateMissionObjective(){
   if(!gameStarted||gameEnded||houseMode||poolroomsActive||tutorialOpenRoomActive)return;
-  if(houseTutorialStage>0&&houseTutorialStage<10)return;
+  if(houseTutorialStage>0&&houseTutorialStage<9)return;
   // Keep objectives broad and diegetic. Players must explore and recognize
   // the environment instead of being handed a distance or compass direction.
   const target=getMissionTarget();
