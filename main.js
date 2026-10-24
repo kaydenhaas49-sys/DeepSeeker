@@ -5477,12 +5477,14 @@ function updateSpiderWallClipBounds(dt){
     originX=tutorialSpiderEntity.position.x;
     originZ=tutorialSpiderEntity.position.z;
     wallBounds=tutorialOpenRoomCollisionBoxes;
+  }else if(spiderActive && spiderModel?.visible){
+    originX=spiderEntity.position.x;
+    originZ=spiderEntity.position.z;
+    // Clip only the nearby wall rectangles against the spider's actual
+    // world-space fragments. This stops animated leg meshes showing through
+    // a wall even when the spider's center remains on the open side.
+    wallBounds=world.getNearbyWallBounds(originX,originZ,SPIDER_TARGET_SPAN*.58+.5);
   }
-  // The imported normal Backrooms rig spans several meters. Clipping its
-  // fragments against every procedural wall AABB can discard the entire model
-  // when overlapping/adjacent wall bounds cover the spider. Let real depth
-  // testing handle normal Backrooms occlusion; keep shader clipping for the
-  // tutorial's small, hand-authored collision boxes above.
   const reach=SPIDER_TARGET_SPAN*.58+.5;
   const nearby=[...wallBounds].filter(wall=>{
     if(!wall || !Number.isFinite(wall.minX) || !Number.isFinite(wall.maxX) ||
@@ -7274,10 +7276,9 @@ function finishSpiderModel(model,animations,sourceName){
   // the model's authored proportions or skeleton.
   // Match the tutorial spider exactly: preserve its authored colors/maps and
   // apply only the tutorial's copied-material/shadow setup.
-  // Do not install the procedural-wall fragment-discard shader on the
-  // normal imported rig. Its large animated bounds can be clipped away;
-  // ordinary depth testing handles Backrooms walls.
-  applyTutorialSpiderMaterialPass(model,{darken:false,wallClip:false});
+  // Apply the same world-space wall clipping used by the tutorial so animated
+  // legs are hidden where they intersect procedural wall geometry.
+  applyTutorialSpiderMaterialPass(model,{darken:false,wallClip:true});
   fitSpiderModel(model);
 
   // Stop both rigs before replacing the current model tree.
