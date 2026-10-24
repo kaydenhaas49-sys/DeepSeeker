@@ -5147,8 +5147,16 @@ player.hands.visible=true;
 const spiderEntity=new THREE.Group();
 spiderEntity.name="SpiderEntity";
 spiderEntity.visible=false;
-// Kept as a lightweight compatibility state only. The spider must not emit
-// its own red light; use the flashlight and room lighting to reveal its shape.
+// A very faint, sickly rim light catches the spider's silhouette nearby.
+// It is attached to the gameplay rig (never the menu) and casts no shadows, so
+// it adds atmosphere without the cost of another shadow map or a red glow.
+const spiderRimLight=new THREE.PointLight(0xc5c7a0,0.34,5.2,2);
+spiderRimLight.name="SpiderRimLight";
+spiderRimLight.position.set(0,3.0,-1.35);
+spiderRimLight.castShadow=false;
+spiderEntity.add(spiderRimLight);
+
+// Kept as a lightweight compatibility state only.
 const spiderRevealLight={visible:false,intensity:0};
 
 scene.add(spiderEntity);
@@ -5552,6 +5560,17 @@ function applyTutorialSpiderMaterialPass(model,{darken=true,wallClip=true}={}){
         Number.isFinite(material.clearcoatRoughness) ? material.clearcoatRoughness : 0.4,
         eyeLike ? 0.09 : 0.34
       );
+    }
+    // Eye/optic surfaces keep a glassy finish even when the model's authored
+    // colors are preserved, letting the player's flashlight create brief glints.
+    if(eyeLike){
+      if(typeof material.roughness==="number"){
+        material.roughness=THREE.MathUtils.clamp(material.roughness,0.08,0.18);
+      }
+      if("clearcoat" in material){
+        material.clearcoat=Math.max(Number(material.clearcoat)||0,0.68);
+        material.clearcoatRoughness=0.08;
+      }
     }
     if(darken && material.emissive) material.emissive.multiplyScalar(0.16);
     if(darken && typeof material.emissiveIntensity==="number"){
