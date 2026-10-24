@@ -38,40 +38,64 @@ function makeWallpaper() {
   g.fillStyle = "#bfa93f";
   g.fillRect(0, 0, S, S);
 
-  // small repeating motif on a 16px grid (alternates per cell)
+  // A quiet, slightly faded print. Keep the pattern legible up close,
+  // but avoid the perfectly crisp, high-contrast repeat of a new game texture.
   for (let y = 0; y < S / 16; y++) {
     for (let x = 0; x < S / 16; x++) {
-      const px = x * 16 + 8;
-      const py = y * 16 + 8;
-      const even = (x + y) % 2 === 0;
-      if (even) {
-        // small diamond, darker olive
-        g.fillStyle = "#9a8b2f";
+      const px = x * 16 + 8 + (rnd() - 0.5) * 1.4;
+      const py = y * 16 + 8 + (rnd() - 0.5) * 1.4;
+      const worn = rnd();
+      if ((x + y) % 2 === 0) {
+        g.fillStyle = worn > 0.72 ? "rgba(105,94,43,0.30)" : "rgba(105,94,43,0.17)";
         g.beginPath();
-        g.moveTo(px, py - 5);
-        g.lineTo(px + 4, py);
-        g.lineTo(px, py + 5);
-        g.lineTo(px - 4, py);
+        g.moveTo(px, py - 4);
+        g.lineTo(px + 3, py);
+        g.lineTo(px, py + 4);
+        g.lineTo(px - 3, py);
         g.closePath();
         g.fill();
-        // center dot, lighter
-        g.fillStyle = "#c8b954";
-        g.fillRect(px - 1, py - 1, 2, 2);
+        g.fillStyle = "rgba(225,207,119,0.24)";
+        g.fillRect(px - 0.5, py - 0.5, 1, 1);
       } else {
-        // two small dots
-        g.fillStyle = "#c2b24b";
-        g.fillRect(px - 4, py - 1, 2, 2);
-        g.fillRect(px + 2, py - 1, 2, 2);
-        g.fillStyle = "#8f812c";
-        g.fillRect(px - 1, py + 3, 2, 2);
+        g.fillStyle = "rgba(226,207,120,0.20)";
+        g.fillRect(px - 3, py - 1, 1.5, 1);
+        g.fillRect(px + 2, py - 1, 1.5, 1);
+        g.fillStyle = "rgba(105,94,43,0.20)";
+        g.fillRect(px - 0.5, py + 2, 1, 1);
       }
     }
   }
 
-  // faint grain over everything
-  for (let i = 0; i < 2600; i++) {
+  // Subtle vertical fading and grime, with uneven edges like old wallpaper.
+  for (let i = 0; i < 22; i++) {
+    const x = rnd() * S;
+    const width = 2 + rnd() * 9;
+    const top = rnd() * 90;
+    const bottom = 120 + rnd() * 100;
+    const grad = g.createLinearGradient(x, top, x + width, bottom);
+    grad.addColorStop(0, "rgba(65,53,20,0)");
+    grad.addColorStop(0.45, `rgba(65,53,20,${0.025 + rnd() * 0.045})`);
+    grad.addColorStop(1, "rgba(65,53,20,0)");
+    g.fillStyle = grad;
+    g.fillRect(x, top, width, bottom - top);
+  }
+
+  // A few fine scuffs and pinprick marks; sparse enough not to read as noise.
+  for (let i = 0; i < 85; i++) {
+    const x = rnd() * S;
+    const y = rnd() * (S * 0.78);
+    g.strokeStyle = rnd() > 0.5 ? "rgba(58,47,20,0.12)" : "rgba(244,224,145,0.13)";
+    g.lineWidth = 0.4 + rnd() * 0.7;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (rnd() - 0.5) * 5, y + 1 + rnd() * 4);
+    g.stroke();
+  }
+
+  // Fine paper grain.
+  for (let i = 0; i < 3400; i++) {
     const v = rnd();
-    g.fillStyle = v > 0.5 ? "rgba(255,244,180,0.05)" : "rgba(40,34,8,0.06)";
+    g.fillStyle = v > 0.5 ? "rgba(255,244,180,0.045)" : "rgba(40,34,8,0.055)";
     g.fillRect(rnd() * S, rnd() * S, 1, 1);
   }
 
@@ -109,16 +133,44 @@ function makeCarpet() {
     g.fillRect(x - r, y - r, r * 2, r * 2);
   }
 
-  // fine carpet noise
-  for (let i = 0; i < 9000; i++) {
+  // Soft, irregular wear where foot traffic has compressed the pile.
+  for (let i = 0; i < 7; i++) {
+    const x = 18 + rnd() * (S - 36);
+    const y = rnd() * S;
+    const width = 5 + rnd() * 15;
+    const grad = g.createLinearGradient(x - width, y, x + width, y + 12);
+    grad.addColorStop(0, "rgba(113,99,68,0)");
+    grad.addColorStop(0.5, "rgba(113,99,68,0.055)");
+    grad.addColorStop(1, "rgba(113,99,68,0)");
+    g.fillStyle = grad;
+    g.fillRect(x - width, y - 8, width * 2, 18);
+  }
+
+  // Short directional fibers catch light differently than flat digital noise.
+  for (let i = 0; i < 5200; i++) {
+    const x = rnd() * S;
+    const y = rnd() * S;
+    const shade = rnd();
+    g.strokeStyle = shade > 0.52
+      ? "rgba(238,230,198,0.17)"
+      : "rgba(111,98,68,0.13)";
+    g.lineWidth = 0.35 + rnd() * 0.45;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (rnd() - 0.5) * 1.5, y + 1 + rnd() * 2.5);
+    g.stroke();
+  }
+
+  // Fine, uneven fibers rather than uniformly sized pixel specks.
+  for (let i = 0; i < 4400; i++) {
     const v = rnd();
     g.fillStyle =
       v > 0.66
-        ? "rgba(238,230,198,0.20)"
+        ? "rgba(238,230,198,0.15)"
         : v > 0.33
-          ? "rgba(196,182,138,0.20)"
-          : "rgba(150,136,96,0.16)";
-    g.fillRect(rnd() * S, rnd() * S, 1 + (rnd() > 0.8 ? 1 : 0), 1);
+          ? "rgba(196,182,138,0.16)"
+          : "rgba(150,136,96,0.14)";
+    g.fillRect(rnd() * S, rnd() * S, 0.5 + rnd() * 1.5, 0.5 + rnd() * 1.3);
   }
   return c;
 }
