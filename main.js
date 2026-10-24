@@ -9786,6 +9786,26 @@ function animate(){
             spiderCaughtHeadBone.rotation.copy(spiderCaughtHeadBaseRotation);
             spiderCaughtHeadBone.rotation.x+=headDip;
             spiderCaughtHeadBone.rotation.z+=Math.sin(spiderCaughtElapsed*5.8)*.045*drag;
+
+            // The bite should meet the centre of the player's view, not pass
+            // over the top of the camera. Ease the head into the view during
+            // the initial bite only, then let the hanging-head drag pose play.
+            if(spiderCaughtElapsed<.62){
+              spiderEntity.updateMatrixWorld(true);
+              camera.updateMatrixWorld(true);
+              const headWorld=spiderCaughtHeadBone.getWorldPosition(new THREE.Vector3());
+              const cameraWorld=camera.getWorldPosition(new THREE.Vector3());
+              const cameraForward=camera.getWorldDirection(new THREE.Vector3());
+              const biteTarget=cameraWorld.addScaledVector(cameraForward,.78);
+              const biteCorrection=biteTarget.sub(headWorld);
+              const biteAlign=1-THREE.MathUtils.smoothstep(
+                spiderCaughtElapsed/.62,0,1
+              );
+              spiderEntity.position.addScaledVector(
+                biteCorrection,
+                Math.min(1,dt*7.5)*biteAlign
+              );
+            }
           }else{
             // Safe fallback for models without a named head/neck bone.
             spiderEntity.rotation.x=THREE.MathUtils.smoothstep(
