@@ -5326,7 +5326,8 @@ const SPIDER_POUNCE_HEIGHT=1.15;
 const SPIDER_SPEED=2.65;
 const SPIDER_ATTACK_RANGE=2.5;
 const SPIDER_HITBOX_PADDING=1.55;
-const SPIDER_CAUGHT_FREEZE_TIME=1.35;
+const SPIDER_CAUGHT_FREEZE_TIME=1.75;
+const SPIDER_CAUGHT_BITE_TIME=.34;
 const SPIDER_CHASE_MIN_TIME=5.0;
 const SPIDER_CHASE_MAX_TIME=8.0;
 const SPIDER_CHASE_SPEED=3.8;
@@ -9662,30 +9663,51 @@ function animate(){
             0,
             1
           );
-          // The spider's attack yanks the player's view off balance before
-          // pulling it down and away. Player.update runs earlier in the frame,
-          // so apply the cinematic camera twist after it has updated the view.
-          const drag=THREE.MathUtils.smoothstep(caughtProgress,.08,.92);
-          player.yaw=spiderCaughtStartYaw+Math.sin(drag*Math.PI*.82)*.54;
+          const biteProgress=THREE.MathUtils.clamp(
+            spiderCaughtElapsed/SPIDER_CAUGHT_BITE_TIME,
+            0,
+            1
+          );
+          // Hold a clear close-up bite beat first, then switch to a second
+          // attack pose as the spider pulls the player's view toward its mouth.
+          if(spiderCaughtElapsed>=SPIDER_CAUGHT_BITE_TIME && spiderAnimationState!=="attack2"){
+            setSpiderAnimation("attack2");
+          }
+          const drag=THREE.MathUtils.smoothstep(
+            (spiderCaughtElapsed-SPIDER_CAUGHT_BITE_TIME)/
+              (SPIDER_CAUGHT_FREEZE_TIME-SPIDER_CAUGHT_BITE_TIME),
+            0,
+            .88
+          );
+          const mouthYaw=Math.atan2(
+            spiderEntity.position.x-player.pos.x,
+            spiderEntity.position.z-player.pos.z
+          );
+          const yawDelta=Math.atan2(
+            Math.sin(mouthYaw-spiderCaughtStartYaw),
+            Math.cos(mouthYaw-spiderCaughtStartYaw)
+          );
+          // The bite lands before the pull begins. The camera then follows
+          // the spider's mouth, pitching down and turning into the grab while
+          // retaining the existing hand/torch drag motion.
+          const biteHold=1-biteProgress;
+          player.yaw=spiderCaughtStartYaw+yawDelta*drag+
+            Math.sin(spiderCaughtElapsed*10)*.018*drag;
           player.pitch=THREE.MathUtils.clamp(
-            spiderCaughtStartPitch+drag*.70,
+            spiderCaughtStartPitch+drag*.98-biteHold*.05,
             -1.35,
             1.35
           );
-          player.camera.rotation.z=Math.sin(drag*Math.PI)*.22;
-          // A short forward scale surge sells the lunge, followed by a fast,
-          // irregular body twitch while the camera is dragged away.
+          player.camera.rotation.z=Math.sin(drag*Math.PI)*.16+
+            drag*.09;
           const lunge=0.14*Math.max(0,1-caughtProgress/.38);
           const scramble=(Math.sin(spiderCaughtElapsed*11)*.008)+
             (Math.sin(spiderCaughtElapsed*17)*.003);
           spiderEntity.scale.setScalar(1+lunge+scramble);
-          spiderEntity.rotation.y=Math.atan2(
-            player.pos.x-spiderEntity.position.x,
-            player.pos.z-spiderEntity.position.z
-          )+Math.sin(spiderCaughtElapsed*12)*.045;
+          spiderEntity.rotation.y=mouthYaw+Math.sin(spiderCaughtElapsed*12)*.025;
           if(spiderCaughtBlackout){
             spiderCaughtBlackout.style.opacity=String(
-              THREE.MathUtils.smoothstep(caughtProgress,.68,1)
+              THREE.MathUtils.smoothstep(caughtProgress,.76,1)
             );
           }
           if(spiderCaughtFreezeTimer<=0){
