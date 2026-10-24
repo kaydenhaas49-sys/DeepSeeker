@@ -9755,7 +9755,7 @@ function animate(){
           // the bite lands, move both together so the spider physically drags
           // the player instead of pulling away and appearing to chew empty air.
           const dragStart=THREE.MathUtils.smoothstep(spiderCaughtElapsed,.82,1.35);
-          const dragDistance=dragStart*(.25+drag*.95);
+          const dragDistance=dragStart*1.2;
           player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
             spiderCaughtRetreatDirection,
             dragDistance
