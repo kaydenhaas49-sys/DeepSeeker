@@ -160,6 +160,7 @@ const adminLockButton=document.getElementById("adminLockButton");
 const adminFlyButton=document.getElementById("adminFlyButton");
 const adminTeleportExitButton=document.getElementById("adminTeleportExitButton");
 const adminTeleportRadioButton=document.getElementById("adminTeleportRadioButton");
+const adminSpiderChaseButton=document.getElementById("adminSpiderChaseButton");
 const adminWaterGunButton=document.getElementById("adminWaterGunButton");
 const adminWaterRpgButton=document.getElementById("adminWaterRpgButton");
 const adminClearWaterButton=document.getElementById("adminClearWaterButton");
@@ -8851,6 +8852,20 @@ adminFlyButton.addEventListener("click",()=>{
 });
 adminTeleportExitButton.addEventListener("click",teleportAdminToExit);
 adminTeleportRadioButton.addEventListener("click",teleportAdminToRadio);
+adminSpiderChaseButton.addEventListener("click",()=>{
+  if(!adminUnlocked)return;
+  if(!gameStarted){adminPanelStatus.textContent="START A GAME FIRST";return;}
+  if(houseMode||tutorialOpenRoomActive){adminPanelStatus.textContent="SPIDER CHASE UNAVAILABLE IN THIS AREA";return;}
+  if(!multiplayer.isWorldAuthority()){adminPanelStatus.textContent="ONLY THE HOST CAN START THE SPIDER";return;}
+  if(spiderActive){adminPanelStatus.textContent="SPIDER IS ALREADY ACTIVE";return;}
+  if(startBackroomsStalker()){
+    adminPanelStatus.textContent="SPIDER SPAWNED — SURVIVE THE CHASE";
+  }else if(!spiderLoaded){
+    adminPanelStatus.textContent="SPIDER LOADING — TRY AGAIN IN A MOMENT";
+  }else{
+    adminPanelStatus.textContent="COULD NOT SPAWN SPIDER — TRY A CLEARER AREA";
+  }
+});
 adminWaterGunButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterGun"); });
 adminWaterRpgButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterRpg"); });
 adminClearWaterButton.addEventListener("click",()=>{ if(adminUnlocked){ clearAdminProjectiles(); adminPanelStatus.textContent="WATER CLEARED"; } });
