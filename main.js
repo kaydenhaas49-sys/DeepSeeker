@@ -9776,9 +9776,11 @@ function animate(){
             0,
             .88
           );
+          // Player yaw zero faces -Z, so negate the spider-relative
+          // direction when converting it to the camera's yaw convention.
           const mouthYaw=Math.atan2(
-            spiderEntity.position.x-player.pos.x,
-            spiderEntity.position.z-player.pos.z
+            player.pos.x-spiderEntity.position.x,
+            player.pos.z-spiderEntity.position.z
           );
           const yawDelta=Math.atan2(
             Math.sin(mouthYaw-spiderCaughtStartYaw),
