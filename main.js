@@ -9753,18 +9753,26 @@ function animate(){
 
         if(spiderCaughtFreezeTimer>0){
           player.movementFrozen=true;
-          // The bite keeps the player anchored at the spider's mouth. Once
-          // the bite lands, move both together so the spider physically drags
-          // the player instead of pulling away and appearing to chew empty air.
-          const dragStart=THREE.MathUtils.smoothstep(spiderCaughtElapsed,.82,1.35);
-          const dragDistance=dragStart*1.2;
+          // Stage the catch in three readable beats: the player dives back
+          // while watching the spider, the spider lunges in to land the bite,
+          // then both move together with the spider still at the player's front.
+          const diveProgress=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.62);
+          const diveDistance=diveProgress*1.25;
+          const biteProgressForMotion=THREE.MathUtils.smoothstep(
+            spiderCaughtElapsed,.58,SPIDER_CAUGHT_BITE_TIME
+          );
+          const spiderLungeDistance=biteProgressForMotion*2.15;
+          const dragStart=THREE.MathUtils.smoothstep(
+            spiderCaughtElapsed,SPIDER_CAUGHT_BITE_TIME,1.72
+          );
+          const dragDistance=dragStart*2.0;
           player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
             spiderCaughtRetreatDirection,
-            dragDistance
+            diveDistance+dragDistance
           );
           spiderEntity.position.copy(spiderCaughtSpiderPosition).addScaledVector(
             spiderCaughtRetreatDirection,
-            dragDistance
+            spiderLungeDistance+dragDistance
           );
           player.vel.set(0,0,0);
           player.keys.clear();
@@ -9817,10 +9825,10 @@ function animate(){
           const secondYank=impact(2.55,.18);
           const finalYank=impact(3.92,.13);
           const yank=firstYank*.9+secondYank*.68+finalYank*1.15;
-          // First the player instinctively turns to face the spider, then
-          // stumbles backward, and finally drops into a low, frightened pose.
+          // Keep the camera locked on the spider through the backward dive; the
+          // head drops only after the bite lands and the drag begins.
           const lookAtSpider=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.28);
-          const fall=THREE.MathUtils.smoothstep(spiderCaughtElapsed,.72,1.28);
+          const fall=THREE.MathUtils.smoothstep(spiderCaughtElapsed,1.05,1.72);
           const aimYaw=spiderCaughtStartYaw+yawDelta;
           player.yaw=spiderCaughtStartYaw+
             Math.atan2(Math.sin(aimYaw-spiderCaughtStartYaw),Math.cos(aimYaw-spiderCaughtStartYaw))*lookAtSpider+
@@ -9890,7 +9898,7 @@ function animate(){
                 (firstYank-secondYank+finalYank)*.16
             );
           }
-          const lunge=0.14*Math.max(0,1-caughtProgress/.38);
+          const lunge=0.18*Math.max(0,1-Math.abs(spiderCaughtElapsed-.88)/.30);
           const scramble=(Math.sin(spiderCaughtElapsed*7.2)*.005)+
             (Math.sin(spiderCaughtElapsed*10.5)*.002)+tugPulse*.005+yank*.008;
           spiderEntity.scale.setScalar(1+lunge+scramble);
