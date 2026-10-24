@@ -1613,47 +1613,33 @@ function drawHandheldRadioRadar(force=false){
   radioRadarLastDraw=now;
   const ctx=radioRadarContext;
   const w=radioRadarCanvas.width,h=radioRadarCanvas.height;
-  const cx=w*0.5,cy=h*0.49,r=88;
   ctx.fillStyle="#06100b";
   ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle="#3c7450";
+  ctx.strokeStyle="#294d36";
   ctx.lineWidth=2;
   ctx.strokeRect(5,5,w-10,h-10);
-  for(const ring of [28,56,84]){
-    ctx.beginPath();ctx.arc(cx,cy,ring,0,Math.PI*2);ctx.stroke();
-  }
-  ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);
-  ctx.moveTo(cx,cy-r);ctx.lineTo(cx,cy+r);ctx.stroke();
-  const sweep=now*0.0016;
-  ctx.strokeStyle="rgba(111,231,150,.75)";
-  ctx.lineWidth=3;
-  ctx.beginPath();ctx.moveTo(cx,cy);
-  ctx.lineTo(cx+Math.sin(sweep)*r,cy-Math.cos(sweep)*r);ctx.stroke();
 
-  const target=getMissionTarget();
-  const dx=Number(target?.x)-player.pos.x;
-  const dz=Number(target?.z)-player.pos.z;
-  const distance=Math.hypot(dx,dz);
-  if(Number.isFinite(distance)&&distance>0.01){
-    const right=(dx*Math.cos(player.yaw))-(dz*Math.sin(player.yaw));
-    const forward=(-dx*Math.sin(player.yaw))-(dz*Math.cos(player.yaw));
-    const pointRadius=Math.min(r-12,Math.max(10,(distance/110)*(r-12)));
-    const px=cx+(right/distance)*pointRadius;
-    const py=cy-(forward/distance)*pointRadius;
-    const pulse=0.72+0.28*Math.sin(now*0.006);
-    ctx.fillStyle="rgba(103,245,157,"+pulse+")";
-    ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle="rgba(103,245,157,.7)";
-    ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(px,py,12,0,Math.PI*2);ctx.stroke();
-  }
-  ctx.fillStyle="#a6d4ac";
+  // The radio is a receiver, not a tracker: show an unreliable signal trace
+  // without plotting objectives, directions, or distances.
+  ctx.fillStyle="#527e5d";
   ctx.font="bold 15px monospace";
   ctx.textAlign="center";
-  ctx.fillText(distance<1000 ? "LOCK "+Math.round(distance)+" M" : "NO SIGNAL",cx,242);
-  ctx.fillStyle="#527e5d";
-  ctx.font="12px monospace";
-  ctx.fillText(String(target?.title||"NEXT OBJECTIVE").toUpperCase().slice(0,22),cx,21);
+  ctx.fillText("SIGNAL ONLY",w/2,34);
+  ctx.strokeStyle="#3c7450";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  const phase=now*.012;
+  for(let x=16;x<w-16;x+=2){
+    const noise=Math.sin(x*.105+phase)*7+
+      Math.sin(x*.037-phase*1.7)*4+
+      Math.sin(x*.31+phase*.6)*2;
+    const y=h*.56+noise;
+    if(x===16)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.fillStyle="#8ac59b";
+  ctx.font="bold 13px monospace";
+  ctx.fillText("LISTEN FOR THE CARRIER",w/2,h-28);
   radioRadarTexture.needsUpdate=true;
 }
 
@@ -1779,18 +1765,10 @@ function getMissionTarget(){
 function updateMissionObjective(){
   if(!gameStarted||gameEnded||houseMode||poolroomsActive||tutorialOpenRoomActive)return;
   if(houseTutorialStage>0&&houseTutorialStage<10)return;
+  // Keep objectives broad and diegetic. Players must explore and recognize
+  // the environment instead of being handed a distance or compass direction.
   const target=getMissionTarget();
-  const dx=target.x-player.pos.x,dz=target.z-player.pos.z;
-  const distance=Math.round(Math.hypot(dx,dz));
-  const horizontal=Math.abs(dx),vertical=Math.abs(dz);
-  const direction=horizontal>vertical*1.65
-    ?(dx<0?"WEST":"EAST")
-    :vertical>horizontal*1.65
-      ?(dz<0?"NORTH":"SOUTH")
-      :(dx<0?"WEST":"EAST")+(dz<0?"-NORTH":"-SOUTH");
-  const label=distance<=3
-    ?target.hint+" · OBJECTIVE REACHED"
-    :target.hint+" · "+distance+" M "+direction;
+  const label=target?.hint||"SEARCH THE BACKROOMS FOR A SIGNAL.";
   if(objective&&objective.textContent!==label)objective.textContent=label;
   if(phoneCardText&&phoneCardText.textContent!==label)phoneCardText.textContent=label;
 }
