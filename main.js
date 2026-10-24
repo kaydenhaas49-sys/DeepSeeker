@@ -5304,6 +5304,7 @@ let spiderCaughtHeadBone=null;
 let spiderCaughtHeadBaseRotation=null;
 let spiderCaughtBlackout=null;
 let spiderCaughtPlayerPosition=new THREE.Vector3();
+let spiderCaughtRetreatDirection=new THREE.Vector3();
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
 let spiderJumpscareScale=1;
@@ -5338,8 +5339,8 @@ const SPIDER_POUNCE_HEIGHT=1.15;
 const SPIDER_SPEED=2.65;
 const SPIDER_ATTACK_RANGE=2.5;
 const SPIDER_HITBOX_PADDING=1.55;
-const SPIDER_CAUGHT_FREEZE_TIME=2.65;
-const SPIDER_CAUGHT_BITE_TIME=.62;
+const SPIDER_CAUGHT_FREEZE_TIME=4.8;
+const SPIDER_CAUGHT_BITE_TIME=.95;
 const SPIDER_CHASE_MIN_TIME=5.0;
 const SPIDER_CHASE_MAX_TIME=8.0;
 const SPIDER_CHASE_SPEED=3.8;
@@ -6939,6 +6940,18 @@ function startSpiderCatchFreeze(){
   spiderCaughtHeadBone=findSpiderCaughtHeadBone();
   spiderCaughtHeadBaseRotation=spiderCaughtHeadBone ? spiderCaughtHeadBone.rotation.clone() : null;
   spiderCaughtPlayerPosition.copy(player.pos);
+  // Give the player a brief instinctive step backward, away from the spider,
+  // before the bite lands. The retreat is animated from the captured position
+  // each frame, so it cannot accumulate or fight the movement-freeze logic.
+  spiderCaughtRetreatDirection.set(
+    player.pos.x-spiderEntity.position.x,
+    0,
+    player.pos.z-spiderEntity.position.z
+  );
+  if(spiderCaughtRetreatDirection.lengthSq()<0.0001){
+    spiderCaughtRetreatDirection.set(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
+  }
+  spiderCaughtRetreatDirection.normalize();
   if(!arachnophobiaMode){
     if(!spiderCaughtBlackout){
       spiderCaughtBlackout=document.createElement("div");
@@ -9712,7 +9725,11 @@ function animate(){
 
         if(spiderCaughtFreezeTimer>0){
           player.movementFrozen=true;
-          player.pos.copy(spiderCaughtPlayerPosition);
+          const retreat=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.42)*.68;
+          player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
+            spiderCaughtRetreatDirection,
+            retreat
+          );
           player.vel.set(0,0,0);
           player.keys.clear();
           player.jumpY=0;
@@ -9729,8 +9746,8 @@ function animate(){
             0,
             1
           );
-          // Hold a clear close-up bite beat first, then switch to a second
-          // attack pose as the spider pulls the player's view toward its mouth.
+          // The player recoils a step first; hold the bite animation long enough
+          // to read clearly, then transition into a longer, slower drag pose.
           if(spiderCaughtElapsed>=SPIDER_CAUGHT_BITE_TIME && spiderAnimationState!=="attack2"){
             setSpiderAnimation("attack2");
           }
@@ -9760,9 +9777,9 @@ function animate(){
           const impact=(time,spread)=>Math.exp(-Math.pow(
             (spiderCaughtElapsed-time)/spread,2
           ));
-          const firstYank=impact(.91,.105);
-          const secondYank=impact(1.62,.145);
-          const finalYank=impact(2.23,.09);
+          const firstYank=impact(1.35,.13);
+          const secondYank=impact(2.55,.18);
+          const finalYank=impact(3.92,.13);
           const yank=firstYank*.9+secondYank*.68+finalYank*1.15;
           player.yaw=spiderCaughtStartYaw+yawDelta*drag+
             Math.sin(spiderCaughtElapsed*10)*.018*drag+
@@ -9821,8 +9838,8 @@ function animate(){
             );
           }
           const lunge=0.14*Math.max(0,1-caughtProgress/.38);
-          const scramble=(Math.sin(spiderCaughtElapsed*11)*.008)+
-            (Math.sin(spiderCaughtElapsed*17)*.003)+tugPulse*.008+yank*.012;
+          const scramble=(Math.sin(spiderCaughtElapsed*7.2)*.005)+
+            (Math.sin(spiderCaughtElapsed*10.5)*.002)+tugPulse*.005+yank*.008;
           spiderEntity.scale.setScalar(1+lunge+scramble);
           // Camera yaw points from the player toward the spider. The spider's
           // own forward axis must face the opposite direction (toward the player),
