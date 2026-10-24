@@ -11,8 +11,6 @@ const PLAYER_RADIUS = 0.4; // m
 const MOUSE_SENS = 0.0022;
 const ACCEL = 12; // velocity smoothing (per second)
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
-const JUMP_SPEED = 3.2;
-const JUMP_GRAVITY = 20;
 
 
 function makeLocalFirstPersonFlashlight(group){
@@ -214,10 +212,6 @@ export class Player {
         }else{
           this.crouched = !this.crouched;
         }
-      }
-      if(e.code === "Space" && this.movementActive && this.jumpY <= 0.001 && !this.crouched && !this.sliding){
-        this.jumpVelocity = JUMP_SPEED;
-        this.stamina = Math.max(0, this.stamina - 8);
       }
       this.keys.add(e.code);
     };
@@ -506,25 +500,10 @@ export class Player {
       this.jumpY=THREE.MathUtils.clamp(this.jumpY+(vertical+forwardLift)*speed*dt,0,120);
       this.jumpVelocity=0;
     }else{
-      this.jumpVelocity -= JUMP_GRAVITY * dt;
-      this.jumpY += this.jumpVelocity * dt;
-
-      // Keep the camera safely below the ceiling even if the map ceiling changes.
-      const ceilingClearance = 0.15;
-      const maxJumpY = Math.max(0, WALL_H - ceilingClearance - targetEye - this.bobOffset);
-      if(this.jumpY > maxJumpY){
-        this.jumpY = maxJumpY;
-        if(this.jumpVelocity > 0) this.jumpVelocity = 0;
-      }
-
-      if(this.jumpY <= 0){
-        this.jumpY = 0;
-        this.jumpVelocity = 0;
-        if(wasAirborne){
-          this.landingKick=.08;
-          if(this.onLand) this.onLand(Math.min(1,Math.max(.25,hSpeed/RUN_SPEED)));
-        }
-      }
+      // Normal play is grounded; jumping has been removed. Space remains
+      // available for vertical movement in admin free-flight mode only.
+      this.jumpY=0;
+      this.jumpVelocity=0;
     }
 
     // Keep pos.y at its long-standing eye-height baseline: gameplay systems
