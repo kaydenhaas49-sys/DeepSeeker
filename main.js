@@ -5305,6 +5305,7 @@ let spiderCaughtHeadBone=null;
 let spiderCaughtHeadBaseRotation=null;
 let spiderCaughtBlackout=null;
 let spiderCaughtPlayerPosition=new THREE.Vector3();
+let spiderCaughtCameraStartY=0;
 let spiderCaughtRetreatDirection=new THREE.Vector3();
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
@@ -6942,6 +6943,7 @@ function startSpiderCatchFreeze(){
   spiderCaughtHeadBone=findSpiderCaughtHeadBone();
   spiderCaughtHeadBaseRotation=spiderCaughtHeadBone ? spiderCaughtHeadBone.rotation.clone() : null;
   spiderCaughtPlayerPosition.copy(player.pos);
+  spiderCaughtCameraStartY=player.camera.position.y;
   // Give the player a brief instinctive step backward, away from the spider,
   // before the bite lands. The retreat is animated from the captured position
   // each frame, so it cannot accumulate or fight the movement-freeze logic.
@@ -9742,7 +9744,7 @@ function animate(){
 
         if(spiderCaughtFreezeTimer>0){
           player.movementFrozen=true;
-          const retreat=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.42)*.68;
+          const retreat=THREE.MathUtils.smoothstep(spiderCaughtElapsed,.12,.78)*1.45;
           player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
             spiderCaughtRetreatDirection,
             retreat
@@ -9798,18 +9800,35 @@ function animate(){
           const secondYank=impact(2.55,.18);
           const finalYank=impact(3.92,.13);
           const yank=firstYank*.9+secondYank*.68+finalYank*1.15;
-          player.yaw=spiderCaughtStartYaw+yawDelta*drag+
-            Math.sin(spiderCaughtElapsed*10)*.018*drag+
-            tugPulse*.018+yank*.035;
-          // Keep the player looking forward at the spider instead of forcing
-          // their view down into the floor during the drag.
+          // First the player instinctively turns to face the spider, then
+          // stumbles backward, and finally drops into a low, frightened pose.
+          const lookAtSpider=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.28);
+          const fall=THREE.MathUtils.smoothstep(spiderCaughtElapsed,.72,1.28);
+          const aimYaw=spiderCaughtStartYaw+yawDelta;
+          player.yaw=spiderCaughtStartYaw+
+            Math.atan2(Math.sin(aimYaw-spiderCaughtStartYaw),Math.cos(aimYaw-spiderCaughtStartYaw))*lookAtSpider+
+            Math.sin(spiderCaughtElapsed*10)*.018*drag+tugPulse*.018+yank*.035;
+          const lookPitch=THREE.MathUtils.clamp(
+            spiderCaughtStartPitch+Math.atan2(
+              spiderEntity.position.y-(player.pos.y+1.45),
+              Math.max(.25,Math.hypot(
+                spiderEntity.position.x-player.pos.x,
+                spiderEntity.position.z-player.pos.z
+              ))
+            ),
+            -1.05,
+            .65
+          );
           player.pitch=THREE.MathUtils.clamp(
-            spiderCaughtStartPitch+drag*.28-biteHold*.035+
-              Math.sin(drag*Math.PI*2.1)*.025*drag+
-              tugPulse*.012+yank*.025,
+            THREE.MathUtils.lerp(spiderCaughtStartPitch,lookPitch,lookAtSpider)+
+              fall*.72+drag*.12+
+              Math.sin(drag*Math.PI*2.1)*.025*drag+tugPulse*.012+yank*.025,
             -1.35,
             1.35
           );
+          // Lower the view as the player falls backward, keeping the spider
+          // in front of them while its attack animation plays.
+          player.camera.position.y=spiderCaughtCameraStartY-fall*.82;
 
           // Let the spider's head/neck droop toward the player after the bite.
           // The mixer updates first each frame, so apply this as a pose offset.
@@ -9828,7 +9847,7 @@ function animate(){
             )*.12;
           }
           player.camera.rotation.z=Math.sin(drag*Math.PI)*.16+
-            drag*.09+tugPulse*.045+
+            fall*.18+drag*.09+tugPulse*.045+
             Math.sin(spiderCaughtElapsed*8.3)*.018*drag+
             (firstYank-secondYank+finalYank)*.07;
 
