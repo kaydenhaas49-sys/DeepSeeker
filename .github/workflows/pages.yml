@@ -2,7 +2,7 @@ name: Deploy browser demo to GitHub Pages
 
 on:
   push:
-    branches: ["work/remove-level-run-20261017"]
+    branches: ["feature/spider-drag-animation-v2"]
   workflow_dispatch:
 
 permissions:
