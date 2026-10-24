@@ -647,13 +647,13 @@ export class SignalStalkerRig {
     for (const leg of this.legs) {
       const phase = this.phase + leg.phase;
       const foot = leg.footBase.clone();
+      let lift = 0;
       if (moving) {
         // A longer stance phase gives each foot a readable plant, followed by
         // a quicker lifted recovery instead of a continuous sinusoidal slide.
         const cycle = ((phase / (Math.PI * 2)) % 1 + 1) % 1;
         const stance = 0.62;
         let stride;
-        let lift = 0;
         if (cycle < stance) {
           const stanceProgress = cycle / stance;
           stride = THREE.MathUtils.lerp(0.095, -0.095, stanceProgress);
