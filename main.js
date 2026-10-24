@@ -9983,6 +9983,25 @@ function animate(){
     }
   }
 
+
+  // Catch recovery must not depend on the spider still being active or this
+  // frame still being owned by the same multiplayer authority. Either can
+  // change during the staged animation and otherwise leave movement locked.
+  if(
+    player.movementFrozen &&
+    spiderCaughtElapsed>0 &&
+    (
+      spiderCaughtFreezeTimer<=0 ||
+      spiderCaughtElapsed>=SPIDER_CAUGHT_FREEZE_TIME ||
+      !spiderActive ||
+      !multiplayer.isWorldAuthority() ||
+      houseMode ||
+      tutorialOpenRoomActive
+    )
+  ){
+    resetPlayerAfterSpiderCatch();
+  }
+
   publishMultiplayerSpiderSnapshot(dt);
 
   // The normal spider system is Backrooms-only. The apartment gets one
