@@ -5473,7 +5473,7 @@ function installSpiderWallClipMaterial(material){
     // (including texture/vertex color), so the original model cannot wash white.
     const spiderAmbientFill=
       "\n// DeepSeeker spider visibility fill: preserve the authored albedo.\n"+
-      "outgoingLight = max(outgoingLight, max(diffuseColor.rgb, vec3(0.12)) * 0.24);\n";
+      "outgoingLight = max(outgoingLight, max(diffuseColor.rgb, vec3(0.22)) * 0.42);\n";
     shader.fragmentShader=shader.fragmentShader.replace(
       opaqueFragmentMarker,
       clipFragment+spiderAmbientFill+opaqueFragmentMarker
