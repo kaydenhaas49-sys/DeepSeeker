@@ -6666,14 +6666,14 @@ function moveSpiderTowardPlayer(dt){
 
   spiderPathRepathTimer=Math.max(0,spiderPathRepathTimer-dt);
 
-  const targetShift=Number.isFinite(spiderPathTargetX)
-    ? Math.hypot(player.pos.x-spiderPathTargetX,player.pos.z-spiderPathTargetZ)
-    : Infinity;
-
+  // Path-grid construction checks hundreds of collision cells synchronously.
+  // Always respect the repath timer while a path exists; letting targetShift
+  // bypass it can rebuild the whole A* grid repeatedly during a chase and stall
+  // the browser's main thread. A fresh path is still built immediately when
+  // none exists, and the timer is reset after each successful build.
   if(
     !spiderPath.length ||
     spiderPathRepathTimer<=0 ||
-    targetShift>SPIDER_PATH_TARGET_SHIFT ||
     spiderPathIndex>=spiderPath.length
   ){
     buildSpiderPath();
