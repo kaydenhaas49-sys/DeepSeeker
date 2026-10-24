@@ -7003,10 +7003,15 @@ function resetPlayerAfterSpiderCatch(){
   player.proceduralArmFlashlight.visible=equippedTool!=="radio";
   player.setFlashlightVisual(equippedTool!=="radio" && flashlightOn);
   flashlight.visible=equippedTool!=="radio" && flashlightOn && battery>0;
-  const teammate=multiplayer.getClosestBackroomsPlayerPosition(
-    player.pos.x,
-    player.pos.z
-  );
+  let teammate=null;
+  try{
+    teammate=multiplayer.getClosestBackroomsPlayerPosition(
+      player.pos.x,
+      player.pos.z
+    );
+  }catch(error){
+    console.warn("[DeepSeeker] Could not find teammate for spider respawn; using level start.",error);
+  }
 
   if(teammate){
     const dx=player.pos.x-teammate.x;
@@ -9889,8 +9894,13 @@ function animate(){
               THREE.MathUtils.smoothstep(caughtProgress,.76,1)
             );
           }
-          if(spiderCaughtFreezeTimer<=0){
-            player.movementFrozen=false;
+          // Use elapsed time as a second completion guard. If the countdown
+          // is interrupted or desynchronised, the catch must still release the
+          // player and run the respawn cleanup after the animation completes.
+          if(
+            spiderCaughtFreezeTimer<=0 ||
+            spiderCaughtElapsed>=SPIDER_CAUGHT_FREEZE_TIME
+          ){
             resetPlayerAfterSpiderCatch();
           }
         }else{
