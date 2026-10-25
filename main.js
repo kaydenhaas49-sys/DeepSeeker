@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261024-wall-refinement-1";
-import { createTextures } from "./textures.js?v=20261024-wall-refinement-1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261024-tutorial-light-dim-1";
+import { createTextures } from "./textures.js?v=20261024-tutorial-light-dim-1";
 import { Player } from "./player.js?v=20261024-collision-radius-fix";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js?v=20261019-usernamefix1";
@@ -428,9 +428,9 @@ function ensureTutorialOpenRoom(){
       fixtureMaterial.clone(),
       new THREE.Vector3(x,h-.055,z)
     );
-    fixtureMesh.material.emissiveIntensity=.30;
+    fixtureMesh.material.emissiveIntensity=.16;
 
-    const light=new THREE.PointLight(0xffe6a8,2.2,100,1.3);
+    const light=new THREE.PointLight(0xffe6a8,1.25,100,1.3);
     light.position.set(x,h-.75,z);
     light.castShadow=false;
     light.visible=true;
@@ -442,7 +442,7 @@ function ensureTutorialOpenRoom(){
       x,
       z,
       phase:Math.random()*Math.PI*2,
-      baseIntensity:2.2
+      baseIntensity:1.25
     });
   }
 
@@ -518,11 +518,11 @@ function updateTutorialOpenRoomLights(dt=0){
       if(level>.42){
         material.color.setHex(0xffedbd);
         material.emissive.setHex(0xffd990);
-        material.emissiveIntensity=1.8*level;
+        material.emissiveIntensity=1.05*level;
       }else if(level>.012){
         material.color.setHex(0xb99e68);
         material.emissive.setHex(0xffbd62);
-        material.emissiveIntensity=.95*level;
+        material.emissiveIntensity=.58*level;
       }else{
         material.color.setHex(0x514b39);
         material.emissive.setHex(0x000000);
@@ -547,7 +547,7 @@ function updateTutorialOpenRoomLights(dt=0){
 
 function getTutorialAmbientScale(){
   if(!tutorialOpenRoomActive)return 1;
-  if(tutorialLightsOutState==="on")return 1;
+  if(tutorialLightsOutState==="on")return .82;
   if(tutorialLightsOutState==="off")return .14;
   return .14+.58*tutorialFlickerAverage;
 }
