@@ -7,7 +7,7 @@ import { createHazmatCharacter } from "./character.js";
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
 const CROUCH_SPEED = 2.2; // m/s
-const PLAYER_RADIUS = 0.4; // m
+const PLAYER_RADIUS = 0.30; // m — tighter collision so visible walls don't feel surrounded by invisible padding
 const MOUSE_SENS = 0.0022;
 const ACCEL = 12; // velocity smoothing (per second)
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
