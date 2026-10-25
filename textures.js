@@ -27,6 +27,38 @@ function rng32(seed) {
   };
 }
 
+// Blend the horizontal repeat edges of procedural wallpaper.
+// The wall UVs repeat along wall length; mismatched border pixels can look like black hairlines.
+function blendHorizontalTextureEdges(canvas, blend = 20) {
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const image = ctx.getImageData(0, 0, width, height);
+  const source = new Uint8ClampedArray(image.data);
+  const channels = 4;
+  const edgeWidth = Math.min(blend, Math.floor(width / 2));
+
+  for (let y = 0; y < height; y++) {
+    for (let d = 0; d < edgeWidth; d++) {
+      const left = (y * width + d) * channels;
+      const right = (y * width + (width - 1 - d)) * channels;
+      const amount = 1 - d / edgeWidth;
+      for (let channel = 0; channel < 3; channel++) {
+        const average = (source[left + channel] + source[right + channel]) * 0.5;
+        image.data[left + channel] = Math.round(
+          source[left + channel] * (1 - amount) + average * amount
+        );
+        image.data[right + channel] = Math.round(
+          source[right + channel] * (1 - amount) + average * amount
+        );
+      }
+    }
+  }
+
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
 function makeWallpaper() {
   const S = 256;
   const c = document.createElement("canvas");
@@ -107,7 +139,7 @@ function makeWallpaper() {
   g.fillRect(0, S - bb, S, 2); // top edge highlight
   g.fillStyle = "rgba(0,0,0,0.25)";
   g.fillRect(0, S - 3, S, 3); // floor contact shadow
-  return c;
+  return blendHorizontalTextureEdges(c);
 }
 
 function makeCarpet() {
