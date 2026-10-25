@@ -131,14 +131,8 @@ function makeWallpaper() {
     g.fillRect(rnd() * S, rnd() * S, 1, 1);
   }
 
-  // dark baseboard strip along the bottom (~15% of tile height)
-  const bb = Math.round(S * 0.15);
-  g.fillStyle = "#392c1a";
-  g.fillRect(0, S - bb, S, bb);
-  g.fillStyle = "#57452a";
-  g.fillRect(0, S - bb, S, 2); // top edge highlight
-  g.fillStyle = "rgba(0,0,0,0.25)";
-  g.fillRect(0, S - 3, S, 3); // floor contact shadow
+  // Keep the wallpaper clean from full-width dark bands and black edge lines.
+  // Wall wear is supplied by the subtle print, scuffs, and paper grain above.
   return blendHorizontalTextureEdges(c);
 }
 
