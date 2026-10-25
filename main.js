@@ -722,6 +722,122 @@ function ensureTutorialOpenRoom(){
     piece.receiveShadow=true;
   }
 
+  // Physical wall failure: layered plaster scars and curled paper edges.
+  // These are actual meshes, not extra dark texture marks, so they catch light
+  // and read as damaged architecture when the player walks past them.
+  const plasterMaterials=[
+    new THREE.MeshStandardMaterial({color:0x8d8878,roughness:1}),
+    new THREE.MeshStandardMaterial({color:0xaaa18a,roughness:1}),
+    new THREE.MeshStandardMaterial({color:0x766f5f,roughness:1})
+  ];
+  const paperEdgeMaterial=new THREE.MeshStandardMaterial({
+    color:0xc1b17c,roughness:1,side:THREE.DoubleSide
+  });
+  const wallScarShadow=new THREE.MeshStandardMaterial({
+    color:0x393326,roughness:1,transparent:true,opacity:.48,
+    side:THREE.DoubleSide,depthWrite:false
+  });
+  const makeIrregularShape=(rx,ry,count,inner=.68)=>{
+    const shape=new THREE.Shape();
+    for(let i=0;i<count;i++){
+      const a=i/count*Math.PI*2;
+      const r=inner+rand()*(1-inner);
+      const x=Math.cos(a)*rx*r,y=Math.sin(a)*ry*r;
+      if(i===0)shape.moveTo(x,y);else shape.lineTo(x,y);
+    }
+    shape.closePath();
+    return shape;
+  };
+  const wallFaces=[
+    {side:"north",angle:0,fixed:min+.025},
+    {side:"south",angle:Math.PI,fixed:max-.025},
+    {side:"west",angle:Math.PI/2,fixed:min+.025},
+    {side:"east",angle:-Math.PI/2,fixed:max-.025}
+  ];
+  for(const face of wallFaces){
+    for(let i=0;i<9;i++){
+      const u=min+5+rand()*(max-min-10);
+      const v=.35+rand()*2.55;
+      const rx=.32+rand()*(i%3===0?.85:.48);
+      const ry=.22+rand()*(i%4===0?.62:.32);
+      const shape=makeIrregularShape(rx,ry,7+Math.floor(rand()*5),.56);
+      const shadow=new THREE.Mesh(new THREE.ShapeGeometry(shape),wallScarShadow);
+      shadow.position.set(
+        face.side==="west"||face.side==="east"?face.fixed:u,
+        v,
+        face.side==="north"||face.side==="south"?face.fixed:u
+      );
+      shadow.rotation.y=face.angle;
+      shadow.position.x+=Math.sin(face.angle)*.012;
+      shadow.position.z+=face.side==="north"?.012:face.side==="south"?-.012:0;
+      tutorialOpenRoomRoot.add(shadow);
+
+      const plasterShape=makeIrregularShape(rx*.94,ry*.94,8+Math.floor(rand()*4),.55);
+      const plaster=new THREE.Mesh(
+        new THREE.ShapeGeometry(plasterShape),
+        plasterMaterials[Math.floor(rand()*plasterMaterials.length)]
+      );
+      plaster.position.copy(shadow.position);
+      plaster.position.y+=.015;
+      plaster.position.x+=Math.sin(face.angle)*.012;
+      plaster.position.z+=face.side==="north"?.012:face.side==="south"?-.012:0;
+      plaster.rotation.y=face.angle;
+      plaster.castShadow=true;
+      plaster.receiveShadow=true;
+      tutorialOpenRoomRoot.add(plaster);
+
+      // A few curled paper tongues give the tear a visible lifted edge.
+      if(i%3===0){
+        const flapShape=new THREE.Shape();
+        flapShape.moveTo(-rx*.45,ry*.24);
+        flapShape.quadraticCurveTo(-rx*.12,ry*.88,rx*.35,ry*.60);
+        flapShape.lineTo(rx*.18,ry*.15);
+        flapShape.quadraticCurveTo(-rx*.10,ry*.05,-rx*.45,ry*.24);
+        const flap=new THREE.Mesh(new THREE.ShapeGeometry(flapShape),paperEdgeMaterial);
+        flap.position.copy(plaster.position);
+        flap.position.y+=.012;
+        flap.position.x+=Math.sin(face.angle)*.012;
+        flap.position.z+=face.side==="north"?.012:face.side==="south"?-.012:0;
+        flap.rotation.y=face.angle;
+        tutorialOpenRoomRoot.add(flap);
+      }
+    }
+  }
+
+  // Water has tracked down from failed ceiling joints. These narrow, irregular
+  // runs connect the ceiling damage to the wall instead of looking like decals.
+  const leakMaterial=new THREE.MeshStandardMaterial({
+    color:0x62523a,roughness:1,transparent:true,opacity:.28,
+    side:THREE.DoubleSide,depthWrite:false
+  });
+  for(const face of wallFaces){
+    for(let i=0;i<4;i++){
+      const u=min+7+rand()*(max-min-14);
+      const height=1.1+rand()*1.7;
+      const width=.045+rand()*.11;
+      const points=[
+        [-width*.5,0],[-width*.18,-height*.28],
+        [-width*.62,-height*.62],[-width*.22,-height],
+        [width*.15,-height*.86],[width*.48,-height*.46],
+        [width*.22,-height*.17],[width*.5,0]
+      ];
+      const shape=new THREE.Shape();
+      shape.moveTo(points[0][0],points[0][1]);
+      for(let j=1;j<points.length;j++)shape.lineTo(points[j][0],points[j][1]);
+      shape.closePath();
+      const run=new THREE.Mesh(new THREE.ShapeGeometry(shape),leakMaterial);
+      run.position.set(
+        face.side==="west"||face.side==="east"?face.fixed:u,
+        h-.1,
+        face.side==="north"||face.side==="south"?face.fixed:u
+      );
+      run.rotation.y=face.angle;
+      run.position.x+=Math.sin(face.angle)*.018;
+      run.position.z+=face.side==="north"?.018:face.side==="south"?-.018:0;
+      tutorialOpenRoomRoot.add(run);
+    }
+  }
+
   // Four permanent fluorescent fixtures, one near each corner of the tutorial.
   // The tutorial is tiny enough that keeping all four on has negligible cost.
   const tutorialFixturePositions=[[12,12],[52,12],[12,52],[52,52]];
