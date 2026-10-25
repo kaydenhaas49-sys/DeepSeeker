@@ -770,6 +770,8 @@ function ensureTutorialOpenRoom(){
       shadow.rotation.y=face.angle;
       shadow.position.x+=Math.sin(face.angle)*.012;
       shadow.position.z+=face.side==="north"?.012:face.side==="south"?-.012:0;
+      shadow.userData.tutorialOwnedGeometry=true;
+      shadow.userData.tutorialOwnedMaterial=true;
       tutorialOpenRoomRoot.add(shadow);
 
       const plasterShape=makeIrregularShape(rx*.94,ry*.94,8+Math.floor(rand()*4),.55);
@@ -784,6 +786,8 @@ function ensureTutorialOpenRoom(){
       plaster.rotation.y=face.angle;
       plaster.castShadow=true;
       plaster.receiveShadow=true;
+      plaster.userData.tutorialOwnedGeometry=true;
+      plaster.userData.tutorialOwnedMaterial=true;
       tutorialOpenRoomRoot.add(plaster);
 
       // A few curled paper tongues give the tear a visible lifted edge.
@@ -799,6 +803,8 @@ function ensureTutorialOpenRoom(){
         flap.position.x+=Math.sin(face.angle)*.012;
         flap.position.z+=face.side==="north"?.012:face.side==="south"?-.012:0;
         flap.rotation.y=face.angle;
+        flap.userData.tutorialOwnedGeometry=true;
+        flap.userData.tutorialOwnedMaterial=true;
         tutorialOpenRoomRoot.add(flap);
       }
     }
@@ -834,6 +840,8 @@ function ensureTutorialOpenRoom(){
       run.rotation.y=face.angle;
       run.position.x+=Math.sin(face.angle)*.018;
       run.position.z+=face.side==="north"?.018:face.side==="south"?-.018:0;
+      run.userData.tutorialOwnedGeometry=true;
+      run.userData.tutorialOwnedMaterial=true;
       tutorialOpenRoomRoot.add(run);
     }
   }
