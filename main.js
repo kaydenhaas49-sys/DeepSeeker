@@ -340,320 +340,39 @@ function ensureTutorialOpenRoom(){
   // wallpaper, tightly woven office carpet, and acoustic ceiling tiles.
   // Wear is built into the surface textures rather than painted on as dark,
   // rectangular overlay planes.
-  const makeTutorialTexture=(kind,size=512)=>{
-    const canvas=document.createElement("canvas");
-    canvas.width=canvas.height=size;
-    const ctx=canvas.getContext("2d");
-    let seed=kind==="wall"?841:kind==="floor"?2917:5039;
-    const rand=()=>{
-      seed=(seed*1664525+1013904223)>>>0;
-      return seed/4294967296;
-    };
-    const wallColors=["#b7ad7b","#b1a675","#c0b789","#a7a071"];
-    const floorColors=["#77705a","#6d6750","#827960","#69644f"];
-    const ceilingColors=["#bcbcae","#b2b2a4","#c5c3b4","#aaa99b"];
-    const colors=kind==="wall"?wallColors:kind==="floor"?floorColors:ceilingColors;
-
-    // Copy a mark over texture edges when needed, so worn spots tile cleanly.
-    const wrapDraw=(x,y,margin,draw)=>{
-      const xs=[0],ys=[0];
-      if(x<margin)xs.push(size);
-      if(x>size-margin)xs.push(-size);
-      if(y<margin)ys.push(size);
-      if(y>size-margin)ys.push(-size);
-      for(const ox of xs)for(const oy of ys)draw(x+ox,y+oy);
-    };
-    const softPatch=(cx,cy,rx,ry,inner,outer="rgba(45,40,28,0)")=>{
-      wrapDraw(cx,cy,Math.max(rx,ry)+2,(x,y)=>{
-        ctx.save();
-        ctx.translate(x,y);
-        ctx.scale(rx,ry);
-        const gradient=ctx.createRadialGradient(0,0,0,0,0,1);
-        gradient.addColorStop(0,inner);
-        gradient.addColorStop(.58,inner);
-        gradient.addColorStop(1,outer);
-        ctx.fillStyle=gradient;
-        ctx.beginPath();
-        ctx.arc(0,0,1,0,Math.PI*2);
-        ctx.fill();
-        ctx.restore();
-      });
-    };
-    const polygon=(points,fill,stroke,lineWidth=1)=>{
-      ctx.beginPath();
-      ctx.moveTo(points[0][0],points[0][1]);
-      for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);
-      ctx.closePath();
-      if(fill){ctx.fillStyle=fill;ctx.fill();}
-      if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lineWidth;ctx.stroke();}
-    };
-
-    const stainBlob=(cx,cy,rx,ry,fill,stroke=null)=>{
-      const points=[];
-      const count=18;
-      for(let i=0;i<count;i++){
-        const angle=i/count*Math.PI*2;
-        const radius=.73+rand()*.48;
-        points.push([Math.cos(angle)*rx*radius,Math.sin(angle)*ry*radius]);
-      }
-      wrapDraw(cx,cy,Math.max(rx,ry)+4,(x,y)=>{
-        ctx.beginPath();
-        ctx.moveTo(x+points[0][0],y+points[0][1]);
-        for(let i=1;i<points.length;i++)ctx.lineTo(x+points[i][0],y+points[i][1]);
-        ctx.closePath();
-        ctx.fillStyle=fill;
-        ctx.fill();
-        if(stroke){
-          ctx.strokeStyle=stroke;
-          ctx.lineWidth=1.15;
-          ctx.stroke();
-        }
-      });
-    };
-
-    if(kind==="wall"){
-      ctx.fillStyle="#b8ac77";
-      ctx.fillRect(0,0,size,size);
-
-      // Broad, soft paper fading instead of confetti-like speckling.
-      for(let i=0;i<11;i++){
-        const x=rand()*size,y=rand()*size,rx=45+rand()*100,ry=65+rand()*130;
-        softPatch(x,y,rx,ry,rand()>.5?"rgba(225,211,157,.13)":"rgba(72,60,38,.10)");
-      }
-
-      // Faded small botanical print, intentionally low contrast.
-      const repeat=38;
-      for(let y=-repeat;y<size+repeat;y+=repeat){
-        for(let x=-repeat;x<size+repeat;x+=repeat){
-          const px=x+repeat*.5+(rand()-.5)*3,py=y+repeat*.5+(rand()-.5)*3;
-          const ink=.075+rand()*.055;
-          ctx.strokeStyle="rgba(78,83,53,"+ink+")";
-          ctx.lineWidth=.75+rand()*.25;
-          ctx.beginPath();
-          ctx.moveTo(px,py-6);
-          ctx.bezierCurveTo(px-6,py-2,px-4,py+3,px,py+6);
-          ctx.bezierCurveTo(px+4,py+3,px+6,py-2,px,py-6);
-          ctx.stroke();
-          ctx.strokeStyle="rgba(231,219,171,"+(ink*.9)+")";
-          ctx.beginPath();
-          ctx.moveTo(px-2,py-1);
-          ctx.lineTo(px+2,py+2);
-          ctx.stroke();
-        }
-      }
-
-      // Water tracks bloom near the ceiling and taper down the wall.
-      for(let i=0;i<6;i++){
-        const x=rand()*size,top=rand()*size*.38;
-        const width=12+rand()*36,length=65+rand()*180;
-        softPatch(x,top+12,width*1.8,22+rand()*24,"rgba(72,57,35,.18)");
-        const g=ctx.createLinearGradient(x,top,x+(rand()-.5)*12,top+length);
-        g.addColorStop(0,"rgba(75,59,36,.19)");
-        g.addColorStop(.25,"rgba(83,66,42,.105)");
-        g.addColorStop(.7,"rgba(83,66,42,.045)");
-        g.addColorStop(1,"rgba(83,66,42,0)");
-        ctx.fillStyle=g;
-        ctx.beginPath();
-        ctx.moveTo(x-width*.5,top);
-        ctx.bezierCurveTo(x-width*.3,top+length*.25,x-width*.7,top+length*.55,x-width*.25,top+length);
-        ctx.lineTo(x+width*.22,top+length*.88);
-        ctx.bezierCurveTo(x+width*.65,top+length*.48,x+width*.25,top+length*.23,x+width*.5,top);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Peeling paper has a dirty shadow, exposed plaster and a curled flap.
-      for(let i=0;i<7;i++){
-        const cx=35+rand()*(size-70),cy=35+rand()*(size-70);
-        const rx=17+rand()*31,ry=23+rand()*47;
-        const points=[],count=10+Math.floor(rand()*5);
-        for(let j=0;j<count;j++){
-          const a=j/count*Math.PI*2,r=.72+rand()*.5;
-          points.push([Math.cos(a)*rx*r,Math.sin(a)*ry*r]);
-        }
-        wrapDraw(cx,cy,Math.max(rx,ry)+8,(x,y)=>{
-          ctx.save();
-          ctx.translate(x,y);
-          polygon(points.map(([px,py])=>[px+3,py+4]),"rgba(49,42,29,.30)",null);
-          polygon(points,"rgba(139,132,105,.96)","rgba(66,57,39,.55)",1.2);
-          polygon(points.map(([px,py])=>[px*.72,py*.72]),"rgba(174,164,128,.82)","rgba(211,198,151,.52)",.8);
-          const flap=[[-rx*.35,-ry*.35],[-rx*.08,-ry*.82],[rx*.28,-ry*.66],[rx*.18,-ry*.35],[-rx*.02,-ry*.17]];
-          polygon(flap,"rgba(219,204,151,.92)","rgba(92,76,45,.56)",1);
-          ctx.strokeStyle="rgba(244,226,172,.64)";
-          ctx.lineWidth=1.2;
-          ctx.beginPath();
-          ctx.moveTo(-rx*.28,-ry*.42);
-          ctx.quadraticCurveTo(-rx*.04,-ry*.58,rx*.18,-ry*.46);
-          ctx.stroke();
-          ctx.strokeStyle="rgba(65,56,38,.30)";
-          ctx.lineWidth=.7;
-          for(let k=1;k<points.length;k+=3){
-            ctx.beginPath();
-            ctx.moveTo(points[k][0]*.86,points[k][1]*.86);
-            ctx.lineTo(points[k][0]*1.03,points[k][1]*1.03);
-            ctx.stroke();
-          }
-          ctx.restore();
-        });
-      }
-
-      // Faint wallpaper joins and accumulated grime at the skirting.
-      for(let x=0;x<=size;x+=128){
-        ctx.fillStyle="rgba(71,61,39,.09)";
-        ctx.fillRect(x,0,1,size);
-        ctx.fillStyle="rgba(235,219,169,.10)";
-        ctx.fillRect(x+1,0,1,size);
-      }
-      const base=ctx.createLinearGradient(0,size*.72,0,size);
-      base.addColorStop(0,"rgba(77,62,39,0)");
-      base.addColorStop(.55,"rgba(77,62,39,.07)");
-      base.addColorStop(1,"rgba(58,48,33,.20)");
-      ctx.fillStyle=base;
-      ctx.fillRect(0,size*.72,size,size*.28);
-    }else if(kind==="floor"){
-      ctx.fillStyle="#82785e";
-      ctx.fillRect(0,0,size,size);
-
-      // Low-frequency dirt and faded areas.
-      for(let i=0;i<17;i++){
-        const x=rand()*size,y=rand()*size,rx=35+rand()*105,ry=28+rand()*80;
-        softPatch(x,y,rx,ry,rand()>.48?"rgba(40,36,27,.13)":"rgba(198,178,132,.10)");
-      }
-
-      // Flattened traffic lanes, with edges that fade into the pile.
-      for(let i=0;i<5;i++){
-        const x=rand()*size,y=rand()*size,len=110+rand()*170,w=12+rand()*27;
-        ctx.save();
-        ctx.translate(x,y);
-        ctx.rotate((rand()-.5)*.34);
-        const g=ctx.createLinearGradient(-len/2,0,len/2,0);
-        g.addColorStop(0,"rgba(53,46,33,0)");
-        g.addColorStop(.22,"rgba(53,46,33,.045)");
-        g.addColorStop(.5,"rgba(53,46,33,.12)");
-        g.addColorStop(.8,"rgba(53,46,33,.04)");
-        g.addColorStop(1,"rgba(53,46,33,0)");
-        ctx.fillStyle=g;
-        ctx.beginPath();
-        ctx.ellipse(0,0,len/2,w/2,0,0,Math.PI*2);
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // Short carpet pile; enough detail to read as fibres, not visual noise.
-      for(let i=0;i<15000;i++){
-        const x=rand()*size,y=rand()*size,v=rand();
-        ctx.strokeStyle=v>.74?"rgba(221,207,169,.19)":v<.20?"rgba(43,39,29,.19)":"rgba(135,122,91,.19)";
-        ctx.lineWidth=.45+rand()*.5;
-        const dx=(rand()-.5)*1.5,dy=.8+rand()*2.2;
-        wrapDraw(x,y,3,(px,py)=>{
-          ctx.beginPath();
-          ctx.moveTo(px,py);
-          ctx.lineTo(px+dx,py+dy);
-          ctx.stroke();
-        });
-      }
-      for(let i=0;i<4;i++){
-        const x=rand()*size,y=rand()*size,rx=10+rand()*22,ry=7+rand()*14;
-        softPatch(x,y,rx,ry,"rgba(49,44,32,.19)","rgba(49,44,32,0)");
-        stainBlob(x,y,rx*.72,ry*.7,"rgba(191,172,128,.12)");
-      }
-    }else{
-      ctx.fillStyle="#9f9f92";
-      ctx.fillRect(0,0,size,size);
-      const tile=size/4;
-      for(let ty=0;ty<4;ty++){
-        for(let tx=0;tx<4;tx++){
-          const x=tx*tile,y=ty*tile;
-          const shade=ceilingColors[Math.floor(rand()*ceilingColors.length)];
-          ctx.fillStyle=shade;
-          ctx.fillRect(x+2,y+2,tile-4,tile-4);
-
-          // Mineral-fibre surface texture.
-          for(let n=0;n<180;n++){
-            const px=x+5+rand()*(tile-10),py=y+5+rand()*(tile-10);
-            ctx.strokeStyle=rand()>.5?"rgba(238,235,215,.09)":"rgba(75,74,64,.045)";
-            ctx.lineWidth=.4;
-            ctx.beginPath();
-            ctx.moveTo(px,py);
-            ctx.lineTo(px+1+rand()*4,py+(rand()-.5)*1.5);
-            ctx.stroke();
-          }
-
-          if(rand()>.30){
-            const cx=x+tile*(.18+rand()*.64),cy=y+tile*(.18+rand()*.64);
-            const rx=16+rand()*33,ry=12+rand()*28;
-            const g=ctx.createRadialGradient(cx,cy,2,cx,cy,Math.max(rx,ry));
-            g.addColorStop(0,"rgba(105,76,47,.16)");
-            g.addColorStop(.5,"rgba(123,91,57,.10)");
-            g.addColorStop(1,"rgba(123,91,57,0)");
-            ctx.fillStyle=g;
-            ctx.beginPath();
-            ctx.ellipse(cx,cy,rx,ry,rand()*.6,0,Math.PI*2);
-            ctx.fill();
-          }
-
-          if(rand()>.78){
-            const cx=x+tile*(.15+rand()*.55),cy=y+tile*(.2+rand()*.55);
-            ctx.strokeStyle="rgba(66,62,51,.48)";
-            ctx.lineWidth=.9;
-            ctx.beginPath();
-            ctx.moveTo(cx,cy);
-            ctx.lineTo(cx+5+rand()*9,cy-4-rand()*8);
-            ctx.lineTo(cx+10+rand()*10,cy-12-rand()*8);
-            ctx.lineTo(cx+16+rand()*6,cy-14-rand()*12);
-            ctx.stroke();
-          }
-        }
-      }
-      ctx.fillStyle="rgba(48,48,41,.40)";
-      for(let p=0;p<=size;p+=tile){
-        ctx.fillRect(p,0,1.8,size);
-        ctx.fillRect(0,p,size,1.8);
-      }
-      ctx.fillStyle="rgba(236,232,210,.24)";
-      for(let p=2;p<=size;p+=tile){
-        ctx.fillRect(p,0,1,size);
-        ctx.fillRect(0,p,size,1);
-      }
-    }
-    ctx.globalAlpha=1;
-    const texture=new THREE.CanvasTexture(canvas);
-    texture.colorSpace=THREE.SRGBColorSpace;
-    texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
-    texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),4);
-    texture.needsUpdate=true;
-    return texture;
-  };
-
-  const tutorialWallTexture=makeTutorialTexture("wall");
+  // Match the playable Backrooms exactly: shared procedural textures and
+  // the same surface material values, with only room-sized UV repeats changed.
+  const tutorialTextures=createTextures(Math.min(
+    renderer.capabilities.getMaxAnisotropy(),
+    activeQualitySettings.anisotropy
+  ));
+  const tutorialWallTexture=tutorialTextures.wall;
   tutorialWallTexture.repeat.set((max-min)/4,h/4);
-  const tutorialFloorTexture=makeTutorialTexture("floor");
-  tutorialFloorTexture.repeat.set((max-min)/3.2,(max-min)/3.2);
-  const tutorialCeilingTexture=makeTutorialTexture("ceiling");
-  tutorialCeilingTexture.repeat.set((max-min)/2.4,(max-min)/2.4);
+  const tutorialFloorTexture=tutorialTextures.floor;
+  tutorialFloorTexture.repeat.set((max-min)/4,(max-min)/4);
+  const tutorialCeilingTexture=tutorialTextures.ceiling;
+  tutorialCeilingTexture.repeat.set((max-min)/4,(max-min)/4);
 
   const wallMaterial=new THREE.MeshStandardMaterial({
     map:tutorialWallTexture,
-    color:0xffffff,
-    roughness:1
+    roughness:0.92
   });
   const floorMaterial=new THREE.MeshStandardMaterial({
     map:tutorialFloorTexture,
-    color:0xffffff,
-    roughness:1,
-    side:THREE.DoubleSide
+    roughness:1.0
   });
   const ceilingMaterial=new THREE.MeshStandardMaterial({
     map:tutorialCeilingTexture,
-    color:0xffffff,
-    roughness:1,
+    color:0x77725e,
+    roughness:0.98,
+    metalness:0,
     side:THREE.DoubleSide
   });
   const fixtureMaterial=new THREE.MeshStandardMaterial({
-    color:0xffedbd,
-    emissive:0xffe7ad,
-    emissiveIntensity:1.8,
-    roughness:.35
+    color:0xfff4ca,
+    emissive:0xffe2a0,
+    emissiveIntensity:0.30,
+    roughness:0.28
   });
 
   const addTutorialMesh=(geometry,material,position)=>{
@@ -697,161 +416,8 @@ function ensureTutorialOpenRoom(){
     tutorialOpenRoomOccluders.push(mesh);
   }
 
-  // Surface aging is handled by the wallpaper, carpet and ceiling textures.
-  // Keep a small amount of physical plaster debris near wall edges below.
-  
-  // A few broken plaster pieces and scraps near the edges of the room.
-  const debrisMaterial=new THREE.MeshStandardMaterial({color:0x5a5546,roughness:1});
-  const debris=[
-    [8.5,.08,9.0,.22,.10,.18],[10.2,.06,10.4,.16,.08,.12],
-    [51.4,.07,9.5,.24,.10,.16],[49.8,.05,11.0,.13,.07,.20],
-    [8.8,.06,49.6,.18,.07,.13],[11.0,.09,51.2,.28,.12,.18],
-    [49.4,.05,49.8,.18,.06,.15],[51.7,.08,47.9,.22,.10,.11],
-    [18.2,.04,7.3,.20,.06,.14],[39.6,.05,54.0,.26,.07,.12],
-    [6.8,.04,33.5,.15,.06,.10],[55.0,.06,27.0,.22,.08,.14]
-  ];
-  for(const [x,y,z,w,h2,d] of debris){
-    const piece=addTutorialMesh(
-      new THREE.BoxGeometry(w,h2,d),
-      debrisMaterial.clone(),
-      new THREE.Vector3(x,y,z)
-    );
-    piece.rotation.y=(x*1.7+z)*.11;
-    piece.rotation.z=(x+z)*.025;
-    piece.castShadow=true;
-    piece.receiveShadow=true;
-  }
-
-  // Physical wall failure: layered plaster scars and curled paper edges.
-  // These are actual meshes, not extra dark texture marks, so they catch light
-  // and read as damaged architecture when the player walks past them.
-  // Keep this damage generator scoped to room construction; the texture
-  // generator's damageRand() helper is local to makeTutorialTexture().
-  let damageSeed=0x51f15e;
-  const damageRand=()=>{
-    damageSeed=(damageSeed*1664525+1013904223)>>>0;
-    return damageSeed/4294967296;
-  };
-  const plasterMaterials=[
-    new THREE.MeshStandardMaterial({color:0x8d8878,roughness:1}),
-    new THREE.MeshStandardMaterial({color:0xaaa18a,roughness:1}),
-    new THREE.MeshStandardMaterial({color:0x766f5f,roughness:1})
-  ];
-  const paperEdgeMaterial=new THREE.MeshStandardMaterial({
-    color:0xc1b17c,roughness:1,side:THREE.DoubleSide
-  });
-  const wallScarShadow=new THREE.MeshStandardMaterial({
-    color:0x393326,roughness:1,transparent:true,opacity:.48,
-    side:THREE.DoubleSide,depthWrite:false
-  });
-  const makeIrregularShape=(rx,ry,count,inner=.68)=>{
-    const shape=new THREE.Shape();
-    for(let i=0;i<count;i++){
-      const a=i/count*Math.PI*2;
-      const r=inner+damageRand()*(1-inner);
-      const x=Math.cos(a)*rx*r,y=Math.sin(a)*ry*r;
-      if(i===0)shape.moveTo(x,y);else shape.lineTo(x,y);
-    }
-    shape.closePath();
-    return shape;
-  };
-  const wallFaces=[
-    {side:"north",angle:0,fixed:min+.025},
-    {side:"south",angle:Math.PI,fixed:max-.025},
-    {side:"west",angle:Math.PI/2,fixed:min+.025},
-    {side:"east",angle:-Math.PI/2,fixed:max-.025}
-  ];
-  for(const face of wallFaces){
-    for(let i=0;i<9;i++){
-      const u=min+5+damageRand()*(max-min-10);
-      const v=.35+damageRand()*2.55;
-      const rx=.32+damageRand()*(i%3===0?.85:.48);
-      const ry=.22+damageRand()*(i%4===0?.62:.32);
-      const shape=makeIrregularShape(rx,ry,7+Math.floor(damageRand()*5),.56);
-      const shadow=new THREE.Mesh(new THREE.ShapeGeometry(shape),wallScarShadow);
-      shadow.position.set(
-        face.side==="west"||face.side==="east"?face.fixed:u,
-        v,
-        face.side==="north"||face.side==="south"?face.fixed:u
-      );
-      shadow.rotation.y=face.angle;
-      shadow.position.x+=Math.sin(face.angle)*.012;
-      shadow.position.z+=face.side==="north"?.012:face.side==="south"?-.012:0;
-      shadow.userData.tutorialOwnedGeometry=true;
-      shadow.userData.tutorialOwnedMaterial=true;
-      tutorialOpenRoomRoot.add(shadow);
-
-      const plasterShape=makeIrregularShape(rx*.94,ry*.94,8+Math.floor(damageRand()*4),.55);
-      const plaster=new THREE.Mesh(
-        new THREE.ShapeGeometry(plasterShape),
-        plasterMaterials[Math.floor(damageRand()*plasterMaterials.length)]
-      );
-      plaster.position.copy(shadow.position);
-      plaster.position.y+=.015;
-      plaster.position.x+=Math.sin(face.angle)*.012;
-      plaster.position.z+=face.side==="north"?.012:face.side==="south"?-.012:0;
-      plaster.rotation.y=face.angle;
-      plaster.castShadow=true;
-      plaster.receiveShadow=true;
-      plaster.userData.tutorialOwnedGeometry=true;
-      plaster.userData.tutorialOwnedMaterial=true;
-      tutorialOpenRoomRoot.add(plaster);
-
-      // A few curled paper tongues give the tear a visible lifted edge.
-      if(i%3===0){
-        const flapShape=new THREE.Shape();
-        flapShape.moveTo(-rx*.45,ry*.24);
-        flapShape.quadraticCurveTo(-rx*.12,ry*.88,rx*.35,ry*.60);
-        flapShape.lineTo(rx*.18,ry*.15);
-        flapShape.quadraticCurveTo(-rx*.10,ry*.05,-rx*.45,ry*.24);
-        const flap=new THREE.Mesh(new THREE.ShapeGeometry(flapShape),paperEdgeMaterial);
-        flap.position.copy(plaster.position);
-        flap.position.y+=.012;
-        flap.position.x+=Math.sin(face.angle)*.012;
-        flap.position.z+=face.side==="north"?.012:face.side==="south"?-.012:0;
-        flap.rotation.y=face.angle;
-        flap.userData.tutorialOwnedGeometry=true;
-        flap.userData.tutorialOwnedMaterial=true;
-        tutorialOpenRoomRoot.add(flap);
-      }
-    }
-  }
-
-  // Water has tracked down from failed ceiling joints. These narrow, irregular
-  // runs connect the ceiling damage to the wall instead of looking like decals.
-  const leakMaterial=new THREE.MeshStandardMaterial({
-    color:0x62523a,roughness:1,transparent:true,opacity:.28,
-    side:THREE.DoubleSide,depthWrite:false
-  });
-  for(const face of wallFaces){
-    for(let i=0;i<4;i++){
-      const u=min+7+damageRand()*(max-min-14);
-      const height=1.1+damageRand()*1.7;
-      const width=.045+damageRand()*.11;
-      const points=[
-        [-width*.5,0],[-width*.18,-height*.28],
-        [-width*.62,-height*.62],[-width*.22,-height],
-        [width*.15,-height*.86],[width*.48,-height*.46],
-        [width*.22,-height*.17],[width*.5,0]
-      ];
-      const shape=new THREE.Shape();
-      shape.moveTo(points[0][0],points[0][1]);
-      for(let j=1;j<points.length;j++)shape.lineTo(points[j][0],points[j][1]);
-      shape.closePath();
-      const run=new THREE.Mesh(new THREE.ShapeGeometry(shape),leakMaterial);
-      run.position.set(
-        face.side==="west"||face.side==="east"?face.fixed:u,
-        h-.1,
-        face.side==="north"||face.side==="south"?face.fixed:u
-      );
-      run.rotation.y=face.angle;
-      run.position.x+=Math.sin(face.angle)*.018;
-      run.position.z+=face.side==="north"?.018:face.side==="south"?-.018:0;
-      run.userData.tutorialOwnedGeometry=true;
-      run.userData.tutorialOwnedMaterial=true;
-      tutorialOpenRoomRoot.add(run);
-    }
-  }
+  // Keep the tutorial's geometry simple; the shared Backrooms materials
+  // provide the same wallpaper, carpet, and ceiling treatment as the main level.
 
   // Four permanent fluorescent fixtures, one near each corner of the tutorial.
   // The tutorial is tiny enough that keeping all four on has negligible cost.
@@ -862,9 +428,9 @@ function ensureTutorialOpenRoom(){
       fixtureMaterial.clone(),
       new THREE.Vector3(x,h-.055,z)
     );
-    fixtureMesh.material.emissiveIntensity=.34;
+    fixtureMesh.material.emissiveIntensity=.30;
 
-    const light=new THREE.PointLight(0xffe6a8,11.5,30,1.35);
+    const light=new THREE.PointLight(0xffe6a8,2.2,100,1.3);
     light.position.set(x,h-.75,z);
     light.castShadow=false;
     light.visible=true;
@@ -876,20 +442,12 @@ function ensureTutorialOpenRoom(){
       x,
       z,
       phase:Math.random()*Math.PI*2,
-      baseIntensity:11.5
+      baseIntensity:2.2
     });
   }
 
-  // The tutorial is a teaching space, not a low-light survival section.
-  // These fill lights are only present while this dedicated room is visible.
-  const tutorialFillHemisphere=new THREE.HemisphereLight(0xfff2d1,0x958565,.46);
-  tutorialFillHemisphere.name="TutorialFullBrightnessHemisphere";
-  tutorialOpenRoomRoot.add(tutorialFillHemisphere);
-  tutorialFillLights.push({light:tutorialFillHemisphere,baseIntensity:.46});
-  const tutorialFillAmbient=new THREE.AmbientLight(0xfff0d0,.24);
-  tutorialFillAmbient.name="TutorialFullBrightnessAmbient";
-  tutorialOpenRoomRoot.add(tutorialFillAmbient);
-  tutorialFillLights.push({light:tutorialFillAmbient,baseIntensity:.24});
+  // Use the same scene-level, quality-scaled ambient lighting as the main level.
+  // tutorialFillLights intentionally stays empty so the room is not washed out.
 
   const half=t*.5;
   tutorialOpenRoomCollisionBoxes.push(
