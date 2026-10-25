@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261023-carpet-seams2";
 import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261017-flyfix1";
+import { Player } from "./player.js?v=20261024-collision-radius-fix";
 import { HorrorAudio } from "./audio.js?v=20261015-victory1";
 import { Multiplayer } from "./multiplayer.js?v=20261019-usernamefix1";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
