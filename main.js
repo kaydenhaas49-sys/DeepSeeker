@@ -725,6 +725,13 @@ function ensureTutorialOpenRoom(){
   // Physical wall failure: layered plaster scars and curled paper edges.
   // These are actual meshes, not extra dark texture marks, so they catch light
   // and read as damaged architecture when the player walks past them.
+  // Keep this damage generator scoped to room construction; the texture
+  // generator's damageRand() helper is local to makeTutorialTexture().
+  let damageSeed=0x51f15e;
+  const damageRand=()=>{
+    damageSeed=(damageSeed*1664525+1013904223)>>>0;
+    return damageSeed/4294967296;
+  };
   const plasterMaterials=[
     new THREE.MeshStandardMaterial({color:0x8d8878,roughness:1}),
     new THREE.MeshStandardMaterial({color:0xaaa18a,roughness:1}),
@@ -741,7 +748,7 @@ function ensureTutorialOpenRoom(){
     const shape=new THREE.Shape();
     for(let i=0;i<count;i++){
       const a=i/count*Math.PI*2;
-      const r=inner+rand()*(1-inner);
+      const r=inner+damageRand()*(1-inner);
       const x=Math.cos(a)*rx*r,y=Math.sin(a)*ry*r;
       if(i===0)shape.moveTo(x,y);else shape.lineTo(x,y);
     }
@@ -756,11 +763,11 @@ function ensureTutorialOpenRoom(){
   ];
   for(const face of wallFaces){
     for(let i=0;i<9;i++){
-      const u=min+5+rand()*(max-min-10);
-      const v=.35+rand()*2.55;
-      const rx=.32+rand()*(i%3===0?.85:.48);
-      const ry=.22+rand()*(i%4===0?.62:.32);
-      const shape=makeIrregularShape(rx,ry,7+Math.floor(rand()*5),.56);
+      const u=min+5+damageRand()*(max-min-10);
+      const v=.35+damageRand()*2.55;
+      const rx=.32+damageRand()*(i%3===0?.85:.48);
+      const ry=.22+damageRand()*(i%4===0?.62:.32);
+      const shape=makeIrregularShape(rx,ry,7+Math.floor(damageRand()*5),.56);
       const shadow=new THREE.Mesh(new THREE.ShapeGeometry(shape),wallScarShadow);
       shadow.position.set(
         face.side==="west"||face.side==="east"?face.fixed:u,
@@ -774,10 +781,10 @@ function ensureTutorialOpenRoom(){
       shadow.userData.tutorialOwnedMaterial=true;
       tutorialOpenRoomRoot.add(shadow);
 
-      const plasterShape=makeIrregularShape(rx*.94,ry*.94,8+Math.floor(rand()*4),.55);
+      const plasterShape=makeIrregularShape(rx*.94,ry*.94,8+Math.floor(damageRand()*4),.55);
       const plaster=new THREE.Mesh(
         new THREE.ShapeGeometry(plasterShape),
-        plasterMaterials[Math.floor(rand()*plasterMaterials.length)]
+        plasterMaterials[Math.floor(damageRand()*plasterMaterials.length)]
       );
       plaster.position.copy(shadow.position);
       plaster.position.y+=.015;
@@ -818,9 +825,9 @@ function ensureTutorialOpenRoom(){
   });
   for(const face of wallFaces){
     for(let i=0;i<4;i++){
-      const u=min+7+rand()*(max-min-14);
-      const height=1.1+rand()*1.7;
-      const width=.045+rand()*.11;
+      const u=min+7+damageRand()*(max-min-14);
+      const height=1.1+damageRand()*1.7;
+      const width=.045+damageRand()*.11;
       const points=[
         [-width*.5,0],[-width*.18,-height*.28],
         [-width*.62,-height*.62],[-width*.22,-height],
