@@ -9,8 +9,8 @@ const ASSETS = Object.freeze({
 
 const RELAYS = Object.freeze([
   { id: 0, title: "FIELD RADIO", x: -80, z: -92, device: "radio" },
-  { id: 1, title: "SIGNAL RELAY 02", x: -84, z: -238, device: "transmitter" },
-  { id: 2, title: "SIGNAL RELAY 03", x: -76, z: -394, device: "transmitter" },
+  { id: 1, title: "SIGNAL RELAY 02", x: 240, z: -280, device: "transmitter" },
+  { id: 2, title: "SIGNAL RELAY 03", x: -280, z: 420, device: "transmitter" },
 ]);
 
 function makeBox(parent, name, w, h, d, x, y, z, material) {
