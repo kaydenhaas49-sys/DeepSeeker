@@ -1592,27 +1592,54 @@ function drawHandheldRadioRadar(force=false){
   ctx.lineWidth=2;
   ctx.strokeRect(5,5,w-10,h-10);
 
-  // The radio is a receiver, not a tracker: show an unreliable signal trace
-  // without plotting objectives, directions, or distances.
-  ctx.fillStyle="#527e5d";
-  ctx.font="bold 15px monospace";
+  // Signal strength rises as the player gets closer to the current mission relay.
+  // It never gives a bearing or exact distance; it behaves like an old receiver.
+  const target=typeof getMissionTarget==="function"?getMissionTarget():null;
+  const playerPos=player?.position;
+  const distance=target&&playerPos
+    ?Math.hypot((playerPos.x??0)-target.x,(playerPos.z??0)-target.z)
+    :Infinity;
+  const strength=Number.isFinite(distance)
+    ?THREE.MathUtils.clamp(1-distance/115,0,1):0;
+  const bars=Math.max(0,Math.min(5,Math.ceil(strength*5)));
+  const phase=now*.012;
   ctx.textAlign="center";
-  ctx.fillText("SIGNAL ONLY",w/2,34);
-  ctx.strokeStyle="#3c7450";
+  ctx.fillStyle="#85b991";
+  ctx.font="bold 17px monospace";
+  ctx.fillText("FIELD RECEIVER",w/2,30);
+  ctx.textAlign="left";
+  ctx.fillStyle="#45634b";
+  ctx.font="bold 12px monospace";
+  ctx.fillText("CARRIER",18,57);
+  const barX=18,barY=67,barGap=7,barW=37,maxH=30;
+  for(let i=0;i<5;i++){
+    const bh=8+i*5;
+    ctx.fillStyle=i<bars?(bars>=4?"#b7d58b":"#79bd87"):"#203528";
+    ctx.fillRect(barX+i*(barW+barGap),barY+maxH-bh,barW,bh);
+    ctx.strokeStyle="#345440";
+    ctx.lineWidth=1;
+    ctx.strokeRect(barX+i*(barW+barGap),barY+maxH-bh,barW,bh);
+  }
+  ctx.textAlign="right";
+  ctx.fillStyle=bars>=4?"#b7d58b":bars>=2?"#8ac59b":"#bd8a60";
+  ctx.font="bold 14px monospace";
+  ctx.fillText(bars>=5?"NEAR LOCK":bars>=3?"CARRIER FOUND":bars>=1?"WEAK CARRIER":"SCANNING",w-18,58);
+  ctx.strokeStyle=bars>=4?"#8dbf83":"#3c7450";
   ctx.lineWidth=2;
   ctx.beginPath();
-  const phase=now*.012;
+  const amplitude=2+(1-strength)*13;
   for(let x=16;x<w-16;x+=2){
-    const noise=Math.sin(x*.105+phase)*7+
-      Math.sin(x*.037-phase*1.7)*4+
-      Math.sin(x*.31+phase*.6)*2;
-    const y=h*.56+noise;
+    const noise=(Math.sin(x*.105+phase)*.55+
+      Math.sin(x*.037-phase*1.7)*.3+
+      Math.sin(x*.31+phase*.6)*.15)*amplitude;
+    const y=h*.66+noise;
     if(x===16)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   }
   ctx.stroke();
+  ctx.textAlign="center";
   ctx.fillStyle="#8ac59b";
-  ctx.font="bold 13px monospace";
-  ctx.fillText("LISTEN FOR THE CARRIER",w/2,h-28);
+  ctx.font="bold 12px monospace";
+  ctx.fillText(bars>=4?"SIGNAL STABILIZING":bars>=2?"MOVE TOWARD STRONGER SIGNAL":"SEARCH FOR A CARRIER",w/2,h-20);
   radioRadarTexture.needsUpdate=true;
 }
 
