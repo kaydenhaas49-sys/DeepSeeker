@@ -8837,9 +8837,10 @@ function teleportAdminToRadio(){
 
 function togglePhone(){
   phoneOpen=!phoneOpen;
-  deepseekerAppOpen=false;
+  // Skip the phone launcher: open straight into DEEPSEEKER every time.
+  deepseekerAppOpen=phoneOpen;
   phone.classList.toggle("open",phoneOpen);
-  phone.classList.remove("app-open");
+  phone.classList.toggle("app-open",phoneOpen);
   phone.setAttribute("aria-hidden",String(!phoneOpen));
 
   if(phoneOpen){
