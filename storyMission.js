@@ -547,6 +547,64 @@ export class StoryMissionWorld {
     const gateMat = new THREE.MeshStandardMaterial({ color: 0x6d766b, roughness: 0.8, metalness: 0.12 });
     const gateBarrierMat = new THREE.MeshStandardMaterial({ color: 0x373e38, roughness: 0.9 });
 
+    // A trail of old claw gouges points down the protected approach toward
+    // the field radio. Keep the marks attached to the corridor-side wall faces,
+    // irregular and faded so they read as environmental storytelling.
+    const scratchGroove = new THREE.MeshBasicMaterial({
+      color: 0x332b1d, transparent: true, opacity: 0.78,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const scratchEdge = new THREE.MeshBasicMaterial({
+      color: 0xc0ad6c, transparent: true, opacity: 0.28,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const scratchTrail = [
+      { z: -40, count: 1 }, { z: -49, count: 1 },
+      { z: -58, count: 2 }, { z: -66, count: 2 },
+      { z: -73, count: 2 }, { z: -80, count: 3 },
+      { z: -86, count: 3 }
+    ];
+    for (const side of [-1, 1]) {
+      const wallX = -80 + side * 4.0;
+      for (let groupIndex = 0; groupIndex < scratchTrail.length; groupIndex++) {
+        const group = scratchTrail[groupIndex];
+        for (let mark = 0; mark < group.count; mark++) {
+          const centerZ = group.z + (mark - (group.count - 1) * 0.5) * 0.82;
+          const centerY = 1.18 + ((groupIndex * 3 + mark * 2 + (side > 0 ? 1 : 0)) % 5) * 0.23;
+          const slashCount = 3;
+          for (let slash = 0; slash < slashCount; slash++) {
+            const len = 0.23 + ((groupIndex + slash + mark) % 3) * 0.075;
+            const lean = (slash - 1) * 0.17 + (side > 0 ? -0.08 : 0.08);
+            const z = centerZ + (slash - 1) * 0.115;
+            const y = centerY + (slash - 1) * 0.045;
+            const groove = new THREE.Mesh(
+              new THREE.BoxGeometry(0.014, len, 0.022),
+              scratchGroove
+            );
+            groove.name = "RadioApproachClawScratch";
+            groove.position.set(wallX + side * 0.025, y, z);
+            groove.rotation.x = lean;
+            groove.renderOrder = 2;
+            groove.castShadow = false;
+            groove.receiveShadow = false;
+            this.root.add(groove);
+
+            const edge = new THREE.Mesh(
+              new THREE.BoxGeometry(0.009, len * 0.92, 0.008),
+              scratchEdge
+            );
+            edge.name = "RadioApproachScratchEdge";
+            edge.position.set(wallX + side * 0.037, y + 0.012, z - 0.012);
+            edge.rotation.x = lean;
+            edge.renderOrder = 3;
+            edge.castShadow = false;
+            edge.receiveShadow = false;
+            this.root.add(edge);
+          }
+        }
+      }
+    }
+
     for (const relay of RELAYS) {
       const station = new THREE.Group();
       station.name = "StoryRelay_" + relay.id;

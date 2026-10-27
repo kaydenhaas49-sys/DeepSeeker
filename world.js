@@ -1,7 +1,7 @@
 // world.js — seeded RNG, chunk layout generation, chunk meshes, chunk manager.
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { createTextures } from "./textures.js?v=20261024-tutorial-light-dim-1";
+import { createTextures } from "./textures.js?v=20261027-radio-scratch-trail-1";
 
 export const CELL = 4; // meters per grid cell
 export const CHUNK_CELLS = 16; // cells per chunk side
