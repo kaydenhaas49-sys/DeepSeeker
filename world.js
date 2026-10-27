@@ -352,16 +352,32 @@ export class World {
     this.roomDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0x484b43,roughness:0.9,metalness:0.08});
     this.roomDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x77786f,roughness:0.68,metalness:0.34});
     this.roomDoorGlassMaterial=new THREE.MeshStandardMaterial({color:0x27312f,roughness:0.3,metalness:0.05});
+    // Old enamel service plate: restrained lettering, screw heads and chipped paint
+    // make it read like building hardware instead of a clean UI label.
     const signCanvas=document.createElement("canvas");
     signCanvas.width=256;signCanvas.height=96;
     const signCtx=signCanvas.getContext("2d");
-    signCtx.fillStyle="#603a32";signCtx.fillRect(0,0,256,96);
-    signCtx.strokeStyle="#c8c0ac";signCtx.lineWidth=4;signCtx.strokeRect(5,5,246,86);
-    signCtx.fillStyle="#e4deca";signCtx.font="bold 35px Arial, sans-serif";
-    signCtx.textAlign="center";signCtx.textBaseline="middle";signCtx.fillText("SERVICE",128,49);
+    signCtx.fillStyle="#51433a";signCtx.fillRect(0,0,256,96);
+    signCtx.fillStyle="#65564a";signCtx.fillRect(8,8,240,80);
+    signCtx.fillStyle="#403a32";signCtx.fillRect(14,14,228,68);
+    signCtx.fillStyle="#b9ad91";signCtx.font="bold 27px Arial, sans-serif";
+    signCtx.textAlign="left";signCtx.textBaseline="middle";signCtx.fillText("SERVICE",28,39);
+    signCtx.fillStyle="#aaa087";signCtx.font="11px Arial, sans-serif";
+    signCtx.fillText("AUTHORIZED PERSONNEL",29,62);
+    signCtx.fillStyle="#302c27";
+    for(const [x,y] of [[13,13],[243,13],[13,83],[243,83]]){
+      signCtx.beginPath();signCtx.arc(x,y,4,0,Math.PI*2);signCtx.fill();
+      signCtx.fillStyle="#928675";signCtx.fillRect(x-2,y-1,4,1);signCtx.fillStyle="#302c27";
+    }
+    signCtx.globalAlpha=.32;signCtx.fillStyle="#c0b49a";
+    for(let i=0;i<34;i++){
+      const x=(i*47+13)%250,y=(i*29+7)%90;
+      signCtx.fillRect(x,y,1+(i%4),1);
+    }
+    signCtx.globalAlpha=1;
     const signTexture=new THREE.CanvasTexture(signCanvas);
     signTexture.colorSpace=THREE.SRGBColorSpace;
-    this.roomDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.88,metalness:0.02,side:THREE.DoubleSide});
+    this.roomDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.96,metalness:0.12,side:THREE.DoubleSide});
     this.breakerRoomLightMaterial=new THREE.MeshStandardMaterial({
       color:0x353328,emissive:0x000000,emissiveIntensity:0,roughness:0.4
     });
@@ -380,14 +396,29 @@ export class World {
     this.breakerRoomBounds=[];
     this.maintenanceRoomGroup=null;
 
+    // A faded paper instruction sheet pinned to the panel, with uneven type
+    // and handling marks rather than a perfectly centered game-prompt graphic.
     const breakerCanvas=document.createElement("canvas");
     breakerCanvas.width=512;breakerCanvas.height=192;
     const breakerCtx=breakerCanvas.getContext("2d");
-    breakerCtx.fillStyle="#20261e";breakerCtx.fillRect(0,0,512,192);
-    breakerCtx.strokeStyle="#c3b891";breakerCtx.lineWidth=5;breakerCtx.strokeRect(8,8,496,176);
-    breakerCtx.fillStyle="#d6d0b8";breakerCtx.textAlign="center";breakerCtx.textBaseline="middle";
-    breakerCtx.font="bold 29px Arial, sans-serif";breakerCtx.fillText("SOLVE EACH EQUATION",256,58);
-    breakerCtx.font="bold 25px Arial, sans-serif";breakerCtx.fillText("LOWEST ANSWER TO HIGHEST",256,126);
+    breakerCtx.fillStyle="#b8ad8e";breakerCtx.fillRect(0,0,512,192);
+    breakerCtx.fillStyle="#d0c5a5";breakerCtx.fillRect(13,10,486,171);
+    breakerCtx.fillStyle="#8e8267";breakerCtx.fillRect(19,16,474,159);
+    breakerCtx.fillStyle="#c9bd9b";breakerCtx.fillRect(22,19,468,153);
+    breakerCtx.fillStyle="#5a5141";breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
+    breakerCtx.font="bold 24px Arial, sans-serif";breakerCtx.fillText("BREAKER RESET",39,48);
+    breakerCtx.fillStyle="#766a53";breakerCtx.fillRect(39,68,274,2);
+    breakerCtx.fillStyle="#403d33";breakerCtx.font="bold 19px Arial, sans-serif";
+    breakerCtx.fillText("START WITH LOWEST VALUE",39,98);
+    breakerCtx.font="16px Arial, sans-serif";breakerCtx.fillText("Work across the row. Don't skip one.",39,128);
+    breakerCtx.fillStyle="#8b7e61";breakerCtx.font="11px Arial, sans-serif";
+    breakerCtx.fillText("MAINTENANCE  /  KEEP THIS SHEET",39,155);
+    breakerCtx.globalAlpha=.22;breakerCtx.fillStyle="#554b39";
+    for(let i=0;i<95;i++){
+      const x=(i*71+17)%508,y=(i*37+11)%188;
+      breakerCtx.fillRect(x,y,1+(i%3),1);
+    }
+    breakerCtx.globalAlpha=1;
     const breakerTexture=new THREE.CanvasTexture(breakerCanvas);
     breakerTexture.colorSpace=THREE.SRGBColorSpace;
     this.breakerNoteMaterial=new THREE.MeshBasicMaterial({map:breakerTexture,side:THREE.DoubleSide,toneMapped:false});
@@ -398,10 +429,18 @@ export class World {
     this.breakerMathLabelMaterials=[];
     for(const problem of BREAKER_MATH_PROBLEMS){
       const canvas=document.createElement("canvas");canvas.width=256;canvas.height=128;
-      const ctx=canvas.getContext("2d");ctx.fillStyle="#1e231c";ctx.fillRect(0,0,256,128);
-      ctx.strokeStyle="#8c9277";ctx.lineWidth=4;ctx.strokeRect(5,5,246,118);
-      ctx.fillStyle="#e1dec7";ctx.font="bold 34px Arial, sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      const ctx=canvas.getContext("2d");
+      ctx.fillStyle="#a79c7d";ctx.fillRect(0,0,256,128);
+      ctx.fillStyle="#c7ba96";ctx.fillRect(5,5,246,118);
+      ctx.fillStyle="#887d64";ctx.fillRect(10,10,236,108);
+      ctx.fillStyle="#d0c3a0";ctx.fillRect(12,12,232,104);
+      ctx.fillStyle="#3e3b31";ctx.font="bold 35px Arial, sans-serif";
+      ctx.textAlign="center";ctx.textBaseline="middle";
       ctx.fillText(problem.expression,128,64);
+      ctx.fillStyle="#766c55";ctx.font="10px Arial, sans-serif";ctx.fillText("CIRCUIT",128,105);
+      ctx.globalAlpha=.18;ctx.fillStyle="#514936";
+      for(let i=0;i<20;i++){const x=(i*43+7)%252,y=(i*31+9)%124;ctx.fillRect(x,y,1+(i%3),1);}
+      ctx.globalAlpha=1;
       const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
       this.breakerMathLabelMaterials.push(new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false}));
     }
