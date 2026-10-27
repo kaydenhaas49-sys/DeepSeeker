@@ -380,35 +380,63 @@ export class World {
     this.breakerRoomBounds=[];
     this.maintenanceRoomGroup=null;
 
+    // A purpose-built maintenance placard with a wide, matching aspect ratio.
+    // Keep the artwork inside a safe inset so it never looks stretched or clipped.
     const breakerCanvas=document.createElement("canvas");
-    breakerCanvas.width=512;breakerCanvas.height=192;
+    breakerCanvas.width=768;breakerCanvas.height=256;
     const breakerCtx=breakerCanvas.getContext("2d");
-    breakerCtx.fillStyle="#242720";breakerCtx.fillRect(0,0,512,192);
-    // Industrial control placard: worn metal border, caution bars, and clearer text hierarchy.
-    breakerCtx.fillStyle="#b7a66a";breakerCtx.fillRect(12,12,488,8);breakerCtx.fillRect(12,172,488,8);
-    breakerCtx.fillStyle="#292d25";breakerCtx.fillRect(20,25,472,142);
-    breakerCtx.strokeStyle="#777c68";breakerCtx.lineWidth=3;breakerCtx.strokeRect(20,25,472,142);
-    breakerCtx.fillStyle="#d3bf72";breakerCtx.fillRect(30,35,7,122);
-    breakerCtx.fillStyle="#d6d2bd";breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
-    breakerCtx.font="bold 24px Arial, sans-serif";breakerCtx.fillText("BREAKER RESET PROCEDURE",50,61);
-    breakerCtx.strokeStyle="#626957";breakerCtx.lineWidth=2;breakerCtx.beginPath();breakerCtx.moveTo(50,83);breakerCtx.lineTo(476,83);breakerCtx.stroke();
-    breakerCtx.fillStyle="#e1dec7";breakerCtx.font="bold 20px Arial, sans-serif";breakerCtx.fillText("SOLVE EQUATIONS IN ORDER",50,108);
-    breakerCtx.fillStyle="#c5bd9f";breakerCtx.font="18px Arial, sans-serif";breakerCtx.fillText("LOWEST ANSWER  →  HIGHEST ANSWER",50,139);
+    breakerCtx.fillStyle="#171b18";breakerCtx.fillRect(0,0,768,256);
+    breakerCtx.fillStyle="#b6a36a";breakerCtx.fillRect(12,12,744,232);
+    breakerCtx.fillStyle="#252a25";breakerCtx.fillRect(20,20,728,216);
+    breakerCtx.fillStyle="#d0b86d";breakerCtx.fillRect(34,34,8,188);
+    breakerCtx.strokeStyle="#626b5d";breakerCtx.lineWidth=3;breakerCtx.strokeRect(52,34,682,188);
+    breakerCtx.fillStyle="#8d9a7d";breakerCtx.font="bold 18px monospace";
+    breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
+    breakerCtx.fillText("FACILITY ELECTRICAL // CONTROL BAY 04",70,60);
+    breakerCtx.strokeStyle="#4e584d";breakerCtx.lineWidth=2;
+    breakerCtx.beginPath();breakerCtx.moveTo(70,82);breakerCtx.lineTo(714,82);breakerCtx.stroke();
+    breakerCtx.fillStyle="#e8e3cf";breakerCtx.font="bold 31px Arial, sans-serif";
+    breakerCtx.fillText("BREAKER RESET PROCEDURE",70,119);
+    breakerCtx.fillStyle="#d0b86d";breakerCtx.font="bold 22px Arial, sans-serif";
+    breakerCtx.fillText("SOLVE EACH EQUATION",70,158);
+    breakerCtx.fillStyle="#b7bba9";breakerCtx.font="20px Arial, sans-serif";
+    breakerCtx.fillText("Switch in order: lowest answer to highest",70,192);
     const breakerTexture=new THREE.CanvasTexture(breakerCanvas);
     breakerTexture.colorSpace=THREE.SRGBColorSpace;
+    breakerTexture.anisotropy=this.maxAnisotropy;
     this.breakerNoteMaterial=new THREE.MeshBasicMaterial({map:breakerTexture,side:THREE.DoubleSide,toneMapped:false});
     this.breakerPanelMaterial=new THREE.MeshStandardMaterial({color:0x35372f,roughness:0.83,metalness:0.08});
     this.breakerHandleMaterial=new THREE.MeshStandardMaterial({color:0x97988a,roughness:0.7,metalness:0.25});
     this.breakerLampOffMaterial=new THREE.MeshStandardMaterial({color:0x4d2822,emissive:0x40100a,emissiveIntensity:0.35});
     this.breakerLampOnMaterial=new THREE.MeshStandardMaterial({color:0x9bd78b,emissive:0x42ff40,emissiveIntensity:1.15});
     this.breakerMathLabelMaterials=[];
-    for(const problem of BREAKER_MATH_PROBLEMS){
-      const canvas=document.createElement("canvas");canvas.width=256;canvas.height=128;
-      const ctx=canvas.getContext("2d");ctx.fillStyle="#1e231c";ctx.fillRect(0,0,256,128);
-      ctx.strokeStyle="#8c9277";ctx.lineWidth=4;ctx.strokeRect(5,5,246,118);
-      ctx.fillStyle="#e1dec7";ctx.font="bold 34px Arial, sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.fillText(problem.expression,128,64);
-      const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+    for(let i=0;i<BREAKER_MATH_PROBLEMS.length;i++){
+      const problem=BREAKER_MATH_PROBLEMS[i];
+      // Wide 3:1 metal ID plates match the physical panel geometry.
+      const canvas=document.createElement("canvas");canvas.width=768;canvas.height=256;
+      const ctx=canvas.getContext("2d");
+      ctx.fillStyle="#171b18";ctx.fillRect(0,0,768,256);
+      ctx.fillStyle="#8b927e";ctx.fillRect(8,8,752,240);
+      ctx.fillStyle="#252a24";ctx.fillRect(16,16,736,224);
+      ctx.strokeStyle="#555f50";ctx.lineWidth=3;ctx.strokeRect(28,28,712,200);
+      ctx.fillStyle="#cbb66f";ctx.fillRect(38,38,8,180);
+      ctx.fillStyle="#a7b19a";ctx.font="bold 20px monospace";
+      ctx.textAlign="left";ctx.textBaseline="middle";
+      ctx.fillText("CIRCUIT "+String(i+1).padStart(2,"0"),62,64);
+      ctx.strokeStyle="#424b40";ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(62,88);ctx.lineTo(714,88);ctx.stroke();
+      ctx.fillStyle="#eee9d5";ctx.textAlign="center";
+      ctx.font="bold 64px Arial, sans-serif";
+      let expression=String(problem.expression);
+      while(ctx.measureText(expression).width>610){
+        const size=parseInt(ctx.font,10)-2;
+        ctx.font="bold "+Math.max(32,size)+"px Arial, sans-serif";
+        if(size<=32)break;
+      }
+      ctx.fillText(expression,400,157);
+      const texture=new THREE.CanvasTexture(canvas);
+      texture.colorSpace=THREE.SRGBColorSpace;
+      texture.anisotropy=this.maxAnisotropy;
       this.breakerMathLabelMaterials.push(new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false}));
     }
     // Ceiling fixtures use a tiny real-light budget. They only activate when
@@ -604,7 +632,7 @@ export class World {
     }
     const boardZ=backZ+.24;
     addBox("BreakerMathInstructionBoard",5.9,.70,.14,centerX,3.50,boardZ,this.breakerPanelMaterial);
-    const instruction=new THREE.Mesh(new THREE.PlaneGeometry(5.58,.50),this.breakerNoteMaterial);
+    const instruction=new THREE.Mesh(new THREE.PlaneGeometry(5.58,1.86),this.breakerNoteMaterial);
     instruction.name="BreakerMathInstructions";instruction.position.set(centerX,3.50,backZ+.315);
     instruction.castShadow=false;group.add(instruction);
 
@@ -619,7 +647,7 @@ export class World {
       root.position.set(spec.x,0,spec.z);root.rotation.y=spec.face;group.add(root);
       const panel=new THREE.Mesh(new THREE.BoxGeometry(.94,1.32,.20),this.breakerPanelMaterial);
       panel.name="BreakerPanelHousing";panel.position.set(0,1.02,0);root.add(panel);
-      const label=new THREE.Mesh(new THREE.PlaneGeometry(.86,.30),this.breakerMathLabelMaterials[spec.index-1]);
+      const label=new THREE.Mesh(new THREE.PlaneGeometry(.86,.287),this.breakerMathLabelMaterials[spec.index-1]);
       label.name="BreakerMathExpression";label.position.set(0,1.43,.112);root.add(label);
       const handle=new THREE.Mesh(new THREE.BoxGeometry(.12,.36,.09),this.breakerHandleMaterial);
       handle.name="BreakerLever";handle.position.set(0,.91,.16);handle.rotation.z=.42;root.add(handle);
