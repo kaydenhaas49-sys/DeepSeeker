@@ -1595,7 +1595,7 @@ function drawHandheldRadioRadar(force=false){
   // Signal strength rises as the player gets closer to the current mission relay.
   // It never gives a bearing or exact distance; it behaves like an old receiver.
   const target=typeof getMissionTarget==="function"?getMissionTarget():null;
-  const playerPos=player?.position;
+  const playerPos=player?.pos;
   const distance=target&&playerPos
     ?Math.hypot((playerPos.x??0)-target.x,(playerPos.z??0)-target.z)
     :Infinity;
