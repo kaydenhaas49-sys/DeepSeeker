@@ -582,7 +582,7 @@ export class StoryMissionWorld {
               scratchGroove
             );
             groove.name = "RadioApproachClawScratch";
-            groove.position.set(wallX + side * 0.025, y, z);
+            groove.position.set(wallX - side * 0.025, y, z);
             groove.rotation.x = lean;
             groove.renderOrder = 2;
             groove.castShadow = false;
@@ -594,7 +594,7 @@ export class StoryMissionWorld {
               scratchEdge
             );
             edge.name = "RadioApproachScratchEdge";
-            edge.position.set(wallX + side * 0.037, y + 0.012, z - 0.012);
+            edge.position.set(wallX - side * 0.037, y + 0.012, z - 0.012);
             edge.rotation.x = lean;
             edge.renderOrder = 3;
             edge.castShadow = false;
