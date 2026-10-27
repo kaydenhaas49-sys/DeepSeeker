@@ -396,26 +396,17 @@ export class World {
     this.breakerRoomBounds=[];
     this.maintenanceRoomGroup=null;
 
-    // Recessed-style wall legend: long, shallow proportions match the actual
-    // in-world panel so text stays natural instead of being stretched vertically.
+    // Plain phenolic-style instruction label: small, flat, high contrast.
+    // The physical plate below is deliberately close to the wall surface.
     const breakerCanvas=document.createElement("canvas");
-    breakerCanvas.width=1024;breakerCanvas.height=92;
+    breakerCanvas.width=512;breakerCanvas.height=128;
     const breakerCtx=breakerCanvas.getContext("2d");
-    breakerCtx.fillStyle="#34362f";breakerCtx.fillRect(0,0,1024,92);
-    breakerCtx.fillStyle="#a69b7c";breakerCtx.fillRect(8,8,1008,76);
-    breakerCtx.fillStyle="#d0c5a5";breakerCtx.fillRect(12,12,1000,68);
-    breakerCtx.fillStyle="#514b3d";breakerCtx.fillRect(22,18,5,56);
-    breakerCtx.fillStyle="#4a473b";breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
-    breakerCtx.font="bold 27px Arial, sans-serif";breakerCtx.fillText("BREAKER RESET",43,30);
-    breakerCtx.fillStyle="#8a7d60";breakerCtx.fillRect(43,47,935,2);
-    breakerCtx.fillStyle="#403d33";breakerCtx.font="bold 19px Arial, sans-serif";
-    breakerCtx.fillText("FLIP IN ORDER  —  LOWEST VALUE FIRST",43,65);
-    breakerCtx.globalAlpha=.17;breakerCtx.fillStyle="#554b39";
-    for(let i=0;i<115;i++){
-      const x=(i*71+17)%1024,y=(i*37+11)%92;
-      breakerCtx.fillRect(x,y,1+(i%3),1);
-    }
-    breakerCtx.globalAlpha=1;
+    breakerCtx.fillStyle="#252823";breakerCtx.fillRect(0,0,512,128);
+    breakerCtx.fillStyle="#deddd2";breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
+    breakerCtx.font="bold 31px Arial, sans-serif";
+    breakerCtx.fillText("BREAKER RESET",24,43);
+    breakerCtx.font="22px Arial, sans-serif";
+    breakerCtx.fillText("LOWEST VALUE FIRST",24,88);
     const breakerTexture=new THREE.CanvasTexture(breakerCanvas);
     breakerTexture.colorSpace=THREE.SRGBColorSpace;
     this.breakerNoteMaterial=new THREE.MeshBasicMaterial({map:breakerTexture,side:THREE.DoubleSide,toneMapped:false});
@@ -427,17 +418,12 @@ export class World {
     for(const problem of BREAKER_MATH_PROBLEMS){
       const canvas=document.createElement("canvas");canvas.width=384;canvas.height=128;
       const ctx=canvas.getContext("2d");
-      ctx.fillStyle="#8d866e";ctx.fillRect(0,0,384,128);
-      ctx.fillStyle="#c9bd99";ctx.fillRect(4,4,376,120);
-      ctx.fillStyle="#4a473b";ctx.fillRect(10,10,364,108);
-      ctx.fillStyle="#c9bd99";ctx.fillRect(13,13,358,102);
-      ctx.fillStyle="#3e3b31";ctx.font="bold 37px Arial, sans-serif";
+      // Simple equipment label, like an engraved panel legend: no faux wear,
+      // nested borders, decorative stripes or extra filler text.
+      ctx.fillStyle="#242622";ctx.fillRect(0,0,384,128);
+      ctx.fillStyle="#e0dfd4";ctx.font="bold 42px Arial, sans-serif";
       ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.fillText(problem.expression,192,55);
-      ctx.fillStyle="#766c55";ctx.font="11px Arial, sans-serif";ctx.fillText("CIRCUIT",192,99);
-      ctx.globalAlpha=.18;ctx.fillStyle="#514936";
-      for(let i=0;i<28;i++){const x=(i*43+7)%380,y=(i*31+9)%124;ctx.fillRect(x,y,1+(i%3),1);}
-      ctx.globalAlpha=1;
+      ctx.fillText(problem.expression,192,64);
       const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
       this.breakerMathLabelMaterials.push(new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false}));
     }
@@ -632,12 +618,12 @@ export class World {
         }
       }
     }
-    // Keep the sign shallow and nearly flush with the wall, like a recessed
-    // facility legend, rather than a thick board sticking into the room.
-    const boardZ=backZ+.16;
-    addBox("BreakerMathInstructionBoard",5.9,.70,.045,centerX,3.50,boardZ,this.breakerPanelMaterial);
-    const instruction=new THREE.Mesh(new THREE.PlaneGeometry(5.58,.50),this.breakerNoteMaterial);
-    instruction.name="BreakerMathInstructions";instruction.position.set(centerX,3.50,backZ+.185);
+    // Small flat instruction plate on the back wall, mounted at a believable
+    // working height rather than oversized and stranded near the ceiling.
+    const boardZ=backZ+.12;
+    addBox("BreakerMathInstructionBoard",1.90,.48,.025,centerX,2.82,boardZ,this.breakerPanelMaterial);
+    const instruction=new THREE.Mesh(new THREE.PlaneGeometry(1.84,.42),this.breakerNoteMaterial);
+    instruction.name="BreakerMathInstructions";instruction.position.set(centerX,2.82,backZ+.134);
     instruction.castShadow=false;group.add(instruction);
 
     const zStart=partitionZ-3.6,zSpacing=5.3;
