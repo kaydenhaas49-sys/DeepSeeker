@@ -18,7 +18,7 @@ import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
 import { SecurityCameraSystem } from "./securityCameras.js";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
 import { SpiderHunter } from "./spiderHunter.js?v=20261024-spider-gait-v2";
-import { StoryMissionWorld } from "./storyMission.js?v=20261027-radio-scratch-trail-1?v=20261023-rollback-poolrooms1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261027-radio-signal-model-2";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
