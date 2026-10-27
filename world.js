@@ -383,18 +383,18 @@ export class World {
     // A purpose-built maintenance placard with a wide, matching aspect ratio.
     // Keep the artwork inside a safe inset so it never looks stretched or clipped.
     const breakerCanvas=document.createElement("canvas");
-    breakerCanvas.width=768;breakerCanvas.height=256;
+    breakerCanvas.width=1024;breakerCanvas.height=256;
     const breakerCtx=breakerCanvas.getContext("2d");
-    breakerCtx.fillStyle="#171b18";breakerCtx.fillRect(0,0,768,256);
-    breakerCtx.fillStyle="#b6a36a";breakerCtx.fillRect(12,12,744,232);
-    breakerCtx.fillStyle="#252a25";breakerCtx.fillRect(20,20,728,216);
+    breakerCtx.fillStyle="#171b18";breakerCtx.fillRect(0,0,1024,256);
+    breakerCtx.fillStyle="#b6a36a";breakerCtx.fillRect(12,12,1000,232);
+    breakerCtx.fillStyle="#252a25";breakerCtx.fillRect(20,20,984,216);
     breakerCtx.fillStyle="#d0b86d";breakerCtx.fillRect(34,34,8,188);
-    breakerCtx.strokeStyle="#626b5d";breakerCtx.lineWidth=3;breakerCtx.strokeRect(52,34,682,188);
+    breakerCtx.strokeStyle="#626b5d";breakerCtx.lineWidth=3;breakerCtx.strokeRect(52,34,938,188);
     breakerCtx.fillStyle="#8d9a7d";breakerCtx.font="bold 18px monospace";
     breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
     breakerCtx.fillText("FACILITY ELECTRICAL // CONTROL BAY 04",70,60);
     breakerCtx.strokeStyle="#4e584d";breakerCtx.lineWidth=2;
-    breakerCtx.beginPath();breakerCtx.moveTo(70,82);breakerCtx.lineTo(714,82);breakerCtx.stroke();
+    breakerCtx.beginPath();breakerCtx.moveTo(70,82);breakerCtx.lineTo(970,82);breakerCtx.stroke();
     breakerCtx.fillStyle="#e8e3cf";breakerCtx.font="bold 31px Arial, sans-serif";
     breakerCtx.fillText("BREAKER RESET PROCEDURE",70,119);
     breakerCtx.fillStyle="#d0b86d";breakerCtx.font="bold 22px Arial, sans-serif";
@@ -631,9 +631,9 @@ export class World {
       }
     }
     const boardZ=backZ+.24;
-    addBox("BreakerMathInstructionBoard",5.9,.70,.14,centerX,3.50,boardZ,this.breakerPanelMaterial);
-    const instruction=new THREE.Mesh(new THREE.PlaneGeometry(5.58,1.86),this.breakerNoteMaterial);
-    instruction.name="BreakerMathInstructions";instruction.position.set(centerX,3.50,backZ+.315);
+    addBox("BreakerMathInstructionBoard",5.9,1.45,.14,centerX,2.70,boardZ,this.breakerPanelMaterial);
+    const instruction=new THREE.Mesh(new THREE.PlaneGeometry(5.58,1.395),this.breakerNoteMaterial);
+    instruction.name="BreakerMathInstructions";instruction.position.set(centerX,2.70,backZ+.315);
     instruction.castShadow=false;group.add(instruction);
 
     const zStart=partitionZ-3.6,zSpacing=5.3;
