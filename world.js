@@ -383,11 +383,17 @@ export class World {
     const breakerCanvas=document.createElement("canvas");
     breakerCanvas.width=512;breakerCanvas.height=192;
     const breakerCtx=breakerCanvas.getContext("2d");
-    breakerCtx.fillStyle="#20261e";breakerCtx.fillRect(0,0,512,192);
-    breakerCtx.strokeStyle="#c3b891";breakerCtx.lineWidth=5;breakerCtx.strokeRect(8,8,496,176);
-    breakerCtx.fillStyle="#d6d0b8";breakerCtx.textAlign="center";breakerCtx.textBaseline="middle";
-    breakerCtx.font="bold 29px Arial, sans-serif";breakerCtx.fillText("SOLVE EACH EQUATION",256,58);
-    breakerCtx.font="bold 25px Arial, sans-serif";breakerCtx.fillText("LOWEST ANSWER TO HIGHEST",256,126);
+    breakerCtx.fillStyle="#242720";breakerCtx.fillRect(0,0,512,192);
+    // Industrial control placard: worn metal border, caution bars, and clearer text hierarchy.
+    breakerCtx.fillStyle="#b7a66a";breakerCtx.fillRect(12,12,488,8);breakerCtx.fillRect(12,172,488,8);
+    breakerCtx.fillStyle="#292d25";breakerCtx.fillRect(20,25,472,142);
+    breakerCtx.strokeStyle="#777c68";breakerCtx.lineWidth=3;breakerCtx.strokeRect(20,25,472,142);
+    breakerCtx.fillStyle="#d3bf72";breakerCtx.fillRect(30,35,7,122);
+    breakerCtx.fillStyle="#d6d2bd";breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
+    breakerCtx.font="bold 24px Arial, sans-serif";breakerCtx.fillText("BREAKER RESET PROCEDURE",50,61);
+    breakerCtx.strokeStyle="#626957";breakerCtx.lineWidth=2;breakerCtx.beginPath();breakerCtx.moveTo(50,83);breakerCtx.lineTo(476,83);breakerCtx.stroke();
+    breakerCtx.fillStyle="#e1dec7";breakerCtx.font="bold 20px Arial, sans-serif";breakerCtx.fillText("SOLVE EQUATIONS IN ORDER",50,108);
+    breakerCtx.fillStyle="#c5bd9f";breakerCtx.font="18px Arial, sans-serif";breakerCtx.fillText("LOWEST ANSWER  →  HIGHEST ANSWER",50,139);
     const breakerTexture=new THREE.CanvasTexture(breakerCanvas);
     breakerTexture.colorSpace=THREE.SRGBColorSpace;
     this.breakerNoteMaterial=new THREE.MeshBasicMaterial({map:breakerTexture,side:THREE.DoubleSide,toneMapped:false});
