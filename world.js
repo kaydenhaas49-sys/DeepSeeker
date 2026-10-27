@@ -396,26 +396,23 @@ export class World {
     this.breakerRoomBounds=[];
     this.maintenanceRoomGroup=null;
 
-    // A faded paper instruction sheet pinned to the panel, with uneven type
-    // and handling marks rather than a perfectly centered game-prompt graphic.
+    // Recessed-style wall legend: long, shallow proportions match the actual
+    // in-world panel so text stays natural instead of being stretched vertically.
     const breakerCanvas=document.createElement("canvas");
-    breakerCanvas.width=512;breakerCanvas.height=192;
+    breakerCanvas.width=1024;breakerCanvas.height=92;
     const breakerCtx=breakerCanvas.getContext("2d");
-    breakerCtx.fillStyle="#b8ad8e";breakerCtx.fillRect(0,0,512,192);
-    breakerCtx.fillStyle="#d0c5a5";breakerCtx.fillRect(13,10,486,171);
-    breakerCtx.fillStyle="#8e8267";breakerCtx.fillRect(19,16,474,159);
-    breakerCtx.fillStyle="#c9bd9b";breakerCtx.fillRect(22,19,468,153);
-    breakerCtx.fillStyle="#5a5141";breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
-    breakerCtx.font="bold 24px Arial, sans-serif";breakerCtx.fillText("BREAKER RESET",39,48);
-    breakerCtx.fillStyle="#766a53";breakerCtx.fillRect(39,68,274,2);
+    breakerCtx.fillStyle="#34362f";breakerCtx.fillRect(0,0,1024,92);
+    breakerCtx.fillStyle="#a69b7c";breakerCtx.fillRect(8,8,1008,76);
+    breakerCtx.fillStyle="#d0c5a5";breakerCtx.fillRect(12,12,1000,68);
+    breakerCtx.fillStyle="#514b3d";breakerCtx.fillRect(22,18,5,56);
+    breakerCtx.fillStyle="#4a473b";breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
+    breakerCtx.font="bold 27px Arial, sans-serif";breakerCtx.fillText("BREAKER RESET",43,30);
+    breakerCtx.fillStyle="#8a7d60";breakerCtx.fillRect(43,47,935,2);
     breakerCtx.fillStyle="#403d33";breakerCtx.font="bold 19px Arial, sans-serif";
-    breakerCtx.fillText("START WITH LOWEST VALUE",39,98);
-    breakerCtx.font="16px Arial, sans-serif";breakerCtx.fillText("Work across the row. Don't skip one.",39,128);
-    breakerCtx.fillStyle="#8b7e61";breakerCtx.font="11px Arial, sans-serif";
-    breakerCtx.fillText("MAINTENANCE  /  KEEP THIS SHEET",39,155);
-    breakerCtx.globalAlpha=.22;breakerCtx.fillStyle="#554b39";
-    for(let i=0;i<95;i++){
-      const x=(i*71+17)%508,y=(i*37+11)%188;
+    breakerCtx.fillText("FLIP IN ORDER  —  LOWEST VALUE FIRST",43,65);
+    breakerCtx.globalAlpha=.17;breakerCtx.fillStyle="#554b39";
+    for(let i=0;i<115;i++){
+      const x=(i*71+17)%1024,y=(i*37+11)%92;
       breakerCtx.fillRect(x,y,1+(i%3),1);
     }
     breakerCtx.globalAlpha=1;
@@ -428,18 +425,18 @@ export class World {
     this.breakerLampOnMaterial=new THREE.MeshStandardMaterial({color:0x9bd78b,emissive:0x42ff40,emissiveIntensity:1.15});
     this.breakerMathLabelMaterials=[];
     for(const problem of BREAKER_MATH_PROBLEMS){
-      const canvas=document.createElement("canvas");canvas.width=256;canvas.height=128;
+      const canvas=document.createElement("canvas");canvas.width=384;canvas.height=128;
       const ctx=canvas.getContext("2d");
-      ctx.fillStyle="#a79c7d";ctx.fillRect(0,0,256,128);
-      ctx.fillStyle="#c7ba96";ctx.fillRect(5,5,246,118);
-      ctx.fillStyle="#887d64";ctx.fillRect(10,10,236,108);
-      ctx.fillStyle="#d0c3a0";ctx.fillRect(12,12,232,104);
-      ctx.fillStyle="#3e3b31";ctx.font="bold 35px Arial, sans-serif";
+      ctx.fillStyle="#8d866e";ctx.fillRect(0,0,384,128);
+      ctx.fillStyle="#c9bd99";ctx.fillRect(4,4,376,120);
+      ctx.fillStyle="#4a473b";ctx.fillRect(10,10,364,108);
+      ctx.fillStyle="#c9bd99";ctx.fillRect(13,13,358,102);
+      ctx.fillStyle="#3e3b31";ctx.font="bold 37px Arial, sans-serif";
       ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.fillText(problem.expression,128,64);
-      ctx.fillStyle="#766c55";ctx.font="10px Arial, sans-serif";ctx.fillText("CIRCUIT",128,105);
+      ctx.fillText(problem.expression,192,55);
+      ctx.fillStyle="#766c55";ctx.font="11px Arial, sans-serif";ctx.fillText("CIRCUIT",192,99);
       ctx.globalAlpha=.18;ctx.fillStyle="#514936";
-      for(let i=0;i<20;i++){const x=(i*43+7)%252,y=(i*31+9)%124;ctx.fillRect(x,y,1+(i%3),1);}
+      for(let i=0;i<28;i++){const x=(i*43+7)%380,y=(i*31+9)%124;ctx.fillRect(x,y,1+(i%3),1);}
       ctx.globalAlpha=1;
       const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
       this.breakerMathLabelMaterials.push(new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false}));
@@ -635,10 +632,12 @@ export class World {
         }
       }
     }
-    const boardZ=backZ+.24;
-    addBox("BreakerMathInstructionBoard",5.9,.70,.14,centerX,3.50,boardZ,this.breakerPanelMaterial);
+    // Keep the sign shallow and nearly flush with the wall, like a recessed
+    // facility legend, rather than a thick board sticking into the room.
+    const boardZ=backZ+.16;
+    addBox("BreakerMathInstructionBoard",5.9,.70,.045,centerX,3.50,boardZ,this.breakerPanelMaterial);
     const instruction=new THREE.Mesh(new THREE.PlaneGeometry(5.58,.50),this.breakerNoteMaterial);
-    instruction.name="BreakerMathInstructions";instruction.position.set(centerX,3.50,backZ+.315);
+    instruction.name="BreakerMathInstructions";instruction.position.set(centerX,3.50,backZ+.185);
     instruction.castShadow=false;group.add(instruction);
 
     const zStart=partitionZ-3.6,zSpacing=5.3;
