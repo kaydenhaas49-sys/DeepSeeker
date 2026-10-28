@@ -1,24 +1,24 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261023-carpet-seams2";
-import { createTextures } from "./textures.js";
-import { Player } from "./player.js?v=20261017-flyfix1";
-import { HorrorAudio } from "./audio.js?v=20261015-victory1";
-import { Multiplayer } from "./multiplayer.js?v=20261019-usernamefix1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261028-cachefix1";
+import { createTextures } from "./textures.js?v=20261028-cachefix1";
+import { Player } from "./player.js?v=20261028-cachefix1";
+import { HorrorAudio } from "./audio.js?v=20261028-cachefix1";
+import { Multiplayer } from "./multiplayer.js?v=20261028-cachefix1";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import { flashlightFlicker } from "./character.js";
-import { InteractionSystem } from "./interaction.js";
-import { NavigationSystem } from "./navigation.js";
-import { ComputerSystem } from "./computer.js?v=20261015-naturaltext1";
-import { SecurityCameraSystem } from "./securityCameras.js";
-import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js";
-import { SpiderHunter } from "./spiderHunter.js?v=20261023-spider-motion2";
-import { StoryMissionWorld } from "./storyMission.js?v=20261023-rollback-poolrooms1";
+import { flashlightFlicker } from "./character.js?v=20261028-cachefix1";
+import { InteractionSystem } from "./interaction.js?v=20261028-cachefix1";
+import { NavigationSystem } from "./navigation.js?v=20261028-cachefix1";
+import { ComputerSystem } from "./computer.js?v=20261028-cachefix1";
+import { SecurityCameraSystem } from "./securityCameras.js?v=20261028-cachefix1";
+import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261028-cachefix1";
+import { SpiderHunter } from "./spiderHunter.js?v=20261028-cachefix1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261028-cachefix1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
