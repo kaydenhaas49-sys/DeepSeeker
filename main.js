@@ -18,6 +18,7 @@ import { ComputerSystem } from "./computer.js?v=20261030-finish-pass7";
 import { SecurityCameraSystem } from "./securityCameras.js?v=20261030-finish-pass7";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261030-finish-pass7";
 import { SpiderHunter } from "./spiderHunter.js?v=20261030-finish-pass7";
+import { SpiderSurfaceController } from "./spiderSurface.js?v=20261030-spider-ai-v2";
 import { StoryMissionWorld } from "./storyMission.js?v=20261030-finish-pass7";
 
 let arachnophobiaMode=getArachnophobiaMode();
@@ -1811,6 +1812,12 @@ async function enterPoolroomsLevel({broadcast=true}={}){
   // through the door or let stale snapshots keep the spider visible here.
   spiderActive=false;
   spiderSpawnPending=false;
+  spiderSurfaceController.reset();
+  hideSpiderDodgeQTE();
+  spiderDodgeQTEResult=null;
+  spiderAmbushAttempted=false;
+  spiderEncounterWasTriggered=false;
+  spiderAfterDodge=false;
   spiderJumpscareTimer=0;
   spiderCaughtFreezeTimer=0;
   spiderBehaviorState="idle";
@@ -5372,6 +5379,14 @@ let spiderBehaviorState="idle";
 let spiderBehaviorTime=0;
 let spiderAttackPlayed=false;
 let spiderActive=false;
+let spiderAmbushAttempted=false;
+let spiderEncounterWasTriggered=false;
+let spiderAfterDodge=false;
+let spiderDodgeQTEActive=false;
+let spiderDodgeQTEResult=null;
+let spiderDodgeQTERemaining=0;
+let spiderDodgeQTEElement=null;
+let spiderDodgeQTEBar=null;
 let spiderSyncElapsed=0;
 let spiderSyncAuthorityId=null;
 let spiderSyncNeedsInitial=true;
@@ -5454,6 +5469,143 @@ const SPIDER_PATH_TARGET_SHIFT=LOW_END_PERFORMANCE?3.6:2.4;
 const SPIDER_STALK_MIN_SPAWN_DISTANCE=18;
 const SPIDER_STALK_MAX_SPAWN_DISTANCE=34;
 const SPIDER_NORMAL_ENCOUNTER_MAX_TIME=72;
+
+const SPIDER_POST_DODGE_CHASE_MIN=24;
+const SPIDER_POST_DODGE_CHASE_MAX=32;
+const SPIDER_DODGE_QTE_WINDOW=1.05;
+
+const spiderSurfaceController=new SpiderSurfaceController({
+  entity:spiderEntity,getWallMeshes:()=>world.wallOccluders,
+  isBlocked:(x,z)=>isSpiderBlocked(x,z),getPlayerPosition:()=>player.pos,
+  canPlayerSee:()=>playerHasLineOfSightToSpider(spiderEntity),
+  setAnimation:name=>setSpiderAnimation(name),groundY:SPIDER_GROUND_OFFSET,bodyRadius:SPIDER_RADIUS,
+  moveOnPlane:(dt,targetX,targetZ,speed)=>{
+    const moved=normalSpiderHunter.tryDirectSteering(dt,targetX,targetZ,speed);
+    if(!moved){normalSpiderHunter.updatePath(dt,targetX,targetZ);normalSpiderHunter.followPath(dt,speed);}
+  }
+});
+
+function ensureSpiderDodgeQTE(){
+  if(spiderDodgeQTEElement)return;
+  const element=document.createElement("div");
+  element.id="spiderDodgeQTE";element.setAttribute("role","dialog");
+  element.setAttribute("aria-label","Dodge the spider");
+  element.style.cssText=[
+    "position:fixed","left:50%","top:50%","transform:translate(-50%,-50%)",
+    "z-index:99990","display:none","width:min(440px,calc(100vw - 36px))",
+    "box-sizing:border-box","padding:22px 20px 18px","border:1px solid rgba(214,196,141,.58)",
+    "border-radius:8px","background:linear-gradient(180deg,rgba(9,11,8,.96),rgba(2,4,3,.98))",
+    "box-shadow:0 20px 80px rgba(0,0,0,.72),inset 0 1px rgba(255,255,255,.06)",
+    "color:#eee8d0","font:600 12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace",
+    "letter-spacing:2px","text-align:center","pointer-events:auto","backdrop-filter:blur(8px)"
+  ].join(";");
+  element.innerHTML=
+    '<div style="color:#d2b97a;font-size:9px;letter-spacing:4px">IMPACT IMMINENT</div>'+
+    '<div style="margin:10px 0 5px;font-size:clamp(24px,5vw,38px);letter-spacing:5px">DODGE!</div>'+
+    '<div style="margin-bottom:16px;color:#aaa58e;font-size:10px;letter-spacing:1.5px">MOVE OUT OF THE WAY</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+    '<button type="button" data-dodge="left" style="min-height:52px;border:1px solid #8f825d;border-radius:4px;background:#171a13;color:#f1e7c5;font:600 11px ui-monospace,monospace;letter-spacing:1.5px;cursor:pointer">A · LEFT</button>'+
+    '<button type="button" data-dodge="right" style="min-height:52px;border:1px solid #8f825d;border-radius:4px;background:#171a13;color:#f1e7c5;font:600 11px ui-monospace,monospace;letter-spacing:1.5px;cursor:pointer">D · RIGHT</button></div>'+
+    '<div style="height:3px;margin-top:16px;background:rgba(255,255,255,.12);overflow:hidden"><i id="spiderDodgeQTEBar" style="display:block;width:100%;height:100%;background:#d2b97a;transform-origin:left center"></i></div>';
+  for(const button of element.querySelectorAll("button[data-dodge]")){
+    button.addEventListener("click",()=>chooseSpiderDodge(button.dataset.dodge));
+    button.addEventListener("pointerdown",event=>event.stopPropagation());
+  }
+  document.body.appendChild(element);
+  spiderDodgeQTEElement=element;spiderDodgeQTEBar=element.querySelector("#spiderDodgeQTEBar");
+}
+
+function showSpiderDodgeQTE(){
+  ensureSpiderDodgeQTE();spiderDodgeQTEActive=true;
+  spiderDodgeQTEResult=null;spiderDodgeQTERemaining=SPIDER_DODGE_QTE_WINDOW;
+  player.movementFrozen=true;player.keys.clear();
+  spiderDodgeQTEElement.style.display="block";
+}
+
+function hideSpiderDodgeQTE(){
+  spiderDodgeQTEActive=false;
+  if(spiderDodgeQTEElement)spiderDodgeQTEElement.style.display="none";
+}
+
+function chooseSpiderDodge(direction){
+  if(!spiderDodgeQTEActive||spiderDodgeQTEResult)return;
+  if(direction!=="left"&&direction!=="right")return;
+  spiderDodgeQTEResult=direction;hideSpiderDodgeQTE();
+}
+
+function updateSpiderDodgeQTE(dt){
+  if(!spiderDodgeQTEActive)return;
+  spiderDodgeQTERemaining=Math.max(0,spiderDodgeQTERemaining-dt);
+  if(spiderDodgeQTEBar)spiderDodgeQTEBar.style.transform="scaleX("+THREE.MathUtils.clamp(spiderDodgeQTERemaining/SPIDER_DODGE_QTE_WINDOW,0,1)+")";
+  if(spiderDodgeQTERemaining<=0){spiderDodgeQTEResult="failed";hideSpiderDodgeQTE();}
+}
+
+document.addEventListener("keydown",event=>{
+  if(!spiderDodgeQTEActive||spiderDodgeQTEResult)return;
+  if(event.code==="KeyA"||event.code==="ArrowLeft"){event.preventDefault();chooseSpiderDodge("left");}
+  else if(event.code==="KeyD"||event.code==="ArrowRight"){event.preventDefault();chooseSpiderDodge("right");}
+},true);
+
+function applySuccessfulSpiderDodge(){
+  const sideSign=spiderDodgeQTEResult==="left"?-1:1;
+  const right=new THREE.Vector3(Math.cos(player.yaw),0,-Math.sin(player.yaw));
+  const origin=player.pos.clone();
+  const trySide=sign=>{
+    const destination=origin.clone().addScaledVector(right,sign*3.45);
+    for(let i=1;i<=12;i++){
+      const t=i/12;
+      if(player.isWallBlocked(THREE.MathUtils.lerp(origin.x,destination.x,t),THREE.MathUtils.lerp(origin.z,destination.z,t)))return false;
+    }
+    player.pos.copy(destination);return true;
+  };
+  player.vel.set(0,0,0);player.keys.clear();player.movementFrozen=false;
+  return trySide(sideSign)||trySide(-sideSign);
+}
+
+function startSpiderSurfaceRetreat(){
+  if(!spiderSurfaceController.startRetreat())return false;
+  hideSpiderDodgeQTE();spiderDodgeQTEResult=null;player.movementFrozen=false;
+  spiderBehaviorState="retreating";spiderRevealLight.visible=false;spiderRevealLight.intensity=0;
+  setSpiderAnimation("walk");return true;
+}
+
+function finishSpiderSurfaceRetreat(){
+  spiderSurfaceController.reset();spiderActive=false;
+  spiderAmbushAttempted=false;spiderEncounterWasTriggered=false;spiderAfterDodge=false;
+  spiderDodgeQTEResult=null;hideSpiderDodgeQTE();player.movementFrozen=false;
+  spiderCaughtFreezeTimer=0;spiderBehaviorState="idle";
+  spiderRevealLight.visible=false;spiderRevealLight.intensity=0;normalSpiderHunter.hide();
+  spiderEntity.visible=false;spiderEntity.position.y=SPIDER_GROUND_OFFSET;
+  spiderEntity.rotation.set(0,0,0);spiderEntity.quaternion.identity();spiderEntity.scale.setScalar(1);
+  if(spiderModel)spiderModel.visible=true;
+  clearSpiderPath();nextEvent=clock.elapsedTime+24+Math.random()*28;
+  showSpiderScareMessage("THE SIGNAL FADES.",1100);
+}
+
+function resolveSpiderSurfaceEvent(surfaceEvent){
+  if(surfaceEvent.pounceStarted){spiderBehaviorState="pounce";showSpiderDodgeQTE();}
+  if(surfaceEvent.pounceLanded){
+    const dodged=spiderDodgeQTEResult==="left"||spiderDodgeQTEResult==="right";
+    hideSpiderDodgeQTE();
+    if(dodged&&applySuccessfulSpiderDodge()){
+      spiderSurfaceController.completePounce();normalSpiderHunter.beginChase();
+      normalSpiderHunter.lastKnownTarget.set(player.pos.x,0,player.pos.z);
+      normalSpiderHunter.lastSeenTime=clock.elapsedTime;
+      spiderAfterDodge=true;spiderEncounterWasTriggered=true;spiderBehaviorTime=0;
+      spiderChaseDuration=THREE.MathUtils.lerp(SPIDER_POST_DODGE_CHASE_MIN,SPIDER_POST_DODGE_CHASE_MAX,Math.random());
+      spiderBehaviorState="chase";spiderRevealLight.visible=false;spiderRevealLight.intensity=0;
+      setSpiderAnimation("chase");eventText.textContent="DODGED. KEEP RUNNING.";eventText.style.opacity="1";
+      setTimeout(()=>{if(eventText.textContent==="DODGED. KEEP RUNNING.")eventText.style.opacity="0";},1300);
+    }else{
+      spiderDodgeQTEResult="failed";player.movementFrozen=true;startSpiderCatchFreeze();
+    }
+  }
+  if(surfaceEvent.failed&&spiderSurfaceController.kind==="ambush"){
+    spiderSurfaceController.reset();player.movementFrozen=false;normalSpiderHunter.beginChase();
+    spiderBehaviorTime=0;spiderBehaviorState="chase";setSpiderAnimation("chase");
+  }
+  if(surfaceEvent.completed&&spiderSurfaceController.kind==="retreat")finishSpiderSurfaceRetreat();
+}
 
 const SPIDER_ANIMATION_RANGES={
   idle1:[164,213],
@@ -6418,6 +6570,12 @@ function startBackroomsStalker(){
 
   spiderActive=true;
   spiderBehaviorTime=0;
+  spiderAmbushAttempted=false;
+  spiderEncounterWasTriggered=false;
+  spiderAfterDodge=false;
+  spiderSurfaceController.reset();
+  hideSpiderDodgeQTE();
+  spiderDodgeQTEResult=null;
   spiderStuckTime=0;
   spiderJumpscareTimer=0;
   spiderCaughtFreezeTimer=0;
@@ -7075,6 +7233,9 @@ function startSpiderCatchFreeze(){
 }
 
 function resetPlayerAfterSpiderCatch(){
+  spiderSurfaceController.reset();
+  hideSpiderDodgeQTE();
+  spiderDodgeQTEResult=null;
   player.movementFrozen=false;
   spiderCaughtFreezeTimer=0;
   spiderCaughtFlashlightOverride=false;
@@ -9288,6 +9449,7 @@ function publishMultiplayerSpiderSnapshot(dt){
         z:spiderEntity.position.z,
         rotationX:0,
         rotationY:spiderEntity.rotation.y,
+        rotationZ:spiderEntity.rotation.z,
         scale:1,
         jumpscareTimer:0
       });
@@ -9311,6 +9473,7 @@ function publishMultiplayerSpiderSnapshot(dt){
     z:spiderEntity.position.z,
     rotationX:spiderEntity.rotation.x,
     rotationY:spiderEntity.rotation.y,
+    rotationZ:spiderEntity.rotation.z,
     scale:spiderEntity.scale.x,
     jumpscareTimer:spiderJumpscareTimer
   });
@@ -9351,7 +9514,7 @@ function applyRemoteSpiderSnapshot(dt){
 
   if(!remoteSpiderPositionInitialized){
     spiderEntity.position.set(snapshot.x,snapshot.y,snapshot.z);
-    spiderEntity.rotation.set(snapshot.rotationX,snapshot.rotationY,0);
+    spiderEntity.rotation.set(snapshot.rotationX,snapshot.rotationY,snapshot.rotationZ||0);
     remoteSpiderPositionInitialized=true;
   }else{
     const alpha=1-Math.exp(-20*Math.max(0,dt));
@@ -9362,6 +9525,7 @@ function applyRemoteSpiderSnapshot(dt){
     )-Math.PI;
     spiderEntity.rotation.y+=deltaYaw*alpha;
     spiderEntity.rotation.x=THREE.MathUtils.lerp(spiderEntity.rotation.x,snapshot.rotationX,alpha);
+    spiderEntity.rotation.z=THREE.MathUtils.lerp(spiderEntity.rotation.z,snapshot.rotationZ||0,alpha);
   }
   spiderEntity.scale.setScalar(snapshot.scale);
   spiderEntity.visible=true;
@@ -10010,51 +10174,61 @@ function animate(){
             resetPlayerAfterSpiderCatch();
           }
         }else{
+          updateSpiderDodgeQTE(dt);
           const huntInfo={target:player,sprinting:player.isRunning,flashlightOn,crouched:player.crouched};
-          normalSpiderHunter.updateHunter(dt,t,huntInfo.target,{
-            sprinting:huntInfo.sprinting,
-            flashlightOn:huntInfo.flashlightOn,
-            crouched:huntInfo.crouched
-          });
-          normalSpiderHunter.step(dt);
-
-          const caughtX=huntInfo.target.pos.x;
-          const caughtZ=huntInfo.target.pos.z;
-          if(normalSpiderHunter.distanceToHitbox(caughtX,caughtZ)<=.06){
-            startSpiderCatchFreeze();
-          }else if(
-            spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
-          ){
-            spiderActive=false;
-            spiderBehaviorState="idle";
-            spiderCaughtFreezeTimer=0;
-            spiderRevealLight.visible=false;
-            spiderRevealLight.intensity=0;
-            normalSpiderHunter.hide();
-            spiderEntity.visible=false;
-            clearSpiderPath();
-            nextEvent=clock.elapsedTime+24+Math.random()*28;
-            showSpiderScareMessage("THE SIGNAL FADES.",850);
+          if(spiderSurfaceController.active){
+            const surfaceEvent=spiderSurfaceController.update(dt,huntInfo.target);
+            spiderBehaviorState=surfaceEvent.behavior;
+            spiderRevealLight.visible=false;spiderRevealLight.intensity=0;
+            resolveSpiderSurfaceEvent(surfaceEvent);
+          }else{
+            normalSpiderHunter.updateHunter(dt,t,huntInfo.target,{
+              sprinting:huntInfo.sprinting,flashlightOn:huntInfo.flashlightOn,crouched:huntInfo.crouched
+            });
+            normalSpiderHunter.step(dt);
+            if(normalSpiderHunter.mode==="hunt"||normalSpiderHunter.mode==="enrage"){
+              spiderEncounterWasTriggered=true;
+              if(!spiderAmbushAttempted){
+                spiderAmbushAttempted=true;
+                if(spiderSurfaceController.startAmbush()){
+                  spiderBehaviorTime=0;spiderBehaviorState="climbing";
+                  spiderRevealLight.visible=false;spiderRevealLight.intensity=0;setSpiderAnimation("walk");
+                }
+              }
+            }
+            const caughtX=huntInfo.target.pos.x,caughtZ=huntInfo.target.pos.z;
+            if(spiderSurfaceController.active){
+              spiderBehaviorState=spiderSurfaceController.behavior;
+            }else if(normalSpiderHunter.distanceToHitbox(caughtX,caughtZ)<=.06){
+              startSpiderCatchFreeze();
+            }else if(
+              (spiderEncounterWasTriggered&&normalSpiderHunter.mode==="roam")||
+              (spiderAfterDodge&&spiderBehaviorTime>=spiderChaseDuration)||
+              spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
+            ){
+              startSpiderSurfaceRetreat();
+            }
           }
+          if(spiderSurfaceController.active&&spiderCaughtFreezeTimer<=0)spiderBehaviorState=spiderSurfaceController.behavior;
         }
 
         if(spiderActive){
           normalSpiderHunter.visualRig.root.visible=false;
           spiderEntity.visible=true;
-          spiderBehaviorState=
-            normalSpiderHunter.mode==="roam" && normalSpiderHunter.speed<.15 ? "peek" :
-            normalSpiderHunter.mode==="hidden" ? "idle" : "chase";
-          if(normalSpiderHunter.mode==="roam" || normalSpiderHunter.mode==="investigate"){
-            setSpiderAnimation(normalSpiderHunter.speed>.22 ? "chase" : "stalk");
+          if(!spiderSurfaceController.active){
+            spiderBehaviorState=
+              normalSpiderHunter.mode==="roam" && normalSpiderHunter.speed<.15 ? "peek" :
+              normalSpiderHunter.mode==="hidden" ? "idle" : "chase";
+            if(normalSpiderHunter.mode==="roam" || normalSpiderHunter.mode==="investigate"){
+              setSpiderAnimation(normalSpiderHunter.speed>.22 ? "chase" : "stalk");
+            }
           }
           spiderVisibleToPlayer=playerHasLineOfSightToSpider(spiderEntity);
-          // Keep the normal model renderable; wall depth testing handles real
-          // occlusion without making the whole spider vanish on a raycast hit.
-          if(spiderModel) spiderModel.visible=true;
+          if(spiderModel)spiderModel.visible=true;
           spiderRevealLight.visible=
-            spiderVisibleToPlayer &&
-            (normalSpiderHunter.mode==="hunt" || normalSpiderHunter.mode==="enrage");
-          spiderRevealLight.intensity=spiderRevealLight.visible ? 4.2 : 0;
+            !spiderSurfaceController.active&&spiderVisibleToPlayer&&
+            (normalSpiderHunter.mode==="hunt"||normalSpiderHunter.mode==="enrage");
+          spiderRevealLight.intensity=spiderRevealLight.visible?4.2:0;
         }else{
           spiderEntity.visible=false;
           spiderRevealLight.visible=false;
