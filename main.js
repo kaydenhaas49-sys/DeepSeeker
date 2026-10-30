@@ -1,24 +1,24 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261028-cachefix1";
-import { createTextures } from "./textures.js?v=20261028-cachefix1";
-import { Player } from "./player.js?v=20261028-cachefix1";
-import { HorrorAudio } from "./audio.js?v=20261028-cachefix1";
-import { Multiplayer } from "./multiplayer.js?v=20261028-cachefix1";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261030-finish-pass1";
+import { createTextures } from "./textures.js?v=20261030-finish-pass1";
+import { Player } from "./player.js?v=20261030-finish-pass1";
+import { HorrorAudio } from "./audio.js?v=20261030-finish-pass1";
+import { Multiplayer } from "./multiplayer.js?v=20261030-finish-pass1";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import { flashlightFlicker } from "./character.js?v=20261028-cachefix1";
-import { InteractionSystem } from "./interaction.js?v=20261028-cachefix1";
-import { NavigationSystem } from "./navigation.js?v=20261028-cachefix1";
-import { ComputerSystem } from "./computer.js?v=20261028-cachefix1";
-import { SecurityCameraSystem } from "./securityCameras.js?v=20261028-cachefix1";
-import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261028-cachefix1";
-import { SpiderHunter } from "./spiderHunter.js?v=20261028-cachefix1";
-import { StoryMissionWorld } from "./storyMission.js?v=20261028-cachefix1";
+import { flashlightFlicker } from "./character.js?v=20261030-finish-pass1";
+import { InteractionSystem } from "./interaction.js?v=20261030-finish-pass1";
+import { NavigationSystem } from "./navigation.js?v=20261030-finish-pass1";
+import { ComputerSystem } from "./computer.js?v=20261030-finish-pass1";
+import { SecurityCameraSystem } from "./securityCameras.js?v=20261030-finish-pass1";
+import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261030-finish-pass1";
+import { SpiderHunter } from "./spiderHunter.js?v=20261030-finish-pass1";
+import { StoryMissionWorld } from "./storyMission.js?v=20261030-finish-pass1";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -161,6 +161,7 @@ const adminFlyButton=document.getElementById("adminFlyButton");
 const adminTeleportExitButton=document.getElementById("adminTeleportExitButton");
 const adminTeleportRadioButton=document.getElementById("adminTeleportRadioButton");
 const adminSpiderChaseButton=document.getElementById("adminSpiderChaseButton");
+const adminSpiderFrontButton=document.getElementById("adminSpiderFrontButton");
 const adminWaterGunButton=document.getElementById("adminWaterGunButton");
 const adminWaterRpgButton=document.getElementById("adminWaterRpgButton");
 const adminClearWaterButton=document.getElementById("adminClearWaterButton");
@@ -284,6 +285,7 @@ const tutorialOpenRoomOccluders=[];
 let tutorialLightsOutState="on";
 let tutorialLightsOutElapsed=0;
 let tutorialCeilingLightsOn=true;
+let tutorialFlickerAverage=1;
 let tutorialOpenRoomLightLastUpdate=0;
 const tutorialOpenRoomLightOrigin=new THREE.Vector3();
 const tutorialOpenRoomLightDirection=new THREE.Vector3();
@@ -331,28 +333,46 @@ function ensureTutorialOpenRoom(){
   const h=WALL_H;
   const t=WALL_T;
 
+  // Give the tutorial its own aged materials instead of reusing the
+  // cleaner shared world textures. This is strictly visual: room dimensions,
+  // collisions, lesson triggers and lighting controls remain unchanged.
+  // Build a restrained, period-correct Level 0 material set: faded repeating
+  // wallpaper, tightly woven office carpet, and acoustic ceiling tiles.
+  // Wear is built into the surface textures rather than painted on as dark,
+  // rectangular overlay planes.
+  // Match the playable Backrooms exactly: shared procedural textures and
+  // the same surface material values, with only room-sized UV repeats changed.
+  const tutorialTextures=createTextures(Math.min(
+    renderer.capabilities.getMaxAnisotropy(),
+    activeQualitySettings.anisotropy
+  ));
+  const tutorialWallTexture=tutorialTextures.wall;
+  tutorialWallTexture.repeat.set((max-min)/4,h/4);
+  const tutorialFloorTexture=tutorialTextures.floor;
+  tutorialFloorTexture.repeat.set((max-min)/4,(max-min)/4);
+  const tutorialCeilingTexture=tutorialTextures.ceiling;
+  tutorialCeilingTexture.repeat.set((max-min)/4,(max-min)/4);
+
   const wallMaterial=new THREE.MeshStandardMaterial({
-    map:world.materials.wall.map,
-    color:0xb6a13f,
-    roughness:.92
+    map:tutorialWallTexture,
+    roughness:0.92
   });
   const floorMaterial=new THREE.MeshStandardMaterial({
-    map:world.materials.floor.map,
-    color:0x8f876f,
-    roughness:1,
-    side:THREE.DoubleSide
+    map:tutorialFloorTexture,
+    roughness:1.0
   });
   const ceilingMaterial=new THREE.MeshStandardMaterial({
-    map:world.materials.ceiling.map,
+    map:tutorialCeilingTexture,
     color:0x77725e,
-    roughness:.96,
+    roughness:0.98,
+    metalness:0,
     side:THREE.DoubleSide
   });
   const fixtureMaterial=new THREE.MeshStandardMaterial({
-    color:0xffedbd,
-    emissive:0xffe7ad,
-    emissiveIntensity:1.8,
-    roughness:.35
+    color:0xfff4ca,
+    emissive:0xffe2a0,
+    emissiveIntensity:0.30,
+    roughness:0.28
   });
 
   const addTutorialMesh=(geometry,material,position)=>{
@@ -396,6 +416,9 @@ function ensureTutorialOpenRoom(){
     tutorialOpenRoomOccluders.push(mesh);
   }
 
+  // Keep the tutorial's geometry simple; the shared Backrooms materials
+  // provide the same wallpaper, carpet, and ceiling treatment as the main level.
+
   // Four permanent fluorescent fixtures, one near each corner of the tutorial.
   // The tutorial is tiny enough that keeping all four on has negligible cost.
   const tutorialFixturePositions=[[12,12],[52,12],[12,52],[52,52]];
@@ -405,9 +428,9 @@ function ensureTutorialOpenRoom(){
       fixtureMaterial.clone(),
       new THREE.Vector3(x,h-.055,z)
     );
-    fixtureMesh.material.emissiveIntensity=.34;
+    fixtureMesh.material.emissiveIntensity=.16;
 
-    const light=new THREE.PointLight(0xffe6a8,11.5,30,1.35);
+    const light=new THREE.PointLight(0xffe6a8,1.25,100,1.3);
     light.position.set(x,h-.75,z);
     light.castShadow=false;
     light.visible=true;
@@ -419,20 +442,12 @@ function ensureTutorialOpenRoom(){
       x,
       z,
       phase:Math.random()*Math.PI*2,
-      baseIntensity:11.5
+      baseIntensity:1.25
     });
   }
 
-  // The tutorial is a teaching space, not a low-light survival section.
-  // These fill lights are only present while this dedicated room is visible.
-  const tutorialFillHemisphere=new THREE.HemisphereLight(0xfff2d1,0x958565,.46);
-  tutorialFillHemisphere.name="TutorialFullBrightnessHemisphere";
-  tutorialOpenRoomRoot.add(tutorialFillHemisphere);
-  tutorialFillLights.push({light:tutorialFillHemisphere,baseIntensity:.46});
-  const tutorialFillAmbient=new THREE.AmbientLight(0xfff0d0,.24);
-  tutorialFillAmbient.name="TutorialFullBrightnessAmbient";
-  tutorialOpenRoomRoot.add(tutorialFillAmbient);
-  tutorialFillLights.push({light:tutorialFillAmbient,baseIntensity:.24});
+  // Use the same scene-level, quality-scaled ambient lighting as the main level.
+  // tutorialFillLights intentionally stays empty so the room is not washed out.
 
   const half=t*.5;
   tutorialOpenRoomCollisionBoxes.push(
@@ -458,46 +473,83 @@ function updateTutorialOpenRoomLights(dt=0){
 
   if(tutorialLightsOutState==="flickering"){
     tutorialLightsOutElapsed+=Math.min(Math.max(dt,0),.1);
-    const t=tutorialLightsOutElapsed;
-    // Keep the pulses slow and uneven, but end the tutorial blackout sequence sooner.
-    const litWindows=[[0,.34],[.70,.91],[1.34,1.60],[2.03,2.25]];
-    tutorialCeilingLightsOn=litWindows.some(([start,end])=>t>=start&&t<end);
-    if(t>=2.60){
+    if(tutorialLightsOutElapsed>=3.05){
       tutorialLightsOutState="off";
-      tutorialCeilingLightsOn=false;
     }
-  }else{
-    tutorialCeilingLightsOn=tutorialLightsOutState==="on";
   }
 
-  const lightsOn=tutorialCeilingLightsOn;
+  const flickering=tutorialLightsOutState==="flickering";
+  const t=tutorialLightsOutElapsed;
+  let totalLevel=0;
+
   for(const item of tutorialOpenRoomLights){
-    item.light.visible=lightsOn;
-    item.light.intensity=lightsOn?item.baseIntensity:0;
+    let level=tutorialLightsOutState==="on"?1:0;
+
+    if(flickering){
+      // Each tube fails at a slightly different moment. The staggered short
+      // dropouts feel like bad ballasts, not four lights tied to one switch.
+      const phase=((item.phase/(Math.PI*2))+1)%1;
+      level=.96;
+      const pulses=[
+        [.12+phase*.06,.075,.12],
+        [.56+(1-phase)*.11,.045,0],
+        [.64+phase*.12,.12,.28],
+        [1.08+(1-phase)*.17,.04,0],
+        [1.16+phase*.13,.07,.17],
+        [1.63+(1-phase)*.16,.11,0],
+        [1.84+phase*.13,.065,.18],
+        [2.18+(1-phase)*.11,.045,0],
+        [2.25+phase*.13,.13,.30]
+      ];
+      for(const [start,duration,output] of pulses){
+        if(t>=start && t<start+duration) level=Math.min(level,output);
+      }
+      // One final uneven sputter, then each fixture stays dead.
+      if(t>=2.72+phase*.18)level=0;
+    }
+
+    level=THREE.MathUtils.clamp(level,0,1);
+    totalLevel+=level;
+    item.light.visible=level>.012;
+    item.light.intensity=item.baseIntensity*level;
+
     const material=item.mesh?.material;
     if(material?.emissiveIntensity!==undefined){
-      material.color.setHex(lightsOn?0xffedbd:0x514b39);
-      material.emissive.setHex(lightsOn?0xffe7ad:0x000000);
-      material.emissiveIntensity=lightsOn?2.1:0;
+      if(level>.42){
+        material.color.setHex(0xffedbd);
+        material.emissive.setHex(0xffd990);
+        material.emissiveIntensity=1.05*level;
+      }else if(level>.012){
+        material.color.setHex(0xb99e68);
+        material.emissive.setHex(0xffbd62);
+        material.emissiveIntensity=.58*level;
+      }else{
+        material.color.setHex(0x514b39);
+        material.emissive.setHex(0x000000);
+        material.emissiveIntensity=0;
+      }
     }
   }
+
+  tutorialFlickerAverage=totalLevel/tutorialOpenRoomLights.length;
+  tutorialCeilingLightsOn=tutorialLightsOutState==="on"||
+    (flickering&&tutorialFlickerAverage>.22);
 
   const fillScale=tutorialLightsOutState==="on"
     ?1
     :tutorialLightsOutState==="off"
       ?.12
-      :lightsOn
-        ?.72
-        :.18;
+      :.10+.48*tutorialFlickerAverage;
   for(const item of tutorialFillLights){
     item.light.intensity=item.baseIntensity*fillScale;
   }
 }
 
 function getTutorialAmbientScale(){
-  if(!tutorialOpenRoomActive||tutorialLightsOutState==="on")return 1;
+  if(!tutorialOpenRoomActive)return 1;
+  if(tutorialLightsOutState==="on")return .82;
   if(tutorialLightsOutState==="off")return .14;
-  return tutorialCeilingLightsOn?.72:.20;
+  return .14+.58*tutorialFlickerAverage;
 }
 
 function disableTutorialOpenRoom(){
@@ -1540,27 +1592,54 @@ function drawHandheldRadioRadar(force=false){
   ctx.lineWidth=2;
   ctx.strokeRect(5,5,w-10,h-10);
 
-  // The radio is a receiver, not a tracker: show an unreliable signal trace
-  // without plotting objectives, directions, or distances.
-  ctx.fillStyle="#527e5d";
-  ctx.font="bold 15px monospace";
+  // Signal strength rises as the player gets closer to the current mission relay.
+  // It never gives a bearing or exact distance; it behaves like an old receiver.
+  const target=typeof getMissionTarget==="function"?getMissionTarget():null;
+  const playerPos=player?.pos;
+  const distance=target&&playerPos
+    ?Math.hypot((playerPos.x??0)-target.x,(playerPos.z??0)-target.z)
+    :Infinity;
+  const strength=Number.isFinite(distance)
+    ?THREE.MathUtils.clamp(1-distance/115,0,1):0;
+  const bars=Math.max(0,Math.min(5,Math.ceil(strength*5)));
+  const phase=now*.012;
   ctx.textAlign="center";
-  ctx.fillText("SIGNAL ONLY",w/2,34);
-  ctx.strokeStyle="#3c7450";
+  ctx.fillStyle="#85b991";
+  ctx.font="bold 17px monospace";
+  ctx.fillText("FIELD RECEIVER",w/2,30);
+  ctx.textAlign="left";
+  ctx.fillStyle="#45634b";
+  ctx.font="bold 12px monospace";
+  ctx.fillText("CARRIER",18,57);
+  const barX=18,barY=67,barGap=7,barW=37,maxH=30;
+  for(let i=0;i<5;i++){
+    const bh=8+i*5;
+    ctx.fillStyle=i<bars?(bars>=4?"#b7d58b":"#79bd87"):"#203528";
+    ctx.fillRect(barX+i*(barW+barGap),barY+maxH-bh,barW,bh);
+    ctx.strokeStyle="#345440";
+    ctx.lineWidth=1;
+    ctx.strokeRect(barX+i*(barW+barGap),barY+maxH-bh,barW,bh);
+  }
+  ctx.textAlign="right";
+  ctx.fillStyle=bars>=4?"#b7d58b":bars>=2?"#8ac59b":"#bd8a60";
+  ctx.font="bold 14px monospace";
+  ctx.fillText(bars>=5?"NEAR LOCK":bars>=3?"CARRIER FOUND":bars>=1?"WEAK CARRIER":"SCANNING",w-18,58);
+  ctx.strokeStyle=bars>=4?"#8dbf83":"#3c7450";
   ctx.lineWidth=2;
   ctx.beginPath();
-  const phase=now*.012;
+  const amplitude=2+(1-strength)*13;
   for(let x=16;x<w-16;x+=2){
-    const noise=Math.sin(x*.105+phase)*7+
-      Math.sin(x*.037-phase*1.7)*4+
-      Math.sin(x*.31+phase*.6)*2;
-    const y=h*.56+noise;
+    const noise=(Math.sin(x*.105+phase)*.55+
+      Math.sin(x*.037-phase*1.7)*.3+
+      Math.sin(x*.31+phase*.6)*.15)*amplitude;
+    const y=h*.66+noise;
     if(x===16)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   }
   ctx.stroke();
+  ctx.textAlign="center";
   ctx.fillStyle="#8ac59b";
-  ctx.font="bold 13px monospace";
-  ctx.fillText("LISTEN FOR THE CARRIER",w/2,h-28);
+  ctx.font="bold 12px monospace";
+  ctx.fillText(bars>=4?"SIGNAL STABILIZING":bars>=2?"MOVE TOWARD STRONGER SIGNAL":"SEARCH FOR A CARRIER",w/2,h-20);
   radioRadarTexture.needsUpdate=true;
 }
 
@@ -1613,7 +1692,7 @@ function refreshMissionState({broadcast=false}={}){
     missionState.relays.every(Boolean)&&missionState.breakerSolved
   );
   storyMissionWorld?.syncState(missionState,{
-    tutorialActive:Boolean(tutorialOpenRoomActive||(gameStarted&&houseTutorialStage>0&&houseTutorialStage<10)),
+    tutorialActive:Boolean(tutorialOpenRoomActive||(gameStarted&&houseTutorialStage>0&&houseTutorialStage<9)),
     poolroomsActive,
     missionVisible:true
   });
@@ -1685,7 +1764,7 @@ function getMissionTarget(){
 
 function updateMissionObjective(){
   if(!gameStarted||gameEnded||houseMode||poolroomsActive||tutorialOpenRoomActive)return;
-  if(houseTutorialStage>0&&houseTutorialStage<10)return;
+  if(houseTutorialStage>0&&houseTutorialStage<9)return;
   // Keep objectives broad and diegetic. Players must explore and recognize
   // the environment instead of being handed a distance or compass direction.
   const target=getMissionTarget();
@@ -3189,14 +3268,21 @@ function startGame(save=null,saveSlot=selectedSaveSlot){
   if(save){
     applySavedGame(save);
   }else{
+    // Every fresh run starts in the Field Tutorial. The tutorial owns its
+    // room geometry and collision until lesson 10 hands the player off to
+    // the procedural Backrooms.
     houseMode=false;
-    ensureTutorialOpenRoom();
     resetMissionState();
+    ensureTutorialOpenRoom();
+    world.root.visible=false;
     player.pos.set(32,EYE,32);
+    player.yaw=0;
+    player.pitch=0;
     player.vel.set(0,0,0);
     player.jumpY=0;
     player.jumpVelocity=0;
     player.keys.clear();
+    resetHouseTutorial();
     setHouseTutorialStage(1);
   }
 
@@ -4561,7 +4647,7 @@ function placeHouseMagazineTeleporter(root){
 function useHouseReturnTeleporter(){
   if(!houseMode || backroomsFallTimer>0) return false;
 
-  if(houseTutorialStage<5){
+  if(houseTutorialStage<4){
     eventText.textContent=houseTutorialStage>=3
       ? "IT IS NOT SAFE YET."
       : "EXPLORE THE ROOM FIRST.";
@@ -5276,8 +5362,15 @@ let spiderCaughtFlashlightWasOn=false;
 let spiderCaughtPreviousTool="flashlight";
 let spiderCaughtStartYaw=0;
 let spiderCaughtStartPitch=0;
+let spiderCaughtFlashlightStartPosition=null;
+let spiderCaughtFlashlightStartRotation=null;
+let spiderCaughtHeadBone=null;
+let spiderCaughtHeadBaseRotation=null;
 let spiderCaughtBlackout=null;
 let spiderCaughtPlayerPosition=new THREE.Vector3();
+let spiderCaughtSpiderPosition=new THREE.Vector3();
+let spiderCaughtCameraStartY=0;
+let spiderCaughtRetreatDirection=new THREE.Vector3();
 let spiderJumpscareStartY=0;
 let spiderJumpscareDirection=new THREE.Vector3();
 let spiderJumpscareScale=1;
@@ -5312,8 +5405,8 @@ const SPIDER_POUNCE_HEIGHT=1.15;
 const SPIDER_SPEED=2.65;
 const SPIDER_ATTACK_RANGE=2.5;
 const SPIDER_HITBOX_PADDING=1.55;
-const SPIDER_CAUGHT_FREEZE_TIME=2.65;
-const SPIDER_CAUGHT_BITE_TIME=.62;
+const SPIDER_CAUGHT_FREEZE_TIME=4.8;
+const SPIDER_CAUGHT_BITE_TIME=2.55;
 const SPIDER_CHASE_MIN_TIME=5.0;
 const SPIDER_CHASE_MAX_TIME=8.0;
 const SPIDER_CHASE_SPEED=3.8;
@@ -5973,7 +6066,7 @@ function prepareHouseTutorialSpider(){
 }
 
 function updateTutorialGuide(){
-  if(!tutorialGuide || !gameStarted || houseMode || houseTutorialStage<=0 || houseTutorialStage>=10){
+  if(!tutorialGuide || !gameStarted || houseMode || houseTutorialStage<=0 || houseTutorialStage>=9){
     tutorialGuide.style.opacity="0";
     tutorialGuide.style.transform="translateX(-50%) translateY(10px)";
     return;
@@ -5981,14 +6074,13 @@ function updateTutorialGuide(){
 
   const lessons={
     1:["MOVE","W A S D","Move around a bit."],
-    2:["JUMP","SPACE","Press SPACE."],
-    3:["CROUCH","CTRL","Hold CTRL."],
-    4:["SPRINT","SHIFT","Hold SHIFT to run."],
-    5:["FLASHLIGHT","F","Press F."],
-    6:["PHONE","P","Press P to open your phone."],
-    7:["MESSAGE","P","Read M's note, then close the phone."],
-    8:["APPROACH","W A S D","Go toward the figure."],
-    9:["RUN","SHIFT","Run. Don't stop."]
+    2:["CROUCH","CTRL","Hold CTRL."],
+    3:["SPRINT","SHIFT","Hold SHIFT to run."],
+    4:["FLASHLIGHT","F","Press F."],
+    5:["PHONE","P","Press P to open your phone."],
+    6:["MESSAGE","P","Read M's note, then close the phone."],
+    7:["APPROACH","W A S D","Go toward the figure."],
+    8:["RUN","SHIFT","Run. Don't stop."]
   };
   const lesson=lessons[houseTutorialStage];
   if(!lesson){
@@ -5996,7 +6088,7 @@ function updateTutorialGuide(){
     return;
   }
 
-  tutorialGuideStep.textContent=String(houseTutorialStage).padStart(2,"0")+"/09";
+  tutorialGuideStep.textContent=String(houseTutorialStage).padStart(2,"0")+"/08";
   tutorialGuideAction.textContent=lesson[0]+" · "+lesson[1];
   tutorialGuideHint.textContent=lesson[2];
   tutorialGuide.style.opacity="1";
@@ -6011,17 +6103,19 @@ function setHouseTutorialStage(stage){
     tutorialLightsOutState="on";
     tutorialLightsOutElapsed=0;
     tutorialCeilingLightsOn=true;
-  }else if(stage===5){
+    tutorialFlickerAverage=1;
+  }else if(stage===4){
     // The room is bright for the movement lessons, then the fluorescents fail
     // right as the player is asked to turn on the flashlight.
     tutorialLightsOutState="flickering";
     tutorialLightsOutElapsed=0;
     tutorialCeilingLightsOn=true;
+    tutorialFlickerAverage=1;
   }
 
   // Hard-reset the normal director for every tutorial stage. This covers stale
   // chases, pounces, pending asset loads, and timers from a previous run.
-  if(stage>=1 && stage<=9){
+  if(stage>=1 && stage<=8){
     spiderActive=false;
     spiderSpawnPending=false;
     spiderJumpscareTimer=0;
@@ -6047,32 +6141,29 @@ function setHouseTutorialStage(stage){
     objective.textContent="MOVE AROUND THE ROOM · W A S D";
     showHouseTutorialMessage("W A S D · MOVE",1500);
   }else if(stage===2){
-    objective.textContent="JUMP OVER THE FLOOR MARK · SPACE";
-    showHouseTutorialMessage("SPACE · JUMP",1500);
-  }else if(stage===3){
     objective.textContent="CROUCH DOWN AND STAY LOW · CTRL";
     showHouseTutorialMessage("CTRL · CROUCH",1500);
-  }else if(stage===4){
+  }else if(stage===3){
     houseTutorialStartX=player.pos.x;
     houseTutorialStartZ=player.pos.z;
     objective.textContent="SPRINT ACROSS THE ROOM · HOLD SHIFT";
     showHouseTutorialMessage("SHIFT · SPRINT",1500);
-  }else if(stage===5){
+  }else if(stage===4){
     flashlightOn=false;
     player.setFlashlightVisual(false);
     flashlight.visible=false;
     flashlight.intensity=0;
     objective.textContent="TURN THE FLASHLIGHT ON · F";
     showHouseTutorialMessage("F · FLASHLIGHT",1500);
-  }else if(stage===6){
+  }else if(stage===5){
     objective.textContent="OPEN THE DEEPSEEKER PHONE · P";
     showHouseTutorialMessage("P · OPEN PHONE",1500);
     eventText.textContent="BADGE AI ONLINE";
     eventText.style.opacity="1";
-  }else if(stage===7){
+  }else if(stage===6){
     objective.textContent="READ M'S MESSAGE, THEN CLOSE THE PHONE · P";
     showHouseTutorialMessage("CHECK THE DEEPSEEKER.",1700);
-  }else if(stage===8){
+  }else if(stage===7){
     objective.textContent="MOVE TOWARD THE FIGURE AT THE END OF THE ROOM.";
     if(!houseTutorialSpiderPrepared){
       prepareHouseTutorialSpider();
@@ -6081,13 +6172,13 @@ function setHouseTutorialStage(stage){
       arachnophobiaMode ? "THERE IS A DUCK AHEAD." : "SOMETHING IS WAITING AHEAD.",
       1900
     );
-  }else if(stage===9){
+  }else if(stage===8){
     objective.textContent="RUN. HOLD SHIFT AND GET AWAY FROM IT.";
     showHouseTutorialMessage(
       arachnophobiaMode ? "THE DUCK IS CHASING YOU." : "IT MOVED. RUN.",
       1600
     );
-  }else if(stage===10){
+  }else if(stage===9){
     objective.textContent="TUTORIAL COMPLETE · FOLLOW THE SIGNAL DEEPER.";
     showHouseTutorialMessage(
       arachnophobiaMode ? "YOU LOST THE DUCK." : "IT STOPPED.",
@@ -6108,7 +6199,7 @@ function setHouseTutorialStage(stage){
 function startHouseTutorialSpiderChase(){
   if(houseTutorialSpiderState!=="static") return;
 
-  setHouseTutorialStage(9);
+  setHouseTutorialStage(8);
   houseTutorialSpiderState="chase";
   houseTutorialSpiderTime=0;
   houseTutorialSpiderStuckTime=0;
@@ -6135,8 +6226,8 @@ function startHouseTutorialSpiderChase(){
 function finishHouseTutorialSpiderChase(){
   hideHouseTutorialSpider();
 
-  if(!houseMode && houseTutorialStage===9){
-    setHouseTutorialStage(10);
+  if(!houseMode && houseTutorialStage===8){
+    setHouseTutorialStage(9);
   }
 }
 
@@ -6162,26 +6253,18 @@ function updateHouseTutorialSpider(dt){
   }
 
   if(houseTutorialStage===2){
-    if(player.jumpY>.25 || player.jumpVelocity>1.2) setHouseTutorialStage(3);
+    if(player.crouched) setHouseTutorialStage(3);
     return;
   }
 
   if(houseTutorialStage===3){
-    if(player.crouched) setHouseTutorialStage(4);
-    return;
-  }
-
-  if(houseTutorialStage===4){
-    const sprintDistance=Math.hypot(
-      player.pos.x-houseTutorialStartX,
-      player.pos.z-houseTutorialStartZ
-    );
+    const sprintDistance=Math.hypot(player.pos.x-houseTutorialStartX,player.pos.z-houseTutorialStartZ);
     const sprinting=player.isRunning && Math.hypot(player.vel.x,player.vel.z)>2.0;
-    if(sprinting && sprintDistance>=4.0) setHouseTutorialStage(5);
+    if(sprinting && sprintDistance>=4.0) setHouseTutorialStage(4);
     return;
   }
 
-  if(houseTutorialStage<8) return;
+  if(houseTutorialStage<7) return;
 
   if(!houseTutorialSpiderPrepared && !prepareHouseTutorialSpider()){
     return;
@@ -6190,12 +6273,12 @@ function updateHouseTutorialSpider(dt){
   houseTutorialSpiderTime+=dt;
   const result=spiderHunter.updateTutorial(dt,player);
 
-  if(houseTutorialStage===8 && result.triggered){
+  if(houseTutorialStage===7 && result.triggered){
     startHouseTutorialSpiderChase();
     return;
   }
 
-  if(houseTutorialStage===9 && result.finished){
+  if(houseTutorialStage===8 && result.finished){
     finishHouseTutorialSpiderChase();
     return;
   }
@@ -6367,12 +6450,13 @@ function showSpiderScareMessage(message,duration=900){
   },duration);
 }
 
-function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15){
+function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15,requireVisibleSpawn=false){
   if(!multiplayer.isWorldAuthority() || tutorialOpenRoomActive || houseMode) return false;
 
-  const spawn=
-    findSpiderVisibleSpawnPosition(minDistance,maxDistance) ||
-    findSpiderSpawnPosition(minDistance,maxDistance);
+  const spawn=requireVisibleSpawn
+    ? findSpiderVisibleSpawnPosition(minDistance,maxDistance)
+    : (findSpiderVisibleSpawnPosition(minDistance,maxDistance) ||
+       findSpiderSpawnPosition(minDistance,maxDistance));
   if(!spawn) return false;
 
   const position=new THREE.Vector3(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
@@ -6636,14 +6720,14 @@ function moveSpiderTowardPlayer(dt){
 
   spiderPathRepathTimer=Math.max(0,spiderPathRepathTimer-dt);
 
-  const targetShift=Number.isFinite(spiderPathTargetX)
-    ? Math.hypot(player.pos.x-spiderPathTargetX,player.pos.z-spiderPathTargetZ)
-    : Infinity;
-
+  // Path-grid construction checks hundreds of collision cells synchronously.
+  // Always respect the repath timer while a path exists; letting targetShift
+  // bypass it can rebuild the whole A* grid repeatedly during a chase and stall
+  // the browser's main thread. A fresh path is still built immediately when
+  // none exists, and the timer is reset after each successful build.
   if(
     !spiderPath.length ||
     spiderPathRepathTimer<=0 ||
-    targetShift>SPIDER_PATH_TARGET_SHIFT ||
     spiderPathIndex>=spiderPath.length
   ){
     buildSpiderPath();
@@ -6878,6 +6962,21 @@ function normalSpiderHitboxTouchesPlayer(){
   return normalSpiderHitboxDistanceTo(player.pos.x,player.pos.z)<=SPIDER_HITBOX_PADDING;
 }
 
+function findSpiderCaughtHeadBone(){
+  if(!spiderModel) return null;
+  const candidates=[];
+  spiderModel.traverse(obj=>{
+    if(!obj.isBone) return;
+    const name=String(obj.name||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(/head|neck|cephalothorax|prosoma|maw|jaw/.test(name)){
+      const score=/head/.test(name)?0:/neck/.test(name)?1:/jaw|maw/.test(name)?2:3;
+      candidates.push({bone:obj,score});
+    }
+  });
+  candidates.sort((a,b)=>a.score-b.score);
+  return candidates[0]?.bone||null;
+}
+
 function startSpiderCatchFreeze(){
   spiderCaughtFreezeTimer=SPIDER_CAUGHT_FREEZE_TIME;
   spiderCaughtFlashlightWasOn=flashlightOn;
@@ -6893,7 +6992,25 @@ function startSpiderCatchFreeze(){
   spiderCaughtElapsed=0;
   spiderCaughtStartYaw=player.yaw;
   spiderCaughtStartPitch=player.pitch;
+  spiderCaughtFlashlightStartPosition=player.proceduralArmFlashlight.position.clone();
+  spiderCaughtFlashlightStartRotation=player.proceduralArmFlashlight.rotation.clone();
+  spiderCaughtHeadBone=findSpiderCaughtHeadBone();
+  spiderCaughtHeadBaseRotation=spiderCaughtHeadBone ? spiderCaughtHeadBone.rotation.clone() : null;
   spiderCaughtPlayerPosition.copy(player.pos);
+  spiderCaughtSpiderPosition.copy(spiderEntity.position);
+  spiderCaughtCameraStartY=player.camera.position.y;
+  // Give the player a brief instinctive step backward, away from the spider,
+  // before the bite lands. The retreat is animated from the captured position
+  // each frame, so it cannot accumulate or fight the movement-freeze logic.
+  spiderCaughtRetreatDirection.set(
+    player.pos.x-spiderEntity.position.x,
+    0,
+    player.pos.z-spiderEntity.position.z
+  );
+  if(spiderCaughtRetreatDirection.lengthSq()<0.0001){
+    spiderCaughtRetreatDirection.set(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
+  }
+  spiderCaughtRetreatDirection.normalize();
   if(!arachnophobiaMode){
     if(!spiderCaughtBlackout){
       spiderCaughtBlackout=document.createElement("div");
@@ -6941,10 +7058,15 @@ function resetPlayerAfterSpiderCatch(){
   player.proceduralArmFlashlight.visible=equippedTool!=="radio";
   player.setFlashlightVisual(equippedTool!=="radio" && flashlightOn);
   flashlight.visible=equippedTool!=="radio" && flashlightOn && battery>0;
-  const teammate=multiplayer.getClosestBackroomsPlayerPosition(
-    player.pos.x,
-    player.pos.z
-  );
+  let teammate=null;
+  try{
+    teammate=multiplayer.getClosestBackroomsPlayerPosition(
+      player.pos.x,
+      player.pos.z
+    );
+  }catch(error){
+    console.warn("[DeepSeeker] Could not find teammate for spider respawn; using level start.",error);
+  }
 
   if(teammate){
     const dx=player.pos.x-teammate.x;
@@ -6977,6 +7099,17 @@ function resetPlayerAfterSpiderCatch(){
   spiderJumpscareScale=1;
   spiderCaughtElapsed=0;
   player.camera.rotation.z=0;
+  if(player.proceduralArmFlashlight && spiderCaughtFlashlightStartPosition && spiderCaughtFlashlightStartRotation){
+    player.proceduralArmFlashlight.position.copy(spiderCaughtFlashlightStartPosition);
+    player.proceduralArmFlashlight.rotation.copy(spiderCaughtFlashlightStartRotation);
+  }
+  spiderCaughtFlashlightStartPosition=null;
+  spiderCaughtFlashlightStartRotation=null;
+  if(spiderCaughtHeadBone && spiderCaughtHeadBaseRotation){
+    spiderCaughtHeadBone.rotation.copy(spiderCaughtHeadBaseRotation);
+  }
+  spiderCaughtHeadBone=null;
+  spiderCaughtHeadBaseRotation=null;
   if(spiderCaughtBlackout){
     const blackout=spiderCaughtBlackout;
     spiderCaughtBlackout=null;
@@ -8415,8 +8548,8 @@ function toggleFlashlight(){
   updateEquipmentStatus();
   multiplayer.sendState(true);
 
-  if(!houseMode && gameStarted && houseTutorialStage===5 && flashlightOn){
-    setHouseTutorialStage(6);
+  if(!houseMode && gameStarted && houseTutorialStage===4 && flashlightOn){
+    setHouseTutorialStage(5);
   }
 }
 function refreshPhoneContent(){
@@ -8704,9 +8837,10 @@ function teleportAdminToRadio(){
 
 function togglePhone(){
   phoneOpen=!phoneOpen;
-  deepseekerAppOpen=false;
+  // Skip the phone launcher: open straight into DEEPSEEKER every time.
+  deepseekerAppOpen=phoneOpen;
   phone.classList.toggle("open",phoneOpen);
-  phone.classList.remove("app-open");
+  phone.classList.toggle("app-open",phoneOpen);
   phone.setAttribute("aria-hidden",String(!phoneOpen));
 
   if(phoneOpen){
@@ -8714,8 +8848,8 @@ function togglePhone(){
     crosshair.style.display="none";
     refreshPhoneContent();
 
-    if(!houseMode && gameStarted && houseTutorialStage===6){
-      setHouseTutorialStage(7);
+    if(!houseMode && gameStarted && houseTutorialStage===5){
+      setHouseTutorialStage(6);
     }
   }else{
     adminOverlay.classList.remove("open");
@@ -8724,8 +8858,8 @@ function togglePhone(){
     if(!houseMode && gameStarted){
       if(houseTutorialStage===0){
         setHouseTutorialStage(1);
-      }else if(houseTutorialStage===7){
-        setHouseTutorialStage(8);
+      }else if(houseTutorialStage===6){
+        setHouseTutorialStage(7);
       }
     }
 
@@ -8891,6 +9025,21 @@ adminSpiderChaseButton.addEventListener("click",()=>{
     adminPanelStatus.textContent="SPIDER LOADING — TRY AGAIN IN A MOMENT";
   }else{
     adminPanelStatus.textContent="COULD NOT SPAWN SPIDER — TRY A CLEARER AREA";
+  }
+});
+adminSpiderFrontButton.addEventListener("click",()=>{
+  if(!adminUnlocked)return;
+  if(!gameStarted){adminPanelStatus.textContent="START A GAME FIRST";return;}
+  if(houseMode||tutorialOpenRoomActive||poolroomsActive){
+    adminPanelStatus.textContent="FRONT SPAWN ONLY WORKS IN THE MAIN BACKROOMS";return;
+  }
+  if(!multiplayer.isWorldAuthority()){adminPanelStatus.textContent="ONLY THE HOST CAN SPAWN THE SPIDER";return;}
+  if(spiderActive){adminPanelStatus.textContent="SPIDER IS ALREADY ACTIVE";return;}
+  if(!spiderLoaded){ensureSpiderLoading();adminPanelStatus.textContent="SPIDER LOADING — TRY AGAIN IN A MOMENT";return;}
+  if(startTutorialStyleBackroomsSpider(5,7,true)){
+    adminPanelStatus.textContent="SPIDER SPAWNED IN FRONT OF YOU";
+  }else{
+    adminPanelStatus.textContent="NO CLEAR SPAWN IN FRONT — MOVE AWAY FROM THE WALL AND RETRY";
   }
 });
 adminWaterGunButton.addEventListener("click",()=>{ if(adminUnlocked) setAdminTool("waterGun"); });
@@ -9656,7 +9805,37 @@ function animate(){
 
         if(spiderCaughtFreezeTimer>0){
           player.movementFrozen=true;
-          player.pos.copy(spiderCaughtPlayerPosition);
+          // Three distinct beats: the player scrambles far backward, the
+          // spider deliberately walks them down, then bites and drags them in
+          // several uneven pulls. Keep the mouth in front throughout the drag.
+          const diveProgress=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.78);
+          const diveDistance=diveProgress*3.6;
+          const approachProgress=THREE.MathUtils.smoothstep(
+            spiderCaughtElapsed,.78,2.38
+          );
+          const startingGap=spiderCaughtPlayerPosition.distanceTo(spiderCaughtSpiderPosition);
+          const approachDistance=Math.max(0,startingGap+diveDistance-.82);
+          const spiderLungeDistance=approachProgress*approachDistance;
+          const dragStart=THREE.MathUtils.smoothstep(
+            spiderCaughtElapsed,SPIDER_CAUGHT_BITE_TIME,2.82
+          );
+          // Several short, cumulative tugs move the player in visible stages
+          // instead of making the camera shake while the body stays still.
+          const dragDistance=
+            .48*THREE.MathUtils.smoothstep(spiderCaughtElapsed,2.62,2.92)+
+            .82*THREE.MathUtils.smoothstep(spiderCaughtElapsed,3.08,3.38)+
+            .76*THREE.MathUtils.smoothstep(spiderCaughtElapsed,3.62,3.92)+
+            .72*THREE.MathUtils.smoothstep(spiderCaughtElapsed,4.18,4.48);
+          // The same backward travel is applied to spider and player after
+          // the bite, preserving a close mouth-to-player gap while dragging.
+          player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
+            spiderCaughtRetreatDirection,
+            diveDistance-dragDistance
+          );
+          spiderEntity.position.copy(spiderCaughtSpiderPosition).addScaledVector(
+            spiderCaughtRetreatDirection,
+            spiderLungeDistance-dragDistance
+          );
           player.vel.set(0,0,0);
           player.keys.clear();
           player.jumpY=0;
@@ -9673,53 +9852,135 @@ function animate(){
             0,
             1
           );
-          // Hold a clear close-up bite beat first, then switch to a second
-          // attack pose as the spider pulls the player's view toward its mouth.
-          if(spiderCaughtElapsed>=SPIDER_CAUGHT_BITE_TIME && spiderAnimationState!=="attack2"){
-            setSpiderAnimation("attack2");
-          }
+          // The player recoils a step first; hold the bite animation long enough
+          // to read clearly, then transition into a longer, slower drag pose.
+          // Stay in the initial bite pose during the pull; attack2 looked like chewing.
           const drag=THREE.MathUtils.smoothstep(
             (spiderCaughtElapsed-SPIDER_CAUGHT_BITE_TIME)/
               (SPIDER_CAUGHT_FREEZE_TIME-SPIDER_CAUGHT_BITE_TIME),
             0,
             .88
           );
+          // Player yaw zero faces -Z, so negate the spider-relative
+          // direction when converting it to the camera's yaw convention.
           const mouthYaw=Math.atan2(
-            spiderEntity.position.x-player.pos.x,
-            spiderEntity.position.z-player.pos.z
+            player.pos.x-spiderEntity.position.x,
+            player.pos.z-spiderEntity.position.z
           );
           const yawDelta=Math.atan2(
             Math.sin(mouthYaw-spiderCaughtStartYaw),
             Math.cos(mouthYaw-spiderCaughtStartYaw)
           );
-          // The bite lands before the pull begins. The camera then follows
-          // the spider's mouth, pitching down and turning into the grab while
-          // retaining the existing hand/torch drag motion.
+          // Keep the initial attack as a bite, then carry that bite through
+          // the drag. Switching to attack2 here reads as repeated chewing.
+          // The camera follows the mouth as the spider pulls the player along.
           const biteHold=1-biteProgress;
-          player.yaw=spiderCaughtStartYaw+yawDelta*drag+
-            Math.sin(spiderCaughtElapsed*10)*.018*drag;
+          // The catch is staged: bite impact, a hard first yank, an uneven
+          // dragging struggle, then one final pull into the blackout.
+          const tugEnvelope=drag*(0.72+0.28*Math.sin(Math.PI*drag));
+          const tugPulse=(Math.sin(spiderCaughtElapsed*7.5)+
+            0.42*Math.sin(spiderCaughtElapsed*13.2))*tugEnvelope;
+          const impact=(time,spread)=>Math.exp(-Math.pow(
+            (spiderCaughtElapsed-time)/spread,2
+          ));
+          const firstYank=impact(2.78,.13);
+          const secondYank=impact(3.48,.18);
+          const finalYank=impact(4.32,.13);
+          const yank=firstYank*.9+secondYank*.68+finalYank*1.15;
+          // Keep the camera locked on the spider through the backward dive; the
+          // head drops only after the bite lands and the drag begins.
+          const lookAtSpider=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.28);
+          const fall=THREE.MathUtils.smoothstep(spiderCaughtElapsed,2.55,3.35);
+          const aimYaw=spiderCaughtStartYaw+yawDelta;
+          player.yaw=spiderCaughtStartYaw+
+            Math.atan2(Math.sin(aimYaw-spiderCaughtStartYaw),Math.cos(aimYaw-spiderCaughtStartYaw))*lookAtSpider+
+            Math.sin(spiderCaughtElapsed*10)*.018*drag+tugPulse*.018+yank*.035;
+          const lookPitch=THREE.MathUtils.clamp(
+            spiderCaughtStartPitch+Math.atan2(
+              spiderEntity.position.y-player.pos.y,
+              Math.max(.25,Math.hypot(
+                spiderEntity.position.x-player.pos.x,
+                spiderEntity.position.z-player.pos.z
+              ))
+            ),
+            -1.05,
+            .65
+          );
           player.pitch=THREE.MathUtils.clamp(
-            spiderCaughtStartPitch+drag*.98-biteHold*.05,
+            THREE.MathUtils.lerp(spiderCaughtStartPitch,lookPitch,lookAtSpider)+
+              fall*.72+drag*.12+
+              Math.sin(drag*Math.PI*2.1)*.025*drag+tugPulse*.012+yank*.025,
             -1.35,
             1.35
           );
+          // Lower the view as the player falls backward, keeping the spider
+          // in front of them while its attack animation plays.
+          player.camera.position.y=spiderCaughtCameraStartY-fall*.82;
+
+          // Let the spider's head/neck droop toward the player after the bite.
+          // The mixer updates first each frame, so apply this as a pose offset.
+          if(spiderCaughtHeadBone && spiderCaughtHeadBaseRotation){
+            const headDip=THREE.MathUtils.smoothstep(
+              (spiderCaughtElapsed-2.25)/.48,0,1
+            )*.62+Math.sin(spiderCaughtElapsed*7.8)*.035*drag;
+            spiderCaughtHeadBone.rotation.copy(spiderCaughtHeadBaseRotation);
+            spiderCaughtHeadBone.rotation.x+=headDip;
+            spiderCaughtHeadBone.rotation.z+=Math.sin(spiderCaughtElapsed*5.8)*.045*drag;
+
+          }else{
+            // Safe fallback for models without a named head/neck bone.
+            spiderEntity.rotation.x=THREE.MathUtils.smoothstep(
+              (spiderCaughtElapsed-2.25)/.48,0,1
+            )*.12;
+          }
           player.camera.rotation.z=Math.sin(drag*Math.PI)*.16+
-            drag*.09;
-          const lunge=0.14*Math.max(0,1-caughtProgress/.38);
-          const scramble=(Math.sin(spiderCaughtElapsed*11)*.008)+
-            (Math.sin(spiderCaughtElapsed*17)*.003);
+            fall*.18+drag*.09+tugPulse*.045+
+            Math.sin(spiderCaughtElapsed*8.3)*.018*drag+
+            (firstYank-secondYank+finalYank)*.07;
+
+          // Let the torch lag behind the player's head, swing out during each
+          // yank, then dip toward the floor as the spider drags them down.
+          // Its original camera-local pose is restored when the catch ends.
+          const torch=player.proceduralArmFlashlight;
+          if(torch && spiderCaughtFlashlightStartPosition && spiderCaughtFlashlightStartRotation){
+            const torchSide=Math.sin(spiderCaughtElapsed*8.8)*.045*drag+
+              (firstYank-secondYank+finalYank)*.095;
+            const torchDip=drag*.105+finalYank*.075+
+              Math.max(0,Math.sin(spiderCaughtElapsed*6.4))*.025*drag;
+            torch.position.set(
+              spiderCaughtFlashlightStartPosition.x+torchSide,
+              spiderCaughtFlashlightStartPosition.y-torchDip,
+              spiderCaughtFlashlightStartPosition.z+drag*.045+yank*.035
+            );
+            torch.rotation.set(
+              spiderCaughtFlashlightStartRotation.x+drag*.16+yank*.22,
+              spiderCaughtFlashlightStartRotation.y+torchSide*1.8,
+              spiderCaughtFlashlightStartRotation.z+
+                Math.sin(spiderCaughtElapsed*8.8)*.09*drag+
+                (firstYank-secondYank+finalYank)*.16
+            );
+          }
+          const lunge=0.18*Math.max(0,1-Math.abs(spiderCaughtElapsed-2.55)/.30);
+          const scramble=(Math.sin(spiderCaughtElapsed*7.2)*.005)+
+            (Math.sin(spiderCaughtElapsed*10.5)*.002)+tugPulse*.005+yank*.008;
           spiderEntity.scale.setScalar(1+lunge+scramble);
-          // Camera yaw points from the player toward the spider. The spider's
-          // own forward axis must face the opposite direction (toward the player),
-          // otherwise the attack clip presents its rear during the drag.
-          spiderEntity.rotation.y=mouthYaw+Math.PI+Math.sin(spiderCaughtElapsed*12)*.025;
+          // Use the same facing convention as the normal chase and pounce:
+          // atan2(player - spider) points the spider's front toward the player.
+          // Adding PI here turned the model around and dragged the player behind it.
+          spiderEntity.rotation.y=mouthYaw+Math.sin(spiderCaughtElapsed*12)*.025;
+
           if(spiderCaughtBlackout){
             spiderCaughtBlackout.style.opacity=String(
               THREE.MathUtils.smoothstep(caughtProgress,.76,1)
             );
           }
-          if(spiderCaughtFreezeTimer<=0){
-            player.movementFrozen=false;
+          // Use elapsed time as a second completion guard. If the countdown
+          // is interrupted or desynchronised, the catch must still release the
+          // player and run the respawn cleanup after the animation completes.
+          if(
+            spiderCaughtFreezeTimer<=0 ||
+            spiderCaughtElapsed>=SPIDER_CAUGHT_FREEZE_TIME
+          ){
             resetPlayerAfterSpiderCatch();
           }
         }else{
@@ -9800,6 +10061,25 @@ function animate(){
       spiderRevealLight.visible=false;
       spiderRevealLight.intensity=0;
     }
+  }
+
+
+  // Catch recovery must not depend on the spider still being active or this
+  // frame still being owned by the same multiplayer authority. Either can
+  // change during the staged animation and otherwise leave movement locked.
+  if(
+    player.movementFrozen &&
+    spiderCaughtElapsed>0 &&
+    (
+      spiderCaughtFreezeTimer<=0 ||
+      spiderCaughtElapsed>=SPIDER_CAUGHT_FREEZE_TIME ||
+      !spiderActive ||
+      !multiplayer.isWorldAuthority() ||
+      houseMode ||
+      tutorialOpenRoomActive
+    )
+  ){
+    resetPlayerAfterSpiderCatch();
   }
 
   publishMultiplayerSpiderSnapshot(dt);

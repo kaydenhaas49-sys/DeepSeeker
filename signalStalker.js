@@ -83,6 +83,8 @@ export class SignalStalkerRig {
     this.legs = [];
     this.jaws = [];
     this.phase = 0;
+    this.motionIntensity = 0;
+    this.motionAcceleration = 0;
 
     this.buildBody();
     this.buildLegRig();
@@ -609,14 +611,26 @@ export class SignalStalkerRig {
 
     const enraged = mode === "enrage";
     const hunting = enraged || mode === "hunt";
+    const targetMotion = moving ? THREE.MathUtils.clamp(moveSpeed / 4.8, 0.18, 1) : 0;
+    const previousMotion = this.motionIntensity;
+    this.motionIntensity = THREE.MathUtils.damp(
+      this.motionIntensity, targetMotion, moving ? 5.5 : 3.2, dt
+    );
+    this.motionAcceleration = dt > 0.0001
+      ? (this.motionIntensity - previousMotion) / dt
+      : 0;
+
     this.root.position.y = this.baseGroundY + (moving
-      ? Math.sin(this.phase * 2) * 0.012
+      ? Math.sin(this.phase * 2) * 0.012 * this.motionIntensity
       : Math.sin(this.phase * 0.65) * 0.002);
-    this.body.rotation.x = enraged
-      ? 0.055 + Math.sin(this.phase * 3.5) * 0.028
-      : moving ? Math.sin(this.phase) * 0.025 : 0.016 + Math.sin(this.phase * 1.4) * 0.008;
+    // The thorax settles a fraction behind starts/stops, with a restrained
+    // lateral sway instead of the same fixed bob at every movement speed.
+    this.body.rotation.x = (enraged ? 0.055 : moving ? 0 : 0.016) +
+      Math.sin(this.phase * (enraged ? 3.5 : 1.8)) *
+        (enraged ? 0.028 : 0.012 + this.motionIntensity * 0.012) -
+      THREE.MathUtils.clamp(this.motionAcceleration, -2, 2) * 0.012;
     this.body.rotation.z = moving
-      ? Math.sin(this.phase * 0.7) * 0.018
+      ? Math.sin(this.phase * 0.7) * 0.018 * this.motionIntensity
       : Math.sin(this.phase * 1.25) * 0.012;
     this.body.scale.setScalar(enraged ? 1.025 : 1);
     // The eyes catch light like glossy cuticle rather than glowing like LEDs.
@@ -632,11 +646,29 @@ export class SignalStalkerRig {
 
     for (const leg of this.legs) {
       const phase = this.phase + leg.phase;
-      const stride = moving ? Math.sin(phase) * 0.095 : Math.sin(phase) * 0.008;
-      const lift = moving ? Math.max(0, Math.cos(phase)) * 0.046 : 0;
       const foot = leg.footBase.clone();
-      foot.z += stride * (leg.row < 2 ? 1 : -1);
-      foot.y += lift;
+      let lift = 0;
+      if (moving) {
+        // A longer stance phase gives each foot a readable plant, followed by
+        // a quicker lifted recovery instead of a continuous sinusoidal slide.
+        const cycle = ((phase / (Math.PI * 2)) % 1 + 1) % 1;
+        const stance = 0.62;
+        let stride;
+        if (cycle < stance) {
+          const stanceProgress = cycle / stance;
+          stride = THREE.MathUtils.lerp(0.095, -0.095, stanceProgress);
+        } else {
+          const swingProgress = (cycle - stance) / (1 - stance);
+          const easedSwing = swingProgress * swingProgress * (3 - 2 * swingProgress);
+          stride = THREE.MathUtils.lerp(-0.095, 0.095, easedSwing);
+          lift = Math.sin(Math.PI * swingProgress) * 0.075;
+        }
+        foot.z += stride * (leg.row < 2 ? 1 : -1) * this.motionIntensity;
+        foot.y += lift * this.motionIntensity;
+      } else {
+        // Idle feet barely shift; the legs don't keep pretending to walk.
+        foot.z += Math.sin(phase) * 0.003;
+      }
 
       const knee = new THREE.Vector3(
         (leg.hip.x + foot.x) * 0.50 + leg.side * 0.25,

@@ -9,8 +9,8 @@ const ASSETS = Object.freeze({
 
 const RELAYS = Object.freeze([
   { id: 0, title: "FIELD RADIO", x: -80, z: -92, device: "radio" },
-  { id: 1, title: "SIGNAL RELAY 02", x: -80, z: -238, device: "transmitter" },
-  { id: 2, title: "SIGNAL RELAY 03", x: -80, z: -394, device: "transmitter" },
+  { id: 1, title: "SIGNAL RELAY 02", x: 240, z: -280, device: "transmitter" },
+  { id: 2, title: "SIGNAL RELAY 03", x: -280, z: 420, device: "transmitter" },
 ]);
 
 function makeBox(parent, name, w, h, d, x, y, z, material) {
@@ -192,6 +192,36 @@ function buildRelayDevice(station, relay, baseMaterial) {
       amberLed,0.16,0.405,0.272);
     addDeviceMesh(root,"RadioChannelButton",new THREE.CylinderGeometry(0.016,0.016,0.018,12),
       rubber,0.18,0.45,0.259,[Math.PI/2,0,0]);
+
+    // Small analog tuning scale makes the face read like rugged field equipment,
+    // rather than a plain rectangular prop.
+    addDeviceMesh(root,"RadioTuningScaleBed",new RoundedBoxGeometry(0.16,0.052,0.008,3,0.002),
+      rubber,0.225,0.615,0.232);
+    for(let i=0;i<9;i++){
+      const x=0.158+i*0.017;
+      addDeviceMesh(root,"RadioTuningTick",new THREE.BoxGeometry(0.003, i%2===0?0.022:0.012,0.003),
+        i===4?amberLed:edgeMetal,x,0.615+(i%2===0?0.002:0),0.239);
+    }
+    addDeviceMesh(root,"RadioTuningNeedle",new THREE.BoxGeometry(0.004,0.034,0.004),
+      amberLed,0.225,0.617,0.243);
+
+    // Reinforced top handle and a short, flexible lead tucked beside the housing.
+    addDeviceMesh(root,"RadioCarryHandleFoot",new THREE.CylinderGeometry(0.024,0.027,0.045,12),
+      trim,-0.235,0.875,-0.075);
+    addDeviceMesh(root,"RadioCarryHandleFootRight",new THREE.CylinderGeometry(0.024,0.027,0.045,12),
+      trim,0.115,0.875,-0.075);
+    addDeviceTube(root,"RadioCarryHandleGrip",
+      [[-0.235,0.88,-0.075],[-0.225,0.965,-0.075],[-0.18,0.99,-0.075],[-0.015,0.99,-0.075],[0.07,0.965,-0.075],[0.115,0.88,-0.075]],
+      0.014,rubber);
+    addDeviceTube(root,"RadioCoiledLead",
+      [[-0.37,0.43,-0.015],[-0.43,0.39,-0.02],[-0.44,0.33,-0.06],[-0.42,0.27,-0.10],[-0.35,0.25,-0.13],[-0.28,0.27,-0.15]],
+      0.012,rubber);
+    addDeviceMesh(root,"RadioBeltClip",new RoundedBoxGeometry(0.09,0.28,0.018,4,0.006),
+      edgeMetal,0,0.51,-0.188,[0.12,0,0]);
+
+    // Add a worn rubber antenna tip and a small base collar.
+    addDeviceMesh(root,"RadioAntennaCollar",new THREE.CylinderGeometry(0.013,0.018,0.045,12),
+      rubber,0.285,1.285,-0.085,[0,0,-0.035]);
   }else{
     addDeviceMesh(root,"TransmitterCabinet",new RoundedBoxGeometry(0.91,1.10,0.49,5,0.045),
       housing,0,0.76,0);
@@ -547,6 +577,31 @@ export class StoryMissionWorld {
     const gateMat = new THREE.MeshStandardMaterial({ color: 0x6d766b, roughness: 0.8, metalness: 0.12 });
     const gateBarrierMat = new THREE.MeshStandardMaterial({ color: 0x373e38, roughness: 0.9 });
 
+    // A small set of claw gouges is embedded just above the floor along
+    // the approach to the radio. Keeping them on the floor avoids floating
+    // marks when procedural corridor walls are absent or offset.
+    const scratchGroove = new THREE.MeshBasicMaterial({
+      color: 0x332b1d, transparent: true, opacity: 0.72,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const scratchTrail = [-54, -67, -79, -87];
+    for (let groupIndex = 0; groupIndex < scratchTrail.length; groupIndex++) {
+      const centerZ = scratchTrail[groupIndex];
+      for (let slash = 0; slash < 3; slash++) {
+        const groove = new THREE.Mesh(
+          new THREE.BoxGeometry(0.045, 0.009, 0.52 + (slash % 2) * 0.12),
+          scratchGroove
+        );
+        groove.name = "RadioApproachClawScratch";
+        groove.position.set(-80 + (slash - 1) * 0.24, 0.014, centerZ + (slash - 1) * 0.10);
+        groove.rotation.y = (slash - 1) * 0.10 + (groupIndex % 2 ? -0.04 : 0.04);
+        groove.renderOrder = 2;
+        groove.castShadow = false;
+        groove.receiveShadow = false;
+        this.root.add(groove);
+      }
+    }
+
     for (const relay of RELAYS) {
       const station = new THREE.Group();
       station.name = "StoryRelay_" + relay.id;
@@ -712,7 +767,7 @@ export class StoryMissionWorld {
     }
     if (this.poolroomsDoorCard) {
       this._updateCard(this.poolroomsDoorCard, "POOLROOMS",
-        unlocked ? "FINISH DEMO" : "3 RELAYS + BREAKERS + RUN",
+        unlocked ? "FINISH DEMO" : "3 RELAYS + BREAKERS",
         unlocked ? "GATE SEALED" : "LOCKED");
       this.poolroomsDoorCard.mesh.userData.interactable.prompt = unlocked
         ? "Finish the demo"

@@ -11,14 +11,6 @@ export const LEVELS = [
     depth: 0
   },
   {
-    id: "level-run",
-    name: "LEVEL RUN",
-    type: "setpiece",
-    profile: "industrial-run",
-    description: "Find the code and open the safe before the spider catches you.",
-    depth: 0.5
-  },
-  {
     id: "level-1",
     name: "LEVEL 1 · SERVICE",
     type: "procedural",

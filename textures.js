@@ -1,6 +1,6 @@
 // textures.js — procedural canvas textures (no external assets).
 // Every surface in the backrooms is drawn here at startup:
-//   wall    — mustard wallpaper, small repeating motif, dark baseboard strip
+//   wall    — aged yellow wallpaper with a faded botanical print
 //   floor   — warm beige carpet with fine noise
 //   ceiling — off-white drop tiles with a dark grid
 //   panel   — fluorescent fixture: dark frame + warm-white diffuser
@@ -27,89 +27,162 @@ function rng32(seed) {
   };
 }
 
-function makeWallpaper() {
-  const S = 256;
-  const c = document.createElement("canvas");
-  c.width = c.height = S;
-  const g = c.getContext("2d");
-  const rnd = rng32(101);
+// Blend the horizontal repeat edges of procedural wallpaper.
+// The wall UVs repeat along wall length; mismatched border pixels can look like black hairlines.
+function blendHorizontalTextureEdges(canvas, blend = 20) {
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const image = ctx.getImageData(0, 0, width, height);
+  const source = new Uint8ClampedArray(image.data);
+  const channels = 4;
+  const edgeWidth = Math.min(blend, Math.floor(width / 2));
 
-  // base golden-yellow
-  g.fillStyle = "#bfa93f";
-  g.fillRect(0, 0, S, S);
-
-  // A quiet, slightly faded print. Keep the pattern legible up close,
-  // but avoid the perfectly crisp, high-contrast repeat of a new game texture.
-  for (let y = 0; y < S / 16; y++) {
-    for (let x = 0; x < S / 16; x++) {
-      const px = x * 16 + 8 + (rnd() - 0.5) * 1.4;
-      const py = y * 16 + 8 + (rnd() - 0.5) * 1.4;
-      const worn = rnd();
-      if ((x + y) % 2 === 0) {
-        g.fillStyle = worn > 0.72 ? "rgba(105,94,43,0.30)" : "rgba(105,94,43,0.17)";
-        g.beginPath();
-        g.moveTo(px, py - 4);
-        g.lineTo(px + 3, py);
-        g.lineTo(px, py + 4);
-        g.lineTo(px - 3, py);
-        g.closePath();
-        g.fill();
-        g.fillStyle = "rgba(225,207,119,0.24)";
-        g.fillRect(px - 0.5, py - 0.5, 1, 1);
-      } else {
-        g.fillStyle = "rgba(226,207,120,0.20)";
-        g.fillRect(px - 3, py - 1, 1.5, 1);
-        g.fillRect(px + 2, py - 1, 1.5, 1);
-        g.fillStyle = "rgba(105,94,43,0.20)";
-        g.fillRect(px - 0.5, py + 2, 1, 1);
+  for (let y = 0; y < height; y++) {
+    for (let d = 0; d < edgeWidth; d++) {
+      const left = (y * width + d) * channels;
+      const right = (y * width + (width - 1 - d)) * channels;
+      const amount = 1 - d / edgeWidth;
+      for (let channel = 0; channel < 3; channel++) {
+        const average = (source[left + channel] + source[right + channel]) * 0.5;
+        image.data[left + channel] = Math.round(
+          source[left + channel] * (1 - amount) + average * amount
+        );
+        image.data[right + channel] = Math.round(
+          source[right + channel] * (1 - amount) + average * amount
+        );
       }
     }
   }
 
-  // Subtle vertical fading and grime, with uneven edges like old wallpaper.
-  for (let i = 0; i < 22; i++) {
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+function makeWallpaper() {
+  // Match the wall texture to the real-world 4 m x 9 m wall UVs. A taller
+  // canvas keeps the printed motif the same size in both directions.
+  const S = 512;
+  const H = 1152;
+  const CELL = 32;
+  const c = document.createElement("canvas");
+  c.width = S;
+  c.height = H;
+  const g = c.getContext("2d");
+  const rnd = rng32(101);
+
+  // Warm, aged yellow paper rather than a flat, saturated mustard color.
+  g.fillStyle = "#c2af59";
+  g.fillRect(0, 0, S, H);
+
+  // Broad, very soft patches of faded pigment. Copy marks over the horizontal
+  // edge so the texture still joins cleanly when the wallpaper repeats.
+  for (let i = 0; i < 56; i++) {
     const x = rnd() * S;
-    const width = 2 + rnd() * 9;
-    const top = rnd() * 90;
-    const bottom = 120 + rnd() * 100;
-    const grad = g.createLinearGradient(x, top, x + width, bottom);
-    grad.addColorStop(0, "rgba(65,53,20,0)");
-    grad.addColorStop(0.45, `rgba(65,53,20,${0.025 + rnd() * 0.045})`);
-    grad.addColorStop(1, "rgba(65,53,20,0)");
-    g.fillStyle = grad;
-    g.fillRect(x, top, width, bottom - top);
+    const y = rnd() * H;
+    const r = 22 + rnd() * 74;
+    const light = rnd() > 0.53;
+    const alpha = 0.018 + rnd() * 0.036;
+    for (const ox of [-S, 0, S]) {
+      const px = x + ox;
+      const grad = g.createRadialGradient(px, y, 0, px, y, r);
+      grad.addColorStop(0, light
+        ? "rgba(245,227,157," + alpha + ")"
+        : "rgba(101,84,34," + alpha + ")");
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = grad;
+      g.fillRect(px - r, y - r, r * 2, r * 2);
+    }
   }
 
-  // A few fine scuffs and pinprick marks; sparse enough not to read as noise.
-  for (let i = 0; i < 85; i++) {
+  // Faded vintage wallpaper print: a small botanical/diamond repeat. Keep the
+  // ink muted and imperfect so it reads as old paper, not a crisp game grid.
+  for (let y = CELL / 2; y < H; y += CELL) {
+    for (let x = CELL / 2; x < S; x += CELL) {
+      const px = x + (rnd() - 0.5) * 2.0;
+      const py = y + (rnd() - 0.5) * 2.0;
+      const wear = rnd();
+      if (wear < 0.09) continue; // occasional faded-away print
+      const ink = 0.075 + rnd() * 0.075;
+      g.lineWidth = 0.8 + rnd() * 0.45;
+      g.strokeStyle = "rgba(103,88,42," + ink + ")";
+      g.beginPath();
+      g.moveTo(px, py - 11);
+      g.lineTo(px + 7, py);
+      g.lineTo(px, py + 11);
+      g.lineTo(px - 7, py);
+      g.closePath();
+      g.stroke();
+
+      // Four rounded petals and a tiny center make the repeat feel more like
+      // faded printed wallpaper than a row of identical diamonds.
+      g.beginPath();
+      g.moveTo(px, py - 8);
+      g.bezierCurveTo(px + 5, py - 5, px + 5, py - 2, px, py);
+      g.bezierCurveTo(px - 5, py - 2, px - 5, py - 5, px, py - 8);
+      g.moveTo(px, py + 8);
+      g.bezierCurveTo(px + 5, py + 5, px + 5, py + 2, px, py);
+      g.bezierCurveTo(px - 5, py + 2, px - 5, py + 5, px, py + 8);
+      g.moveTo(px - 6, py);
+      g.bezierCurveTo(px - 3, py - 4, px - 1, py - 4, px, py);
+      g.bezierCurveTo(px - 1, py + 4, px - 3, py + 4, px - 6, py);
+      g.moveTo(px + 6, py);
+      g.bezierCurveTo(px + 3, py - 4, px + 1, py - 4, px, py);
+      g.bezierCurveTo(px + 1, py + 4, px + 3, py + 4, px + 6, py);
+      g.stroke();
+
+      if (rnd() > 0.43) {
+        g.fillStyle = "rgba(239,220,145," + (0.08 + rnd() * 0.09) + ")";
+        g.fillRect(px - 1, py - 1, 2, 2);
+      }
+    }
+  }
+
+  // Uneven, translucent vertical fading and old damp marks. These are
+  // individual soft smudges, never continuous stripes across the wall.
+  for (let i = 0; i < 42; i++) {
     const x = rnd() * S;
-    const y = rnd() * (S * 0.78);
-    g.strokeStyle = rnd() > 0.5 ? "rgba(58,47,20,0.12)" : "rgba(244,224,145,0.13)";
-    g.lineWidth = 0.4 + rnd() * 0.7;
+    const width = 3 + rnd() * 13;
+    const top = rnd() * (H - 180);
+    const height = 65 + rnd() * 240;
+    const grad = g.createLinearGradient(x, top, x + width, top + height);
+    grad.addColorStop(0, "rgba(76,62,25,0)");
+    grad.addColorStop(0.28, "rgba(76,62,25," + (0.018 + rnd() * 0.025) + ")");
+    grad.addColorStop(0.68, "rgba(76,62,25," + (0.012 + rnd() * 0.021) + ")");
+    grad.addColorStop(1, "rgba(76,62,25,0)");
+    g.fillStyle = grad;
+    g.fillRect(x, top, width, height);
+  }
+
+  // Scuffs and small flecks from age and handling, sparse enough to disappear
+  // into the wall at a distance instead of turning into visual noise.
+  for (let i = 0; i < 190; i++) {
+    const x = rnd() * S;
+    const y = rnd() * H;
+    const len = 1.5 + rnd() * 8;
+    const drop = 1 + rnd() * 7;
+    g.strokeStyle = rnd() > 0.55
+      ? "rgba(71,57,24," + (0.045 + rnd() * 0.055) + ")"
+      : "rgba(255,238,171," + (0.07 + rnd() * 0.08) + ")";
+    g.lineWidth = 0.45 + rnd() * 0.55;
     g.beginPath();
     g.moveTo(x, y);
-    g.lineTo(x + (rnd() - 0.5) * 5, y + 1 + rnd() * 4);
+    g.lineTo(x + (rnd() - 0.5) * len, y + drop);
     g.stroke();
   }
 
-  // Fine paper grain.
-  for (let i = 0; i < 3400; i++) {
+  // Fine paper grain and slight print mottling.
+  for (let i = 0; i < 9800; i++) {
     const v = rnd();
-    g.fillStyle = v > 0.5 ? "rgba(255,244,180,0.045)" : "rgba(40,34,8,0.055)";
-    g.fillRect(rnd() * S, rnd() * S, 1, 1);
+    g.fillStyle = v > 0.54
+      ? "rgba(255,244,190," + (0.025 + rnd() * 0.035) + ")"
+      : "rgba(61,49,18," + (0.018 + rnd() * 0.035) + ")";
+    g.fillRect(rnd() * S, rnd() * H, 1, 1);
   }
 
-  // dark baseboard strip along the bottom (~15% of tile height)
-  const bb = Math.round(S * 0.15);
-  g.fillStyle = "#392c1a";
-  g.fillRect(0, S - bb, S, bb);
-  g.fillStyle = "#57452a";
-  g.fillRect(0, S - bb, S, 2); // top edge highlight
-  g.fillStyle = "rgba(0,0,0,0.25)";
-  g.fillRect(0, S - 3, S, 3); // floor contact shadow
-  return c;
+  // Keep the repeating edge seamless and free of dark hairline seams.
+  return blendHorizontalTextureEdges(c, 24);
 }
-
 function makeCarpet() {
   const S = 256;
   const c = document.createElement("canvas");
