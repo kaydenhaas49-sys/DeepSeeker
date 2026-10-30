@@ -1,24 +1,24 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261030-finish-pass4";
-import { createTextures } from "./textures.js?v=20261030-finish-pass4";
-import { Player } from "./player.js?v=20261030-finish-pass4";
-import { HorrorAudio } from "./audio.js?v=20261030-finish-pass4";
-import { Multiplayer } from "./multiplayer.js?v=20261030-finish-pass4";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261030-finish-pass5";
+import { createTextures } from "./textures.js?v=20261030-finish-pass5";
+import { Player } from "./player.js?v=20261030-finish-pass5";
+import { HorrorAudio } from "./audio.js?v=20261030-finish-pass5";
+import { Multiplayer } from "./multiplayer.js?v=20261030-finish-pass5";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import { flashlightFlicker } from "./character.js?v=20261030-finish-pass4";
-import { InteractionSystem } from "./interaction.js?v=20261030-finish-pass4";
-import { NavigationSystem } from "./navigation.js?v=20261030-finish-pass4";
-import { ComputerSystem } from "./computer.js?v=20261030-finish-pass4";
-import { SecurityCameraSystem } from "./securityCameras.js?v=20261030-finish-pass4";
-import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261030-finish-pass4";
-import { SpiderHunter } from "./spiderHunter.js?v=20261030-finish-pass4";
-import { StoryMissionWorld } from "./storyMission.js?v=20261030-finish-pass4";
+import { flashlightFlicker } from "./character.js?v=20261030-finish-pass5";
+import { InteractionSystem } from "./interaction.js?v=20261030-finish-pass5";
+import { NavigationSystem } from "./navigation.js?v=20261030-finish-pass5";
+import { ComputerSystem } from "./computer.js?v=20261030-finish-pass5";
+import { SecurityCameraSystem } from "./securityCameras.js?v=20261030-finish-pass5";
+import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261030-finish-pass5";
+import { SpiderHunter } from "./spiderHunter.js?v=20261030-finish-pass5";
+import { StoryMissionWorld } from "./storyMission.js?v=20261030-finish-pass5";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -3101,7 +3101,12 @@ function applySavedGame(data){
       // A save made during the chase resumes at the approach lesson so the
       // scripted spider encounter can be initialized cleanly after reload.
       const resumeStage=Math.min(savedTutorialStage,7);
-      if(resumeStage>=5){
+      if(resumeStage<=3){
+        tutorialLightsOutState="on";
+        tutorialLightsOutElapsed=0;
+        tutorialCeilingLightsOn=true;
+        tutorialFlickerAverage=1;
+      }else if(resumeStage>=5){
         tutorialLightsOutState="off";
         tutorialLightsOutElapsed=3.05;
         tutorialCeilingLightsOn=false;
