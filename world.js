@@ -1,7 +1,7 @@
 // world.js — seeded RNG, chunk layout generation, chunk meshes, chunk manager.
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { createTextures } from "./textures.js?v=20261030-finish-pass3";
+import { createTextures } from "./textures.js?v=20261030-finish-pass6";
 
 export const CELL = 4; // meters per grid cell
 export const CHUNK_CELLS = 16; // cells per chunk side
@@ -61,7 +61,8 @@ function isProtectedRouteCell(gx,gz){
   return (
     (gz >= 7 && gz <= 9 && gx >= -23 && gx <= 23) ||
     (gx >= -21 && gx <= -19 && gz >= MAP_MIN_CHUNK * CHUNK_CELLS && gz <= 8) ||
-    // Keep the scattered third signal relay on a clear 20 m approach pad.
+    // Keep the scattered signal relays on separate clear 20 m approach pads.
+    (gx >= 58 && gx <= 62 && gz >= -72 && gz <= -68) ||
     (gx >= -72 && gx <= -68 && gz >= 103 && gz <= 107)
   );
 }
