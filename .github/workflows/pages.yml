@@ -25,6 +25,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Validate JavaScript module syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          sources=(./*.js)
+          if (( ${#sources[@]} == 0 )); then
+            echo "No JavaScript modules were found."
+            exit 1
+          fi
+          for source in "${sources[@]}"; do
+            echo "Checking ${source}"
+            node --input-type=module --check < "${source}"
+          done
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
