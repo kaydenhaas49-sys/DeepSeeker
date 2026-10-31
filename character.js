@@ -123,25 +123,59 @@ export function loadHazmatCharacter(){
   if(!templatePromise){
     templatePromise=(async()=>{
       let staticFallback=null;
+      let bestRigged=null;
+      let bestScore=-1;
       const errors=[];
+      let sourceSkeleton=null;
+
+      try{
+        const pack=await loadUniversalAnimationPack();
+        sourceSkeleton=pack.sourceMesh.skeleton;
+      }catch(error){
+        console.warn("[DeepSeeker] UAL 1 skeleton unavailable during Hazmat selection:",error);
+      }
+
       for(const path of CHARACTER_PATHS){
         try{
           const gltf=await loadGLTFAsset(path);
           const scene=normalizeTemplate(gltf.scene);
           const skinnedMesh=findFirstSkinnedMesh(scene);
           const candidate={scene,animations:gltf.animations||[],skinnedMesh,path};
+
           if(skinnedMesh){
-            console.info("[DeepSeeker] selected rigged Hazmat asset",{
-              path,bones:skinnedMesh.skeleton.bones.length
+            const mapping=sourceSkeleton
+              ? buildUALBoneNameMap(skinnedMesh.skeleton,sourceSkeleton)
+              : {mappedBoneCount:0,requiredBoneCount:0};
+            const score=mapping.mappedBoneCount+mapping.requiredBoneCount*10;
+            candidate.mapping=mapping;
+            candidate.compatibilityScore=score;
+            console.info("[DeepSeeker] checked Hazmat rig compatibility",{
+              path,
+              targetBones:skinnedMesh.skeleton.bones.length,
+              mappedBones:mapping.mappedBoneCount,
+              requiredMatches:mapping.requiredBoneCount
             });
-            return candidate;
+            if(score>bestScore){
+              bestRigged=candidate;
+              bestScore=score;
+            }
+          }else if(!staticFallback){
+            staticFallback=candidate;
+            console.warn("[DeepSeeker] Hazmat asset has no usable skin:",path);
           }
-          if(!staticFallback) staticFallback=candidate;
-          console.warn("[DeepSeeker] Hazmat asset has no usable skin; trying next candidate:",path);
         }catch(error){
           errors.push({path,message:String(error?.message||error)});
           console.warn("[DeepSeeker] Hazmat asset failed to load:",path,error);
         }
+      }
+
+      if(bestRigged){
+        console.info("[DeepSeeker] selected best matching rigged Hazmat asset",{
+          path:bestRigged.path,
+          mappedBones:bestRigged.mapping.mappedBoneCount,
+          requiredMatches:bestRigged.mapping.requiredBoneCount
+        });
+        return bestRigged;
       }
       if(staticFallback){
         console.warn("[DeepSeeker] no rigged Hazmat asset loaded; using static fallback",staticFallback.path);
