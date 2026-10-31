@@ -47,6 +47,13 @@ function disposeRemoteCharacterInstance(model){
   });
 }
 
+function animationForRemoteState(state){
+  if(state?.crouched) return state.moving ? "Crouch_Fwd_Loop" : "Crouch_Idle_Loop";
+  if(state?.running && state?.moving) return "Sprint_Loop";
+  if(state?.moving) return "Walk_Loop";
+  return "Idle_Loop";
+}
+
 export class Multiplayer {
   constructor({ scene, player, getLevel, getFlashlightOn, onStatus, onCount, onRoster, onGameStart, onSharedFall, onChat, onWorldEvent }) {
     this.scene = scene;
@@ -154,7 +161,7 @@ export class Multiplayer {
     this.scene.remove(remote.group);
     if(remote.mixer && remote.model){
       remote.mixer.stopAllAction();
-      remote.mixer.uncacheRoot(remote.model);
+      remote.mixer.uncacheRoot(remote.mixer.getRoot());
     }
     disposeRemoteCharacterInstance(remote.model);
     if(remote.nameplate){
@@ -417,6 +424,9 @@ export class Multiplayer {
           ? "poolrooms"
           : "backrooms",
       crouched: Boolean(state?.crouched),
+      moving: Boolean(state?.moving),
+      running: Boolean(state?.running),
+      sliding: Boolean(state?.sliding),
       flashlight: Boolean(state?.flashlight),
       playerName: this.sanitizeName(state?.playerName || ""),
       fallSequence: Number.isFinite(fallSequence) ? fallSequence : 0,
@@ -552,6 +562,8 @@ export class Multiplayer {
         nameplate:null,
         lastChatSequence:this.normalizeState(player.state || {}).chatSequence,
         animationRefresh:0,
+        playAnimation:null,
+        animationName:"",
       };
 
       this.players.set(player.id, remote);
@@ -567,6 +579,9 @@ export class Multiplayer {
 
           remote.model = character.model;
           remote.mixer = character.mixer;
+          remote.playAnimation = character.playAnimation || null;
+          remote.animationName = "";
+          if(remote.playAnimation) remote.animationName=remote.playAnimation("Idle_Loop",0)||"";
           remote.flashlight = character.flashlight;
           remote.flashlightLens=character.flashlight?.getObjectByName?.("FlashlightLens")||null;
           remote.group.add(character.model);
@@ -656,6 +671,9 @@ export class Multiplayer {
       pitch: Number(this.player.pitch.toFixed(2)),
       level: this.getLevel?.()==="house" || this.getLevel?.()==="apartment" ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
+      moving: Math.hypot(this.player.vel.x,this.player.vel.z)>.35,
+      running: Boolean(this.player.isRunning),
+      sliding: Boolean(this.player.sliding),
       flashlight: Boolean(this.getFlashlightOn()),
       playerName: this.getPlayerName(),
       fallSequence: this.fallSequence,
@@ -677,6 +695,9 @@ export class Multiplayer {
       Math.abs(state.pitch - this.lastSent.pitch) > 0.03 ||
       state.level !== this.lastSent.level ||
       state.crouched !== this.lastSent.crouched ||
+      state.moving !== this.lastSent.moving ||
+      state.running !== this.lastSent.running ||
+      state.sliding !== this.lastSent.sliding ||
       state.flashlight !== this.lastSent.flashlight ||
       state.playerName !== this.lastSent.playerName ||
       state.fallSequence !== this.lastSent.fallSequence ||
@@ -723,6 +744,9 @@ export class Multiplayer {
       remote.current.pitch = remote.target.pitch;
       remote.current.level = remote.target.level;
       remote.current.crouched = remote.target.crouched;
+      remote.current.moving = remote.target.moving;
+      remote.current.running = remote.target.running;
+      remote.current.sliding = remote.target.sliding;
       remote.current.flashlight = remote.target.flashlight;
       remote.current.playerName = remote.target.playerName;
 
@@ -744,6 +768,11 @@ export class Multiplayer {
         remote.nameplate.material.opacity = sameLevel && nearby
           ? Math.min(1,Math.max(0,(45-Math.sqrt(dx*dx+dz*dz))/15))
           : 0;
+      }
+
+      const wantedAnimation=animationForRemoteState(remote.current);
+      if(remote.playAnimation && wantedAnimation!==remote.animationName){
+        remote.animationName=remote.playAnimation(wantedAnimation,.16)||wantedAnimation;
       }
 
       remote.animationRefresh=(remote.animationRefresh||0)+dt;

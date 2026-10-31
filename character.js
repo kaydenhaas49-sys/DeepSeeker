@@ -2,12 +2,19 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
-import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
+import { clone as cloneSkeleton, retargetClip } from "three/addons/utils/SkeletonUtils.js";
 
-const CHARACTER_PATH = "./assets/hazmat suit 3d model.glb";
+const CHARACTER_PATHS = [
+  "./assets/hazmat_suit_pack-_character_a.glb",
+  "./assets/backrooms_rigged_hazmat.glb",
+  "./assets/hazmat suit 3d model.glb"
+];
+const UAL_ANIMATION_PATH = "./projects/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb";
 const CHARACTER_HEIGHT = 1.8;
 
 let templatePromise = null;
+let animationPackPromise = null;
+let retargetedAnimationsPromise = null;
 
 function makeLoader(){
   const loader = new GLTFLoader();
@@ -97,30 +104,153 @@ function normalizeTemplate(scene){
   return scene;
 }
 
+function findFirstSkinnedMesh(root){
+  let found=null;
+  root?.traverse?.(object=>{
+    if(!found && object.isSkinnedMesh && object.skeleton?.bones?.length) found=object;
+  });
+  return found;
+}
+
+function loadGLTFAsset(path){
+  return new Promise((resolve,reject)=>{
+    const loader=makeLoader();
+    loader.load(path,resolve,undefined,reject);
+  });
+}
+
 export function loadHazmatCharacter(){
   if(!templatePromise){
-    templatePromise=new Promise((resolve,reject)=>{
-      const loader=makeLoader();
-
-      loader.load(
-        CHARACTER_PATH,
-        gltf=>{
-          try{
-            resolve({
-              scene:normalizeTemplate(gltf.scene),
-              animations:gltf.animations || []
+    templatePromise=(async()=>{
+      let staticFallback=null;
+      const errors=[];
+      for(const path of CHARACTER_PATHS){
+        try{
+          const gltf=await loadGLTFAsset(path);
+          const scene=normalizeTemplate(gltf.scene);
+          const skinnedMesh=findFirstSkinnedMesh(scene);
+          const candidate={scene,animations:gltf.animations||[],skinnedMesh,path};
+          if(skinnedMesh){
+            console.info("[DeepSeeker] selected rigged Hazmat asset",{
+              path,bones:skinnedMesh.skeleton.bones.length
             });
-          }catch(error){
-            reject(error);
+            return candidate;
           }
-        },
-        undefined,
-        reject
-      );
+          if(!staticFallback) staticFallback=candidate;
+          console.warn("[DeepSeeker] Hazmat asset has no usable skin; trying next candidate:",path);
+        }catch(error){
+          errors.push({path,message:String(error?.message||error)});
+          console.warn("[DeepSeeker] Hazmat asset failed to load:",path,error);
+        }
+      }
+      if(staticFallback){
+        console.warn("[DeepSeeker] no rigged Hazmat asset loaded; using static fallback",staticFallback.path);
+        return staticFallback;
+      }
+      throw new Error("No Hazmat character asset could be loaded: "+JSON.stringify(errors));
+    })();
+  }
+  return templatePromise;
+}
+
+function loadUniversalAnimationPack(){
+  if(!animationPackPromise){
+    animationPackPromise=(async()=>{
+      const gltf=await loadGLTFAsset(UAL_ANIMATION_PATH);
+      const sourceMesh=findFirstSkinnedMesh(gltf.scene);
+      if(!sourceMesh) throw new Error("UAL 1 GLB did not contain a skinned humanoid mesh");
+      gltf.scene.updateMatrixWorld(true);
+      console.info("[DeepSeeker] UAL 1 loaded",{
+        clips:gltf.animations?.length||0,
+        sourceBones:sourceMesh.skeleton.bones.length
+      });
+      return {scene:gltf.scene,sourceMesh,animations:gltf.animations||[]};
+    })();
+  }
+  return animationPackPromise;
+}
+
+function normalizeRigBoneName(name){
+  return String(name||"").toLowerCase().replace(/^mixamorig:?/,"").replace(/[^a-z0-9]/g,"");
+}
+
+function buildUALBoneNameMap(targetSkeleton,sourceSkeleton){
+  const sourceNames=new Map();
+  for(const bone of sourceSkeleton.bones) sourceNames.set(normalizeRigBoneName(bone.name),bone.name);
+  const aliases={
+    hips:"pelvis",hip:"pelvis",spine:"spine_01",spine1:"spine_02",spine2:"spine_03",
+    neck:"neck_01",leftshoulder:"clavicle_l",rightshoulder:"clavicle_r",
+    leftarm:"upperarm_l",rightarm:"upperarm_r",leftupperarm:"upperarm_l",rightupperarm:"upperarm_r",
+    leftforearm:"lowerarm_l",rightforearm:"lowerarm_r",leftlowerarm:"lowerarm_l",rightlowerarm:"lowerarm_r",
+    lefthand:"hand_l",righthand:"hand_r",leftupleg:"thigh_l",rightupleg:"thigh_r",
+    leftthigh:"thigh_l",rightthigh:"thigh_r",leftleg:"calf_l",rightleg:"calf_r",
+    leftcalf:"calf_l",rightcalf:"calf_r",leftfoot:"foot_l",rightfoot:"foot_r",
+    lefttoebase:"ball_l",righttoebase:"ball_r"
+  };
+  for(const [side,letter] of [["left","l"],["right","r"]]){
+    for(const [finger,sourceFinger] of [
+      ["index","index"],["middle","middle"],["ring","ring"],["pinky","pinky"],["thumb","thumb"]
+    ]){
+      for(let segment=1;segment<=3;segment++){
+        aliases[side+"hand"+finger+segment]=sourceFinger+"_0"+segment+"_"+letter;
+      }
+    }
+  }
+  const names={},matchedSourceNames=new Set(),required=[
+    "hips","spine","leftarm","rightarm","leftforearm","rightforearm",
+    "leftupleg","rightupleg","leftleg","rightleg"
+  ];
+  const matchedRequired=new Set();
+  for(const targetBone of targetSkeleton.bones){
+    const token=normalizeRigBoneName(targetBone.name);
+    const mappedName=aliases[token]||sourceNames.get(token);
+    if(!mappedName) continue;
+    const actualSourceName=sourceNames.get(normalizeRigBoneName(mappedName));
+    if(!actualSourceName) continue;
+    names[targetBone.name]=actualSourceName;
+    matchedSourceNames.add(actualSourceName);
+    if(required.includes(token)) matchedRequired.add(token);
+  }
+  return {names,mappedBoneCount:Object.keys(names).length,requiredBoneCount:matchedRequired.size,matchedSourceNames:[...matchedSourceNames]};
+}
+
+function retargetUALClips(targetMesh,sourceMesh,sourceClips){
+  const mapping=buildUALBoneNameMap(targetMesh.skeleton,sourceMesh.skeleton);
+  if(mapping.mappedBoneCount<8||mapping.requiredBoneCount<6){
+    console.warn("[DeepSeeker] UAL retarget skipped: Hazmat skeleton match is too small",{
+      targetBones:targetMesh.skeleton.bones.length,sourceBones:sourceMesh.skeleton.bones.length,
+      mappedBones:mapping.mappedBoneCount,requiredMatches:mapping.requiredBoneCount
+    });
+    return {clips:{},mapping};
+  }
+  const wanted=new Set(["Idle_Loop","Walk_Loop","Sprint_Loop","Crouch_Fwd_Loop","Crouch_Idle_Loop"]);
+  const clips={};
+  for(const clip of sourceClips){
+    if(!wanted.has(clip.name)) continue;
+    try{
+      clips[clip.name]=retargetClip(targetMesh,sourceMesh,clip,{
+        names:mapping.names,hip:"pelvis",preservePosition:true,preserveHipPosition:true
+      });
+    }catch(error){
+      console.warn("[DeepSeeker] UAL clip retarget failed:",clip.name,error);
+    }
+  }
+  targetMesh.skeleton.pose();
+  targetMesh.updateMatrixWorld(true);
+  return {clips,mapping};
+}
+
+function loadRetargetedUALAnimations(targetMesh){
+  if(!retargetedAnimationsPromise){
+    retargetedAnimationsPromise=(async()=>{
+      const pack=await loadUniversalAnimationPack();
+      return retargetUALClips(targetMesh,pack.sourceMesh,pack.animations);
+    })().catch(error=>{
+      retargetedAnimationsPromise=null;
+      throw error;
     });
   }
-
-  return templatePromise;
+  return retargetedAnimationsPromise;
 }
 
 function findRightHandBone(root){
@@ -891,22 +1021,52 @@ export async function createHazmatCharacter(){
   const model=cloneSkeleton(template.scene);
   cloneCharacterMaterials(model);
 
-  // The supplied rig has a bind-pose/animation combination that can
-  // snap back to a T-pose. Use a deterministic relaxed pose instead
-  // until a verified humanoid idle clip is available.
-  const idleClip=null;
-  const mixer=null;
-  const action=null;
+  const targetMesh=findFirstSkinnedMesh(model);
+  let mixer=null,action=null,idleClip=null,activeAction=null;
+  let retargetedAnimations={},animationNameMap={};
 
-  // Keep the authored bind pose on the full model; pose only the first-person clone.
+  if(targetMesh){
+    try{
+      const retargeted=await loadRetargetedUALAnimations(targetMesh);
+      retargetedAnimations=retargeted.clips;
+      animationNameMap=retargeted.mapping.names;
+      if(Object.keys(retargetedAnimations).length) mixer=new THREE.AnimationMixer(targetMesh);
+    }catch(error){
+      console.warn("[DeepSeeker] UAL 1 animation setup unavailable; keeping Hazmat rig static",error);
+    }
+  }else{
+    console.warn("[DeepSeeker] selected Hazmat model is not skinned; animation playback is disabled");
+  }
+
+  const actions={};
+  if(mixer){
+    for(const [name,clip] of Object.entries(retargetedAnimations)) actions[name]=mixer.clipAction(clip);
+    idleClip=retargetedAnimations.Idle_Loop||null;
+  }
+
+  const playAnimation=(name,fadeSeconds=.16)=>{
+    const next=actions[name]||actions.Idle_Loop||actions.Walk_Loop;
+    if(!next) return null;
+    if(activeAction===next) return next.getClip().name;
+    if(activeAction) activeAction.fadeOut(Math.max(0,fadeSeconds));
+    next.reset();
+    if(fadeSeconds>0) next.fadeIn(fadeSeconds);
+    next.play();
+    activeAction=next;
+    action=next;
+    return next.getClip().name;
+  };
+  if(actions.Idle_Loop) playAnimation("Idle_Loop",0);
+
   const flashlight=attachFlashlight(model);
+  console.info("[DeepSeeker] Hazmat character ready",{
+    rig:template.path,bones:targetMesh?.skeleton?.bones?.length||0,
+    retargetedClips:Object.keys(retargetedAnimations),
+    mappedBones:Object.keys(animationNameMap).length,flashlight:!!flashlight
+  });
 
   return {
-    model,
-    mixer,
-    action,
-    flashlight,
-    animations:template.animations,
-    idleClip
+    model,mixer,action,actions,playAnimation,flashlight,
+    animations:Object.values(retargetedAnimations),idleClip,rigPath:template.path
   };
 }
