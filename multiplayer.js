@@ -5,7 +5,7 @@ import {
   updateRemoteFlashlight,
   disposeRemoteFlashlight,
   flashlightFlicker
-} from "./character.js";
+} from "./character.js?v=20261031-ual-animations";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
