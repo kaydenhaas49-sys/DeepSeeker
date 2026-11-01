@@ -93,7 +93,7 @@ function normalizeTemplate(scene){
   const scaledBox = new THREE.Box3().setFromObject(scene);
   const center = scaledBox.getCenter(new THREE.Vector3());
 
-  // Original placement: center the model on X/Z and place its feet at Y=0.
+  // Center the model on X/Z and place its feet at the configured vertical offset.
   scene.position.x -= center.x;
   scene.position.z -= center.z;
   scene.position.y -= scaledBox.min.y - 0.75;
