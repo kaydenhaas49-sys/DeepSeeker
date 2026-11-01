@@ -11,6 +11,12 @@ const CHARACTER_PATHS = [
 ];
 const UAL_ANIMATION_PATH = "./projects/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb";
 const CHARACTER_HEIGHT = 1.8;
+// Extra model rotation in degrees. Adjust these to change the Hazmat's angle.
+const CHARACTER_ROTATION_DEGREES = {
+  x: 0, // Pitch: tilt forward or backward
+  y: 0, // Yaw: turn left or right
+  z: 0  // Roll: lean side to side
+};
 
 let templatePromise = null;
 let animationPackPromise = null;
@@ -76,18 +82,21 @@ function normalizeTemplate(scene){
   const scale = CHARACTER_HEIGHT / Math.max(size.y, 0.001);
 
   scene.scale.multiplyScalar(scale);
+
+  // Apply optional rotation before measuring bounds so the model stays
+  // centered and grounded even when an angle adjustment is used.
+  scene.rotation.x += THREE.MathUtils.degToRad(CHARACTER_ROTATION_DEGREES.x);
+  scene.rotation.y += THREE.MathUtils.degToRad(CHARACTER_ROTATION_DEGREES.y);
+  scene.rotation.z += THREE.MathUtils.degToRad(CHARACTER_ROTATION_DEGREES.z);
   scene.updateMatrixWorld(true);
 
   const scaledBox = new THREE.Box3().setFromObject(scene);
   const center = scaledBox.getCenter(new THREE.Vector3());
 
+  // Original placement: center the model on X/Z and place its feet at Y=0.
   scene.position.x -= center.x;
   scene.position.z -= center.z;
   scene.position.y -= scaledBox.min.y;
-
-  scene.position.x += 8.5;
-  scene.position.y += 0.5;
-  scene.position.z += 8.5;
   scene.updateMatrixWorld(true);
 
   scene.traverse(obj=>{

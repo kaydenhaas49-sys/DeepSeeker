@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { EYE, WALL_H } from "./world.js?v=20261030-finish-pass6";
-import { createHazmatCharacter } from "./character.js?v=20261101-hazmat-yz-swapped";
+import { createHazmatCharacter } from "./character.js?v=20261101-hazmat-angle-controls";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s

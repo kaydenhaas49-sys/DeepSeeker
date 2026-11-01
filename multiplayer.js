@@ -5,7 +5,7 @@ import {
   updateRemoteFlashlight,
   disposeRemoteFlashlight,
   flashlightFlicker
-} from "./character.js?v=20261101-hazmat-yz-swapped";
+} from "./character.js?v=20261101-hazmat-angle-controls";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
