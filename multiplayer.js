@@ -5,7 +5,7 @@ import {
   updateRemoteFlashlight,
   disposeRemoteFlashlight,
   flashlightFlicker
-} from "./character.js?v=20261101-flashlight-handfix";
+} from "./character.js?v=20261101-flashlight-beam-grip";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
