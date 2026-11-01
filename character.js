@@ -96,7 +96,7 @@ function normalizeTemplate(scene){
   // Center the model on X/Z and place its feet at the configured vertical offset.
   scene.position.x -= center.x;
   scene.position.z -= center.z;
-  scene.position.y -= scaledBox.min.y - 0.75;
+  scene.position.y -= scaledBox.min.y - 0.78;
   scene.updateMatrixWorld(true);
 
   scene.traverse(obj=>{
@@ -395,28 +395,67 @@ function loadRetargetedUALAnimations(targetMesh){
 }
 
 function findRightHandBone(root){
-  let best=null;
-
+  const candidates=[];
   root.traverse(obj=>{
-    if(!obj.isBone || best) return;
-    const n=(obj.name || "").toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(!obj.isBone) return;
 
-    if(
-      /righthand|rightwrist|handr$|wristr$|mixamorigrighthand/.test(n)
-    ){
-      best=obj;
-    }
+    const name=String(obj.name||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const token=name.replace(/^mixamorig/,"");
+
+    // Do not mistake a finger segment (for example RightHandIndex1) for
+    // the palm bone. The flashlight must be parented to the actual hand.
+    if(/index|middle|ring|pinky|little|thumb/.test(token)) return;
+
+    let score=0;
+    if(token==="righthand" || token==="handr" || token==="handright") score=100;
+    else if(token.endsWith("righthand")) score=95;
+    else if(token==="rightwrist" || token.endsWith("rightwrist")) score=85;
+    else if(token.endsWith("handr")) score=80;
+    else if(token.includes("righthand")) score=70;
+
+    if(score>0) candidates.push({bone:obj,score});
   });
 
-  if(best) return best;
+  candidates.sort((a,b)=>b.score-a.score);
+  return candidates[0]?.bone || null;
+}
 
-  root.traverse(obj=>{
-    if(!obj.isBone || best) return;
-    const n=(obj.name || "").toLowerCase();
-    if(/hand|wrist/.test(n)) best=obj;
-  });
+function getFlashlightHandPose(hand){
+  // Finger-base bones provide a reliable local direction from the wrist
+  // into the palm, even when the imported rig uses different bone axes.
+  const fingerBones=hand.children.filter(child=>
+    child.isBone && /(index|middle|ring|pinky|little)/i.test(child.name||"")
+  );
+  if(!fingerBones.length){
+    return {
+      position:new THREE.Vector3(0,0,-.13),
+      quaternion:new THREE.Quaternion(),
+      fingerCount:0
+    };
+  }
 
-  return best;
+  const palmCenter=new THREE.Vector3();
+  for(const finger of fingerBones) palmCenter.add(finger.position);
+  palmCenter.multiplyScalar(1/fingerBones.length);
+
+  const palmDirection=palmCenter.clone();
+  if(palmDirection.lengthSq()<1e-8){
+    return {
+      position:new THREE.Vector3(0,0,-.13),
+      quaternion:new THREE.Quaternion(),
+      fingerCount:fingerBones.length
+    };
+  }
+
+  palmDirection.normalize();
+  const beamAxis=new THREE.Vector3(0,0,-1);
+  const quaternion=new THREE.Quaternion().setFromUnitVectors(beamAxis,palmDirection);
+  return {
+    // Keep the grip around the middle of the palm, just past the wrist.
+    position:palmCenter.multiplyScalar(.42),
+    quaternion,
+    fingerCount:fingerBones.length
+  };
 }
 
 export function attachFlashlight(model){
@@ -445,12 +484,12 @@ export function attachFlashlight(model){
 
   const flashlight=new THREE.Group();
   flashlight.name="HeldFlashlight";
-  flashlight.position.set(.055,-.07,-.13);
-  flashlight.rotation.set(
-    THREE.MathUtils.degToRad(-8),
-    THREE.MathUtils.degToRad(-2),
-    THREE.MathUtils.degToRad(2)
-  );
+  const handPose=getFlashlightHandPose(hand);
+  flashlight.position.copy(handPose.position);
+  flashlight.quaternion.copy(handPose.quaternion);
+  flashlight.scale.setScalar(.72);
+  flashlight.userData.attachedHandBone=hand.name;
+  flashlight.userData.fingerGuideCount=handPose.fingerCount;
 
   const body=new THREE.Mesh(
     new THREE.CylinderGeometry(.055,.066,.50,10),
