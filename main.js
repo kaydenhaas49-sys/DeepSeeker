@@ -1418,10 +1418,10 @@ function updateMenuScene(t,dt){
 let FLASHLIGHT_BASE_DISTANCE=activeQualitySettings.flashlightDistance;
 const flashlight=new THREE.SpotLight(
   0xf0dfad,
-  LOW_END_PERFORMANCE?17:20,
+  LOW_END_PERFORMANCE?24:27,
   FLASHLIGHT_BASE_DISTANCE,
-  LOW_END_PERFORMANCE?Math.PI/6.0:Math.PI/6.6,
-  LOW_END_PERFORMANCE?.72:.68,
+  Math.PI/4.4,
+  .76,
   1.35
 );
 let ENABLE_SHADOWS=activeQualitySettings.shadows;
@@ -9968,7 +9968,7 @@ function animate(){
       ? THREE.MathUtils.lerp(1,.58,lowBattery*lowBatteryWave)
       : 1;
 
-  let flashlightStrength=20.0*flicker*lowBatteryDrop;
+  let flashlightStrength=27.0*flicker*lowBatteryDrop;
 
   if(flashlightOn && !houseMode && spiderActive){
     const spiderDistance=Math.hypot(
