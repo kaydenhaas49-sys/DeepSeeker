@@ -2,16 +2,16 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261030-finish-pass7";
 import { createTextures } from "./textures.js?v=20261030-finish-pass7";
-import { Player } from "./player.js?v=20261101-hazmat-pitch05";
+import { Player } from "./player.js?v=20261101-spider-mp-sync";
 import { HorrorAudio } from "./audio.js?v=20261030-finish-pass7";
-import { Multiplayer } from "./multiplayer.js?v=20261101-hazmat-pitch05";
+import { Multiplayer } from "./multiplayer.js?v=20261101-spider-mp-sync";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import { flashlightFlicker } from "./character.js?v=20261101-hazmat-pitch05";
+import { flashlightFlicker } from "./character.js?v=20261101-spider-mp-sync";
 import { InteractionSystem } from "./interaction.js?v=20261030-finish-pass7";
 import { NavigationSystem } from "./navigation.js?v=20261030-finish-pass7";
 import { ComputerSystem } from "./computer.js?v=20261030-finish-pass7";
@@ -3562,6 +3562,10 @@ const multiplayer=new Multiplayer({
         scale:THREE.MathUtils.clamp(finite(payload.scale,1),.1,3),
         behavior:String(payload.behavior||"idle").slice(0,24),
         animation:String(payload.animation||"idle").slice(0,24),
+        animationSequence:Math.max(0,Math.floor(finite(payload.animationSequence))),
+        animationTime:Math.max(0,finite(payload.animationTime)),
+        caught:Boolean(payload.caught),
+        caughtElapsed:Math.max(0,finite(payload.caughtElapsed)),
         jumpscareTimer:THREE.MathUtils.clamp(finite(payload.jumpscareTimer),0,2)
       };
       remoteSpiderSnapshotReceivedAt=performance.now();
@@ -5391,6 +5395,12 @@ let spiderSyncElapsed=0;
 let spiderSyncAuthorityId=null;
 let spiderSyncNeedsInitial=true;
 let spiderSyncLastActive=false;
+let spiderAnimationSequence=0;
+let remoteSpiderAnimationSequence=-1;
+let remoteSpiderAnimationSyncAt=0;
+let remoteSpiderCaughtActive=false;
+let remoteSpiderCaughtHeadBone=null;
+let remoteSpiderCaughtHeadBaseRotation=null;
 let remoteSpiderSnapshot=null;
 let remoteSpiderSnapshotReceivedAt=0;
 let remoteSpiderPositionInitialized=false;
@@ -5632,7 +5642,8 @@ const SPIDER_ANIMATION_ALIAS={
   runby:"walk",
   attack:"attack1",
   hit:"hit1",
-  death:"die1"
+  death:"die1",
+  drag:"walk"
 };
 
 
@@ -5966,7 +5977,7 @@ function fitSpiderModel(model){
   spiderModelHalfHeight=Math.max(.001,scaledSize.y*.5);
 }
 
-function setSpiderAnimation(name){
+function setSpiderAnimation(name,forceRestart=false){
   spiderWantedState=name;
 
   const requestedName=SPIDER_ANIMATION_ALIAS[name] || name;
@@ -5981,9 +5992,9 @@ function setSpiderAnimation(name){
     action=actualName ? spiderActions.get(actualName) : null;
   }
 
-  if(!action || !actualName || spiderAnimationState===actualName) return;
+  if(!action || !actualName || (!forceRestart && spiderAnimationState===actualName)) return;
 
-  const timeScale=name==="runby" ? 1.25 : name==="chase" ? 0.78 : (actualName==="attack1" || actualName==="attack2") ? 0.62 : 0.78;
+  const timeScale=name==="drag" ? 0.38 : name==="runby" ? 1.25 : name==="chase" ? 0.78 : (actualName==="attack1" || actualName==="attack2") ? 0.62 : 0.78;
   const transitionActions=(actions)=>{
     for(const [key,item] of actions){
       if(key===actualName){
@@ -6000,6 +6011,7 @@ function setSpiderAnimation(name){
   transitionActions(spiderActions);
   transitionActions(spiderOverlapActions);
   spiderAnimationState=actualName;
+  spiderAnimationSequence+=1;
 }
 
 function groundSpiderEntity(){
@@ -7226,7 +7238,8 @@ function startSpiderCatchFreeze(){
     player.pos.x-spiderEntity.position.x,
     player.pos.z-spiderEntity.position.z
   );
-  setSpiderAnimation("attack");
+  player.spiderCaught=true;
+  setSpiderAnimation("walk");
   pulse=1;
   eventText.textContent=arachnophobiaMode ? "CAUGHT. QUACK." : "IT GOT YOU.";
   eventText.style.opacity="1";
@@ -7237,6 +7250,7 @@ function resetPlayerAfterSpiderCatch(){
   hideSpiderDodgeQTE();
   spiderDodgeQTEResult=null;
   player.movementFrozen=false;
+  player.spiderCaught=false;
   spiderCaughtFreezeTimer=0;
   spiderCaughtFlashlightOverride=false;
   flashlightOn=spiderCaughtFlashlightWasOn;
@@ -9444,6 +9458,10 @@ function publishMultiplayerSpiderSnapshot(dt){
         active:false,
         behavior:"idle",
         animation:"idle",
+        animationSequence:spiderAnimationSequence,
+        animationTime:0,
+        caught:false,
+        caughtElapsed:0,
         x:spiderEntity.position.x,
         y:SPIDER_GROUND_OFFSET,
         z:spiderEntity.position.z,
@@ -9468,6 +9486,10 @@ function publishMultiplayerSpiderSnapshot(dt){
     active:true,
     behavior:spiderBehaviorState,
     animation:spiderBehaviorState==="peek" ? "static" : (spiderWantedState||"chase"),
+    animationSequence:spiderAnimationSequence,
+    animationTime:spiderActions.get(spiderAnimationState)?.time||0,
+    caught:spiderCaughtFreezeTimer>0,
+    caughtElapsed:spiderCaughtElapsed,
     x:spiderEntity.position.x,
     y:spiderEntity.position.y,
     z:spiderEntity.position.z,
@@ -9477,6 +9499,45 @@ function publishMultiplayerSpiderSnapshot(dt){
     scale:spiderEntity.scale.x,
     jumpscareTimer:spiderJumpscareTimer
   });
+}
+
+function resetRemoteSpiderCaughtPose(){
+  if(!remoteSpiderCaughtActive) return;
+  if(remoteSpiderCaughtHeadBone && remoteSpiderCaughtHeadBaseRotation){
+    remoteSpiderCaughtHeadBone.rotation.copy(remoteSpiderCaughtHeadBaseRotation);
+  }
+  remoteSpiderCaughtHeadBone=null;
+  remoteSpiderCaughtHeadBaseRotation=null;
+  remoteSpiderCaughtActive=false;
+}
+
+function applyRemoteSpiderCaughtPose(snapshot){
+  if(!snapshot?.caught){
+    resetRemoteSpiderCaughtPose();
+    return;
+  }
+  if(!remoteSpiderCaughtActive){
+    remoteSpiderCaughtHeadBone=findSpiderCaughtHeadBone();
+    remoteSpiderCaughtHeadBaseRotation=remoteSpiderCaughtHeadBone
+      ? remoteSpiderCaughtHeadBone.rotation.clone()
+      : null;
+    remoteSpiderCaughtActive=true;
+  }
+  if(!remoteSpiderCaughtHeadBone || !remoteSpiderCaughtHeadBaseRotation) return;
+
+  const packetAge=Math.min(.18,Math.max(0,(performance.now()-remoteSpiderSnapshotReceivedAt)/1000));
+  const elapsed=Math.max(0,snapshot.caughtElapsed+packetAge);
+  const drag=THREE.MathUtils.smoothstep(
+    (elapsed-SPIDER_CAUGHT_BITE_TIME)/
+      (SPIDER_CAUGHT_FREEZE_TIME-SPIDER_CAUGHT_BITE_TIME),
+    0,
+    .88
+  );
+  const headDip=THREE.MathUtils.smoothstep((elapsed-2.25)/.48,0,1)*.62+
+    Math.sin(elapsed*7.8)*.035*drag;
+  remoteSpiderCaughtHeadBone.rotation.copy(remoteSpiderCaughtHeadBaseRotation);
+  remoteSpiderCaughtHeadBone.rotation.x+=headDip;
+  remoteSpiderCaughtHeadBone.rotation.z+=Math.sin(elapsed*5.8)*.045*drag;
 }
 
 function applyRemoteSpiderSnapshot(dt){
@@ -9503,6 +9564,9 @@ function applyRemoteSpiderSnapshot(dt){
     spiderRevealLight.visible=false;
     if(spiderModel) spiderModel.visible=true;
     remoteSpiderPositionInitialized=false;
+    remoteSpiderAnimationSequence=-1;
+    remoteSpiderAnimationSyncAt=0;
+    resetRemoteSpiderCaughtPose();
     return;
   }
 
@@ -9529,14 +9593,34 @@ function applyRemoteSpiderSnapshot(dt){
   }
   spiderEntity.scale.setScalar(snapshot.scale);
   spiderEntity.visible=true;
-  if(snapshot.animation==="static"){
-    if(spiderAnimationState || spiderWantedState!=="stalk"){
-      spiderMixer?.stopAllAction();
-      spiderAnimationState="";
-      spiderWantedState="stalk";
+  const snapshotIsNew=remoteSpiderSnapshotReceivedAt!==remoteSpiderAnimationSyncAt;
+  if(snapshotIsNew){
+    remoteSpiderAnimationSyncAt=remoteSpiderSnapshotReceivedAt;
+    const sequenceChanged=snapshot.animationSequence!==remoteSpiderAnimationSequence;
+    if(snapshot.animation==="static"){
+      if(spiderAnimationState || spiderWantedState!=="stalk"){
+        spiderMixer?.stopAllAction();
+        spiderAnimationState="";
+        spiderWantedState="stalk";
+      }
+    }else{
+      if(sequenceChanged || spiderWantedState!==snapshot.animation || !spiderAnimationState){
+        setSpiderAnimation(snapshot.animation,sequenceChanged);
+      }
+      const clipName=SPIDER_ANIMATION_ALIAS[snapshot.animation]||snapshot.animation;
+      const action=spiderActions.get(clipName);
+      if(action && Number.isFinite(snapshot.animationTime)){
+        const targetTime=THREE.MathUtils.clamp(
+          snapshot.animationTime,
+          0,
+          action.getClip().duration
+        );
+        if(sequenceChanged || Math.abs(action.time-targetTime)>.18){
+          action.time=targetTime;
+        }
+      }
     }
-  }else if(spiderWantedState!==snapshot.animation || !spiderAnimationState){
-    setSpiderAnimation(snapshot.animation);
+    remoteSpiderAnimationSequence=snapshot.animationSequence;
   }
   spiderVisibleToPlayer=playerHasLineOfSightToSpider();
   // Let the renderer's depth buffer hide the model behind real walls. The
@@ -9988,6 +10072,15 @@ function animate(){
     }
   }
 
+  if(
+    !multiplayer.isWorldAuthority() && spiderActive && remoteSpiderSnapshot &&
+    performance.now()-remoteSpiderSnapshotReceivedAt<1200
+  ){
+    applyRemoteSpiderCaughtPose(remoteSpiderSnapshot);
+  }else{
+    resetRemoteSpiderCaughtPose();
+  }
+
   if(!tutorialOpenRoomActive){
     if(multiplayer.isWorldAuthority() && !houseMode){
       if(spiderActive){
@@ -10032,6 +10125,22 @@ function animate(){
           player.jumpVelocity=0;
           spiderCaughtElapsed+=dt;
           spiderCaughtFreezeTimer=Math.max(0,spiderCaughtFreezeTimer-dt);
+          const biteAction=spiderActions.get("attack1");
+          const biteDuration=biteAction ? biteAction.getClip().duration/.62 : .9;
+          const biteAnimationEnd=SPIDER_CAUGHT_BITE_TIME+
+            THREE.MathUtils.clamp(biteDuration,.65,1.1);
+          if(
+            spiderCaughtElapsed>=SPIDER_CAUGHT_BITE_TIME &&
+            spiderCaughtElapsed<biteAnimationEnd &&
+            spiderWantedState!=="attack"
+          ){
+            setSpiderAnimation("attack",true);
+          }else if(
+            spiderCaughtElapsed>=biteAnimationEnd &&
+            spiderWantedState!=="drag"
+          ){
+            setSpiderAnimation("drag",true);
+          }
           const caughtProgress=THREE.MathUtils.clamp(
             spiderCaughtElapsed/SPIDER_CAUGHT_FREEZE_TIME,
             0,
