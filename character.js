@@ -226,6 +226,12 @@ function normalizeRigBoneName(name){
   return value.replace(/[^a-z0-9]/g,"");
 }
 
+function isFingerRigBoneName(name){
+  const token=normalizeRigBoneName(name);
+  return token.includes("finger") ||
+    /(?:hand)?(?:thumb|index|middle|ring|pinky|little)(?:[0-9]+)?(?:[lr])?/.test(token);
+}
+
 function buildUALBoneNameMap(targetSkeleton,sourceSkeleton){
   const sourceNames=new Map();
   for(const bone of sourceSkeleton.bones) sourceNames.set(normalizeRigBoneName(bone.name),bone.name);
@@ -255,6 +261,10 @@ function buildUALBoneNameMap(targetSkeleton,sourceSkeleton){
   const matchedRequired=new Set();
   for(const targetBone of targetSkeleton.bones){
     const token=normalizeRigBoneName(targetBone.name);
+    // UAL finger rotations use a different local convention on this Hazmat
+    // rig and were bending the fingers backward. Keep the model's neutral
+    // bind-pose fingers instead of retargeting those joints.
+    if(isFingerRigBoneName(token)) continue;
     const mappedName=aliases[token]||sourceNames.get(token);
     if(!mappedName) continue;
     const actualSourceName=sourceNames.get(normalizeRigBoneName(mappedName));
@@ -1158,7 +1168,7 @@ export function createFirstPersonArms(model){
 
 export function createRemoteFlashlight(scene){
   const target=new THREE.Object3D();
-  const light=new THREE.SpotLight(0xf0dfad,27,60,Math.PI/5.5,.88,1.5);
+  const light=new THREE.SpotLight(0xf0dfad,35,60,Math.PI/4.4,.76,1.5);
   light.castShadow=false;
   scene.add(light);
   scene.add(target);
@@ -1181,7 +1191,7 @@ export function updateRemoteFlashlight(remoteLight, origin, yaw, pitch, enabled)
   );
   remoteLight.target.position.copy(origin).addScaledVector(remoteLight.direction,60);
   remoteLight.light.visible=enabled;
-  remoteLight.light.intensity=enabled ? 27 : 0;
+  remoteLight.light.intensity=enabled ? 35 : 0;
 }
 
 export function disposeRemoteFlashlight(scene, remoteLight){
