@@ -81,9 +81,13 @@ function normalizeTemplate(scene){
   const scaledBox = new THREE.Box3().setFromObject(scene);
   const center = scaledBox.getCenter(new THREE.Vector3());
 
-  scene.position.x -= center.x; 1
-  scene.position.z -= center.z; 1
-  scene.position.y -= scaledBox.min.y; 
+  scene.position.x -= center.x;
+  scene.position.z -= center.z;
+  scene.position.y -= scaledBox.min.y;
+
+  scene.position.x += 0.5;
+  scene.position.y += 0.5;
+  scene.position.z += 0.5;
   scene.updateMatrixWorld(true);
 
   scene.traverse(obj=>{
