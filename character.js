@@ -10,10 +10,10 @@ const CHARACTER_PATHS = [
   "./assets/hazmat suit 3d model.glb"
 ];
 const UAL_ANIMATION_PATH = "./projects/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb";
-const CHARACTER_HEIGHT = 1.8;
+const CHARACTER_HEIGHT = 0.6;
 // Extra model rotation in degrees. Adjust these to change the Hazmat's angle.
 const CHARACTER_ROTATION_DEGREES = {
-  x: -80, // Pitch: tilt forward or backward
+  x: -100, // Pitch: tilt forward or backward
   y: 0, // Yaw: turn left or right
   z: 0  // Roll: lean side to side
 };
