@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
-import { clone as cloneSkeleton, retargetClip } from "three/addons/utils/SkeletonUtils.js";
+import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
 
 const CHARACTER_PATHS = [
   "./assets/hazmat_suit_pack-_character_a.glb",
@@ -205,7 +205,12 @@ function loadUniversalAnimationPack(){
 }
 
 function normalizeRigBoneName(name){
-  return String(name||"").toLowerCase().replace(/^mixamorig:?/,"").replace(/[^a-z0-9]/g,"");
+  let value=String(name||"").toLowerCase();
+  // Mixamo exports append numeric IDs (for example, Hips_66). UAL uses
+  // meaningful numeric suffixes such as spine_01, so strip IDs only from
+  // Mixamo-prefixed names before normalizing punctuation.
+  if(/^mixamorig:?/.test(value)) value=value.replace(/^mixamorig:?/,"").replace(/_\d+$/,"");
+  return value.replace(/[^a-z0-9]/g,"");
 }
 
 function buildUALBoneNameMap(targetSkeleton,sourceSkeleton){
@@ -248,6 +253,92 @@ function buildUALBoneNameMap(targetSkeleton,sourceSkeleton){
   return {names,mappedBoneCount:Object.keys(names).length,requiredBoneCount:matchedRequired.size,matchedSourceNames:[...matchedSourceNames]};
 }
 
+function retargetUALClipByBindPose(targetMesh,sourceMesh,clip,mapping){
+  // Retarget in world space, then convert each desired target orientation back
+  // into its own parent space. This compensates for different bone-local axes.
+  targetMesh.skeleton.pose();
+  sourceMesh.skeleton.pose();
+  targetMesh.updateMatrixWorld(true);
+  sourceMesh.updateMatrixWorld(true);
+
+  const sourceByName=new Map(sourceMesh.skeleton.bones.map(bone=>[bone.name,bone]));
+  const mapped=[];
+  for(const targetBone of targetMesh.skeleton.bones){
+    const sourceName=mapping.names[targetBone.name];
+    const sourceBone=sourceName ? sourceByName.get(sourceName) : null;
+    if(!sourceBone) continue;
+    let depth=0;
+    for(let parent=targetBone.parent;parent;parent=parent.parent) depth++;
+    mapped.push({
+      targetBone,
+      sourceBone,
+      depth,
+      inverseSourceBindWorldQuaternion:sourceBone.getWorldQuaternion(new THREE.Quaternion()).invert(),
+      targetBindWorldQuaternion:targetBone.getWorldQuaternion(new THREE.Quaternion())
+    });
+  }
+  mapped.sort((a,b)=>a.depth-b.depth);
+
+  const sampleCount=Math.max(2,...clip.tracks.map(track=>track.times.length));
+  const times=new Float32Array(sampleCount);
+  for(let i=0;i<sampleCount;i++) times[i]=clip.duration*i/(sampleCount-1);
+
+  const mixer=new THREE.AnimationMixer(sourceMesh);
+  const action=mixer.clipAction(clip);
+  action.setLoop(THREE.LoopOnce,0);
+  action.clampWhenFinished=true;
+  action.play();
+
+  const valuesByBone=new Map(mapped.map(item=>[
+    item.targetBone,
+    new Float32Array(sampleCount*4)
+  ]));
+
+  for(let frame=0;frame<sampleCount;frame++){
+    const sampleTime=Math.min(times[frame],Math.max(0,clip.duration-1e-5));
+    mixer.setTime(sampleTime);
+    sourceMesh.updateMatrixWorld(true);
+
+    const desiredWorldByBone=new Map();
+    for(const item of mapped){
+      const sourceAnimatedWorldQuaternion=item.sourceBone.getWorldQuaternion(new THREE.Quaternion());
+      // Compute the source's WORLD-space delta from bind to animated pose:
+      // qDeltaWorld = qSourceAnimated * inverse(qSourceBind).
+      // Apply that world delta to the target's bind orientation:
+      // qTargetWorld = qDeltaWorld * qTargetBind.
+      // Reversing this order rotates the whole rig into the wrong frame.
+      const targetDesiredWorldQuaternion=sourceAnimatedWorldQuaternion.clone()
+        .multiply(item.inverseSourceBindWorldQuaternion)
+        .multiply(item.targetBindWorldQuaternion)
+        .normalize();
+
+      const parent=item.targetBone.parent;
+      const parentWorldQuaternion=parent?.isBone
+        ? (desiredWorldByBone.get(parent) || parent.getWorldQuaternion(new THREE.Quaternion()))
+        : (parent ? parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion());
+
+      const targetLocalQuaternion=parentWorldQuaternion.clone()
+        .invert()
+        .multiply(targetDesiredWorldQuaternion)
+        .normalize();
+
+      desiredWorldByBone.set(item.targetBone,targetDesiredWorldQuaternion);
+      targetLocalQuaternion.toArray(valuesByBone.get(item.targetBone),frame*4);
+    }
+  }
+
+  mixer.stopAllAction();
+  mixer.uncacheAction(clip,sourceMesh);
+  sourceMesh.skeleton.pose();
+  sourceMesh.updateMatrixWorld(true);
+
+  const tracks=mapped.map(item=>new THREE.QuaternionKeyframeTrack(
+    ".bones["+item.targetBone.name+"].quaternion",
+    times,
+    valuesByBone.get(item.targetBone)
+  ));
+  return new THREE.AnimationClip(clip.name,clip.duration,tracks);
+}
 function retargetUALClips(targetMesh,sourceMesh,sourceClips){
   const mapping=buildUALBoneNameMap(targetMesh.skeleton,sourceMesh.skeleton);
   if(mapping.mappedBoneCount<8||mapping.requiredBoneCount<6){
@@ -257,23 +348,26 @@ function retargetUALClips(targetMesh,sourceMesh,sourceClips){
     });
     return {clips:{},mapping};
   }
+
   const wanted=new Set(["Idle_Loop","Walk_Loop","Sprint_Loop","Crouch_Fwd_Loop","Crouch_Idle_Loop"]);
   const clips={};
   for(const clip of sourceClips){
     if(!wanted.has(clip.name)) continue;
     try{
-      clips[clip.name]=retargetClip(targetMesh,sourceMesh,clip,{
-        names:mapping.names,hip:"pelvis",preservePosition:true,preserveHipPosition:true
-      });
+      clips[clip.name]=retargetUALClipByBindPose(targetMesh,sourceMesh,clip,mapping);
     }catch(error){
-      console.warn("[DeepSeeker] UAL clip retarget failed:",clip.name,error);
+      console.warn("[DeepSeeker] UAL bind-pose retarget failed:",clip.name,error);
     }
   }
+
   targetMesh.skeleton.pose();
   targetMesh.updateMatrixWorld(true);
+  console.info("[DeepSeeker] UAL bind-pose retarget complete",{
+    mappedBones:mapping.mappedBoneCount,
+    clips:Object.keys(clips)
+  });
   return {clips,mapping};
 }
-
 function loadRetargetedUALAnimations(targetMesh){
   if(!retargetedAnimationsPromise){
     retargetedAnimationsPromise=(async()=>{
