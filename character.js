@@ -96,7 +96,7 @@ function normalizeTemplate(scene){
   // Original placement: center the model on X/Z and place its feet at Y=0.
   scene.position.x -= center.x;
   scene.position.z -= center.z;
-  scene.position.y -= scaledBox.min.y - 0.65;
+  scene.position.y -= scaledBox.min.y - 0.75;
   scene.updateMatrixWorld(true);
 
   scene.traverse(obj=>{
