@@ -13,7 +13,7 @@ const UAL_ANIMATION_PATH = "./projects/Universal Animation Library[Standard]/Unr
 const CHARACTER_HEIGHT = 1.8;
 // Extra model rotation in degrees. Adjust these to change the Hazmat's angle.
 const CHARACTER_ROTATION_DEGREES = {
-  x: 0.5, // Pitch: tilt forward or backward
+  x: 5, // Pitch: tilt forward or backward
   y: 0, // Yaw: turn left or right
   z: 0  // Roll: lean side to side
 };
