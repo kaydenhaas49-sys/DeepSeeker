@@ -87,7 +87,7 @@ function normalizeTemplate(scene){
 
   scene.position.x += 8.5;
   scene.position.y += 8.5;
-  scene.position.z += 0.1;
+  scene.position.z += 0.5;
   scene.updateMatrixWorld(true);
 
   scene.traverse(obj=>{

@@ -5,7 +5,7 @@ import {
   updateRemoteFlashlight,
   disposeRemoteFlashlight,
   flashlightFlicker
-} from "./character.js?v=20261101-hazmat-position-adjust-2";
+} from "./character.js?v=20261101-hazmat-z05";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
