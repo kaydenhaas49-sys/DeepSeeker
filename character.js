@@ -86,8 +86,8 @@ function normalizeTemplate(scene){
   scene.position.y -= scaledBox.min.y;
 
   scene.position.x += 8.5;
-  scene.position.y += 8.5;
-  scene.position.z += 0.5;
+  scene.position.y += 0.5;
+  scene.position.z += 8.5;
   scene.updateMatrixWorld(true);
 
   scene.traverse(obj=>{
