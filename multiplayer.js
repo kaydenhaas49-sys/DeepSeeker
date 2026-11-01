@@ -5,7 +5,7 @@ import {
   updateRemoteFlashlight,
   disposeRemoteFlashlight,
   flashlightFlicker
-} from "./character.js?v=20261101-hazmat-pitch05";
+} from "./character.js?v=20261101-spider-mp-sync";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
@@ -48,6 +48,9 @@ function disposeRemoteCharacterInstance(model){
 }
 
 function animationForRemoteState(state){
+  // A caught player is dragged by the spider; use the crouched-forward loop
+  // so the remote avatar does not remain frozen in its idle pose.
+  if(state?.spiderCaught) return "Crouch_Fwd_Loop";
   if(state?.crouched) return state.moving ? "Crouch_Fwd_Loop" : "Crouch_Idle_Loop";
   if(state?.running && state?.moving) return "Sprint_Loop";
   if(state?.moving) return "Walk_Loop";
@@ -424,6 +427,7 @@ export class Multiplayer {
           ? "poolrooms"
           : "backrooms",
       crouched: Boolean(state?.crouched),
+      spiderCaught: Boolean(state?.spiderCaught),
       moving: Boolean(state?.moving),
       running: Boolean(state?.running),
       sliding: Boolean(state?.sliding),
@@ -671,6 +675,7 @@ export class Multiplayer {
       pitch: Number(this.player.pitch.toFixed(2)),
       level: this.getLevel?.()==="house" || this.getLevel?.()==="apartment" ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
+      spiderCaught: Boolean(this.player.spiderCaught),
       moving: Math.hypot(this.player.vel.x,this.player.vel.z)>.35,
       running: Boolean(this.player.isRunning),
       sliding: Boolean(this.player.sliding),
@@ -695,6 +700,7 @@ export class Multiplayer {
       Math.abs(state.pitch - this.lastSent.pitch) > 0.03 ||
       state.level !== this.lastSent.level ||
       state.crouched !== this.lastSent.crouched ||
+      state.spiderCaught !== this.lastSent.spiderCaught ||
       state.moving !== this.lastSent.moving ||
       state.running !== this.lastSent.running ||
       state.sliding !== this.lastSent.sliding ||
@@ -744,6 +750,7 @@ export class Multiplayer {
       remote.current.pitch = remote.target.pitch;
       remote.current.level = remote.target.level;
       remote.current.crouched = remote.target.crouched;
+      remote.current.spiderCaught = remote.target.spiderCaught;
       remote.current.moving = remote.target.moving;
       remote.current.running = remote.target.running;
       remote.current.sliding = remote.target.sliding;
