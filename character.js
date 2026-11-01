@@ -13,7 +13,7 @@ const UAL_ANIMATION_PATH = "./projects/Universal Animation Library[Standard]/Unr
 const CHARACTER_HEIGHT = 1.8;
 // Extra model rotation in degrees. Adjust these to change the Hazmat's angle.
 const CHARACTER_ROTATION_DEGREES = {
-  x: -100, // Pitch: tilt forward or backward
+  x: -80, // Pitch: tilt forward or backward
   y: 0, // Yaw: turn left or right
   z: 0  // Roll: lean side to side
 };
@@ -96,7 +96,7 @@ function normalizeTemplate(scene){
   // Original placement: center the model on X/Z and place its feet at Y=0.
   scene.position.x -= center.x;
   scene.position.z -= center.z;
-  scene.position.y -= scaledBox.min.y - 0.6;
+  scene.position.y -= scaledBox.min.y - 0.65;
   scene.updateMatrixWorld(true);
 
   scene.traverse(obj=>{
