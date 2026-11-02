@@ -958,7 +958,7 @@ function applyNaturalGripPose(hand){
     const digit=["thumb","index","middle","ring","pinky","little"]
       .find(name=>token.includes(name));
     if(!digit)return;
-    const match=token.match(/([123])$/);
+    const match=token.match(/([123])(?:l|r)?$/);
     if(!match)return;
     if(!digits.has(digit))digits.set(digit,[]);
     digits.get(digit).push({bone:obj,segment:Number(match[1])});
