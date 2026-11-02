@@ -1486,8 +1486,9 @@ mountFlashlightOnHeldProp(player.proceduralArmFlashlight);
 player.onFlashlightMountChanged=mountFlashlightOnHeldProp;
 
 function setFirstPersonArmsVisible(visible){
+  player.firstPersonArmsDesiredVisible=Boolean(visible);
   if(player.firstPersonArmViewmodel){
-    player.firstPersonArmViewmodel.visible=Boolean(visible);
+    player.firstPersonArmViewmodel.visible=player.firstPersonArmsDesiredVisible;
   }
 }
 
