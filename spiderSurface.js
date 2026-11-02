@@ -16,7 +16,7 @@ export class SpiderSurfaceController {
     this.pounceStart=new THREE.Vector3();this.pounceTarget=new THREE.Vector3();
     this.retreatTarget=new THREE.Vector3();this.retreatDirection=new THREE.Vector3();
     this.phase="idle";this.kind=null;this.elapsed=0;this.cornerDuration=1.15;
-    this.pounceDuration=1.18;this.fadeDuration=1.35;this.ceilingY=9;
+    this.pounceDuration=1.30;this.fadeDuration=1.35;this.ceilingY=9;
     this.route=null;this.pounceStartedPending=false;this.pounceLandedPending=false;
     this.completedPending=false;this.fadeStartScale=1;
   }
