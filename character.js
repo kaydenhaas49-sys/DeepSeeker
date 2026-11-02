@@ -1168,7 +1168,7 @@ export function createFirstPersonArms(model){
 
 export function createRemoteFlashlight(scene){
   const target=new THREE.Object3D();
-  const light=new THREE.SpotLight(0xf0dfad,35,60,Math.PI/4.4,.76,1.5);
+  const light=new THREE.SpotLight(0xf0dfad,35,110,Math.PI/8,.58,1.35);
   light.castShadow=false;
   scene.add(light);
   scene.add(target);
@@ -1189,7 +1189,7 @@ export function updateRemoteFlashlight(remoteLight, origin, yaw, pitch, enabled)
     -Math.sin(pitch),
     -Math.cos(yaw)*Math.cos(pitch)
   );
-  remoteLight.target.position.copy(origin).addScaledVector(remoteLight.direction,60);
+  remoteLight.target.position.copy(origin).addScaledVector(remoteLight.direction,110);
   remoteLight.light.visible=enabled;
   remoteLight.light.intensity=enabled ? 35 : 0;
 }
