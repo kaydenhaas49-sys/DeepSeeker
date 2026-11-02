@@ -1737,6 +1737,7 @@ function resetMissionState(){
   equippedTool="flashlight";
   radioViewmodel.visible=false;
   player.proceduralArmFlashlight.visible=true;
+  setFirstPersonArmsVisible(true);
   updateEquipmentStatus();
   refreshMissionState({broadcast:false});
 }
