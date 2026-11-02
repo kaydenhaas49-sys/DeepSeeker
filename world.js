@@ -313,13 +313,13 @@ export class World {
     this.fixtureMaterial = new THREE.MeshStandardMaterial({
       color: 0xfff4ca,
       emissive: 0xffe2a0,
-      emissiveIntensity: 0.30,
+      emissiveIntensity: 0.18,
       roughness: 0.28,
     });
     this.fixtureDimMaterial = new THREE.MeshStandardMaterial({
       color: 0xfff4ca,
       emissive: 0xffe2a0,
-      emissiveIntensity: 0.19,
+      emissiveIntensity: 0.11,
       roughness: 0.30,
     });
     this.fixtureBlackMaterial = new THREE.MeshStandardMaterial({
@@ -615,7 +615,7 @@ export class World {
           group.add(light);
           this.breakerRoomLights.push({
             light,
-            baseIntensity:10,
+            baseIntensity:6.5,
             phase:rib*.83+(side>0?.45:0)
           });
         }
@@ -1053,7 +1053,7 @@ export class World {
     this.breakerRoomLightMaterial.emissive.setHex(
       breakerRoomLightsOn?0xffd98d:0x000000
     );
-    this.breakerRoomLightMaterial.emissiveIntensity=breakerRoomLightsOn?1.65:0;
+    this.breakerRoomLightMaterial.emissiveIntensity=breakerRoomLightsOn?1.05:0;
     const lightFlickerTime=performance.now()*.004;
     for(const item of this.breakerRoomLights){
       item.light.visible=breakerRoomLightsOn;
@@ -1222,7 +1222,7 @@ export class World {
       // Keep one strong reference fixture per chunk; the rest are usually damaged.
       const cracked=index!==0 && rng()<.82;
       const phase=rng()*Math.PI*2;
-      const power=cracked ? .95+rng()*.30 : 2.0+rng()*.45;
+      const power=cracked ? .62+rng()*.18 : 1.35+rng()*.20;
       const x=cx*CHUNK_SIZE+localX;
       const z=cz*CHUNK_SIZE+localZ;
       const y=WALL_H-.035;
