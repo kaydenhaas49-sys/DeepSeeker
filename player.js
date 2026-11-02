@@ -257,6 +257,7 @@ export class Player {
     this.standaloneFlashlightViewmodel=viewmodel.flashlight;
     this.proceduralHands=null;
     this.firstPersonArmViewmodel=null;
+    this.firstPersonArmsDesiredVisible=true;
     this.armViewmodelBasePosition=null;
     this.armViewmodelBaseRotation=null;
     this.armSwayPhase=0;
@@ -314,6 +315,7 @@ export class Player {
         const armMeshCount=armViewmodel?.userData?.extractedArmMeshCount||0;
         if(armViewmodel && armMeshCount>0 && heldTorch){
           this.firstPersonArmViewmodel=armViewmodel;
+          armViewmodel.visible=this.firstPersonArmsDesiredVisible;
           this.hands.add(armViewmodel);
           this.armViewmodelBasePosition=armViewmodel.position.clone();
           this.armViewmodelBaseRotation=armViewmodel.rotation.clone();
