@@ -18,7 +18,7 @@ import { ComputerSystem } from "./computer.js?v=20261030-finish-pass7";
 import { SecurityCameraSystem } from "./securityCameras.js?v=20261030-finish-pass7";
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261030-finish-pass7";
 import { SpiderHunter } from "./spiderHunter.js?v=20261030-finish-pass7";
-import { SpiderSurfaceController } from "./spiderSurface.js?v=20261030-spider-ai-v2";
+import { SpiderSurfaceController } from "./spiderSurface.js?v=20261102-hand-beam-qte-fix";
 import { StoryMissionWorld } from "./storyMission.js?v=20261030-finish-pass7";
 
 let arachnophobiaMode=getArachnophobiaMode();
