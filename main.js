@@ -11,7 +11,7 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import { flashlightFlicker } from "./character.js?v=20261101-flashlight-long-throw";
+import { flashlightFlicker } from "./character.js?v=20261102-natural-hands-motion";
 import { InteractionSystem } from "./interaction.js?v=20261030-finish-pass7";
 import { NavigationSystem } from "./navigation.js?v=20261030-finish-pass7";
 import { ComputerSystem } from "./computer.js?v=20261030-finish-pass7";
