@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { EYE, WALL_H } from "./world.js?v=20261101-darker-env";
-import { createHazmatCharacter, createFirstPersonArms } from "./character.js?v=20261102-natural-hands-motion-v2";
+import { createHazmatCharacter, createFirstPersonArms } from "./character.js?v=20261102-hand-beam-qte-fix";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
