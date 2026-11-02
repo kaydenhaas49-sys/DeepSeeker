@@ -8,7 +8,8 @@ import {
 } from "./character.js?v=20261101-flashlight-long-throw";
 
 const SEND_INTERVAL = 0.10;
-const REMOTE_LERP = 14;
+const REMOTE_LERP = 12;
+const REMOTE_ROTATION_LERP = 10;
 const MP_LOW_END =
   (() => {
     const q = new URLSearchParams(location.search).get("quality");
@@ -45,6 +46,14 @@ function disposeRemoteCharacterInstance(model){
       material.dispose();
     }
   });
+}
+
+function lerpAngle(current,target,alpha){
+  const difference=Math.atan2(
+    Math.sin(target-current),
+    Math.cos(target-current)
+  );
+  return current+difference*alpha;
 }
 
 function animationForRemoteState(state){
@@ -566,6 +575,7 @@ export class Multiplayer {
         nameplate:null,
         lastChatSequence:this.normalizeState(player.state || {}).chatSequence,
         animationRefresh:0,
+        movingBlend:0,
         playAnimation:null,
         animationName:"",
       };
@@ -602,6 +612,7 @@ export class Multiplayer {
       remote.target = this.normalizeState(player.state);
       if(!remote.hasInitialState){
         remote.current={...remote.target};
+        remote.movingBlend=remote.current.moving ? 1 : 0;
         remote.hasInitialState=true;
       }
     }
@@ -746,16 +757,24 @@ export class Multiplayer {
         remote.target.z,
         1 - Math.exp(-REMOTE_LERP * dt)
       );
-      remote.current.yaw = remote.target.yaw;
-      remote.current.pitch = remote.target.pitch;
-      remote.current.level = remote.target.level;
-      remote.current.crouched = remote.target.crouched;
-      remote.current.spiderCaught = remote.target.spiderCaught;
-      remote.current.moving = remote.target.moving;
-      remote.current.running = remote.target.running;
-      remote.current.sliding = remote.target.sliding;
-      remote.current.flashlight = remote.target.flashlight;
-      remote.current.playerName = remote.target.playerName;
+      const turnAlpha=1-Math.exp(-REMOTE_ROTATION_LERP*dt);
+      remote.current.yaw=lerpAngle(remote.current.yaw,remote.target.yaw,turnAlpha);
+      remote.current.pitch+=
+        (remote.target.pitch-remote.current.pitch)*turnAlpha;
+      remote.current.level=remote.target.level;
+      remote.current.crouched=remote.target.crouched;
+      remote.current.spiderCaught=remote.target.spiderCaught;
+
+      // A little state smoothing prevents brief network packet gaps from
+      // snapping the avatar between idle and walk every tenth of a second.
+      const movementGoal=remote.target.moving?1:0;
+      const movementAlpha=1-Math.exp(-(movementGoal?11:7)*dt);
+      remote.movingBlend+=(movementGoal-remote.movingBlend)*movementAlpha;
+      remote.current.moving=remote.movingBlend>.24;
+      remote.current.running=remote.current.moving&&remote.target.running;
+      remote.current.sliding=remote.target.sliding;
+      remote.current.flashlight=remote.target.flashlight;
+      remote.current.playerName=remote.target.playerName;
 
       remote.group.position.set(
         remote.current.x,
@@ -779,7 +798,7 @@ export class Multiplayer {
 
       const wantedAnimation=animationForRemoteState(remote.current);
       if(remote.playAnimation && wantedAnimation!==remote.animationName){
-        remote.animationName=remote.playAnimation(wantedAnimation,.16)||wantedAnimation;
+        remote.animationName=remote.playAnimation(wantedAnimation,.28)||wantedAnimation;
       }
 
       remote.animationRefresh=(remote.animationRefresh||0)+dt;
