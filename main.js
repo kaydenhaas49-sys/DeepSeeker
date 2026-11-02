@@ -5490,7 +5490,7 @@ const SPIDER_NORMAL_ENCOUNTER_MAX_TIME=72;
 
 const SPIDER_POST_DODGE_CHASE_MIN=24;
 const SPIDER_POST_DODGE_CHASE_MAX=32;
-const SPIDER_DODGE_QTE_WINDOW=1.05;
+const SPIDER_DODGE_QTE_WINDOW=1.45;
 
 const spiderSurfaceController=new SpiderSurfaceController({
   entity:spiderEntity,getWallMeshes:()=>world.wallOccluders,
@@ -5526,8 +5526,12 @@ function ensureSpiderDodgeQTE(){
     '<button type="button" data-dodge="right" style="min-height:52px;border:1px solid #8f825d;border-radius:4px;background:#171a13;color:#f1e7c5;font:600 11px ui-monospace,monospace;letter-spacing:1.5px;cursor:pointer">D · RIGHT</button></div>'+
     '<div style="height:3px;margin-top:16px;background:rgba(255,255,255,.12);overflow:hidden"><i id="spiderDodgeQTEBar" style="display:block;width:100%;height:100%;background:#d2b97a;transform-origin:left center"></i></div>';
   for(const button of element.querySelectorAll("button[data-dodge]")){
+    button.addEventListener("pointerdown",event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      chooseSpiderDodge(button.dataset.dodge);
+    });
     button.addEventListener("click",()=>chooseSpiderDodge(button.dataset.dodge));
-    button.addEventListener("pointerdown",event=>event.stopPropagation());
   }
   document.body.appendChild(element);
   spiderDodgeQTEElement=element;spiderDodgeQTEBar=element.querySelector("#spiderDodgeQTEBar");
@@ -5560,8 +5564,11 @@ function updateSpiderDodgeQTE(dt){
 
 document.addEventListener("keydown",event=>{
   if(!spiderDodgeQTEActive||spiderDodgeQTEResult)return;
-  if(event.code==="KeyA"||event.code==="ArrowLeft"){event.preventDefault();chooseSpiderDodge("left");}
-  else if(event.code==="KeyD"||event.code==="ArrowRight"){event.preventDefault();chooseSpiderDodge("right");}
+  if(event.code==="KeyA"||event.code==="ArrowLeft"||event.key?.toLowerCase()==="a"){
+    event.preventDefault();event.stopImmediatePropagation();chooseSpiderDodge("left");
+  }else if(event.code==="KeyD"||event.code==="ArrowRight"||event.key?.toLowerCase()==="d"){
+    event.preventDefault();event.stopImmediatePropagation();chooseSpiderDodge("right");
+  }
 },true);
 
 function applySuccessfulSpiderDodge(){
@@ -5569,7 +5576,7 @@ function applySuccessfulSpiderDodge(){
   const right=new THREE.Vector3(Math.cos(player.yaw),0,-Math.sin(player.yaw));
   const origin=player.pos.clone();
   const trySide=sign=>{
-    const destination=origin.clone().addScaledVector(right,sign*3.45);
+    const destination=origin.clone().addScaledVector(right,sign*2.35);
     for(let i=1;i<=12;i++){
       const t=i/12;
       if(player.isWallBlocked(THREE.MathUtils.lerp(origin.x,destination.x,t),THREE.MathUtils.lerp(origin.z,destination.z,t)))return false;
@@ -5601,8 +5608,16 @@ function finishSpiderSurfaceRetreat(){
 }
 
 function resolveSpiderSurfaceEvent(surfaceEvent){
-  if(surfaceEvent.pounceStarted){spiderBehaviorState="pounce";showSpiderDodgeQTE();}
+  if(surfaceEvent.pounceStarted){
+    spiderBehaviorState="pounce";
+    showSpiderDodgeQTE();
+    eventText.textContent="DODGE!  A = LEFT  ·  D = RIGHT";
+    eventText.style.opacity="1";
+  }
   if(surfaceEvent.pounceLanded){
+    // Resolve on landing even if the countdown callback was delayed by a
+    // low frame rate; never leave the player frozen with an active prompt.
+    if(!spiderDodgeQTEResult)spiderDodgeQTEResult="failed";
     const dodged=spiderDodgeQTEResult==="left"||spiderDodgeQTEResult==="right";
     hideSpiderDodgeQTE();
     if(dodged&&applySuccessfulSpiderDodge()){
