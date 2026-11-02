@@ -430,42 +430,33 @@ function findRightHandBone(root){
   return candidates[0]?.bone || null;
 }
 
-function getFlashlightHandPose(hand){
-  // Finger-base bones provide a reliable local direction from the wrist
-  // into the palm, even when the imported rig uses different bone axes.
+function getFlashlightHandPose(model,hand){
+  // Aim the torch along the character's actual forward axis, not the average
+  // of the finger-bone offsets (those offsets vary between exported rigs).
+  // The model faces local +Z; the torch lens and beam point along local -Z.
+  model.updateMatrixWorld(true);
+  hand.updateMatrixWorld(true);
+  const modelForward=new THREE.Vector3(0,0,1)
+    .applyQuaternion(model.getWorldQuaternion(new THREE.Quaternion()))
+    .normalize();
+  const handInverse=hand.getWorldQuaternion(new THREE.Quaternion()).invert();
+  const handForward=modelForward.applyQuaternion(handInverse).normalize();
+  const quaternion=new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0,0,-1),
+    handForward
+  );
+
   const fingerBones=hand.children.filter(child=>
     child.isBone && /(index|middle|ring|pinky|little)/i.test(child.name||"")
   );
-  if(!fingerBones.length){
-    return {
-      position:new THREE.Vector3(0,0,-.13),
-      quaternion:new THREE.Quaternion(),
-      fingerCount:0
-    };
+  const position=new THREE.Vector3();
+  if(fingerBones.length){
+    for(const finger of fingerBones) position.add(finger.position);
+    position.multiplyScalar(.30/fingerBones.length);
+  }else{
+    position.set(0,0,.015);
   }
-
-  const palmCenter=new THREE.Vector3();
-  for(const finger of fingerBones) palmCenter.add(finger.position);
-  palmCenter.multiplyScalar(1/fingerBones.length);
-
-  const palmDirection=palmCenter.clone();
-  if(palmDirection.lengthSq()<1e-8){
-    return {
-      position:new THREE.Vector3(0,0,-.13),
-      quaternion:new THREE.Quaternion(),
-      fingerCount:fingerBones.length
-    };
-  }
-
-  palmDirection.normalize();
-  const beamAxis=new THREE.Vector3(0,0,-1);
-  const quaternion=new THREE.Quaternion().setFromUnitVectors(beamAxis,palmDirection);
-  return {
-    // Keep the grip around the middle of the palm, just past the wrist.
-    position:palmCenter.multiplyScalar(.42),
-    quaternion,
-    fingerCount:fingerBones.length
-  };
+  return {position,quaternion,fingerCount:fingerBones.length};
 }
 
 export function attachFlashlight(model){
@@ -494,7 +485,7 @@ export function attachFlashlight(model){
 
   const flashlight=new THREE.Group();
   flashlight.name="HeldFlashlight";
-  const handPose=getFlashlightHandPose(hand);
+  const handPose=getFlashlightHandPose(model,hand);
   flashlight.position.copy(handPose.position);
   flashlight.quaternion.copy(handPose.quaternion);
   flashlight.scale.setScalar(.72);
@@ -923,18 +914,103 @@ function applyFirstPersonArmPose(root){
     "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
   ]) || getBoneChild(rightUpper);
 
-  // Bring the upper arms forward with a little outward elbow flare, then
-  // angle the forearms back toward the shared grip. This avoids the rigid,
-  // ruler-straight "zombie arms" pose while keeping both hands in view.
-  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(.25,-.18,-.95).normalize());
-  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(-.25,-.18,-.95).normalize());
+  // Upper arms angle out and down; forearms return inward toward the torch.
+  // This gives the wrists a visibly bent, supported pose instead of two straight
+  // arms held out like a karate stance.
+  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(.56,-.66,-.50).normalize());
+  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(-.56,-.66,-.50).normalize());
 
   root.updateMatrixWorld(true);
 
-  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(.07,-.025,-.997).normalize());
-  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(-.07,-.025,-.997).normalize());
+  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(-.20,-.08,-.977).normalize());
+  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(.20,-.08,-.977).normalize());
 
   root.updateMatrixWorld(true);
+  applyNaturalGripPose(findFirstPersonHandBone(root,"left"));
+  applyNaturalGripPose(findFirstPersonHandBone(root,"right"));
+  root.updateMatrixWorld(true);
+}
+
+function findFirstPersonHandBone(root,side){
+  const fingerPattern=/(thumb|index|middle|ring|pinky|little|finger)/;
+  const candidates=[];
+  root.traverse(obj=>{
+    if(!obj.isBone)return;
+    const token=normalizeBoneName(obj.name);
+    if(fingerPattern.test(token))return;
+    let score=0;
+    if(token===(side+"hand") || token===("hand"+(side==="left"?"l":"r")))score=100;
+    else if(token.endsWith(side+"hand"))score=95;
+    else if(token.includes(side)&&token.endsWith("hand"))score=85;
+    if(score)candidates.push({bone:obj,score});
+  });
+  candidates.sort((a,b)=>b.score-a.score);
+  return candidates[0]?.bone||null;
+}
+
+function applyNaturalGripPose(hand){
+  if(!hand)return;
+  hand.updateWorldMatrix(true,true);
+  const digits=new Map();
+  hand.traverse(obj=>{
+    if(!obj.isBone || obj===hand)return;
+    const token=normalizeBoneName(obj.name);
+    const digit=["thumb","index","middle","ring","pinky","little"]
+      .find(name=>token.includes(name));
+    if(!digit)return;
+    const match=token.match(/([123])$/);
+    if(!match)return;
+    if(!digits.has(digit))digits.set(digit,[]);
+    digits.get(digit).push({bone:obj,segment:Number(match[1])});
+  });
+
+  const basePositions=[];
+  for(const chain of digits.values()){
+    for(const item of chain){
+      if(item.segment===1){
+        basePositions.push(item.bone.getWorldPosition(new THREE.Vector3()));
+      }
+    }
+  }
+  if(!basePositions.length)return;
+  const handPosition=hand.getWorldPosition(new THREE.Vector3());
+  const knuckleCenter=basePositions.reduce(
+    (sum,point)=>sum.add(point),new THREE.Vector3()
+  ).multiplyScalar(1/basePositions.length);
+  // A point just inside the palm gives each finger a shared, natural curl target.
+  const palmCenter=handPosition.clone().lerp(knuckleCenter,.34);
+
+  for(const [digit,chain] of digits){
+    chain.sort((a,b)=>a.segment-b.segment);
+    for(const item of chain){
+      const bone=item.bone;
+      const child=bone.children.find(candidate=>
+        candidate.isBone &&
+        normalizeBoneName(candidate.name).includes(digit)
+      );
+      if(!child)continue;
+
+      hand.updateWorldMatrix(true,true);
+      const bonePosition=bone.getWorldPosition(new THREE.Vector3());
+      const childPosition=child.getWorldPosition(new THREE.Vector3());
+      const currentDirection=childPosition.sub(bonePosition).normalize();
+      const targetDirection=palmCenter.clone().sub(bonePosition).normalize();
+      if(currentDirection.lengthSq()<1e-8||targetDirection.lengthSq()<1e-8)continue;
+
+      const delta=new THREE.Quaternion().setFromUnitVectors(
+        currentDirection,targetDirection
+      );
+      const curl=item.segment===1?.19:item.segment===2?.25:.17;
+      const weightedDelta=new THREE.Quaternion().identity().slerp(delta,curl);
+      const desiredWorld=weightedDelta.multiply(
+        bone.getWorldQuaternion(new THREE.Quaternion())
+      );
+      const parentWorld=bone.parent?.getWorldQuaternion(new THREE.Quaternion())
+        ||new THREE.Quaternion();
+      bone.quaternion.copy(parentWorld.invert().multiply(desiredWorld));
+    }
+  }
+  hand.updateWorldMatrix(true,true);
 }
 
 function createWeightedArmSubset(source, armRoot){
@@ -1136,7 +1212,9 @@ export function createFirstPersonArms(model){
   // The player installer gives it its own render order and visible materials.
   const heldFlashlight=rig.getObjectByName("HeldFlashlight");
   if(heldFlashlight){
-    heldFlashlight.visible=true;
+    // First-person rendering uses the stable camera-local torch model. Keep
+    // this skeleton-mounted duplicate hidden so two props cannot overlap.
+    heldFlashlight.visible=false;
     heldFlashlight.traverse(obj=>{
       if(!obj.isMesh) return;
       obj.frustumCulled=false;
@@ -1187,7 +1265,7 @@ export function updateRemoteFlashlight(remoteLight, origin, yaw, pitch, enabled)
   remoteLight.light.position.copy(origin);
   remoteLight.direction.set(
     -Math.sin(yaw)*Math.cos(pitch),
-    -Math.sin(pitch),
+    Math.sin(pitch),
     -Math.cos(yaw)*Math.cos(pitch)
   );
   remoteLight.target.position.copy(origin).addScaledVector(remoteLight.direction,110);
