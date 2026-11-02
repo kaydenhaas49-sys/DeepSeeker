@@ -5,7 +5,7 @@ import {
   updateRemoteFlashlight,
   disposeRemoteFlashlight,
   flashlightFlicker
-} from "./character.js?v=20261102-natural-hands-motion";
+} from "./character.js?v=20261102-natural-hands-motion-v2";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 12;
