@@ -23,7 +23,7 @@ export class SpiderSurfaceController {
 
   get active(){return this.phase!=="idle";}
   get behavior(){
-    if(["approach","wall","corner"].includes(this.phase))return this.kind==="retreat"?"retreat-climb":"climbing";
+    if(["approach","wall","corner","ground-approach"].includes(this.phase))return this.kind==="retreat"?"retreat-climb":"climbing";
     if(this.phase==="ceiling-approach")return "ceiling-stalk";
     if(this.phase==="ceiling-retreat")return "retreat-ceiling";
     if(this.phase==="pounce"||this.phase==="landed")return "pounce";
@@ -86,8 +86,20 @@ export class SpiderSurfaceController {
   startAmbush(){
     if(this.active)return false;
     const route=this._findClimbRoute(13);
-    if(!route)return false;
-    this._startRoute(route,"ambush");
+    if(route){
+      this._startRoute(route,"ambush");
+      return true;
+    }
+
+    // Some streamed rooms have no visible wall mesh to raycast against.
+    // Still run the same pounce/QTE from ground level instead of silently
+    // disabling the entire ambush when a climb route cannot be found.
+    this.kind="ambush";
+    this.route=null;
+    this.elapsed=0;
+    this.phase="ground-approach";
+    this.entity.scale.setScalar(1);
+    this.setAnimation("walk");
     return true;
   }
 
@@ -168,7 +180,22 @@ export class SpiderSurfaceController {
     const step=THREE.MathUtils.clamp(Number(dt)||0,0,.05);
     this.elapsed+=step;
 
-    if(this.phase==="approach"){
+    if(this.phase==="ground-approach"){
+      const target=player.pos;
+      this.forward.set(target.x-this.entity.position.x,0,target.z-this.entity.position.z);
+      const distance=Math.hypot(this.forward.x,this.forward.z);
+      if(distance<5.2){
+        this._beginPounce(player);
+      }else if(this.elapsed>12){
+        this.phase="idle";
+        this.kind=null;
+        events.failed=true;
+      }else{
+        this.moveOnPlane(step,target.x,target.z,3.1);
+        this.forward.set(target.x-this.entity.position.x,0,target.z-this.entity.position.z);
+        this._applyOrientation(this.up,this.forward,step);
+      }
+    }else if(this.phase==="approach"){
       const dx=this.wallApproach.x-this.entity.position.x,dz=this.wallApproach.z-this.entity.position.z;
       this.moveOnPlane(step,this.wallApproach.x,this.wallApproach.z,3.0);
       this._applyOrientation(this.up,new THREE.Vector3(dx,0,dz),step);
