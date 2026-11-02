@@ -923,15 +923,16 @@ function applyFirstPersonArmPose(root){
     "mixamorigrightforearm","rightforearm","rightlowerarm","rightelbow","forearmr"
   ]) || getBoneChild(rightUpper);
 
-  // The cloned rig faces the camera after its 180-degree Y rotation. Mirror
-  // the slight side offsets so the two real arms extend forward in parallel.
-  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(.10,-.06,-.99).normalize());
-  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(-.10,-.06,-.99).normalize());
+  // Bring the upper arms forward with a little outward elbow flare, then
+  // angle the forearms back toward the shared grip. This avoids the rigid,
+  // ruler-straight "zombie arms" pose while keeping both hands in view.
+  aimBoneAtWorldDirection(leftUpper,new THREE.Vector3(.25,-.18,-.95).normalize());
+  aimBoneAtWorldDirection(rightUpper,new THREE.Vector3(-.25,-.18,-.95).normalize());
 
   root.updateMatrixWorld(true);
 
-  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(.03,-.035,-.999).normalize());
-  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(-.03,-.035,-.999).normalize());
+  aimBoneAtWorldDirection(leftForearm,new THREE.Vector3(.07,-.025,-.997).normalize());
+  aimBoneAtWorldDirection(rightForearm,new THREE.Vector3(-.07,-.025,-.997).normalize());
 
   root.updateMatrixWorld(true);
 }
@@ -1234,17 +1235,46 @@ export async function createHazmatCharacter(){
     idleClip=retargetedAnimations.Idle_Loop||null;
   }
 
-  const playAnimation=(name,fadeSeconds=.16)=>{
+  const playAnimation=(name,fadeSeconds=.28)=>{
     const next=actions[name]||actions.Idle_Loop||actions.Walk_Loop;
     if(!next) return null;
     if(activeAction===next) return next.getClip().name;
-    if(activeAction) activeAction.fadeOut(Math.max(0,fadeSeconds));
-    next.reset();
-    if(fadeSeconds>0) next.fadeIn(fadeSeconds);
+
+    const previous=activeAction;
+    const previousClip=previous?.getClip?.();
+    const nextClip=next.getClip();
+    const gaitLoop=clip=>/walk|sprint|crouch_fwd/i.test(clip?.name||"");
+    if(previous && gaitLoop(previousClip) && gaitLoop(nextClip) &&
+       previousClip.duration>0 && nextClip.duration>0){
+      // Keep the stride at the same normalized point when changing walk/run
+      // loops so the feet do not visibly jump back to the start of a cycle.
+      const phase=(previous.time%previousClip.duration)/previousClip.duration;
+      next.time=phase*nextClip.duration;
+    }else{
+      next.reset();
+    }
+
+    next.enabled=true;
+    next.setLoop(THREE.LoopRepeat,Infinity);
+    next.setEffectiveWeight(1);
+    const clipName=nextClip.name;
+    const locomotionRate=/sprint/i.test(clipName) ? 1.06 :
+      /walk/i.test(clipName) ? .96 :
+      /crouch/i.test(clipName) ? .92 : 1;
+    next.setEffectiveTimeScale(locomotionRate);
     next.play();
+
+    const blend=Math.max(0,fadeSeconds);
+    if(previous && blend>0){
+      previous.crossFadeTo(next,blend,true);
+    }else{
+      if(previous) previous.stop();
+      next.fadeIn(0);
+    }
+
     activeAction=next;
     action=next;
-    return next.getClip().name;
+    return clipName;
   };
   if(actions.Idle_Loop) playAnimation("Idle_Loop",0);
 
