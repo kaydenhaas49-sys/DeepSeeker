@@ -188,7 +188,8 @@ export class SpiderSurfaceController {
         this._beginPounce(player);
       }else if(this.elapsed>12){
         this.phase="idle";
-        this.kind=null;
+        // Keep kind=ambush until the main controller consumes failed.
+        this.route=null;
         events.failed=true;
       }else{
         this.moveOnPlane(step,target.x,target.z,3.1);
