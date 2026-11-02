@@ -51,10 +51,10 @@ function detectLowEndHardware(){
 }
 const PERFORMANCE_TIER=detectLowEndHardware();
 const QUALITY_PROFILES={
- low:{lowEnd:true,ultraLow:PERFORMANCE_TIER.ultraLow,pixelRatioCap:.65,housePixelRatio:.58,minHousePixelRatio:.38,shadows:false,shadowResolution:256,farPlane:165,fogNear:13,fogFar:95,fogColor:0x282619,hemisphere:.16,ambient:.0285,anisotropy:2,targetFps:45,flashlightDistance:75},
- medium:{lowEnd:false,ultraLow:false,pixelRatioCap:1,housePixelRatio:.70,minHousePixelRatio:.52,shadows:false,shadowResolution:512,farPlane:230,fogNear:14,fogFar:115,fogColor:0x252419,hemisphere:.22,ambient:.04,anisotropy:4,targetFps:50,flashlightDistance:90},
+ low:{lowEnd:true,ultraLow:PERFORMANCE_TIER.ultraLow,pixelRatioCap:.65,housePixelRatio:.58,minHousePixelRatio:.38,shadows:false,shadowResolution:256,farPlane:165,fogNear:13,fogFar:95,fogColor:0x282619,hemisphere:.20,ambient:.035,anisotropy:2,targetFps:45,flashlightDistance:75},
+ medium:{lowEnd:false,ultraLow:false,pixelRatioCap:1,housePixelRatio:.70,minHousePixelRatio:.52,shadows:false,shadowResolution:512,farPlane:230,fogNear:14,fogFar:115,fogColor:0x252419,hemisphere:.16,ambient:.028,anisotropy:4,targetFps:50,flashlightDistance:90},
  high:{lowEnd:false,ultraLow:false,pixelRatioCap:1.5,housePixelRatio:.82,minHousePixelRatio:.64,shadows:true,shadowResolution:768,farPlane:300,fogNear:15,fogFar:140,fogColor:0x201f15,hemisphere:.14,ambient:.024,anisotropy:8,targetFps:60,flashlightDistance:110},
- ultra:{lowEnd:false,ultraLow:false,pixelRatioCap:2,housePixelRatio:.95,minHousePixelRatio:.72,shadows:true,shadowResolution:1024,farPlane:380,fogNear:18,fogFar:165,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:16,targetFps:60,flashlightDistance:130}
+ ultra:{lowEnd:false,ultraLow:false,pixelRatioCap:2,housePixelRatio:.95,minHousePixelRatio:.72,shadows:true,shadowResolution:1024,farPlane:380,fogNear:18,fogFar:165,fogColor:0x201f15,hemisphere:.12,ambient:.020,anisotropy:16,targetFps:60,flashlightDistance:130}
 };
 let activeQualityPreset=readQualityPreset();
 function getQualitySettings(preset=activeQualityPreset){
