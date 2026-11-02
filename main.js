@@ -1483,6 +1483,13 @@ function mountFlashlightOnHeldProp(mount){
   flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
 }
 mountFlashlightOnHeldProp(player.proceduralArmFlashlight);
+player.onFlashlightMountChanged=mountFlashlightOnHeldProp;
+
+function setFirstPersonArmsVisible(visible){
+  if(player.firstPersonArmViewmodel){
+    player.firstPersonArmViewmodel.visible=Boolean(visible);
+  }
+}
 
 // A held radio viewmodel and a small, live radar screen are created locally.
 // The handheld prop never depends on a downloaded model or texture.
@@ -7184,6 +7191,7 @@ function startSpiderCatchFreeze(){
   equippedTool="flashlight";
   radioViewmodel.visible=false;
   player.proceduralArmFlashlight.visible=true;
+  setFirstPersonArmsVisible(true);
   player.setFlashlightVisual(true);
   spiderCaughtElapsed=0;
   spiderCaughtStartYaw=player.yaw;
@@ -7257,6 +7265,7 @@ function resetPlayerAfterSpiderCatch(){
   equippedTool=spiderCaughtPreviousTool;
   radioViewmodel.visible=equippedTool==="radio";
   player.proceduralArmFlashlight.visible=equippedTool!=="radio";
+  setFirstPersonArmsVisible(equippedTool!=="radio");
   player.setFlashlightVisual(equippedTool!=="radio" && flashlightOn);
   flashlight.visible=equippedTool!=="radio" && flashlightOn && battery>0;
   let teammate=null;
@@ -8714,6 +8723,7 @@ function setEquippedTool(tool,{turnOnFlashlight=true}={}){
     flashlightOn=false;
     player.setFlashlightVisual(false);
     player.proceduralArmFlashlight.visible=false;
+    setFirstPersonArmsVisible(false);
     radioViewmodel.visible=true;
     flashlight.intensity=0;
     flashlight.visible=false;
@@ -8721,6 +8731,7 @@ function setEquippedTool(tool,{turnOnFlashlight=true}={}){
   }else{
     radioViewmodel.visible=false;
     player.proceduralArmFlashlight.visible=true;
+    setFirstPersonArmsVisible(true);
     if(turnOnFlashlight&&battery>0)flashlightOn=true;
     player.setFlashlightVisual(flashlightOn);
     flashlight.visible=flashlightOn&&battery>0;
@@ -8743,6 +8754,7 @@ function syncRadioPickupFromMission(){
 function toggleFlashlight(){
   flashlightOn=!flashlightOn;
   player.proceduralArmFlashlight.visible=true;
+  setFirstPersonArmsVisible(true);
   radioViewmodel.visible=false;
   equippedTool="flashlight";
   player.setFlashlightVisual(flashlightOn);
@@ -10001,6 +10013,7 @@ function animate(){
   flashlight.visible=(flashlightOn && battery>0) || spiderCaughtFlashlightOverride;
   if(spiderCaughtFlashlightOverride){
     player.proceduralArmFlashlight.visible=true;
+    setFirstPersonArmsVisible(true);
     radioViewmodel.visible=false;
   }
   // The beam now follows the hand-held torch rather than a camera-center fill.
