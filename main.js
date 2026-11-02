@@ -51,9 +51,9 @@ function detectLowEndHardware(){
 }
 const PERFORMANCE_TIER=detectLowEndHardware();
 const QUALITY_PROFILES={
- low:{lowEnd:true,ultraLow:PERFORMANCE_TIER.ultraLow,pixelRatioCap:.65,housePixelRatio:.58,minHousePixelRatio:.38,shadows:false,shadowResolution:256,farPlane:165,fogNear:13,fogFar:95,fogColor:0x282619,hemisphere:.30,ambient:.065,anisotropy:2,targetFps:45,flashlightDistance:75},
+ low:{lowEnd:true,ultraLow:PERFORMANCE_TIER.ultraLow,pixelRatioCap:.65,housePixelRatio:.58,minHousePixelRatio:.38,shadows:false,shadowResolution:256,farPlane:165,fogNear:13,fogFar:95,fogColor:0x282619,hemisphere:.16,ambient:.0285,anisotropy:2,targetFps:45,flashlightDistance:75},
  medium:{lowEnd:false,ultraLow:false,pixelRatioCap:1,housePixelRatio:.70,minHousePixelRatio:.52,shadows:false,shadowResolution:512,farPlane:230,fogNear:14,fogFar:115,fogColor:0x252419,hemisphere:.22,ambient:.04,anisotropy:4,targetFps:50,flashlightDistance:90},
- high:{lowEnd:false,ultraLow:false,pixelRatioCap:1.5,housePixelRatio:.82,minHousePixelRatio:.64,shadows:true,shadowResolution:768,farPlane:300,fogNear:15,fogFar:140,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:8,targetFps:60,flashlightDistance:110},
+ high:{lowEnd:false,ultraLow:false,pixelRatioCap:1.5,housePixelRatio:.82,minHousePixelRatio:.64,shadows:true,shadowResolution:768,farPlane:300,fogNear:15,fogFar:140,fogColor:0x201f15,hemisphere:.14,ambient:.024,anisotropy:8,targetFps:60,flashlightDistance:110},
  ultra:{lowEnd:false,ultraLow:false,pixelRatioCap:2,housePixelRatio:.95,minHousePixelRatio:.72,shadows:true,shadowResolution:1024,farPlane:380,fogNear:18,fogFar:165,fogColor:0x201f15,hemisphere:.20,ambient:.035,anisotropy:16,targetFps:60,flashlightDistance:130}
 };
 let activeQualityPreset=readQualityPreset();
@@ -429,9 +429,9 @@ function ensureTutorialOpenRoom(){
       fixtureMaterial.clone(),
       new THREE.Vector3(x,h-.055,z)
     );
-    fixtureMesh.material.emissiveIntensity=.16;
+    fixtureMesh.material.emissiveIntensity=.10;
 
-    const light=new THREE.PointLight(0xffe6a8,1.25,100,1.3);
+    const light=new THREE.PointLight(0xffe6a8,.85,100,1.3);
     light.position.set(x,h-.75,z);
     light.castShadow=false;
     light.visible=true;
@@ -443,7 +443,7 @@ function ensureTutorialOpenRoom(){
       x,
       z,
       phase:Math.random()*Math.PI*2,
-      baseIntensity:1.25
+      baseIntensity:.85
     });
   }
 
@@ -1005,18 +1005,18 @@ for(let fixtureIndex=0;fixtureIndex<menuLightFixtures3D.length;fixtureIndex++){
 }
 
 // A few weak pools of practical light keep the 3D geometry readable.
-const menuAmbient=new THREE.HemisphereLight(0xd5c995,0x10110e,.56);
+const menuAmbient=new THREE.HemisphereLight(0xd5c995,0x10110e,.38);
 menuSet.add(menuAmbient);
 
-const menuFill=new THREE.PointLight(0xd5b96f,2.7,48,2);
+const menuFill=new THREE.PointLight(0xd5b96f,1.9,48,2);
 menuFill.position.set(-9,4,-6);
 menuSet.add(menuFill);
 
-const menuNearLight=new THREE.PointLight(0xffe2a0,1.15,32,2);
+const menuNearLight=new THREE.PointLight(0xffe2a0,.80,32,2);
 menuNearLight.position.set(-2,3,21);
 menuSet.add(menuNearLight);
 
-const menuFarLight=new THREE.PointLight(0xffd98e,.95,38,2);
+const menuFarLight=new THREE.PointLight(0xffd98e,.65,38,2);
 menuFarLight.position.set(4,3,-50);
 menuSet.add(menuFarLight);
 
@@ -4168,7 +4168,7 @@ houseReturnPortal.userData.active=false;
 houseRoot.add(houseReturnPortal);
 
 // Low-cost apartment ambience. The flashlight handles local illumination.
-const houseAmbient=new THREE.HemisphereLight(0xffe6b0,0x3c2818,0.55);
+const houseAmbient=new THREE.HemisphereLight(0xffe6b0,0x3c2818,0.38);
 houseRoot.add(houseAmbient);
 
 function attachHouseDoor(obj,index){
