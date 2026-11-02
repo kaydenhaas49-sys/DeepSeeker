@@ -319,13 +319,15 @@ export class Player {
           this.hands.add(armViewmodel);
           this.armViewmodelBasePosition=armViewmodel.position.clone();
           this.armViewmodelBaseRotation=armViewmodel.rotation.clone();
-          this.standaloneFlashlightViewmodel.visible=false;
-          this.proceduralArmFlashlight=heldTorch;
+          // Keep the known-good camera-local flashlight model visible. The
+          // skeleton clone's wrist-mounted copy is hidden to avoid a broken
+          // duplicate or an incorrectly scaled beam mount.
+          heldTorch.visible=false;
+          this.standaloneFlashlightViewmodel.visible=true;
+          this.proceduralArmFlashlight=this.standaloneFlashlightViewmodel;
           this.proceduralArmFlashlightLens=
-            heldTorch.getObjectByName("FlashlightLens")||null;
-          if(this.onFlashlightMountChanged){
-            this.onFlashlightMountChanged(heldTorch);
-          }
+            this.standaloneFlashlightViewmodel.getObjectByName("FlashlightLens")
+            ||this.proceduralArmFlashlightLens;
           console.info("[DeepSeeker] first-person Hazmat hands installed",{
             armMeshes:armMeshCount,
             armTriangles:armViewmodel.userData.extractedArmTriangleCount||0
