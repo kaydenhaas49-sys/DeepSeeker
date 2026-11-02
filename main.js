@@ -1483,7 +1483,6 @@ function mountFlashlightOnHeldProp(mount){
   flashlight.target.position.set(0,0,-FLASHLIGHT_BASE_DISTANCE);
 }
 mountFlashlightOnHeldProp(player.proceduralArmFlashlight);
-player.onFlashlightMountChanged=mountFlashlightOnHeldProp;
 
 function setFirstPersonArmsVisible(visible){
   player.firstPersonArmsDesiredVisible=Boolean(visible);
