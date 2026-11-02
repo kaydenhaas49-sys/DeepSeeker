@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { EYE, WALL_H } from "./world.js?v=20261101-darker-env";
-import { createHazmatCharacter } from "./character.js?v=20261101-flashlight-long-throw";
+import { createHazmatCharacter, createFirstPersonArms } from "./character.js?v=20261101-flashlight-long-throw";
 
 const WALK_SPEED = 4; // m/s
 const RUN_SPEED = 8; // m/s
@@ -254,8 +254,14 @@ export class Player {
     const viewmodel=makeLocalFirstPersonFlashlight(this.hands);
     this.proceduralArmFlashlightLens=viewmodel.lens;
     this.proceduralArmFlashlight=viewmodel.flashlight;
+    this.standaloneFlashlightViewmodel=viewmodel.flashlight;
     this.proceduralHands=null;
     this.firstPersonArmViewmodel=null;
+    this.armViewmodelBasePosition=null;
+    this.armViewmodelBaseRotation=null;
+    this.armSwayPhase=0;
+    this.flashlightVisualOn=true;
+    this.onFlashlightMountChanged=null;
 
     this.characterModel = null;
     this.characterMixer = null;
@@ -295,13 +301,41 @@ export class Player {
       this.characterFlashlightLens =
         character.flashlight?.getObjectByName("FlashlightLens") || null;
 
-      // The first-person viewmodel is now only the standalone flashlight.
-      // Keep the full hazmat character for the world/multiplayer avatar.
+      // Use the actual skinned Hazmat sleeves and gloves in first person.
+      // The fallback torch stays available if the source rig has no arm mesh.
       this.hands.visible=true;
       this.hands.renderOrder=2999;
       this.proceduralArmFlashlight.visible=true;
       if(this.characterFlashlight) this.characterFlashlight.visible=false;
 
+      try{
+        const armViewmodel=createFirstPersonArms(character.model);
+        const heldTorch=armViewmodel?.getObjectByName("HeldFlashlight");
+        const armMeshCount=armViewmodel?.userData?.extractedArmMeshCount||0;
+        if(armViewmodel && armMeshCount>0 && heldTorch){
+          this.firstPersonArmViewmodel=armViewmodel;
+          this.hands.add(armViewmodel);
+          this.armViewmodelBasePosition=armViewmodel.position.clone();
+          this.armViewmodelBaseRotation=armViewmodel.rotation.clone();
+          this.standaloneFlashlightViewmodel.visible=false;
+          this.proceduralArmFlashlight=heldTorch;
+          this.proceduralArmFlashlightLens=
+            heldTorch.getObjectByName("FlashlightLens")||null;
+          if(this.onFlashlightMountChanged){
+            this.onFlashlightMountChanged(heldTorch);
+          }
+          console.info("[DeepSeeker] first-person Hazmat hands installed",{
+            armMeshes:armMeshCount,
+            armTriangles:armViewmodel.userData.extractedArmTriangleCount||0
+          });
+        }else{
+          console.warn("[DeepSeeker] first-person arm mesh unavailable; using standalone flashlight");
+        }
+      }catch(armError){
+        console.warn("[DeepSeeker] first-person arms could not be built; using standalone flashlight",armError);
+      }
+
+      this.setFlashlightVisual(this.flashlightVisualOn);
       this.worldAvatar.add(character.model);
       this.characterLoaded = true;
       this.characterLoadFailed = false;
@@ -319,6 +353,7 @@ export class Player {
   }
 
   setFlashlightVisual(on){
+    this.flashlightVisualOn=Boolean(on);
     const updateLens=(lens)=>{
       if(!lens?.material) return;
       lens.material.emissive.set(0x000000);
@@ -516,6 +551,34 @@ export class Player {
       this.pos.z
     );
     this.camera.rotation.set(this.pitch, this.yaw, 0);
+
+    if(
+      this.firstPersonArmViewmodel &&
+      this.armViewmodelBasePosition &&
+      this.armViewmodelBaseRotation
+    ){
+      const motion=THREE.MathUtils.clamp(hSpeed/RUN_SPEED,0,1);
+      const lateralVelocity=this.vel.x*Math.cos(this.yaw)-this.vel.z*Math.sin(this.yaw);
+      this.armSwayPhase+=dt*(2.8+hSpeed*1.55);
+      const phase=this.armSwayPhase;
+      const breath=Math.sin(phase*.34);
+      const stride=Math.sin(phase);
+      const base=this.armViewmodelBasePosition;
+      const baseRotation=this.armViewmodelBaseRotation;
+
+      this.firstPersonArmViewmodel.position.set(
+        base.x+breath*.0015+Math.sin(phase*.5)*.0035*motion,
+        base.y+this.bobOffset*.32+(1-Math.cos(phase))*.0025*motion,
+        base.z+Math.cos(phase)*.005*motion
+      );
+      this.firstPersonArmViewmodel.rotation.set(
+        baseRotation.x+breath*.0015+stride*.0055*motion,
+        baseRotation.y+Math.sin(phase*.5)*.004*motion,
+        baseRotation.z+
+          THREE.MathUtils.clamp(lateralVelocity/RUN_SPEED,-1,1)*.012+
+          stride*.005*motion
+      );
+    }
 
     if(this.characterMixer) {
       this.characterMixer.update(dt);
