@@ -8353,39 +8353,44 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
 
   if(broadcast) multiplayer.broadcastWorldEvent(demo?"demo_complete":"game_victory","ending",{});
   audio.start();
-  audio.celebrate();
 
   if(!victoryOverlay){
     const style=document.createElement("style");
     style.id="deepseekerVictoryStyles";
     style.textContent=[
-      '#deepseekerVictory{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% 32%,#242a1d 0%,#090d09 48%,#020403 100%);color:#fff7e7;font-family:system-ui,-apple-system,sans-serif;opacity:0;transition:opacity .8s ease;user-select:none}',
-      '#deepseekerVictory .victoryConfetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}',
-      '#deepseekerVictory .victoryConfetti i{position:absolute;top:-16vh;left:var(--confetti-left);width:9px;height:15px;border-radius:2px;background:hsl(var(--confetti-hue),94%,65%);animation:victoryConfettiFall var(--confetti-duration) linear var(--confetti-delay) infinite;box-shadow:0 0 8px hsl(var(--confetti-hue),94%,65%,.24)}',
-      '@keyframes victoryConfettiFall{0%{transform:translate3d(0,-10vh,0) rotate(0deg);opacity:0}10%{opacity:1}100%{transform:translate3d(var(--confetti-drift),115vh,0) rotate(760deg);opacity:0}}',
-      '#deepseekerVictory .victorySplash{position:relative;z-index:2;width:min(760px,88vw);box-sizing:border-box;padding:38px 26px;text-align:center;transition:opacity .8s ease,transform .8s ease}',
-      '#deepseekerVictory.creditsActive .victorySplash{opacity:0;transform:translateY(-22px);pointer-events:none}',
-      '#deepseekerVictory .victoryKicker{font-size:10px;letter-spacing:4px;color:#c7c4a7;margin-bottom:20px;text-transform:uppercase}',
-      '#deepseekerVictory .victoryPoppers{display:flex;align-items:center;justify-content:center;gap:20px;font-size:clamp(46px,8vw,76px);line-height:1.2;margin:0 auto 14px;filter:drop-shadow(0 6px 16px #0009);animation:victoryPop .85s cubic-bezier(.2,.8,.3,1.2) both}',
-      '#deepseekerVictory .victoryPoppers span:last-child{animation:victoryTilt 1.4s ease-in-out infinite alternate}',
-      '@keyframes victoryPop{from{opacity:0;transform:scale(.35) rotate(-12deg)}to{opacity:1;transform:scale(1) rotate(0)}}',
-      '@keyframes victoryTilt{from{transform:rotate(-10deg) translateY(0)}to{transform:rotate(9deg) translateY(-7px)}}',
-      '#deepseekerVictory h1{margin:10px 0 14px;font-size:clamp(32px,6vw,64px);letter-spacing:clamp(2px,.7vw,7px);line-height:1.08;font-weight:800;color:#fff5d6;text-shadow:0 0 30px #ffe39b35}',
-      '#deepseekerVictory .victoryLead{margin:15px 0 10px;font-size:clamp(15px,2vw,19px);color:#f0eedf}',
-      '#deepseekerVictory .victoryMore{max-width:520px;margin:0 auto;font-size:13px;line-height:1.8;color:#c4c8b7}',
-      '#deepseekerVictory .victoryCountdown{margin-top:29px;font-size:9px;letter-spacing:3px;color:#8e987f}',
-      '#deepseekerVictory .victoryCredits{position:absolute;inset:0;z-index:3;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;opacity:0;pointer-events:none;background:linear-gradient(180deg,#03050430,#030504e8);transition:opacity .8s ease}',
+      '#deepseekerVictory{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;overflow:hidden;box-sizing:border-box;padding:24px;background:radial-gradient(ellipse at 50% 50%,rgba(19,27,21,.88),rgba(2,5,4,.97) 72%);color:#d8dfcf;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;opacity:0;transition:opacity 1.1s ease;user-select:none}',
+      '#deepseekerVictory:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.12;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(160,190,150,.14) 4px,transparent 5px)}',
+      '#deepseekerVictory:after{content:"";position:absolute;inset:18px;border:1px solid rgba(157,178,145,.12);pointer-events:none}',
+      '#deepseekerVictory .victorySplash{position:relative;z-index:2;width:min(780px,92vw);box-sizing:border-box;padding:clamp(22px,5vw,54px);border:1px solid rgba(164,185,150,.25);background:linear-gradient(135deg,rgba(12,18,14,.94),rgba(4,8,6,.96));box-shadow:0 24px 90px #0009; text-align:left;transition:opacity .8s ease,transform .8s ease}',
+      '#deepseekerVictory.creditsActive .victorySplash{opacity:0;transform:translateY(-14px);pointer-events:none}',
+      '#deepseekerVictory .victoryHeader{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-bottom:16px;border-bottom:1px solid rgba(164,185,150,.2);font-size:9px;letter-spacing:2px;color:#879783}',
+      '#deepseekerVictory .victoryKicker{display:flex;align-items:center;gap:9px}',
+      '#deepseekerVictory .victoryKicker:before{content:"";width:7px;height:7px;border-radius:50%;background:#a4c18b;box-shadow:0 0 10px #a4c18b88}',
+      '#deepseekerVictory .victoryLog{white-space:nowrap;color:#667568}',
+      '#deepseekerVictory .victoryStamp{display:inline-block;margin:clamp(26px,5vh,42px) 0 14px;padding:7px 10px;border:1px solid rgba(164,193,139,.42);color:#a4c18b;font-size:9px;letter-spacing:2px}',
+      '#deepseekerVictory h1{margin:0;color:#e2e8d9;font-family:Arial,Helvetica,sans-serif;font-size:clamp(34px,7vw,68px);font-weight:500;letter-spacing:clamp(1px,.4vw,5px);line-height:.98}',
+      '#deepseekerVictory h1 em{font-style:normal;color:#a4c18b}',
+      '#deepseekerVictory .victoryLead{max-width:570px;margin:24px 0 8px;color:#c8d0c1;font-family:Arial,Helvetica,sans-serif;font-size:clamp(14px,2vw,17px);line-height:1.6}',
+      '#deepseekerVictory .victoryMore{max-width:570px;margin:0;color:#879487;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.75}',
+      '#deepseekerVictory .victoryReadout{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px;padding-top:18px;border-top:1px solid rgba(164,185,150,.18)}',
+      '#deepseekerVictory .readoutCell{padding:12px 14px;border-left:2px solid #718b65;background:rgba(126,155,107,.07)}',
+      '#deepseekerVictory .readoutLabel{display:block;margin-bottom:7px;color:#728071;font-size:8px;letter-spacing:2px}',
+      '#deepseekerVictory .readoutValue{color:#c8d9bc;font-size:12px;letter-spacing:1px}',
+      '#deepseekerVictory .victoryCountdown{margin:24px 0 0;color:#647364;font-size:8px;letter-spacing:2px}',
+      '#deepseekerVictory .victoryCredits{position:absolute;inset:0;z-index:3;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;opacity:0;pointer-events:none;background:rgba(2,5,4,.96);transition:opacity .9s ease}',
       '#deepseekerVictory.creditsActive .victoryCredits{opacity:1}',
-      '#deepseekerVictory .victoryCreditsRoll{width:min(680px,90vw);box-sizing:border-box;padding:0 12px 8vh;text-align:center;color:#d9d7c6;animation:victoryCreditsRoll 23s linear forwards}',
+      '#deepseekerVictory .victoryCreditsRoll{width:min(680px,90vw);box-sizing:border-box;padding:0 12px 8vh;text-align:center;color:#c4cebd;animation:victoryCreditsRoll 23s linear forwards}',
       '@keyframes victoryCreditsRoll{from{transform:translateY(105vh)}to{transform:translateY(-115%)}}',
-      '#deepseekerVictory .creditsTiny{font-size:10px;letter-spacing:4px;color:#8f9d84;margin-bottom:30px}',
-      '#deepseekerVictory .creditsHeading{font-size:clamp(32px,5vw,52px);font-weight:800;letter-spacing:8px;color:#fff4d4;margin-bottom:42px}',
-      '#deepseekerVictory .creditsLabel{font-size:9px;letter-spacing:3px;color:#84917b;margin:28px 0 9px}',
-      '#deepseekerVictory .creditsName{font-size:16px;letter-spacing:2px;color:#eee9d8;line-height:1.6}',
+      '#deepseekerVictory .creditsTiny{font-size:9px;letter-spacing:4px;color:#81917d;margin-bottom:30px}',
+      '#deepseekerVictory .creditsHeading{font-size:clamp(28px,5vw,46px);font-weight:500;letter-spacing:8px;color:#dce5d4;margin-bottom:42px}',
+      '#deepseekerVictory .creditsLabel{font-size:8px;letter-spacing:3px;color:#71836d;margin:28px 0 9px}',
+      '#deepseekerVictory .creditsName{font-size:14px;letter-spacing:2px;color:#c4cebd;line-height:1.6}',
       '#deepseekerVictory .creditsSpacer{height:50px}',
-      '#deepseekerVictory .creditsThanks{font-size:14px;letter-spacing:3px;line-height:2;color:#fff1ce}',
-      '#deepseekerVictory #victoryReturnButton{position:absolute;z-index:5;right:20px;bottom:18px;padding:12px 16px;border:1px solid #ffffff45;border-radius:8px;background:#070a08d9;color:#f5eacb;font:inherit;font-size:10px;letter-spacing:2px;cursor:pointer;pointer-events:auto;transition:background .2s,border-color .2s}',
-      '#deepseekerVictory #victoryReturnButton:hover{background:#293124;border-color:#f1dfab}'
+      '#deepseekerVictory .creditsThanks{font-size:12px;letter-spacing:3px;line-height:2;color:#dce5d4}',
+      '#deepseekerVictory #victoryReturnButton{position:absolute;z-index:5;right:clamp(24px,5vw,56px);bottom:clamp(24px,5vw,48px);padding:12px 15px;border:1px solid rgba(164,185,150,.35);border-radius:0;background:rgba(5,10,7,.94);color:#c8d9bc;font:inherit;font-size:9px;letter-spacing:2px;cursor:pointer;pointer-events:auto;transition:background .2s,border-color .2s}',
+      '#deepseekerVictory #victoryReturnButton:hover{background:#18251a;border-color:#a4c18b}',
+      '@media(max-width:560px){#deepseekerVictory .victoryHeader{align-items:flex-start;flex-direction:column}#deepseekerVictory .victoryReadout{grid-template-columns:1fr}#deepseekerVictory .victorySplash{padding:22px}#deepseekerVictory:after{inset:8px}}',
+      '@media(prefers-reduced-motion:reduce){#deepseekerVictory,#deepseekerVictory *{animation:none!important;transition:none!important}}'
     ].join("");
     if(!document.getElementById(style.id)) document.head.appendChild(style);
 
@@ -8396,14 +8401,20 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
     victoryOverlay.setAttribute("aria-label","You beat the game. Credits follow.");
     victoryOverlay.style.cssText="position:fixed;inset:0;opacity:0";
     victoryOverlay.innerHTML=[
-      '<div class="victoryConfetti" aria-hidden="true"></div>',
       '<section class="victorySplash" aria-live="polite">',
-      '<div class="victoryKicker">EXIT FOUND</div>',
-      '<div class="victoryPoppers" aria-hidden="true"><span>🎉</span><span>🎊</span></div>',
-      '<h1>YOU BEAT THE GAME!</h1>',
-      '<p class="victoryLead">You made it out. Thanks for playing.</p>',
-      '<p class="victoryMore">More levels coming.</p>',
-      '<p class="victoryCountdown">CREDITS BEGIN IN A MOMENT</p>',
+      '<header class="victoryHeader">',
+      '<div class="victoryKicker">FACILITY MAINTENANCE NETWORK</div>',
+      '<div class="victoryLog">RECORD 03-08 // FINAL ENTRY</div>',
+      '</header>',
+      '<div class="victoryStamp">SYSTEM STATUS: POWER RESTORED</div>',
+      '<h1>GATE SYSTEM<br><em>ONLINE</em></h1>',
+      '<p class="victoryLead">Three signal relays synchronized. Eight breakers reset. The maintenance gate is receiving power.</p>',
+      '<p class="victoryMore">The Poolrooms access point remains sealed in this build. The signal continues beyond this door.</p>',
+      '<div class="victoryReadout">',
+      '<div class="readoutCell"><span class="readoutLabel">SIGNAL RELAYS</span><span class="readoutValue">03 / 03  &nbsp; ONLINE</span></div>',
+      '<div class="readoutCell"><span class="readoutLabel">BREAKER CIRCUIT</span><span class="readoutValue">08 / 08  &nbsp; RESTORED</span></div>',
+      '</div>',
+      '<p class="victoryCountdown">END OF TRANSMISSION  //  ARCHIVE WILL FOLLOW</p>',
       '</section>',
       '<section class="victoryCredits" aria-label="Credits">',
       '<div class="victoryCreditsRoll">',
@@ -8418,24 +8429,14 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
       '<div class="creditsLabel">THIRD-PARTY ASSET ATTRIBUTIONS</div>',
       '<div class="creditsName">SEE THE INCLUDED LICENSE FILES</div>',
       '<div class="creditsSpacer"></div>',
+      '<div class="creditsThanks">TRANSMISSION ENDED</div>',
       '<div class="creditsThanks">THANK YOU FOR PLAYING</div>',
-      '<div class="creditsThanks">MORE LEVELS ARE ON THE WAY</div>',
       '</div>',
       '</section>',
-      '<button id="victoryReturnButton" type="button">BACK TO TITLE</button>'
+      '<button id="victoryReturnButton" type="button">RETURN TO TITLE</button>'
     ].join("");
     document.body.appendChild(victoryOverlay);
 
-    const confetti=victoryOverlay.querySelector(".victoryConfetti");
-    for(let i=0;i<96;i++){
-      const piece=document.createElement("i");
-      piece.style.setProperty("--confetti-left",(Math.random()*100)+"%");
-      piece.style.setProperty("--confetti-hue",String(Math.floor(Math.random()*360)));
-      piece.style.setProperty("--confetti-drift",Math.round((Math.random()-.5)*320)+"px");
-      piece.style.setProperty("--confetti-delay",(-Math.random()*5)+"s");
-      piece.style.setProperty("--confetti-duration",(3.8+Math.random()*3.7)+"s");
-      confetti.appendChild(piece);
-    }
     victoryOverlay.querySelector("#victoryReturnButton").addEventListener("click",()=>{
       location.href=location.pathname;
     });
@@ -8446,12 +8447,16 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
   const lead=victoryOverlay.querySelector(".victoryLead");
   const more=victoryOverlay.querySelector(".victoryMore");
   const countdown=victoryOverlay.querySelector(".victoryCountdown");
-  if(kicker)kicker.textContent=demo?"BACKROOMS: LOST SIGNAL // DEMO":"EXIT FOUND";
-  if(title)title.textContent=demo?"DEMO COMPLETE!":"YOU BEAT THE GAME!";
-  if(lead)lead.textContent=demo?"You finished the Backrooms demo.":"You made it out. Thanks for playing.";
-  if(more)more.textContent=demo?"The Poolrooms are saved for a future update.":"More levels coming.";
-  if(countdown)countdown.textContent=demo?"THANKS FOR PLAYTESTING":"CREDITS BEGIN IN A MOMENT";
-  victoryOverlay.setAttribute("aria-label",demo?"Demo complete. The Poolrooms are planned for a future update.":"You beat the game. Credits follow.");
+  const stamp=victoryOverlay.querySelector(".victoryStamp");
+  const readout=victoryOverlay.querySelector(".victoryReadout");
+  if(kicker)kicker.textContent=demo?"FACILITY MAINTENANCE NETWORK // DEMO":"FACILITY MAINTENANCE NETWORK";
+  if(title)title.innerHTML=demo?"GATE SYSTEM<br><em>ONLINE</em>":"EXIT ROUTE<br><em>CONFIRMED</em>";
+  if(lead)lead.textContent=demo?"Three signal relays synchronized. Eight breakers reset. The maintenance gate is receiving power.":"You reached the end of the signal. The route out is clear.";
+  if(more)more.textContent=demo?"The Poolrooms access point remains sealed in this build. The signal continues beyond this door.":"Thank you for playing Backrooms: Lost Signal.";
+  if(countdown)countdown.textContent=demo?"END OF TRANSMISSION  //  ARCHIVE WILL FOLLOW":"END OF RECORDING  //  ARCHIVE WILL FOLLOW";
+  if(stamp)stamp.textContent=demo?"SYSTEM STATUS: POWER RESTORED":"SYSTEM STATUS: EXIT CONFIRMED";
+  if(readout)readout.hidden=!demo;
+  victoryOverlay.setAttribute("aria-label",demo?"Demo complete. Signal relays and breaker circuit restored.":"Game complete. Exit route confirmed.");
 
   const activeOverlay=victoryOverlay;
   requestAnimationFrame(()=>{
