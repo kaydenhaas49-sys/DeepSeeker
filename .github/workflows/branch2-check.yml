@@ -1,8 +1,13 @@
-name: Validate BRANCH2 JavaScript
+name: Validate JavaScript
 
 on:
   push:
-    branches: ["BRANCH2"]
+    branches:
+      - "BRANCH2"
+      - "codex/deepseeker-high-autonomy"
+  pull_request:
+    branches:
+      - "BRANCH2"
   workflow_dispatch:
 
 permissions:
