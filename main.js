@@ -8332,10 +8332,8 @@ let adminBackroomsTestMapReturnState=null;
 let adminBackroomsTestMapWallCollision=null;
 let adminBackroomsTestMapCrawler=null;
 const ADMIN_BACKROOMS_TEST_MAP_ORIGIN=new THREE.Vector3(900,0,900);
-// The finite Backrooms spans 21 chunks x 64m = 1344m per side.
- // Scale the 32m test sample uniformly to match that full map footprint.
-const ADMIN_BACKROOMS_TEST_MAP_SCALE=
-  ((MAP_MAX_CHUNK-MAP_MIN_CHUNK+1)*CHUNK_SIZE)/32;
+// Keep the original 32m test sample, enlarged by 1.5× to 48m per side.
+const ADMIN_BACKROOMS_TEST_MAP_SCALE=1.5;
 const adminProjectiles=[];
 const ADMIN_PASSWORD="DEEPSEEKER";
 let storyStage=0;
