@@ -138,13 +138,47 @@ const SIGNAL_GLITCH_FRAGMENTS=Object.freeze([
   "IT IS ALREADY OPEN","LOOK AWAY FROM THE SCREEN","THE SCREEN IS LOOKING BACK","END OF MESSAGE",
 ]);
 
+const SIGNAL_ZALGO_ABOVE=Object.freeze([
+  "\\u0300","\\u0301","\\u0302","\\u0303","\\u0304","\\u0305",
+  "\\u0306","\\u0307","\\u0308","\\u0309","\\u030A","\\u030B",
+  "\\u030C","\\u030F","\\u0311","\\u0312","\\u0313","\\u0314",
+  "\\u033D","\\u0342","\\u0344","\\u0350"
+]);
+const SIGNAL_ZALGO_THROUGH=Object.freeze([
+  "\\u0334","\\u0335","\\u0336","\\u0337","\\u0338"
+]);
+const SIGNAL_ZALGO_BELOW=Object.freeze([
+  "\\u0316","\\u0317","\\u0318","\\u0319","\\u031C","\\u031D",
+  "\\u031E","\\u031F","\\u0320","\\u0323","\\u0324","\\u0325",
+  "\\u0326","\\u0327","\\u0328","\\u0329","\\u032A","\\u032B",
+  "\\u032C","\\u032D","\\u032E","\\u0330","\\u0331","\\u0332",
+  "\\u0333"
+]);
+
+function corruptSignalText(value){
+  const pick=marks=>marks[Math.floor(Math.random()*marks.length)];
+  return [...String(value??"")].map(character=>{
+    if(!/[A-Z0-9]/i.test(character))return character;
+
+    let corrupted=character;
+    const aboveCount=1+(Math.random()<.52?1:0)+(Math.random()<.12?1:0);
+    const belowCount=Math.random()<.28?0:1+(Math.random()<.34?1:0);
+    for(let i=0;i<aboveCount;i++)corrupted+=pick(SIGNAL_ZALGO_ABOVE);
+    if(Math.random()<.34)corrupted+=pick(SIGNAL_ZALGO_THROUGH);
+    for(let i=0;i<belowCount;i++)corrupted+=pick(SIGNAL_ZALGO_BELOW);
+    return corrupted;
+  }).join("");
+}
+
 function populateSignalGlitchNoise(){
   if(!signalGlitchNoise)return;
   const fragment=document.createDocumentFragment();
   for(let i=0;i<100;i++){
     const item=document.createElement("span");
     item.className="signalGlitchFragment";
-    item.textContent=SIGNAL_GLITCH_FRAGMENTS[Math.floor(Math.random()*SIGNAL_GLITCH_FRAGMENTS.length)];
+    const phrase=SIGNAL_GLITCH_FRAGMENTS[Math.floor(Math.random()*SIGNAL_GLITCH_FRAGMENTS.length)];
+    item.textContent=corruptSignalText(phrase);
+    item.setAttribute("aria-label",phrase);
     item.style.left=(Math.random()*94)+"%";
     item.style.top=(Math.random()*96)+"%";
     item.style.setProperty("--signal-duration",(5.2+Math.random()*5.8)+"s");
