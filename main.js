@@ -241,8 +241,7 @@ tutorialGuide.style.cssText=[
   "transition:opacity .22s ease,transform .22s ease"
 ].join(";");
 tutorialGuide.innerHTML=
-  '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">'+
-    '<span id="tutorialGuideLabel" style="font-size:8px;letter-spacing:3px;color:#989174">FIELD TUTORIAL</span>'+
+  '<div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:8px">'+
     '<span id="tutorialGuideStep" style="font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.5px;color:#7f7c69">01/09</span>'+
   '</div>'+
   '<div id="tutorialGuideAction" style="font-size:15px;letter-spacing:1.4px;color:#eee8cb"></div>'+
@@ -5632,9 +5631,7 @@ function ensureSpiderDodgeQTE(){
     "letter-spacing:2px","text-align:center","pointer-events:auto","backdrop-filter:blur(8px)"
   ].join(";");
   element.innerHTML=
-    '<div style="color:#d2b97a;font-size:9px;letter-spacing:4px">IMPACT IMMINENT</div>'+
-    '<div style="margin:10px 0 5px;font-size:clamp(24px,5vw,38px);letter-spacing:5px">DODGE!</div>'+
-    '<div style="margin-bottom:16px;color:#aaa58e;font-size:10px;letter-spacing:1.5px">MOVE OUT OF THE WAY</div>'+
+    '<div style="margin:0 0 16px;font-size:clamp(24px,5vw,38px);letter-spacing:5px">DODGE!</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
     '<button type="button" data-dodge="left" style="min-height:52px;border:1px solid #8f825d;border-radius:4px;background:#171a13;color:#f1e7c5;font:600 11px ui-monospace,monospace;letter-spacing:1.5px;cursor:pointer">A · LEFT</button>'+
     '<button type="button" data-dodge="right" style="min-height:52px;border:1px solid #8f825d;border-radius:4px;background:#171a13;color:#f1e7c5;font:600 11px ui-monospace,monospace;letter-spacing:1.5px;cursor:pointer">D · RIGHT</button></div>'+
@@ -8477,20 +8474,13 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
       '#deepseekerVictory:after{content:"";position:absolute;inset:18px;border:1px solid rgba(157,178,145,.12);pointer-events:none}',
       '#deepseekerVictory .victorySplash{position:relative;z-index:2;width:min(780px,92vw);box-sizing:border-box;padding:clamp(22px,5vw,54px);border:1px solid rgba(164,185,150,.25);background:linear-gradient(135deg,rgba(12,18,14,.94),rgba(4,8,6,.96));box-shadow:0 24px 90px #0009; text-align:left;transition:opacity .8s ease,transform .8s ease}',
       '#deepseekerVictory.creditsActive .victorySplash{opacity:0;transform:translateY(-14px);pointer-events:none}',
-      '#deepseekerVictory .victoryHeader{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-bottom:16px;border-bottom:1px solid rgba(164,185,150,.2);font-size:9px;letter-spacing:2px;color:#879783}',
-      '#deepseekerVictory .victoryKicker{display:flex;align-items:center;gap:9px}',
-      '#deepseekerVictory .victoryKicker:before{content:"";width:7px;height:7px;border-radius:50%;background:#a4c18b;box-shadow:0 0 10px #a4c18b88}',
-      '#deepseekerVictory .victoryLog{white-space:nowrap;color:#667568}',
-      '#deepseekerVictory .victoryStamp{display:inline-block;margin:clamp(26px,5vh,42px) 0 14px;padding:7px 10px;border:1px solid rgba(164,193,139,.42);color:#a4c18b;font-size:9px;letter-spacing:2px}',
       '#deepseekerVictory h1{margin:0;color:#e2e8d9;font-family:Arial,Helvetica,sans-serif;font-size:clamp(34px,7vw,68px);font-weight:500;letter-spacing:clamp(1px,.4vw,5px);line-height:.98}',
       '#deepseekerVictory h1 em{font-style:normal;color:#a4c18b}',
       '#deepseekerVictory .victoryLead{max-width:570px;margin:24px 0 8px;color:#c8d0c1;font-family:Arial,Helvetica,sans-serif;font-size:clamp(14px,2vw,17px);line-height:1.6}',
-      '#deepseekerVictory .victoryMore{max-width:570px;margin:0;color:#879487;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.75}',
       '#deepseekerVictory .victoryReadout{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px;padding-top:18px;border-top:1px solid rgba(164,185,150,.18)}',
       '#deepseekerVictory .readoutCell{padding:12px 14px;border-left:2px solid #718b65;background:rgba(126,155,107,.07)}',
       '#deepseekerVictory .readoutLabel{display:block;margin-bottom:7px;color:#728071;font-size:8px;letter-spacing:2px}',
       '#deepseekerVictory .readoutValue{color:#c8d9bc;font-size:12px;letter-spacing:1px}',
-      '#deepseekerVictory .victoryCountdown{margin:24px 0 0;color:#647364;font-size:8px;letter-spacing:2px}',
       '#deepseekerVictory .victoryCredits{position:absolute;inset:0;z-index:3;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;opacity:0;pointer-events:none;background:rgba(2,5,4,.96);transition:opacity .9s ease}',
       '#deepseekerVictory.creditsActive .victoryCredits{opacity:1}',
       '#deepseekerVictory .victoryCreditsRoll{width:min(680px,90vw);box-sizing:border-box;padding:0 12px 8vh;text-align:center;color:#c4cebd;animation:victoryCreditsRoll 23s linear forwards}',
@@ -8503,7 +8493,7 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
       '#deepseekerVictory .creditsThanks{font-size:12px;letter-spacing:3px;line-height:2;color:#dce5d4}',
       '#deepseekerVictory #victoryReturnButton{position:absolute;z-index:5;right:clamp(24px,5vw,56px);bottom:clamp(24px,5vw,48px);padding:12px 15px;border:1px solid rgba(164,185,150,.35);border-radius:0;background:rgba(5,10,7,.94);color:#c8d9bc;font:inherit;font-size:9px;letter-spacing:2px;cursor:pointer;pointer-events:auto;transition:background .2s,border-color .2s}',
       '#deepseekerVictory #victoryReturnButton:hover{background:#18251a;border-color:#a4c18b}',
-      '@media(max-width:560px){#deepseekerVictory .victoryHeader{align-items:flex-start;flex-direction:column}#deepseekerVictory .victoryReadout{grid-template-columns:1fr}#deepseekerVictory .victorySplash{padding:22px}#deepseekerVictory:after{inset:8px}}',
+      '@media(max-width:560px){#deepseekerVictory .victoryReadout{grid-template-columns:1fr}#deepseekerVictory .victorySplash{padding:22px}#deepseekerVictory:after{inset:8px}}',
       '@media(prefers-reduced-motion:reduce){#deepseekerVictory,#deepseekerVictory *{animation:none!important;transition:none!important}}'
     ].join("");
     if(!document.getElementById(style.id)) document.head.appendChild(style);
@@ -8516,19 +8506,12 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
     victoryOverlay.style.cssText="position:fixed;inset:0;opacity:0";
     victoryOverlay.innerHTML=[
       '<section class="victorySplash" aria-live="polite">',
-      '<header class="victoryHeader">',
-      '<div class="victoryKicker">FACILITY MAINTENANCE NETWORK</div>',
-      '<div class="victoryLog">RECORD 03-08 // FINAL ENTRY</div>',
-      '</header>',
-      '<div class="victoryStamp">SYSTEM STATUS: POWER RESTORED</div>',
       '<h1>GATE SYSTEM<br><em>ONLINE</em></h1>',
       '<p class="victoryLead">Three signal relays synchronized. Eight breakers reset. The maintenance gate is receiving power.</p>',
-      '<p class="victoryMore">The Poolrooms access point remains sealed in this build. The signal continues beyond this door.</p>',
       '<div class="victoryReadout">',
       '<div class="readoutCell"><span class="readoutLabel">SIGNAL RELAYS</span><span class="readoutValue">03 / 03  &nbsp; ONLINE</span></div>',
       '<div class="readoutCell"><span class="readoutLabel">BREAKER CIRCUIT</span><span class="readoutValue">08 / 08  &nbsp; RESTORED</span></div>',
       '</div>',
-      '<p class="victoryCountdown">END OF TRANSMISSION  //  ARCHIVE WILL FOLLOW</p>',
       '</section>',
       '<section class="victoryCredits" aria-label="Credits">',
       '<div class="victoryCreditsRoll">',
@@ -8544,7 +8527,6 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
       '<div class="creditsName">SEE THE INCLUDED LICENSE FILES</div>',
       '<div class="creditsSpacer"></div>',
       '<div class="creditsThanks">TRANSMISSION ENDED</div>',
-      '<div class="creditsThanks">THANK YOU FOR PLAYING</div>',
       '</div>',
       '</section>',
       '<button id="victoryReturnButton" type="button">RETURN TO TITLE</button>'
@@ -8556,19 +8538,11 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
     });
   }
 
-  const kicker=victoryOverlay.querySelector(".victoryKicker");
   const title=victoryOverlay.querySelector(".victorySplash h1");
   const lead=victoryOverlay.querySelector(".victoryLead");
-  const more=victoryOverlay.querySelector(".victoryMore");
-  const countdown=victoryOverlay.querySelector(".victoryCountdown");
-  const stamp=victoryOverlay.querySelector(".victoryStamp");
   const readout=victoryOverlay.querySelector(".victoryReadout");
-  if(kicker)kicker.textContent=demo?"FACILITY MAINTENANCE NETWORK // DEMO":"FACILITY MAINTENANCE NETWORK";
   if(title)title.innerHTML=demo?"GATE SYSTEM<br><em>ONLINE</em>":"EXIT ROUTE<br><em>CONFIRMED</em>";
   if(lead)lead.textContent=demo?"Three signal relays synchronized. Eight breakers reset. The maintenance gate is receiving power.":"You reached the end of the signal. The route out is clear.";
-  if(more)more.textContent=demo?"The Poolrooms access point remains sealed in this build. The signal continues beyond this door.":"Thank you for playing Backrooms: Lost Signal.";
-  if(countdown)countdown.textContent=demo?"END OF TRANSMISSION  //  ARCHIVE WILL FOLLOW":"END OF RECORDING  //  ARCHIVE WILL FOLLOW";
-  if(stamp)stamp.textContent=demo?"SYSTEM STATUS: POWER RESTORED":"SYSTEM STATUS: EXIT CONFIRMED";
   if(readout)readout.hidden=!demo;
   victoryOverlay.setAttribute("aria-label",demo?"Demo complete. Signal relays and breaker circuit restored.":"Game complete. Exit route confirmed.");
 
@@ -8595,9 +8569,7 @@ function ensurePauseMenu(){
       "#deepseekerPause{position:fixed;inset:0;z-index:11000;display:none;place-items:center;padding:20px;box-sizing:border-box;background:rgba(2,4,3,.84);backdrop-filter:blur(8px);color:#eee7ca;font-family:system-ui,-apple-system,sans-serif}",
       "#deepseekerPause.visible{display:grid}",
       "#deepseekerPause .pauseCard{width:min(440px,calc(100vw - 32px));box-sizing:border-box;padding:clamp(24px,5vw,40px);border:1px solid rgba(229,218,170,.20);border-radius:16px;background:linear-gradient(150deg,rgba(20,23,18,.98),rgba(5,7,5,.99));box-shadow:0 25px 90px #000b;text-align:center}",
-      "#deepseekerPause .pauseKicker{font-size:9px;letter-spacing:3px;color:#8f927b}",
       "#deepseekerPause h1{margin:12px 0;font-size:clamp(28px,7vw,42px);letter-spacing:6px;font-weight:500;color:#eee6c4}",
-      "#deepseekerPause p{font-size:13px;line-height:1.6;color:#ada991}",
       "#deepseekerPause .pauseActions{display:grid;gap:9px;margin-top:24px}",
       "#deepseekerPause button{min-height:46px;padding:12px 16px;border:1px solid rgba(229,218,170,.25);border-radius:9px;background:rgba(216,201,138,.08);color:#eee6c4;font:inherit;font-size:11px;letter-spacing:2px;cursor:pointer}",
       "#deepseekerPause button:hover{background:rgba(216,201,138,.16);border-color:rgba(216,201,138,.50)}",
@@ -8622,9 +8594,7 @@ function ensurePauseMenu(){
   pauseOverlay.setAttribute("aria-hidden","true");
   pauseOverlay.innerHTML=[
     '<section class="pauseCard">',
-    '<div class="pauseKicker">BACKROOMS: LOST SIGNAL</div>',
     '<h1>PAUSED</h1>',
-    '<p>Your game is paused.</p>',
     '<div class="pauseActions">',
     '<button id="pauseResume" type="button">RESUME</button>',
     '<button id="pauseReturn" type="button">RETURN TO TITLE</button>',
