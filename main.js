@@ -173,7 +173,7 @@ function corruptSignalText(value){
 function populateSignalGlitchNoise(){
   if(!signalGlitchNoise)return;
   const fragment=document.createDocumentFragment();
-  for(let i=0;i<100;i++){
+  for(let i=0;i<22;i++){
     const item=document.createElement("span");
     item.className="signalGlitchFragment";
     const phrase=SIGNAL_GLITCH_FRAGMENTS[Math.floor(Math.random()*SIGNAL_GLITCH_FRAGMENTS.length)];
@@ -197,7 +197,7 @@ function populateSignalGlitchNoise(){
 function showSignalGlitch(message,detail="",duration=3600){
   if(!signalGlitchOverlay||!signalGlitchMessage||!signalGlitchNoise)return;
   const headline=String(message||"UNKNOWN SIGNAL").trim().slice(0,100).toUpperCase();
-  const subline=String(detail||"").trim().slice(0,220).toUpperCase();
+  const subline=String(detail||"").trim().slice(0,120).toUpperCase();
   const generation=++signalGlitchGeneration;
   window.clearTimeout(signalGlitchTimer);
 
