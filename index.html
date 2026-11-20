@@ -23,6 +23,126 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 .meter i{display:block;height:100%;width:100%;background:#d4c98e;transition:width .08s}
 #battery i{background:#d3d0ab}
 #event{position:absolute;left:50%;top:25%;transform:translate(-50%,-50%);font-size:14px;letter-spacing:4px;color:#d6cfa8;text-align:center;text-shadow:0 0 18px #000;opacity:0;transition:opacity .2s}
+
+/* Unstable signal transmission: deliberately intrusive, brief, and diegetic. */
+#signalGlitch{
+  position:fixed;inset:0;z-index:18;display:grid;place-items:center;overflow:hidden;
+  pointer-events:none;visibility:hidden;opacity:0;
+  color:#fff0ed;
+  background:
+    radial-gradient(ellipse at 50% 48%,rgba(158,8,12,.78) 0%,rgba(82,0,4,.91) 48%,rgba(7,0,2,.985) 100%),
+    #180003;
+  transition:opacity .24s ease,visibility 0s linear .28s;
+  isolation:isolate;
+}
+#signalGlitch.active{visibility:visible;opacity:1;transition:opacity .12s ease}
+#signalGlitch::before{
+  content:"";position:absolute;inset:-20%;z-index:0;pointer-events:none;opacity:.34;
+  background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,210,205,.10) 4px,transparent 5px),
+    repeating-linear-gradient(90deg,transparent 0 31px,rgba(255,80,80,.055) 32px,transparent 33px);
+  mix-blend-mode:screen;animation:signalScan 7s linear infinite;
+}
+#signalGlitch::after{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse,transparent 20%,rgba(0,0,0,.16) 62%,rgba(0,0,0,.82) 110%),
+    linear-gradient(90deg,rgba(0,0,0,.48),transparent 18% 82%,rgba(0,0,0,.48));
+  box-shadow:inset 0 0 0 1px rgba(255,80,80,.15),inset 0 0 90px rgba(0,0,0,.75);
+}
+#signalGlitchNoise{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.9}
+.signalGlitchFragment{
+  position:absolute;display:block;max-width:38vw;overflow:hidden;white-space:nowrap;
+  color:rgba(255,170,165,.48);font:600 10px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:var(--signal-spacing,2px);text-shadow:0 0 8px rgba(255,30,40,.7);
+  opacity:0;will-change:opacity,transform;
+  animation:signalFragmentFade var(--signal-duration,7s) ease-in-out var(--signal-delay,0s) infinite;
+}
+.signalGlitchFragment:nth-child(3n){color:rgba(255,225,218,.32);font-size:12px}
+.signalGlitchFragment:nth-child(4n){color:rgba(255,65,72,.48);filter:blur(.35px)}
+.signalGlitchCore{
+  position:relative;z-index:3;width:min(1050px,92vw);padding:clamp(22px,5vw,64px);
+  box-sizing:border-box;text-align:center;
+  border-top:1px solid rgba(255,120,120,.25);border-bottom:1px solid rgba(255,120,120,.22);
+  background:linear-gradient(90deg,transparent,rgba(14,0,2,.42) 18% 82%,transparent);
+  text-shadow:0 2px 18px rgba(0,0,0,.95);
+}
+#signalGlitchEyebrow{
+  margin:0 0 clamp(18px,3vh,30px);color:rgba(255,176,169,.78);
+  font:600 9px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:clamp(2px,.7vw,6px);text-transform:uppercase;
+}
+#signalGlitchMessage{
+  position:relative;display:inline-block;max-width:100%;margin:0;
+  color:#fff2ee;font:900 clamp(28px,6.5vw,78px)/1.05 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:clamp(2px,.75vw,10px);text-transform:uppercase;overflow-wrap:anywhere;
+  text-shadow:0 0 7px rgba(255,220,210,.8),0 0 28px rgba(255,0,18,.8),0 4px 2px #240004;
+  animation:signalCoreFlicker 2.8s steps(1,end) infinite;
+}
+#signalGlitchMessage.long{font-size:clamp(21px,4vw,48px);letter-spacing:clamp(1px,.35vw,5px)}
+#signalGlitchMessage::before,#signalGlitchMessage::after{
+  content:attr(data-text);position:absolute;inset:0;overflow:hidden;pointer-events:none;
+  white-space:inherit;overflow-wrap:inherit;
+}
+#signalGlitchMessage::before{
+  color:#ff4b56;transform:translateX(-2px);mix-blend-mode:screen;
+  clip-path:inset(0 0 68% 0);animation:signalSliceRed 1.9s steps(2,end) infinite;
+}
+#signalGlitchMessage::after{
+  color:#ffd7d0;transform:translateX(2px);mix-blend-mode:screen;
+  clip-path:inset(72% 0 0 0);animation:signalSliceWhite 2.3s steps(2,end) infinite;
+}
+#signalGlitchDetail{
+  max-width:760px;margin:clamp(18px,3vh,28px) auto 0;
+  color:rgba(255,220,213,.86);font:500 clamp(11px,1.55vw,15px)/1.75 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:clamp(1px,.22vw,2px);text-transform:uppercase;
+  text-shadow:0 0 14px rgba(255,0,25,.85);
+}
+#signalGlitchFooter{
+  margin:clamp(22px,4vh,38px) 0 0;color:rgba(255,95,100,.72);
+  font:600 8px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:4px;
+}
+#signalGlitch.active .signalGlitchCore{animation:signalCoreEnter .28s steps(3,end) both}
+@keyframes signalFragmentFade{
+  0%,100%{opacity:0;transform:translate3d(0,12px,0) skewX(-5deg)}
+  13%{opacity:.35}28%{opacity:.08;transform:translate3d(-9px,-3px,0) skewX(4deg)}
+  46%{opacity:.48;transform:translate3d(5px,-12px,0) skewX(-2deg)}
+  64%{opacity:.12}78%{opacity:.31;transform:translate3d(-5px,4px,0) skewX(3deg)}
+}
+@keyframes signalCoreFlicker{
+  0%,91%,94%,97%,100%{opacity:1;filter:none}
+  92%{opacity:.68;filter:contrast(1.8) brightness(1.7);transform:translateX(3px)}
+  93%{opacity:.92;transform:translateX(-2px)}
+  96%{opacity:.48;filter:blur(.7px)}
+}
+@keyframes signalSliceRed{
+  0%,82%,100%{clip-path:inset(0 0 83% 0);transform:translate(-3px,-1px)}
+  84%{clip-path:inset(18% 0 55% 0);transform:translate(5px,1px)}
+  86%{clip-path:inset(62% 0 18% 0);transform:translate(-6px,0)}
+  88%{clip-path:inset(0 0 83% 0);transform:translate(2px,1px)}
+}
+@keyframes signalSliceWhite{
+  0%,74%,100%{clip-path:inset(78% 0 0 0);transform:translate(3px,1px)}
+  76%{clip-path:inset(38% 0 42% 0);transform:translate(-5px,-1px)}
+  78%{clip-path:inset(84% 0 4% 0);transform:translate(6px,0)}
+}
+@keyframes signalCoreEnter{
+  0%{opacity:0;transform:scale(1.025) skewX(5deg);filter:blur(3px)}
+  35%{opacity:1;transform:translateX(-5px) skewX(-2deg)}
+  55%{transform:translateX(4px) skewX(1deg)}
+  100%{opacity:1;transform:none;filter:none}
+}
+@keyframes signalScan{to{transform:translateY(8%)}}
+@media(prefers-reduced-motion:reduce){
+  #signalGlitch::before,.signalGlitchFragment,#signalGlitchMessage,
+  #signalGlitchMessage::before,#signalGlitchMessage::after,
+  #signalGlitch.active .signalGlitchCore{animation:none!important}
+  .signalGlitchFragment{opacity:.14}
+}
+@media(max-width:600px){
+  .signalGlitchCore{padding:24px 12px}
+  #signalGlitchEyebrow{letter-spacing:2px}
+  #signalGlitchFooter{letter-spacing:2px}
+  .signalGlitchFragment{max-width:55vw;font-size:8px}
+}
 #controlsPanel{position:fixed;inset:0;z-index:12;display:grid;place-items:center;background:rgba(0,0,0,.76);backdrop-filter:blur(7px);color:#ddd}
 #controlsPanel.hidden{display:none}
 #controlsBox{width:min(680px,calc(100vw - 42px));padding:28px;border:1px solid #fff2;border-radius:18px;background:#090b09f5;box-shadow:0 25px 100px #000}
@@ -447,6 +567,15 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
     <div id="multiplayerStatus">MULTIPLAYER · OFFLINE</div>
   </div>
   <div id="event"></div>
+<div id="signalGlitch" aria-hidden="true">
+  <div id="signalGlitchNoise" aria-hidden="true"></div>
+  <div class="signalGlitchCore">
+    <p id="signalGlitchEyebrow">INCOMING TRANSMISSION // FREQUENCY UNKNOWN</p>
+    <h1 id="signalGlitchMessage" data-text="">SIGNAL LOST</h1>
+    <p id="signalGlitchDetail"></p>
+    <p id="signalGlitchFooter">DO NOT TRUST THE SIGNAL</p>
+  </div>
+</div>
   <div id="hudRight">
     <div class="meterLabel"><span>STAMINA</span><span id="staminaValue">100</span></div>
     <div class="meter"><i id="staminaBar"></i></div>

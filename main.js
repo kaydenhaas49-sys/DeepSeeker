@@ -103,6 +103,67 @@ const staminaValue=document.getElementById("staminaValue");
 const batteryBar=document.getElementById("batteryBar");
 const batteryValue=document.getElementById("batteryValue");
 const eventText=document.getElementById("event");
+const signalGlitchOverlay=document.getElementById("signalGlitch");
+const signalGlitchNoise=document.getElementById("signalGlitchNoise");
+const signalGlitchMessage=document.getElementById("signalGlitchMessage");
+const signalGlitchDetail=document.getElementById("signalGlitchDetail");
+let signalGlitchTimer=0;
+let signalGlitchGeneration=0;
+
+const SIGNAL_GLITCH_FRAGMENTS=Object.freeze([
+  "I CAN HEAR YOU","DO NOT TURN AROUND","NO CARRIER","STAY OFF CHANNEL 03",
+  "WE WERE HERE FIRST","CAN YOU SEE THIS","SIGNAL BELOW FLOOR LEVEL",
+  "DON'T ANSWER","IT KNOWS YOUR NAME","THERE IS NO EXIT","PLEASE REPEAT",
+  "WRONG FREQUENCY","SOMETHING IS LISTENING","YOU MISSED A STEP",
+  "THE LIGHTS ARE NOT FAILING","I FOUND THE DOOR","STOP TRANSMITTING",
+  "WE NEVER LEFT","LOOK AT THE WALL","ARE YOU STILL THERE","NOT YOUR VOICE",
+  "00 01 00 11 01","//// NO SIGNAL ////","CH 0? 0?","M M M M M",
+  "THE ROOM IS OCCUPIED","BEHIND THE STATIC","DO NOT FOLLOW THE VOICE",
+  "IT IS CLOSER NOW","CAN YOU HEAR THE WATER","THIS MESSAGE IS OLD"
+]);
+
+function populateSignalGlitchNoise(){
+  if(!signalGlitchNoise)return;
+  const fragment=document.createDocumentFragment();
+  for(let i=0;i<58;i++){
+    const item=document.createElement("span");
+    item.className="signalGlitchFragment";
+    item.textContent=SIGNAL_GLITCH_FRAGMENTS[Math.floor(Math.random()*SIGNAL_GLITCH_FRAGMENTS.length)];
+    item.style.left=(Math.random()*94)+"%";
+    item.style.top=(Math.random()*96)+"%";
+    item.style.setProperty("--signal-duration",(4.2+Math.random()*7.8)+"s");
+    item.style.setProperty("--signal-delay",(-Math.random()*9)+"s");
+    item.style.setProperty("--signal-spacing",(1+Math.random()*3)+"px");
+    if(Math.random()<.22)item.style.filter="blur(1px)";
+    fragment.appendChild(item);
+  }
+  signalGlitchNoise.replaceChildren(fragment);
+}
+
+function showSignalGlitch(message,detail="",duration=3600){
+  if(!signalGlitchOverlay||!signalGlitchMessage||!signalGlitchNoise)return;
+  const headline=String(message||"UNKNOWN SIGNAL").trim().slice(0,100).toUpperCase();
+  const subline=String(detail||"").trim().slice(0,220).toUpperCase();
+  const generation=++signalGlitchGeneration;
+  window.clearTimeout(signalGlitchTimer);
+
+  signalGlitchMessage.textContent=headline;
+  signalGlitchMessage.dataset.text=headline;
+  signalGlitchMessage.classList.toggle("long",headline.length>26);
+  signalGlitchDetail.textContent=subline;
+  populateSignalGlitchNoise();
+  signalGlitchOverlay.setAttribute("aria-hidden","false");
+  signalGlitchOverlay.classList.remove("active");
+  void signalGlitchOverlay.offsetWidth;
+  signalGlitchOverlay.classList.add("active");
+
+  signalGlitchTimer=window.setTimeout(()=>{
+    if(generation!==signalGlitchGeneration)return;
+    signalGlitchOverlay.classList.remove("active");
+    signalGlitchOverlay.setAttribute("aria-hidden","true");
+  },Math.max(1400,Number(duration)||3600));
+}
+
 const objective=document.getElementById("objective");
 const equipmentStatus=document.getElementById("equipmentStatus");
 const hudRight=document.getElementById("hudRight");
@@ -1792,8 +1853,8 @@ function activateMissionRelay(index,{broadcast=true}={}){
     ["RELAY THREE ONLINE","The last relay locks onto a signal beyond the Poolrooms door."]
   ][index];
   recordMissionLog(details[0],details[1]);
-  eventText.textContent=details[0];
-  eventText.style.opacity="1";
+  showSignalGlitch(details[0],details[1],index===0?4600:3600);
+  eventText.style.opacity="0";
   refreshMissionState({broadcast});
   if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
   return true;
@@ -8695,9 +8756,12 @@ function applyStoryStage(index, announce=true){
   renderStoryLog();
 
   if(announce && storyStage>0){
-    eventText.textContent=entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "NEW NOTE FROM ????";
-    eventText.style.opacity="1";
-    setTimeout(()=>{eventText.style.opacity="0";},2200);
+    showSignalGlitch(
+      entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "NEW NOTE FROM ????",
+      entry.text,
+      3400
+    );
+    eventText.style.opacity="0";
   }
 }
 
