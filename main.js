@@ -147,9 +147,13 @@ function populateSignalGlitchNoise(){
     item.textContent=SIGNAL_GLITCH_FRAGMENTS[Math.floor(Math.random()*SIGNAL_GLITCH_FRAGMENTS.length)];
     item.style.left=(Math.random()*94)+"%";
     item.style.top=(Math.random()*96)+"%";
-    item.style.setProperty("--signal-duration",(4.2+Math.random()*7.8)+"s");
-    item.style.setProperty("--signal-delay",(-Math.random()*9)+"s");
+    item.style.setProperty("--signal-duration",(5.2+Math.random()*5.8)+"s");
+    item.style.setProperty("--signal-delay",(-Math.random()*11)+"s");
     item.style.setProperty("--signal-spacing",(1+Math.random()*3)+"px");
+    const driftX=(12+Math.random()*34)*(Math.random()<.5?-1:1);
+    const driftY=(10+Math.random()*28)*(Math.random()<.5?-1:1);
+    item.style.setProperty("--signal-drift-x",driftX+"px");
+    item.style.setProperty("--signal-drift-y",driftY+"px");
     if(Math.random()<.22)item.style.filter="blur(1px)";
     fragment.appendChild(item);
   }

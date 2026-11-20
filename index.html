@@ -51,8 +51,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 #signalGlitchNoise{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.9}
 .signalGlitchFragment{
   position:absolute;display:block;max-width:38vw;overflow:hidden;white-space:nowrap;
-  color:rgba(255,170,165,.48);font:600 10px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;
-  letter-spacing:var(--signal-spacing,2px);text-shadow:0 0 8px rgba(255,30,40,.7);
+  color:rgba(255,190,184,.62);font:600 10px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:var(--signal-spacing,2px);text-shadow:0 0 10px rgba(255,30,40,.8);
   opacity:0;will-change:opacity,transform;
   animation:signalFragmentFade var(--signal-duration,7s) ease-in-out var(--signal-delay,0s) infinite;
 }
@@ -102,10 +102,13 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 }
 #signalGlitch.active .signalGlitchCore{animation:signalCoreEnter .28s steps(3,end) both}
 @keyframes signalFragmentFade{
-  0%,100%{opacity:0;transform:translate3d(0,12px,0) skewX(-5deg)}
-  13%{opacity:.35}28%{opacity:.08;transform:translate3d(-9px,-3px,0) skewX(4deg)}
-  46%{opacity:.48;transform:translate3d(5px,-12px,0) skewX(-2deg)}
-  64%{opacity:.12}78%{opacity:.31;transform:translate3d(-5px,4px,0) skewX(3deg)}
+  0%,100%{opacity:0;transform:translate3d(0,22px,0) skewX(-7deg) scale(.96)}
+  14%{opacity:0;transform:translate3d(0,14px,0) skewX(-4deg) scale(.98)}
+  25%{opacity:.72;transform:translate3d(calc(var(--signal-drift-x,18px)*-.28),calc(var(--signal-drift-y,-16px)*-.15),0) skewX(3deg) scale(1)}
+  48%{opacity:.86;transform:translate3d(var(--signal-drift-x,18px),var(--signal-drift-y,-16px),0) skewX(-2deg) scale(1.02)}
+  70%{opacity:.24;transform:translate3d(calc(var(--signal-drift-x,18px)*-.45),calc(var(--signal-drift-y,-16px)*.65),0) skewX(4deg) scale(1)}
+  86%{opacity:.62;transform:translate3d(calc(var(--signal-drift-x,18px)*.35),calc(var(--signal-drift-y,-16px)*-.45),0) skewX(-3deg) scale(.99)}
+  96%{opacity:0;transform:translate3d(0,-18px,0) skewX(5deg) scale(.97)}
 }
 @keyframes signalCoreFlicker{
   0%,91%,94%,97%,100%{opacity:1;filter:none}
