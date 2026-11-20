@@ -1763,7 +1763,7 @@ function refreshMissionState({broadcast=false}={}){
     missionState.relays.every(Boolean)&&missionState.breakerSolved
   );
   storyMissionWorld?.syncState(missionState,{
-    tutorialActive:Boolean(tutorialOpenRoomActive||(gameStarted&&houseTutorialStage>0&&houseTutorialStage<9)),
+    tutorialActive:Boolean(tutorialOpenRoomActive),
     poolroomsActive,
     missionVisible:true
   });
@@ -6342,7 +6342,7 @@ function prepareHouseTutorialSpider(){
 }
 
 function updateTutorialGuide(){
-  if(!tutorialGuide || !gameStarted || houseMode || houseTutorialStage<=0 || houseTutorialStage>=9){
+  if(!tutorialGuide || !gameStarted || houseMode || !tutorialOpenRoomActive || houseTutorialStage<=0 || houseTutorialStage>=9){
     tutorialGuide.style.opacity="0";
     tutorialGuide.style.transform="translateX(-50%) translateY(10px)";
     return;
@@ -6372,7 +6372,7 @@ function updateTutorialGuide(){
 }
 
 function setHouseTutorialStage(stage){
-  if(!gameStarted || houseMode) return;
+  if(!gameStarted || houseMode || !tutorialOpenRoomActive) return;
 
   houseTutorialStage=stage;
   if(stage===1){
@@ -8848,7 +8848,7 @@ function toggleFlashlight(){
   updateEquipmentStatus();
   multiplayer.sendState(true);
 
-  if(!houseMode && gameStarted && houseTutorialStage===4 && flashlightOn){
+  if(tutorialOpenRoomActive && !houseMode && gameStarted && houseTutorialStage===4 && flashlightOn){
     setHouseTutorialStage(5);
   }
 }
@@ -9148,14 +9148,14 @@ function togglePhone(){
     crosshair.style.display="none";
     refreshPhoneContent();
 
-    if(!houseMode && gameStarted && houseTutorialStage===5){
+    if(tutorialOpenRoomActive && !houseMode && gameStarted && houseTutorialStage===5){
       setHouseTutorialStage(6);
     }
   }else{
     adminOverlay.classList.remove("open");
     adminOverlay.setAttribute("aria-hidden","true");
 
-    if(!houseMode && gameStarted){
+    if(tutorialOpenRoomActive && !houseMode && gameStarted){
       if(houseTutorialStage===0){
         setHouseTutorialStage(1);
       }else if(houseTutorialStage===6){
