@@ -1944,8 +1944,11 @@ async function enterPoolroomsLevel({broadcast=true}={}){
   spiderBehaviorState="idle";
   spiderBehaviorTime=0;
   normalSpiderHunter.hide();
-  spiderEntity.visible=false;
+  spiderEntity.visible=Boolean(spiderModel);
+  if(spiderModel)spiderModel.visible=true;
+  setSpiderAnimation("walk",true);
   spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
   spiderRevealLight.intensity=0;
   player.movementFrozen=false;
   clearSpiderPath();
@@ -8327,6 +8330,7 @@ let adminBackroomsTestMapActive=false;
 let adminBackroomsTestMapRoot=null;
 let adminBackroomsTestMapReturnState=null;
 let adminBackroomsTestMapWallCollision=null;
+let adminBackroomsTestMapCrawler=null;
 const ADMIN_BACKROOMS_TEST_MAP_ORIGIN=new THREE.Vector3(900,0,900);
 const adminProjectiles=[];
 const ADMIN_PASSWORD="DEEPSEEKER";
@@ -9027,6 +9031,113 @@ function updateAdminFly(){
 }
 
 
+function createAdminBackroomsTestMapCrawler(){
+  // Use the live gameplay entity itself: no cloned rig, replacement materials,
+  // separate mixer, or scale changes.
+  if(!spiderModel || spiderModel.parent!==spiderEntity)return null;
+
+  const point=(x,y,z,nx,ny,nz)=>({
+    position:new THREE.Vector3(x,y,z),
+    normal:new THREE.Vector3(nx,ny,nz)
+  });
+
+  // Follow the actual wall and ceiling surfaces, then return across the floor.
+  const points=[
+    point(-5.2,.08,-15.98,0,0,1),
+    point(-5.2,8.72,-15.98,0,0,1),
+    point(-5.2,9.00,-15.72,0,-1,0),
+    point(-5.2,9.00,-14.00,0,-1,0),
+    point(5.2,9.00,-14.00,0,-1,0),
+    point(5.2,9.00,-15.72,0,-1,0),
+    point(5.2,8.72,-15.98,0,0,1),
+    point(5.2,.08,-15.98,0,0,1),
+    point(5.2,.08,-15.76,0,1,0),
+    point(-5.2,.08,-15.76,0,1,0),
+    point(-5.2,.08,-15.98,0,0,1)
+  ];
+  const segments=points.slice(0,-1).map((from,index)=>{
+    const to=points[index+1];
+    return {
+      from,
+      to,
+      length:Math.max(.001,from.position.distanceTo(to.position))
+    };
+  });
+
+  setSpiderAnimation("walk",true);
+  spiderModel.visible=true;
+  spiderEntity.visible=true;
+  spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
+
+  return {
+    segments,
+    segmentIndex:0,
+    progress:0,
+    speed:2.35,
+    normal:new THREE.Vector3(),
+    forward:new THREE.Vector3(),
+    right:new THREE.Vector3(),
+    position:new THREE.Vector3(),
+    basis:new THREE.Matrix4()
+  };
+}
+
+function updateAdminBackroomsTestMapCrawler(dt){
+  if(!adminBackroomsTestMapActive || !adminBackroomsTestMapRoot)return;
+  if(!adminBackroomsTestMapCrawler){
+    adminBackroomsTestMapCrawler=createAdminBackroomsTestMapCrawler();
+  }
+  const crawler=adminBackroomsTestMapCrawler;
+  if(!crawler)return;
+
+  const delta=Math.max(0,Math.min(Number(dt)||0,.05));
+  // The normal gameplay animation update is gated while the test map is open,
+  // so advance the real gameplay spider's mixer here, exactly once per frame.
+  if(spiderMixer){
+    spiderMixer.timeScale=1;
+    spiderMixer.update(delta);
+    if(spiderOverlapMixer){
+      spiderOverlapMixer.timeScale=1;
+      spiderOverlapMixer.update(delta);
+    }
+  }
+
+  const segments=crawler.segments;
+  crawler.progress+=delta*crawler.speed/segments[crawler.segmentIndex].length;
+  while(crawler.progress>=1){
+    crawler.progress-=1;
+    crawler.segmentIndex=(crawler.segmentIndex+1)%segments.length;
+  }
+
+  const segment=segments[crawler.segmentIndex];
+  const progress=THREE.MathUtils.clamp(crawler.progress,0,1);
+  const eased=progress*progress*(3-2*progress);
+  crawler.position.lerpVectors(
+    segment.from.position,
+    segment.to.position,
+    progress
+  );
+  spiderEntity.position.copy(crawler.position).add(ADMIN_BACKROOMS_TEST_MAP_ORIGIN);
+
+  crawler.normal.copy(segment.from.normal)
+    .lerp(segment.to.normal,eased)
+    .normalize();
+  crawler.forward.copy(segment.to.position)
+    .sub(segment.from.position)
+    .normalize();
+  crawler.right.crossVectors(crawler.normal,crawler.forward).normalize();
+  crawler.forward.crossVectors(crawler.right,crawler.normal).normalize();
+  crawler.basis.makeBasis(
+    crawler.right,
+    crawler.normal,
+    crawler.forward
+  );
+  spiderEntity.quaternion.setFromRotationMatrix(crawler.basis);
+  spiderEntity.visible=true;
+  if(spiderModel)spiderModel.visible=true;
+}
+
 function buildAdminBackroomsTestMap(){
   const root=new THREE.Group();
   root.name="AdminBackroomsTestMap";
@@ -9114,6 +9225,8 @@ function exitAdminBackroomsTestMap({announce=true}={}){
     adminBackroomsTestMapWallCollision=null;
   }
 
+  adminBackroomsTestMapCrawler=null;
+
   if(adminBackroomsTestMapRoot){
     scene.remove(adminBackroomsTestMapRoot);
     adminBackroomsTestMapRoot.traverse(object=>{
@@ -9135,7 +9248,12 @@ function exitAdminBackroomsTestMap({announce=true}={}){
     player.vel.set(0,0,0);
     camera.position.copy(saved.cameraPosition);
     camera.rotation.copy(saved.cameraRotation);
+    spiderEntity.position.copy(saved.spiderPosition);
+    spiderEntity.quaternion.copy(saved.spiderQuaternion);
+    spiderEntity.scale.copy(saved.spiderScale);
     spiderEntity.visible=saved.spiderEntityVisible;
+    if(spiderModel)spiderModel.visible=saved.spiderModelVisible;
+    setSpiderAnimation(saved.spiderWantedState||"idle",true);
     spiderRevealLight.visible=saved.spiderRevealLightVisible;
     if(normalSpiderHunter.visualRig?.root){
       normalSpiderHunter.visualRig.root.visible=saved.normalSpiderVisible;
@@ -9167,6 +9285,11 @@ function enterAdminBackroomsTestMap(){
     worldRootVisible:world.root.visible,
     tutorialRootVisible:tutorialOpenRoomRoot.visible,
     spiderEntityVisible:spiderEntity.visible,
+    spiderPosition:spiderEntity.position.clone(),
+    spiderQuaternion:spiderEntity.quaternion.clone(),
+    spiderScale:spiderEntity.scale.clone(),
+    spiderModelVisible:spiderModel?.visible!==false,
+    spiderWantedState,
     spiderRevealLightVisible:spiderRevealLight.visible,
     normalSpiderVisible:Boolean(normalSpiderHunter.visualRig?.root?.visible)
   };
@@ -10241,6 +10364,7 @@ function animate(){
   updateTutorialOpenRoomLights(dt);
   updateAdminFly(dt);
   updateAdminProjectiles(dt);
+  updateAdminBackroomsTestMapCrawler(dt);
 
   if(backroomsFallTimer>0 && gameStarted && houseMode){
     camera.position.y+=fallCameraOffset;
@@ -10387,7 +10511,7 @@ function animate(){
   }
   flashlight.distance=activeFlashlightDistance;
   flashlight.target.position.set(0,0,-activeFlashlightDistance);
-  if(spiderMixer && spiderActive){
+  if(spiderMixer && spiderActive && !adminBackroomsTestMapActive){
     spiderMixer.timeScale=1;
     spiderMixer.update(dt);
     if(spiderOverlapMixer){
