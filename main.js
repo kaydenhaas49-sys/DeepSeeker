@@ -9032,6 +9032,16 @@ function buildAdminBackroomsTestMap(){
   root.name="AdminBackroomsTestMap";
   root.position.copy(ADMIN_BACKROOMS_TEST_MAP_ORIGIN);
 
+  // These lights exist only while this isolated sample is visible.
+  // They do not change the lighting of the normal Backrooms map.
+  const testFill=new THREE.HemisphereLight(0xffffff,0xb9b09b,1.7);
+  testFill.name="AdminBackroomsTest_BrightFill";
+  root.add(testFill);
+
+  const testAmbient=new THREE.AmbientLight(0xffffff,1.15);
+  testAmbient.name="AdminBackroomsTest_Ambient";
+  root.add(testAmbient);
+
   const addPanel=(geometry,material,name,x,y,z)=>{
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=name;
@@ -9043,31 +9053,39 @@ function buildAdminBackroomsTestMap(){
   };
 
   // Reuse the actual Level 0 materials and four-metre grid size from world.js.
+  // Eight rows by eight columns gives a 32m x 32m floor sample.
   const floorTileGeometry=new THREE.BoxGeometry(4,.08,4);
-  const floorPositions=[[-2,-2],[2,-2],[-2,2],[2,2]];
-  floorPositions.forEach(([x,z],index)=>{
-    addPanel(
-      floorTileGeometry.clone(),
-      world.materials.floor,
-      "AdminBackroomsTest_FloorTile_"+(index+1),
-      x,-.04,z
-    );
-  });
+  let tileIndex=0;
+  for(let row=0;row<8;row++){
+    for(let column=0;column<8;column++){
+      const x=(column-3.5)*4;
+      const z=(row-3.5)*4;
+      tileIndex++;
+      addPanel(
+        floorTileGeometry.clone(),
+        world.materials.floor,
+        "AdminBackroomsTest_FloorTile_"+tileIndex,
+        x,-.04,z
+      );
+    }
+  }
 
+  // One wall panel occupies the back edge of a single floor tile.
   const wallGeometry=new THREE.BoxGeometry(4,9,.12);
   addPanel(
     wallGeometry,
     world.materials.wall,
     "AdminBackroomsTest_Wall",
-    0,4.5,-4
+    0,4.5,-16.06
   );
 
+  // One ceiling tile sits directly over the floor tile beside the wall.
   const ceilingGeometry=new THREE.BoxGeometry(4,.10,4);
   addPanel(
     ceilingGeometry,
     world.materials.ceiling,
     "AdminBackroomsTest_CeilingTile",
-    0,9.05,-2
+    0,9.05,-14
   );
 
   return {
@@ -9075,8 +9093,8 @@ function buildAdminBackroomsTestMap(){
     wallBounds:{
       minX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x-2,
       maxX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x+2,
-      minZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-4.06,
-      maxZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-3.94
+      minZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16.12,
+      maxZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16.00
     }
   };
 }
