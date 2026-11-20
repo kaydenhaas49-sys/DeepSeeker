@@ -9033,6 +9033,52 @@ function updateAdminFly(){
 }
 
 
+function measureAdminBackroomsSpiderLocalBounds(targetBounds){
+  targetBounds.makeEmpty();
+  if(!spiderModel || spiderModel.parent!==spiderEntity)return targetBounds;
+
+  const savedPosition=spiderEntity.position.clone();
+  const savedQuaternion=spiderEntity.quaternion.clone();
+  const savedScale=spiderEntity.scale.clone();
+  try{
+    // Measure in the moving entity's local space, but include the current
+    // skinned vertex positions rather than the rig's bind-pose geometry.
+    spiderEntity.position.set(0,0,0);
+    spiderEntity.quaternion.identity();
+    spiderEntity.scale.setScalar(1);
+    spiderEntity.updateMatrixWorld(true);
+    spiderModel.updateWorldMatrix(true,true);
+    spiderModel.traverse(object=>{
+      if(object.isSkinnedMesh && object.skeleton)object.skeleton.update();
+    });
+    targetBounds.setFromObject(spiderModel,true);
+  }finally{
+    spiderEntity.position.copy(savedPosition);
+    spiderEntity.quaternion.copy(savedQuaternion);
+    spiderEntity.scale.copy(savedScale);
+    spiderEntity.updateMatrixWorld(true);
+    spiderModel.traverse(object=>{
+      if(object.isSkinnedMesh && object.skeleton)object.skeleton.update();
+    });
+  }
+  return targetBounds;
+}
+
+function projectAdminBackroomsSpiderBounds(localBounds,quaternion,targetBounds,corner){
+  targetBounds.makeEmpty();
+  if(localBounds.isEmpty())return targetBounds;
+
+  for(let index=0;index<8;index++){
+    corner.set(
+      index&1 ? localBounds.max.x : localBounds.min.x,
+      index&2 ? localBounds.max.y : localBounds.min.y,
+      index&4 ? localBounds.max.z : localBounds.min.z
+    ).applyQuaternion(quaternion);
+    targetBounds.expandByPoint(corner);
+  }
+  return targetBounds;
+}
+
 function createAdminBackroomsTestMapCrawler(){
   if(!spiderModel || spiderModel.parent!==spiderEntity)return null;
 
@@ -9044,36 +9090,14 @@ function createAdminBackroomsTestMapCrawler(){
   spiderMixer?.update(0);
   spiderOverlapMixer?.update(0);
 
-  // Measure the complete animated model in the spider entity's own space.
-  // The entity is temporarily neutralized so min.y is the support edge along
-  // its local +Y axis, which is the side that faces away from each surface.
-  const savedPosition=spiderEntity.position.clone();
-  const savedQuaternion=spiderEntity.quaternion.clone();
-  const savedScale=spiderEntity.scale.clone();
-  const localBounds=new THREE.Box3();
-  try{
-    spiderEntity.position.set(0,0,0);
-    spiderEntity.quaternion.identity();
-    spiderEntity.scale.setScalar(1);
-    spiderEntity.updateMatrixWorld(true);
-    spiderModel.updateWorldMatrix(true,true);
-    spiderModel.traverse(object=>{
-      if(object.isSkinnedMesh && object.skeleton)object.skeleton.update();
-    });
-    localBounds.setFromObject(spiderModel,true);
-  }finally{
-    spiderEntity.position.copy(savedPosition);
-    spiderEntity.quaternion.copy(savedQuaternion);
-    spiderEntity.scale.copy(savedScale);
-    spiderEntity.updateMatrixWorld(true);
-  }
-
+  // Start with the exact bounds of the current animated pose. They are
+  // refreshed during the crawl because the walk cycle changes the support edge.
+  const localBounds=measureAdminBackroomsSpiderLocalBounds(new THREE.Box3());
   const minimumSupport=Number.isFinite(localBounds.min.y)
     ? localBounds.min.y
     : 0;
-  // Keep the lowest part of the full model clear of the wall/ceiling/floor.
-  // This offset follows the whole entity; it never pushes individual legs.
-  const surfaceClearance=Math.max(.28,.28-minimumSupport);
+  // Leave a visible safety gap rather than letting the feet skim the surface.
+  const surfaceClearance=Math.max(.45,.45-minimumSupport);
 
   const surfacePoint=(x,y,z,nx,ny,nz)=>({
     position:new THREE.Vector3(x,y,z),
@@ -9156,6 +9180,10 @@ function createAdminBackroomsTestMapCrawler(){
     elapsed:0,
     speed:.58,
     surfaceClearance,
+    localBounds,
+    projectedBounds:new THREE.Box3(),
+    boundsCorner:new THREE.Vector3(),
+    boundsRefreshElapsed:0,
     surfacePosition:new THREE.Vector3(),
     normal:new THREE.Vector3(),
     forward:new THREE.Vector3(),
@@ -9187,6 +9215,17 @@ function updateAdminBackroomsTestMapCrawler(dt){
     if(spiderOverlapMixer){
       spiderOverlapMixer.timeScale=1;
       spiderOverlapMixer.update(delta);
+    }
+  }
+
+  // Re-sample the whole skinned rig after the walk mixer changes its pose.
+  // Box3's precise path uses SkinnedMesh.getVertexPosition in Three.js r165.
+  crawler.boundsRefreshElapsed+=delta;
+  if(crawler.boundsRefreshElapsed>=.08){
+    crawler.boundsRefreshElapsed=0;
+    measureAdminBackroomsSpiderLocalBounds(crawler.localBounds);
+    if(!crawler.localBounds.isEmpty() && Number.isFinite(crawler.localBounds.min.y)){
+      crawler.surfaceClearance=Math.max(.45,.45-crawler.localBounds.min.y);
     }
   }
 
@@ -9240,6 +9279,44 @@ function updateAdminBackroomsTestMapCrawler(dt){
       crawler.normalWorld,
       crawler.surfaceClearance+slowBodyPulse
     );
+
+  // The route turns around a hard 90-degree wall/ceiling edge. A single
+  // surface-normal offset cannot protect the far side of a long rigid model
+  // while it is diagonal, so project the complete animated bounds and keep
+  // every part outside the wall, above the floor, and below the ceiling.
+  projectAdminBackroomsSpiderBounds(
+    crawler.localBounds,
+    spiderEntity.quaternion,
+    crawler.projectedBounds,
+    crawler.boundsCorner
+  );
+  if(!crawler.projectedBounds.isEmpty()){
+    const safeGap=Math.max(.45,crawler.surfaceClearance);
+    const floorTop=ADMIN_BACKROOMS_TEST_MAP_ORIGIN.y;
+    const ceilingUnderside=floorTop+9*ADMIN_BACKROOMS_TEST_MAP_SCALE;
+    const wallFront=ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16*ADMIN_BACKROOMS_TEST_MAP_SCALE;
+
+    const lowestAllowedRootY=floorTop+safeGap-crawler.projectedBounds.min.y;
+    const highestAllowedRootY=ceilingUnderside-safeGap-crawler.projectedBounds.max.y;
+    if(lowestAllowedRootY<=highestAllowedRootY){
+      spiderEntity.position.y=THREE.MathUtils.clamp(
+        spiderEntity.position.y,
+        lowestAllowedRootY,
+        highestAllowedRootY
+      );
+    }else{
+      // If a diagonal pose temporarily fills the room height, centre it in
+      // the available space instead of biasing the whole rig through one face.
+      spiderEntity.position.y=(
+        lowestAllowedRootY+highestAllowedRootY
+      )*.5;
+    }
+
+    const lowestAllowedRootZ=wallFront+safeGap-crawler.projectedBounds.min.z;
+    if(spiderEntity.position.z<lowestAllowedRootZ){
+      spiderEntity.position.z=lowestAllowedRootZ;
+    }
+  }
 
   spiderEntity.visible=true;
   spiderModel.visible=true;
