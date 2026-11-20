@@ -3082,6 +3082,11 @@ function updateHouseLoadingUI(progress=null,status=null){
 }
 
 async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
+  if(adminBackroomsTestMapActive){
+    eventText.textContent="RETURN FROM THE ADMIN TEST MAP BEFORE SAVING.";
+    eventText.style.opacity="1";
+    return false;
+  }
   if(poolroomsActive){
     eventText.textContent="THE POOLROOMS ARE NOT A CHECKPOINT.";
     eventText.style.opacity="1";
@@ -3471,6 +3476,7 @@ function continueGame(slot=selectedSaveSlot){
 }
 
 function resetForNewGame(slot=selectedSaveSlot,{skipConfirm=false}={}){
+  if(adminBackroomsTestMapActive)exitAdminBackroomsTestMap({announce:false});
   const targetSlot=normalizeSaveSlot(slot);
 
   if(!skipConfirm && getSavedGame(targetSlot) && !window.confirm("SLOT "+targetSlot+" ALREADY HAS A SAVE. STARTING NEW GAME WILL OVERWRITE IT. CONTINUE?")){
@@ -8317,6 +8323,11 @@ let deepseekerAppOpen=false;
 let adminUnlocked=false;
 let adminFlyEnabled=false;
 let adminTool=null;
+let adminBackroomsTestMapActive=false;
+let adminBackroomsTestMapRoot=null;
+let adminBackroomsTestMapReturnState=null;
+let adminBackroomsTestMapWallCollision=null;
+const ADMIN_BACKROOMS_TEST_MAP_ORIGIN=new THREE.Vector3(900,0,900);
 const adminProjectiles=[];
 const ADMIN_PASSWORD="DEEPSEEKER";
 let storyStage=0;
@@ -8624,6 +8635,7 @@ function ensurePauseMenu(){
     pauseOverlay.querySelector("#pauseReturn").focus();
   });
   pauseOverlay.querySelector("#pauseSaveReturn").addEventListener("click",async()=>{
+    if(adminBackroomsTestMapActive)exitAdminBackroomsTestMap({announce:false});
     const saveButton=pauseOverlay.querySelector("#pauseSaveReturn");
     const status=pauseOverlay.querySelector("#pauseStatus");
     if(!pauseMenuOpen||pauseReturnPending)return;
@@ -8789,7 +8801,7 @@ function applyStoryStage(index, announce=true){
 }
 
 function updateStoryProgress(){
-  if(poolroomsActive||houseMode)return;
+  if(poolroomsActive||houseMode||adminBackroomsTestMapActive)return;
   const dx=player.pos.x-32;
   const dz=player.pos.z-32;
   maxStoryDistance=Math.max(maxStoryDistance,Math.hypot(dx,dz));
@@ -8951,6 +8963,7 @@ function setAdminFlyEnabled(enabled){
   return true;
 }
 function lockAdminAccess(){
+  if(adminBackroomsTestMapActive)exitAdminBackroomsTestMap({announce:false});
   adminUnlocked=false;
   setAdminFlyEnabled(false);
   adminTool=null;
@@ -9011,6 +9024,174 @@ function updateAdminFly(){
   player.adminFlyMode=active;
   player.ignoreWorldCollision=active || houseMode;
   if(active) player.jumpVelocity=0;
+}
+
+
+function buildAdminBackroomsTestMap(){
+  const root=new THREE.Group();
+  root.name="AdminBackroomsTestMap";
+  root.position.copy(ADMIN_BACKROOMS_TEST_MAP_ORIGIN);
+
+  const addPanel=(geometry,material,name,x,y,z)=>{
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.name=name;
+    mesh.position.set(x,y,z);
+    mesh.castShadow=false;
+    mesh.receiveShadow=true;
+    root.add(mesh);
+    return mesh;
+  };
+
+  // Reuse the actual Level 0 materials and four-metre grid size from world.js.
+  const floorTileGeometry=new THREE.BoxGeometry(4,.08,4);
+  const floorPositions=[[-2,-2],[2,-2],[-2,2],[2,2]];
+  floorPositions.forEach(([x,z],index)=>{
+    addPanel(
+      floorTileGeometry.clone(),
+      world.materials.floor,
+      "AdminBackroomsTest_FloorTile_"+(index+1),
+      x,-.04,z
+    );
+  });
+
+  const wallGeometry=new THREE.BoxGeometry(4,9,.12);
+  addPanel(
+    wallGeometry,
+    world.materials.wall,
+    "AdminBackroomsTest_Wall",
+    0,4.5,-4
+  );
+
+  const ceilingGeometry=new THREE.BoxGeometry(4,.10,4);
+  addPanel(
+    ceilingGeometry,
+    world.materials.ceiling,
+    "AdminBackroomsTest_CeilingTile",
+    0,9.05,-2
+  );
+
+  return {
+    root,
+    wallBounds:{
+      minX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x-2,
+      maxX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x+2,
+      minZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-4.06,
+      maxZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-3.94
+    }
+  };
+}
+
+function exitAdminBackroomsTestMap({announce=true}={}){
+  if(!adminBackroomsTestMapActive)return false;
+
+  adminBackroomsTestMapActive=false;
+  if(adminBackroomsTestMapWallCollision){
+    const index=player.extraCollisionTests.indexOf(adminBackroomsTestMapWallCollision);
+    if(index>=0)player.extraCollisionTests.splice(index,1);
+    adminBackroomsTestMapWallCollision=null;
+  }
+
+  if(adminBackroomsTestMapRoot){
+    scene.remove(adminBackroomsTestMapRoot);
+    adminBackroomsTestMapRoot.traverse(object=>{
+      if(object.isMesh)object.geometry?.dispose();
+    });
+    adminBackroomsTestMapRoot=null;
+  }
+
+  const saved=adminBackroomsTestMapReturnState;
+  adminBackroomsTestMapReturnState=null;
+  if(saved){
+    world.root.visible=saved.worldRootVisible;
+    tutorialOpenRoomRoot.visible=saved.tutorialRootVisible;
+    player.pos.copy(saved.playerPosition);
+    player.yaw=saved.yaw;
+    player.pitch=saved.pitch;
+    player.jumpY=saved.jumpY;
+    player.jumpVelocity=saved.jumpVelocity;
+    player.vel.set(0,0,0);
+    camera.position.copy(saved.cameraPosition);
+    camera.rotation.copy(saved.cameraRotation);
+    spiderEntity.visible=saved.spiderEntityVisible;
+    spiderRevealLight.visible=saved.spiderRevealLightVisible;
+    if(normalSpiderHunter.visualRig?.root){
+      normalSpiderHunter.visualRig.root.visible=saved.normalSpiderVisible;
+    }
+  }
+
+  if(announce)setAdminStatus("RETURNED TO YOUR PREVIOUS LOCATION");
+  return true;
+}
+
+function enterAdminBackroomsTestMap(){
+  if(!gameStarted||gameEnded||houseMode||poolroomsActive){
+    setAdminStatus("START A BACKROOMS GAME FIRST");
+    return false;
+  }
+  if(adminBackroomsTestMapActive){
+    exitAdminBackroomsTestMap();
+    return true;
+  }
+
+  adminBackroomsTestMapReturnState={
+    playerPosition:player.pos.clone(),
+    yaw:player.yaw,
+    pitch:player.pitch,
+    jumpY:player.jumpY,
+    jumpVelocity:player.jumpVelocity,
+    cameraPosition:camera.position.clone(),
+    cameraRotation:camera.rotation.clone(),
+    worldRootVisible:world.root.visible,
+    tutorialRootVisible:tutorialOpenRoomRoot.visible,
+    spiderEntityVisible:spiderEntity.visible,
+    spiderRevealLightVisible:spiderRevealLight.visible,
+    normalSpiderVisible:Boolean(normalSpiderHunter.visualRig?.root?.visible)
+  };
+
+  const built=buildAdminBackroomsTestMap();
+  adminBackroomsTestMapRoot=built.root;
+  scene.add(adminBackroomsTestMapRoot);
+
+  const bounds=built.wallBounds;
+  adminBackroomsTestMapWallCollision=(x,z)=>{
+    if(!adminBackroomsTestMapActive)return false;
+    const nearestX=Math.max(bounds.minX,Math.min(x,bounds.maxX));
+    const nearestZ=Math.max(bounds.minZ,Math.min(z,bounds.maxZ));
+    const dx=x-nearestX;
+    const dz=z-nearestZ;
+    return dx*dx+dz*dz<.42*.42;
+  };
+  player.extraCollisionTests.push(adminBackroomsTestMapWallCollision);
+
+  adminBackroomsTestMapActive=true;
+  world.root.visible=false;
+  tutorialOpenRoomRoot.visible=false;
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  if(normalSpiderHunter.visualRig?.root){
+    normalSpiderHunter.visualRig.root.visible=false;
+  }
+
+  player.pos.set(
+    ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x,
+    EYE,
+    ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-1
+  );
+  player.vel.set(0,0,0);
+  player.keys.clear();
+  player.jumpY=0;
+  player.jumpVelocity=0;
+  player.yaw=0;
+  player.pitch=0;
+  camera.position.set(
+    ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x,
+    EYE,
+    ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-1
+  );
+  camera.rotation.set(0,0,0);
+
+  setAdminStatus("TEST MAP LOADED · RUN TESTMAP AGAIN TO RETURN");
+  return true;
 }
 
 function teleportAdminToExit(){
@@ -9325,7 +9506,15 @@ function runAdminCommand(){
     return;
   }
   if(command==="help"||command==="?"){
-    adminPanelStatus.textContent="AVAILABLE: GLITCH · HELP";
+    adminPanelStatus.textContent="AVAILABLE: GLITCH · TESTMAP · HELP";
+    return;
+  }
+  if(["testmap","test map","backrooms test"].includes(command)){
+    enterAdminBackroomsTestMap();
+    return;
+  }
+  if(["testmap off","testmap exit","test map exit"].includes(command)){
+    if(!exitAdminBackroomsTestMap())setAdminStatus("TEST MAP IS NOT ACTIVE");
     return;
   }
   if(["glitch","signal glitch","test glitch","test signal","signal test"].includes(command)){
@@ -10047,21 +10236,21 @@ function animate(){
   }
 
   // Keep the flashlight cone exactly centered on the camera/crosshair.
-    if(!houseMode  && !poolroomsActive && storyRefreshElapsed>=(
+    if(!houseMode  && !poolroomsActive && !adminBackroomsTestMapActive && storyRefreshElapsed>=(
     LOW_END_PERFORMANCE?.08:.02
   )){
     storyRefreshElapsed=0;
     updateStoryProgress();
   }
 
-  if(gameStarted&&!poolroomsActive){
+  if(gameStarted&&!poolroomsActive&&!adminBackroomsTestMapActive){
     if(t-lastAutoSave>20){
       lastAutoSave=t;
       saveGame(undefined,{confirmOverwrite:false});
     }
   }
 
-  if(!houseMode  && !poolroomsActive){
+  if(!houseMode  && !poolroomsActive&&!adminBackroomsTestMapActive){
     if(!gameStarted){
       // Keep the title-screen camera centered on a known open section of
       // chunk 0,0 while the game remains on the menu.
@@ -10232,7 +10421,7 @@ function animate(){
     resetRemoteSpiderCaughtPose();
   }
 
-  if(!tutorialOpenRoomActive){
+  if(!tutorialOpenRoomActive&&!adminBackroomsTestMapActive){
     if(multiplayer.isWorldAuthority() && !houseMode){
       if(spiderActive){
         spiderBehaviorTime+=dt;
@@ -10542,11 +10731,11 @@ function animate(){
     resetPlayerAfterSpiderCatch();
   }
 
-  publishMultiplayerSpiderSnapshot(dt);
+  if(!adminBackroomsTestMapActive)publishMultiplayerSpiderSnapshot(dt);
 
   // The normal spider system is Backrooms-only. The apartment gets one
   // deliberately scripted teaching encounter on top of it.
-  if(houseMode || tutorialOpenRoomActive){
+  if((houseMode || tutorialOpenRoomActive)&&!adminBackroomsTestMapActive){
     if(tutorialOpenRoomActive){
       spiderEntity.visible=false;
       spiderRevealLight.visible=false;
@@ -10564,7 +10753,7 @@ function animate(){
   }
 
   if(eventCooldown>0) eventCooldown-=dt;
-  if(!houseMode  && !poolroomsActive && !tutorialOpenRoomActive && !spiderActive &&
+  if(!houseMode  && !poolroomsActive && !adminBackroomsTestMapActive && !tutorialOpenRoomActive && !spiderActive &&
      eventCooldown<=0 && t>nextEvent){
     triggerEvent();
     nextEvent=t+28+Math.random()*35;
@@ -10576,7 +10765,7 @@ function animate(){
   // the player's torch provide nearly all useful illumination. Keep the tutorial,
   // apartment, and Poolrooms lighting unchanged.
   const tutorialScale=getTutorialAmbientScale();
-  const regularBackroomsScale=(
+  const regularBackroomsScale=adminBackroomsTestMapActive ? .48 : (
     gameStarted &&
     !houseMode &&
     !poolroomsActive &&
@@ -10626,8 +10815,10 @@ function animate(){
     debugPerfMaxFrameMs=0;
   }
 
-  updateSpiderWallClipBounds(dt);
-  storyMissionWorld?.update(dt);
+  if(!adminBackroomsTestMapActive){
+    updateSpiderWallClipBounds(dt);
+    storyMissionWorld?.update(dt);
+  }
 
   renderer.render(scene,camera);
 }
@@ -10635,7 +10826,7 @@ beginInitialLoading();
 animate();
 
 window.addEventListener("beforeunload",()=>{
-  if(gameStarted&&!poolroomsActive) saveGame(undefined,{confirmOverwrite:false});
+  if(gameStarted&&!poolroomsActive&&!adminBackroomsTestMapActive) saveGame(undefined,{confirmOverwrite:false});
 });
 
 // URL-based save continuation is consumed by finishInitialLoading() only
