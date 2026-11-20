@@ -9036,215 +9036,99 @@ function updateAdminFly(){
 function createAdminBackroomsTestMapCrawler(){
   if(!spiderModel || spiderModel.parent!==spiderEntity)return null;
 
-  // Keep the original gameplay spider and its real walk animation. We layer
-  // foot planting over that pose instead of replacing the model or its rig.
+  // Use only the real gameplay rig and its authored walk animation.
+  // No bones are edited by the test-map controller.
   setSpiderAnimation("walk",true);
+  const walkAction=spiderActions.get(spiderAnimationState);
+  if(walkAction)walkAction.setEffectiveTimeScale(.48);
   spiderMixer?.update(0);
   spiderOverlapMixer?.update(0);
-  spiderModel.updateWorldMatrix(true,true);
 
-  const modelInverse=spiderModel.matrixWorld.clone().invert();
-  const toModelSpace=(object)=>{
-    return object.getWorldPosition(new THREE.Vector3()).applyMatrix4(modelInverse);
-  };
-  const boneSet=new Set();
-  spiderModel.traverse(object=>{
-    if(object.isBone)boneSet.add(object);
-    if(object.isSkinnedMesh && object.skeleton){
-      for(const bone of object.skeleton.bones)boneSet.add(bone);
-    }
-  });
-  const bones=[...boneSet];
-
-  // Some FBX rigs put non-bone helper groups between joints. Find the next
-  // actual bone descendants without skipping any leg branch.
-  const directBoneBranches=(node)=>{
-    const branches=[];
-    const visit=(parent)=>{
-      for(const child of parent.children||[]){
-        if(child.isBone)branches.push(child);
-        else visit(child);
-      }
-    };
-    visit(node);
-    return branches;
-  };
-  const longestBonePath=(root,depth=0)=>{
-    if(depth>12)return [root];
-    const children=directBoneBranches(root);
-    if(!children.length)return [root];
-    let best=[root];
-    let bestLength=-1;
-    for(const child of children){
-      const path=longestBonePath(child,depth+1);
-      const full=[root,...path];
-      let length=0;
-      for(let i=1;i<full.length;i++){
-        const a=toModelSpace(full[i-1]);
-        const b=toModelSpace(full[i]);
-        length+=a.distanceTo(b);
-      }
-      if(length>bestLength){
-        bestLength=length;
-        best=full;
-      }
-    }
-    return best;
-  };
-  const pathLength=(path)=>{
-    let length=0;
-    for(let i=1;i<path.length;i++){
-      length+=toModelSpace(path[i-1]).distanceTo(toModelSpace(path[i]));
-    }
-    return length;
-  };
-
-  const candidateAnchors=bones.map(anchor=>{
-    const branches=directBoneBranches(anchor);
-    if(branches.length<6 || branches.length>10)return null;
-    const paths=branches.map(root=>longestBonePath(root));
-    const viable=paths.filter(path=>path.length>=2 && pathLength(path)>.30);
-    if(viable.length<6)return null;
-
-    const tipAngles=viable.map(path=>{
-      const tip=toModelSpace(path[path.length-1]);
-      return Math.atan2(tip.z,tip.x);
+  // Measure the complete animated model in the spider entity's own space.
+  // The entity is temporarily neutralized so min.y is the support edge along
+  // its local +Y axis, which is the side that faces away from each surface.
+  const savedPosition=spiderEntity.position.clone();
+  const savedQuaternion=spiderEntity.quaternion.clone();
+  const savedScale=spiderEntity.scale.clone();
+  const localBounds=new THREE.Box3();
+  try{
+    spiderEntity.position.set(0,0,0);
+    spiderEntity.quaternion.identity();
+    spiderEntity.scale.setScalar(1);
+    spiderEntity.updateMatrixWorld(true);
+    spiderModel.updateWorldMatrix(true,true);
+    spiderModel.traverse(object=>{
+      if(object.isSkinnedMesh && object.skeleton)object.skeleton.update();
     });
-    const sectors=new Set(tipAngles.map(angle=>
-      Math.floor((angle+Math.PI)/(Math.PI*2)*8)%8
-    )).size;
-    const averageLength=viable.reduce((sum,path)=>sum+pathLength(path),0)/viable.length;
-    const score=
-      18-Math.abs(8-viable.length)*5+
-      sectors*2.5+
-      Math.min(averageLength,5);
-    return {anchor,paths:viable,score};
-  }).filter(Boolean).sort((a,b)=>b.score-a.score);
-
-  let selectedPaths=candidateAnchors[0]?.paths||[];
-
-  // Name-based fallback supports rigs whose legs are labelled conventionally
-  // instead of branching eight ways from one central body bone.
-  if(selectedPaths.length<6){
-    const legName=/(leg|foot|toe|tars|tibia|femur|coxa|knee|claw)/i;
-    const namedRoots=bones.filter(bone=>
-      legName.test(bone.name||"") &&
-      !legName.test(bone.parent?.name||"")
-    );
-    const namedPaths=namedRoots
-      .map(root=>longestBonePath(root))
-      .filter(path=>path.length>=2 && pathLength(path)>.30);
-    if(namedPaths.length>=6)selectedPaths=namedPaths;
+    localBounds.setFromObject(spiderModel,true);
+  }finally{
+    spiderEntity.position.copy(savedPosition);
+    spiderEntity.quaternion.copy(savedQuaternion);
+    spiderEntity.scale.copy(savedScale);
+    spiderEntity.updateMatrixWorld(true);
   }
 
-  // Final fallback: use the eight most outward skeleton leaf chains, choosing
-  // at most one per radial sector so toes are not mistaken for extra legs.
-  if(selectedPaths.length<6){
-    const roots=bones.filter(bone=>
-      !bone.parent || !bone.parent.isBone
-    );
-    const leaves=[];
-    const walk=(node,path,depth=0)=>{
-      if(depth>24)return;
-      const next=directBoneBranches(node);
-      if(!next.length){
-        if(path.length>=3){
-          const tip=toModelSpace(path[path.length-1]);
-          const radius=Math.hypot(tip.x,tip.z);
-          leaves.push({path,radius,angle:Math.atan2(tip.z,tip.x)});
-        }
-        return;
-      }
-      for(const child of next)walk(child,[...path,child],depth+1);
-    };
-    for(const root of roots)walk(root,[root]);
-    const sectors=new Map();
-    for(const leaf of leaves){
-      const sector=Math.floor((leaf.angle+Math.PI)/(Math.PI*2)*8)%8;
-      const previous=sectors.get(sector);
-      if(!previous || leaf.radius>previous.radius)sectors.set(sector,leaf);
-    }
-    selectedPaths=[...sectors.values()]
-      .filter(item=>item.radius>.25)
-      .map(item=>item.path.slice(-4));
-  }
-
-  // Keep eight distinct legs maximum, sorted around the body. Each chain
-  // retains its own rest pose and wall-contact point for independent IK.
-  const centerBox=new THREE.Box3().setFromObject(spiderModel);
-  const bodyCenter=centerBox.getCenter(new THREE.Vector3());
-  const uniquePaths=[];
-  const usedRoots=new Set();
-  for(const path of selectedPaths){
-    const chain=path.slice(-5);
-    if(chain.length<2 || usedRoots.has(chain[0]))continue;
-    usedRoots.add(chain[0]);
-    const tipPosition=toModelSpace(chain[chain.length-1]);
-    const rootPosition=toModelSpace(chain[0]);
-    let radial=new THREE.Vector3(
-      tipPosition.x-bodyCenter.x,
-      0,
-      tipPosition.z-bodyCenter.z
-    );
-    if(radial.lengthSq()<.04){
-      radial.set(
-        tipPosition.x-rootPosition.x,
-        0,
-        tipPosition.z-rootPosition.z
-      );
-    }
-    if(radial.lengthSq()<.04)continue;
-    radial.normalize();
-    uniquePaths.push({
-      chain,
-      tipPosition,
-      rootPosition,
-      angle:Math.atan2(radial.z,radial.x),
-      radial
-    });
-  }
-  uniquePaths.sort((a,b)=>a.angle-b.angle);
-  const legs=uniquePaths.slice(0,8).map((item,index)=>({
-    chain:item.chain,
-    tip:item.chain[item.chain.length-1],
-    restQuaternions:item.chain.map(bone=>bone.quaternion.clone()),
-    contact:item.tipPosition.clone(),
-    radial:item.radial.clone(),
-    phaseOffset:index/Math.max(1,Math.min(uniquePaths.length,8)),
-    jointWorld:new THREE.Vector3(),
-    tipWorld:new THREE.Vector3(),
-    startDirection:new THREE.Vector3(),
-    targetDirection:new THREE.Vector3(),
-    deltaQuaternion:new THREE.Quaternion(),
-    currentWorldQuaternion:new THREE.Quaternion(),
-    desiredWorldQuaternion:new THREE.Quaternion(),
-    parentWorldQuaternion:new THREE.Quaternion(),
-    localQuaternion:new THREE.Quaternion(),
-    targetLocal:new THREE.Vector3(),
-    targetWorld:new THREE.Vector3()
-  }));
+  const minimumSupport=Number.isFinite(localBounds.min.y)
+    ? localBounds.min.y
+    : 0;
+  // Keep the lowest part of the full model clear of the wall/ceiling/floor.
+  // This offset follows the whole entity; it never pushes individual legs.
+  const surfaceClearance=Math.max(.28,.28-minimumSupport);
 
   const surfacePoint=(x,y,z,nx,ny,nz)=>({
     position:new THREE.Vector3(x,y,z),
-    normal:new THREE.Vector3(nx,ny,nz)
+    normal:new THREE.Vector3(nx,ny,nz).normalize()
   });
 
-  // Contact points follow the wall, wrap smoothly around the ceiling edge,
-  // descend the opposite wall, then return over the floor.
+  // The route is drawn on the visible faces of the sample geometry.
+  // Rounded corner control points take the whole body around each edge rather
+  // than rotating it through the wall or roof.
   const route=[
-    surfacePoint(-5.2,0,-15.98,0,0,1),
-    surfacePoint(-5.2,7.90,-15.98,0,0,1),
-    surfacePoint(-5.2,8.72,-15.90,0,0,1),
-    surfacePoint(-5.2,9.00,-15.52,0,-1,0),
-    surfacePoint(-4.5,9.00,-14.00,0,-1,0),
-    surfacePoint(4.5,9.00,-14.00,0,-1,0),
-    surfacePoint(5.2,9.00,-15.52,0,-1,0),
-    surfacePoint(5.2,8.72,-15.90,0,0,1),
-    surfacePoint(5.2,0,-15.98,0,0,1),
-    surfacePoint(5.2,0,-15.34,0,1,0),
-    surfacePoint(0,0,-14.00,0,1,0),
-    surfacePoint(-5.2,0,-15.34,0,1,0)
+    // Climb the left wall.
+    surfacePoint(-5.2,.8,-16.0,0,0,1),
+    surfacePoint(-5.2,3.2,-16.0,0,0,1),
+    surfacePoint(-5.2,6.2,-16.0,0,0,1),
+    surfacePoint(-5.2,8.2,-16.0,0,0,1),
+
+    // Wrap the upper-left corner onto the underside of the ceiling.
+    surfacePoint(-5.2,8.52,-15.94,0,-.38,.92),
+    surfacePoint(-5.2,8.77,-15.77,0,-.71,.71),
+    surfacePoint(-5.2,8.94,-15.52,0,-.92,.38),
+    surfacePoint(-5.2,9.0,-15.2,0,-1,0),
+
+    // Cross the ceiling.
+    surfacePoint(-2.8,9.0,-14.0,0,-1,0),
+    surfacePoint(0,9.0,-14.0,0,-1,0),
+    surfacePoint(2.8,9.0,-14.0,0,-1,0),
+    surfacePoint(5.2,9.0,-15.2,0,-1,0),
+
+    // Wrap over the upper-right corner and descend.
+    surfacePoint(5.2,8.94,-15.52,0,-.92,.38),
+    surfacePoint(5.2,8.77,-15.77,0,-.71,.71),
+    surfacePoint(5.2,8.52,-15.94,0,-.38,.92),
+    surfacePoint(5.2,8.2,-16.0,0,0,1),
+    surfacePoint(5.2,6.2,-16.0,0,0,1),
+    surfacePoint(5.2,3.2,-16.0,0,0,1),
+    surfacePoint(5.2,.8,-16.0,0,0,1),
+
+    // Round the bottom edge onto the floor.
+    surfacePoint(5.2,.52,-15.94,0,.38,.92),
+    surfacePoint(5.2,.23,-15.77,0,.71,.71),
+    surfacePoint(5.2,.06,-15.52,0,.92,.38),
+    surfacePoint(5.2,0,-15.2,0,1,0),
+
+    // Return along the floor to the starting wall.
+    surfacePoint(2.8,0,-14.0,0,1,0),
+    surfacePoint(0,0,-14.0,0,1,0),
+    surfacePoint(-2.8,0,-14.0,0,1,0),
+    surfacePoint(-5.2,0,-15.2,0,1,0),
+
+    // Round back onto the starting wall.
+    surfacePoint(-5.2,.06,-15.52,0,.92,.38),
+    surfacePoint(-5.2,.23,-15.77,0,.71,.71),
+    surfacePoint(-5.2,.52,-15.94,0,.38,.92)
   ];
+
   const curve=new THREE.CatmullRomCurve3(
     route.map(point=>point.position),
     true,
@@ -9258,21 +9142,7 @@ function createAdminBackroomsTestMapCrawler(){
     .5
   );
 
-  const activeAction=spiderActions.get(spiderAnimationState);
-  if(activeAction)activeAction.setEffectiveTimeScale(.44);
-  if(legs.length<6){
-    console.warn("[DeepSeeker] Could not identify enough spider leg chains for wall IK",{
-      boneCount:bones.length,
-      legChainsFound:legs.length,
-      boneNames:bones.map(bone=>bone.name)
-    });
-  }else{
-    console.info("[DeepSeeker] Procedural wall-climb legs ready",{
-      legCount:legs.length,
-      chains:legs.map(leg=>leg.chain.map(bone=>bone.name))
-    });
-  }
-
+  spiderEntity.scale.setScalar(1);
   spiderModel.visible=true;
   spiderEntity.visible=true;
   spiderRevealLight.visible=false;
@@ -9284,66 +9154,18 @@ function createAdminBackroomsTestMapCrawler(){
     totalLength:Math.max(.001,curve.getLength()*ADMIN_BACKROOMS_TEST_MAP_SCALE),
     distance:0,
     elapsed:0,
-    speed:.68,
-    clearance:.55,
-    stridePeriod:4.2,
-    strideLength:.82,
-    swingLift:.42,
-    legs,
+    speed:.58,
+    surfaceClearance,
     surfacePosition:new THREE.Vector3(),
     normal:new THREE.Vector3(),
     forward:new THREE.Vector3(),
     right:new THREE.Vector3(),
-    position:new THREE.Vector3(),
     normalWorld:new THREE.Vector3(),
     targetQuaternion:new THREE.Quaternion(),
     basis:new THREE.Matrix4(),
-    targetUp:new THREE.Vector3(0,1,0),
-    footTarget:new THREE.Vector3()
+    localUp:new THREE.Vector3(0,1,0),
+    bodyBob:0
   };
-}
-
-function solveAdminBackroomsSpiderLeg(leg,targetWorld){
-  const chain=leg.chain;
-  if(chain.length<2)return;
-
-  // CCD inverse kinematics rotates each joint toward its own planted foot.
-  // The real leg joints are solved separately, one after another.
-  for(let iteration=0;iteration<4;iteration++){
-    for(let jointIndex=chain.length-2;jointIndex>=0;jointIndex--){
-      const joint=chain[jointIndex];
-      joint.getWorldPosition(leg.jointWorld);
-      leg.tip.getWorldPosition(leg.tipWorld);
-      leg.startDirection.copy(leg.tipWorld).sub(leg.jointWorld);
-      leg.targetDirection.copy(targetWorld).sub(leg.jointWorld);
-      if(
-        leg.startDirection.lengthSq()<1e-7 ||
-        leg.targetDirection.lengthSq()<1e-7
-      )continue;
-
-      leg.startDirection.normalize();
-      leg.targetDirection.normalize();
-      leg.deltaQuaternion.setFromUnitVectors(
-        leg.startDirection,
-        leg.targetDirection
-      );
-      joint.getWorldQuaternion(leg.currentWorldQuaternion);
-      leg.desiredWorldQuaternion.multiplyQuaternions(
-        leg.deltaQuaternion,
-        leg.currentWorldQuaternion
-      );
-      joint.parent?.getWorldQuaternion(leg.parentWorldQuaternion);
-      if(joint.parent){
-        leg.localQuaternion.copy(leg.parentWorldQuaternion).invert()
-          .multiply(leg.desiredWorldQuaternion);
-      }else{
-        leg.localQuaternion.copy(leg.desiredWorldQuaternion);
-      }
-      joint.quaternion.slerp(leg.localQuaternion,.78);
-      // The next tip.getWorldPosition() refreshes its own bone ancestry.
-      // Avoid updating the entire spider scene graph for every CCD joint.
-    }
-  }
 }
 
 function updateAdminBackroomsTestMapCrawler(dt){
@@ -9357,13 +9179,8 @@ function updateAdminBackroomsTestMapCrawler(dt){
   const delta=Math.max(0,Math.min(Number(dt)||0,.05));
   crawler.elapsed+=delta;
 
-  // Restore the clip's initial leg pose before advancing it. IK is then
-  // layered onto the current animated body pose without accumulating twist.
-  for(const leg of crawler.legs){
-    for(let index=0;index<leg.chain.length;index++){
-      leg.chain[index].quaternion.copy(leg.restQuaternions[index]);
-    }
-  }
+  // Only the original gameplay mixers run. Their authored leg motion remains
+  // intact while the complete spider entity is moved around the test surface.
   if(spiderMixer){
     spiderMixer.timeScale=1;
     spiderMixer.update(delta);
@@ -9373,12 +9190,14 @@ function updateAdminBackroomsTestMapCrawler(dt){
     }
   }
 
-  // Constant-distance Catmull-Rom traversal removes the sharp speed changes
-  // at each waypoint. A tiny slow pulse gives the movement a more deliberate,
-  // unsettling rhythm without jolting the body.
-  const speedPulse=.78+.22*(.5+.5*Math.sin(crawler.elapsed*.62));
-  crawler.distance=(crawler.distance+delta*crawler.speed*speedPulse)%crawler.totalLength;
+  // Arc-length traversal keeps speed even between control points. A very slow
+  // pulse and tiny whole-body movement make the crawl feel deliberate.
+  const speedPulse=.84+.16*(.5+.5*Math.sin(crawler.elapsed*.48));
+  crawler.distance=(
+    crawler.distance+delta*crawler.speed*speedPulse
+  )%crawler.totalLength;
   const progress=crawler.distance/crawler.totalLength;
+
   crawler.surfacePosition.copy(crawler.curve.getPointAt(progress));
   crawler.normal.copy(crawler.normalCurve.getPointAt(progress)).normalize();
   crawler.forward.copy(crawler.curve.getTangentAt(progress)).normalize();
@@ -9386,62 +9205,45 @@ function updateAdminBackroomsTestMapCrawler(dt){
     crawler.normal,
     -crawler.forward.dot(crawler.normal)
   ).normalize();
+
+  if(crawler.forward.lengthSq()<1e-6){
+    crawler.forward.set(0,0,1);
+    crawler.forward.addScaledVector(
+      crawler.normal,
+      -crawler.forward.dot(crawler.normal)
+    ).normalize();
+  }
+
   crawler.right.crossVectors(crawler.normal,crawler.forward).normalize();
   crawler.forward.crossVectors(crawler.right,crawler.normal).normalize();
-  crawler.basis.makeBasis(crawler.right,crawler.normal,crawler.forward);
+  crawler.basis.makeBasis(
+    crawler.right,
+    crawler.normal,
+    crawler.forward
+  );
   crawler.targetQuaternion.setFromRotationMatrix(crawler.basis);
+
+  // Rotate and translate the entire entity; the rig's bones are untouched.
   spiderEntity.quaternion.slerp(
     crawler.targetQuaternion,
-    1-Math.exp(-7.0*delta)
+    1-Math.exp(-5.2*delta)
   );
-  crawler.normalWorld.copy(crawler.targetUp)
+  crawler.normalWorld.copy(crawler.localUp)
     .applyQuaternion(spiderEntity.quaternion)
     .normalize();
 
-  const bodyBob=.018*Math.sin(crawler.elapsed*1.7);
+  const slowBodyPulse=.012*Math.sin(crawler.elapsed*1.3);
   spiderEntity.position.copy(crawler.surfacePosition)
     .multiplyScalar(ADMIN_BACKROOMS_TEST_MAP_SCALE)
     .add(ADMIN_BACKROOMS_TEST_MAP_ORIGIN)
-    .addScaledVector(crawler.normalWorld,crawler.clearance+bodyBob);
+    .addScaledVector(
+      crawler.normalWorld,
+      crawler.surfaceClearance+slowBodyPulse
+    );
+
   spiderEntity.visible=true;
   spiderModel.visible=true;
   spiderEntity.updateMatrixWorld(true);
-  spiderModel.updateWorldMatrix(true,true);
-
-  // The model's local +Y points out from whichever surface it is on. Each
-  // planted foot is held at local -Y clearance; only one leg lifts and resets
-  // at a time in a slow wave around the body.
-  const swingShare=.12;
-  for(const leg of crawler.legs){
-    const phase=(crawler.elapsed/crawler.stridePeriod+leg.phaseOffset)%1;
-    let strideOffset=0,lift=0;
-    if(phase<1-swingShare){
-      const stance=phase/(1-swingShare);
-      strideOffset=THREE.MathUtils.lerp(
-        crawler.strideLength*.5,
-        -crawler.strideLength*.5,
-        stance
-      );
-      lift=.025*Math.sin(Math.PI*stance);
-    }else{
-      const swing=(phase-(1-swingShare))/swingShare;
-      const eased=swing*swing*(3-2*swing);
-      strideOffset=THREE.MathUtils.lerp(
-        -crawler.strideLength*.5,
-        crawler.strideLength*.5,
-        eased
-      );
-      lift=Math.sin(Math.PI*swing)*crawler.swingLift;
-    }
-
-    leg.targetLocal.set(
-      leg.contact.x,
-      -crawler.clearance+lift,
-      leg.contact.z+strideOffset
-    );
-    leg.targetWorld.copy(leg.targetLocal).applyMatrix4(spiderModel.matrixWorld);
-    solveAdminBackroomsSpiderLeg(leg,leg.targetWorld);
-  }
 }
 
 
@@ -9578,6 +9380,12 @@ function exitAdminBackroomsTestMap({announce=true}={}){
     spiderEntity.visible=saved.spiderEntityVisible;
     if(spiderModel)spiderModel.visible=saved.spiderModelVisible;
     setSpiderAnimation(saved.spiderWantedState||"idle",true);
+    for(const pose of saved.spiderBonePose||[]){
+      pose.bone.position.copy(pose.position);
+      pose.bone.quaternion.copy(pose.quaternion);
+      pose.bone.scale.copy(pose.scale);
+    }
+    spiderEntity.updateMatrixWorld(true);
     spiderRevealLight.visible=saved.spiderRevealLightVisible;
     if(normalSpiderHunter.visualRig?.root){
       normalSpiderHunter.visualRig.root.visible=saved.normalSpiderVisible;
@@ -9614,6 +9422,20 @@ function enterAdminBackroomsTestMap(){
     spiderScale:spiderEntity.scale.clone(),
     spiderModelVisible:spiderModel?.visible!==false,
     spiderWantedState,
+    spiderBonePose:(()=>{
+      const pose=[];
+      spiderModel?.traverse(object=>{
+        if(object.isBone){
+          pose.push({
+            bone:object,
+            position:object.position.clone(),
+            quaternion:object.quaternion.clone(),
+            scale:object.scale.clone()
+          });
+        }
+      });
+      return pose;
+    })(),
     spiderRevealLightVisible:spiderRevealLight.visible,
     normalSpiderVisible:Boolean(normalSpiderHunter.visualRig?.root?.visible)
   };
