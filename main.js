@@ -9070,29 +9070,34 @@ function buildAdminBackroomsTestMap(){
     }
   }
 
-  // One wall panel occupies the back edge of a single floor tile.
+  // Three adjoining wall panels form a short straight wall.
+  // The original centre panel stays in place, with one panel added on each side.
   const wallGeometry=new THREE.BoxGeometry(4,9,.12);
-  addPanel(
-    wallGeometry,
-    world.materials.wall,
-    "AdminBackroomsTest_Wall",
-    0,4.5,-16.06
-  );
+  for(const [index,x] of [-4,0,4].entries()){
+    addPanel(
+      wallGeometry.clone(),
+      world.materials.wall,
+      index===1 ? "AdminBackroomsTest_Wall" : "AdminBackroomsTest_Wall_"+(index===0?"Left":"Right"),
+      x,4.5,-16.06
+    );
+  }
 
-  // One ceiling tile sits directly over the floor tile beside the wall.
+  // Three ceiling tiles line up directly above the three wall panels.
   const ceilingGeometry=new THREE.BoxGeometry(4,.10,4);
-  addPanel(
-    ceilingGeometry,
-    world.materials.ceiling,
-    "AdminBackroomsTest_CeilingTile",
-    0,9.05,-14
-  );
+  for(const [index,x] of [-4,0,4].entries()){
+    addPanel(
+      ceilingGeometry.clone(),
+      world.materials.ceiling,
+      index===1 ? "AdminBackroomsTest_CeilingTile" : "AdminBackroomsTest_CeilingTile_"+(index===0?"Left":"Right"),
+      x,9.05,-14
+    );
+  }
 
   return {
     root,
     wallBounds:{
-      minX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x-2,
-      maxX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x+2,
+      minX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x-6,
+      maxX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x+6,
       minZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16.12,
       maxZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16.00
     }
