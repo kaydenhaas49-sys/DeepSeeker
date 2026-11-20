@@ -9297,7 +9297,7 @@ adminPasswordInput.addEventListener("keydown",e=>{ if(e.code==="Enter"){ e.preve
 adminLockButton.addEventListener("click",lockAdminAccess);
 function runAdminCommand(){
   if(!adminUnlocked)return;
-  const command=(adminCommandInput.value||"").trim().toLowerCase().replace(/\\s+/g," ");
+  const command=(adminCommandInput.value||"").trim().toLowerCase().replace(/\s+/g," ");
   adminCommandInput.value="";
   if(!command){
     adminPanelStatus.textContent="ENTER A COMMAND · TYPE HELP";
