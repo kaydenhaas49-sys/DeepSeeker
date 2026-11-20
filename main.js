@@ -8332,6 +8332,10 @@ let adminBackroomsTestMapReturnState=null;
 let adminBackroomsTestMapWallCollision=null;
 let adminBackroomsTestMapCrawler=null;
 const ADMIN_BACKROOMS_TEST_MAP_ORIGIN=new THREE.Vector3(900,0,900);
+// The finite Backrooms spans 21 chunks x 64m = 1344m per side.
+ // Scale the 32m test sample uniformly to match that full map footprint.
+const ADMIN_BACKROOMS_TEST_MAP_SCALE=
+  ((MAP_MAX_CHUNK-MAP_MIN_CHUNK+1)*CHUNK_SIZE)/32;
 const adminProjectiles=[];
 const ADMIN_PASSWORD="DEEPSEEKER";
 let storyStage=0;
@@ -9043,16 +9047,16 @@ function createAdminBackroomsTestMapCrawler(){
 
   // Follow the actual wall and ceiling surfaces, then return across the floor.
   const points=[
-    point(-5.2,.08,-15.98,0,0,1),
+    point(-5.2,0,-15.98,0,0,1),
     point(-5.2,8.72,-15.98,0,0,1),
     point(-5.2,9.00,-15.72,0,-1,0),
     point(-5.2,9.00,-14.00,0,-1,0),
     point(5.2,9.00,-14.00,0,-1,0),
     point(5.2,9.00,-15.72,0,-1,0),
     point(5.2,8.72,-15.98,0,0,1),
-    point(5.2,.08,-15.98,0,0,1),
-    point(5.2,.08,-15.76,0,1,0),
-    point(-5.2,.08,-15.76,0,1,0),
+    point(5.2,0,-15.98,0,0,1),
+    point(5.2,0,-15.76,0,1,0),
+    point(-5.2,0,-15.76,0,1,0),
     point(-5.2,.08,-15.98,0,0,1)
   ];
   const segments=points.slice(0,-1).map((from,index)=>{
@@ -9060,7 +9064,7 @@ function createAdminBackroomsTestMapCrawler(){
     return {
       from,
       to,
-      length:Math.max(.001,from.position.distanceTo(to.position))
+      length:Math.max(.001,from.position.distanceTo(to.position)*ADMIN_BACKROOMS_TEST_MAP_SCALE)
     };
   });
 
@@ -9118,7 +9122,9 @@ function updateAdminBackroomsTestMapCrawler(dt){
     segment.to.position,
     progress
   );
-  spiderEntity.position.copy(crawler.position).add(ADMIN_BACKROOMS_TEST_MAP_ORIGIN);
+  spiderEntity.position.copy(crawler.position)
+    .multiplyScalar(ADMIN_BACKROOMS_TEST_MAP_SCALE)
+    .add(ADMIN_BACKROOMS_TEST_MAP_ORIGIN);
 
   crawler.normal.copy(segment.from.normal)
     .lerp(segment.to.normal,eased)
@@ -9142,6 +9148,7 @@ function buildAdminBackroomsTestMap(){
   const root=new THREE.Group();
   root.name="AdminBackroomsTestMap";
   root.position.copy(ADMIN_BACKROOMS_TEST_MAP_ORIGIN);
+  root.scale.setScalar(ADMIN_BACKROOMS_TEST_MAP_SCALE);
 
   // These lights exist only while this isolated sample is visible.
   // They do not change the lighting of the normal Backrooms map.
@@ -9164,7 +9171,8 @@ function buildAdminBackroomsTestMap(){
   };
 
   // Reuse the actual Level 0 materials and four-metre grid size from world.js.
-  // Eight rows by eight columns gives a 32m x 32m floor sample.
+  // Eight rows by eight columns retain the sample's tiled floor.
+  // The uniformly scaled root expands the full 32m grid to the Backrooms footprint.
   const floorTileGeometry=new THREE.BoxGeometry(4,.08,4);
   let tileIndex=0;
   for(let row=0;row<8;row++){
@@ -9207,10 +9215,10 @@ function buildAdminBackroomsTestMap(){
   return {
     root,
     wallBounds:{
-      minX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x-6,
-      maxX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x+6,
-      minZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16.12,
-      maxZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16.00
+      minX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x-6*ADMIN_BACKROOMS_TEST_MAP_SCALE,
+      maxX:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x+6*ADMIN_BACKROOMS_TEST_MAP_SCALE,
+      minZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16.12*ADMIN_BACKROOMS_TEST_MAP_SCALE,
+      maxZ:ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-16.00*ADMIN_BACKROOMS_TEST_MAP_SCALE
     }
   };
 }
@@ -9321,7 +9329,7 @@ function enterAdminBackroomsTestMap(){
   player.pos.set(
     ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x,
     EYE,
-    ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-1
+    ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-ADMIN_BACKROOMS_TEST_MAP_SCALE
   );
   player.vel.set(0,0,0);
   player.keys.clear();
@@ -9332,7 +9340,7 @@ function enterAdminBackroomsTestMap(){
   camera.position.set(
     ADMIN_BACKROOMS_TEST_MAP_ORIGIN.x,
     EYE,
-    ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-1
+    ADMIN_BACKROOMS_TEST_MAP_ORIGIN.z-ADMIN_BACKROOMS_TEST_MAP_SCALE
   );
   camera.rotation.set(0,0,0);
 
