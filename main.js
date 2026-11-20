@@ -9170,19 +9170,29 @@ function buildAdminBackroomsTestMap(){
     return mesh;
   };
 
-  // Reuse the actual Level 0 materials and four-metre grid size from world.js.
-  // Eight rows by eight columns retain the sample's tiled floor.
-  // The uniformly scaled root expands the full 32m grid to the Backrooms footprint.
-  const floorTileGeometry=new THREE.BoxGeometry(4,.08,4);
+  // Four large carpet panels keep the full 32m x 32m sample footprint.
+  // The root scales this to the full 1344m x 1344m Backrooms size.
+  // Scale the cloned texture repeat with the panels so carpet detail stays
+  // the same size as it was on the original 4m tiles.
+  const testFloorMaterial=world.materials.floor.clone();
+  testFloorMaterial.map=world.materials.floor.map?.clone()||null;
+  if(testFloorMaterial.map){
+    const sourceRepeat=world.materials.floor.map.repeat;
+    testFloorMaterial.map.repeat.set(sourceRepeat.x*4,sourceRepeat.y*4);
+    testFloorMaterial.map.needsUpdate=true;
+  }
+  root.userData.adminBackroomsTestFloorMaterial=testFloorMaterial;
+
+  const floorTileGeometry=new THREE.BoxGeometry(16,.08,16);
   let tileIndex=0;
-  for(let row=0;row<8;row++){
-    for(let column=0;column<8;column++){
-      const x=(column-3.5)*4;
-      const z=(row-3.5)*4;
+  for(let row=0;row<2;row++){
+    for(let column=0;column<2;column++){
+      const x=(column-.5)*16;
+      const z=(row-.5)*16;
       tileIndex++;
       addPanel(
         floorTileGeometry.clone(),
-        world.materials.floor,
+        testFloorMaterial,
         "AdminBackroomsTest_FloorTile_"+tileIndex,
         x,-.04,z
       );
@@ -9240,6 +9250,11 @@ function exitAdminBackroomsTestMap({announce=true}={}){
     adminBackroomsTestMapRoot.traverse(object=>{
       if(object.isMesh)object.geometry?.dispose();
     });
+    const testFloorMaterial=adminBackroomsTestMapRoot.userData.adminBackroomsTestFloorMaterial;
+    if(testFloorMaterial){
+      testFloorMaterial.map?.dispose();
+      testFloorMaterial.dispose();
+    }
     adminBackroomsTestMapRoot=null;
   }
 
