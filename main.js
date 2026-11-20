@@ -227,6 +227,8 @@ const adminSpiderFrontButton=document.getElementById("adminSpiderFrontButton");
 const adminWaterGunButton=document.getElementById("adminWaterGunButton");
 const adminWaterRpgButton=document.getElementById("adminWaterRpgButton");
 const adminClearWaterButton=document.getElementById("adminClearWaterButton");
+const adminCommandInput=document.getElementById("adminCommandInput");
+const adminCommandRunButton=document.getElementById("adminCommandRunButton");
 const adminAuthStatus=document.getElementById("adminAuthStatus");
 const adminPanelStatus=document.getElementById("adminPanelStatus");
 const houseLoadFillHome=document.getElementById("houseLoadFillHome");
@@ -9293,6 +9295,36 @@ adminUnlockButton.addEventListener("click",()=>{
 });
 adminPasswordInput.addEventListener("keydown",e=>{ if(e.code==="Enter"){ e.preventDefault(); adminUnlockButton.click(); } });
 adminLockButton.addEventListener("click",lockAdminAccess);
+function runAdminCommand(){
+  if(!adminUnlocked)return;
+  const command=(adminCommandInput.value||"").trim().toLowerCase().replace(/\\s+/g," ");
+  adminCommandInput.value="";
+  if(!command){
+    adminPanelStatus.textContent="ENTER A COMMAND · TYPE HELP";
+    return;
+  }
+  if(command==="help"||command==="?"){
+    adminPanelStatus.textContent="AVAILABLE: GLITCH · HELP";
+    return;
+  }
+  if(["glitch","signal glitch","test glitch","test signal","signal test"].includes(command)){
+    showSignalGlitch(
+      "SIGNAL TEST",
+      "MANUAL ADMIN OVERRIDE // THIS IS NOT A STORY EVENT",
+      5200
+    );
+    adminPanelStatus.textContent="SIGNAL GLITCH TEST TRIGGERED · LOCAL ONLY";
+    return;
+  }
+  adminPanelStatus.textContent="UNKNOWN COMMAND · TYPE HELP";
+}
+adminCommandRunButton.addEventListener("click",runAdminCommand);
+adminCommandInput.addEventListener("keydown",e=>{
+  if(e.code==="Enter"){
+    e.preventDefault();
+    runAdminCommand();
+  }
+});
 adminFlyButton.addEventListener("click",()=>{
   if(!adminUnlocked) return;
   const enabling=!adminFlyEnabled;
