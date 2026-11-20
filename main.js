@@ -106,7 +106,6 @@ const eventText=document.getElementById("event");
 const signalGlitchOverlay=document.getElementById("signalGlitch");
 const signalGlitchNoise=document.getElementById("signalGlitchNoise");
 const signalGlitchMessage=document.getElementById("signalGlitchMessage");
-const signalGlitchDetail=document.getElementById("signalGlitchDetail");
 let signalGlitchTimer=0;
 let signalGlitchGeneration=0;
 
@@ -194,17 +193,15 @@ function populateSignalGlitchNoise(){
   signalGlitchNoise.replaceChildren(fragment);
 }
 
-function showSignalGlitch(message,detail="",duration=3600){
+function showSignalGlitch(message,_detail="",duration=3600){
   if(!signalGlitchOverlay||!signalGlitchMessage||!signalGlitchNoise)return;
   const headline=String(message||"UNKNOWN SIGNAL").trim().slice(0,100).toUpperCase();
-  const subline=String(detail||"").trim().slice(0,120).toUpperCase();
   const generation=++signalGlitchGeneration;
   window.clearTimeout(signalGlitchTimer);
 
   signalGlitchMessage.textContent=headline;
   signalGlitchMessage.dataset.text=headline;
   signalGlitchMessage.classList.toggle("long",headline.length>26);
-  signalGlitchDetail.textContent=subline;
   populateSignalGlitchNoise();
   signalGlitchOverlay.setAttribute("aria-hidden","false");
   signalGlitchOverlay.classList.remove("active");
