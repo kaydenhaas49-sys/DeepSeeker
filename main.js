@@ -1695,69 +1695,125 @@ for(let i=0;i<4;i++){
 addRadioViewPart(new THREE.TorusGeometry(0.055,0.006,7,18),radioEdgeMaterial,
   "HandheldRadioShoulderStrapLoop",-0.045,0.185,-0.020,[Math.PI/2,0,0]);
 
+const RADIO_CHANNELS=Object.freeze([
+  {id:"mission",label:"CH 01 · MISSION"},
+  {id:"unlisted",label:"CH 02 · UNLISTED"},
+  {id:"quiet",label:"CH 03 · QUIET"}
+]);
+let radioChannelIndex=0;
 let radioRadarLastDraw=0;
 function drawHandheldRadioRadar(force=false){
-  if(!radioCollected || equippedTool!=="radio" || !radioRadarContext) return;
+  if(!radioCollected || equippedTool!=="radio" || !radioRadarContext)return;
   const now=performance.now();
-  if(!force && now-radioRadarLastDraw<110) return;
+  if(!force && now-radioRadarLastDraw<110)return;
   radioRadarLastDraw=now;
+
   const ctx=radioRadarContext;
   const w=radioRadarCanvas.width,h=radioRadarCanvas.height;
+  const channel=RADIO_CHANNELS[radioChannelIndex];
+  const target=channel.id==="mission"&&typeof getMissionTarget==="function"
+    ?getMissionTarget():null;
+  const playerPos=player?.pos;
+  const distance=target&&playerPos
+    ?Math.hypot((playerPos.x??0)-target.x,(playerPos.z??0)-target.z)
+    :Infinity;
+  const missionStrength=Number.isFinite(distance)
+    ?THREE.MathUtils.clamp(1-distance/115,0,1):0;
+
+  // CH 02 hears occasional unlisted carrier bursts. These are deliberately
+  // unlocated and never advance or change the campaign mission.
+  const seconds=now*.001;
+  const burstWave=.5+.5*Math.sin(seconds*.83+Math.sin(seconds*.19)*.8);
+  const unlistedBurst=burstWave>.90?THREE.MathUtils.clamp((burstWave-.90)/.10,0,1):0;
+  const rawStrength=channel.id==="mission"
+    ?missionStrength
+    :channel.id==="unlisted"?unlistedBurst*.82:0;
+  const interference=channel.id==="mission"
+    ?THREE.MathUtils.clamp(.18+(1-missionStrength)*.56,.18,.82)
+    :channel.id==="unlisted"?.92:.98;
+  const noise=(Math.sin(seconds*17.1)+Math.sin(seconds*37.7+1.2)*.55)*.025*interference;
+  const strength=THREE.MathUtils.clamp(rawStrength+noise,0,1);
+  const bars=Math.max(0,Math.min(5,Math.floor(strength*5+.15)));
+  const locked=channel.id==="mission"&&missionStrength>=.94&&bars===5;
+  const status=channel.id==="mission"
+    ?locked?"SIGNAL LOCKED":bars>=3?"CARRIER PRESENT":bars>=1?"WEAK CARRIER":"SCANNING"
+    :channel.id==="unlisted"
+      ?bars>=3?"UNLISTED CARRIER":bars>=1?"FRAGMENTARY BURST":"NO CARRIER"
+      :"NO CARRIER";
+
   ctx.fillStyle="#06100b";
   ctx.fillRect(0,0,w,h);
   ctx.strokeStyle="#294d36";
   ctx.lineWidth=2;
   ctx.strokeRect(5,5,w-10,h-10);
 
-  // Signal strength rises as the player gets closer to the current mission relay.
-  // It never gives a bearing or exact distance; it behaves like an old receiver.
-  const target=typeof getMissionTarget==="function"?getMissionTarget():null;
-  const playerPos=player?.pos;
-  const distance=target&&playerPos
-    ?Math.hypot((playerPos.x??0)-target.x,(playerPos.z??0)-target.z)
-    :Infinity;
-  const strength=Number.isFinite(distance)
-    ?THREE.MathUtils.clamp(1-distance/115,0,1):0;
-  const bars=Math.max(0,Math.min(5,Math.ceil(strength*5)));
-  const phase=now*.012;
   ctx.textAlign="center";
   ctx.fillStyle="#85b991";
-  ctx.font="bold 17px monospace";
-  ctx.fillText("FIELD RECEIVER",w/2,30);
+  ctx.font="bold 15px monospace";
+  ctx.fillText("FIELD RECEIVER",w/2,26);
+  ctx.fillStyle="#567b5d";
+  ctx.font="bold 11px monospace";
+  ctx.fillText(channel.label,w/2,45);
+
   ctx.textAlign="left";
   ctx.fillStyle="#45634b";
-  ctx.font="bold 12px monospace";
-  ctx.fillText("CARRIER",18,57);
-  const barX=18,barY=67,barGap=7,barW=37,maxH=30;
+  ctx.font="bold 11px monospace";
+  ctx.fillText("CARRIER",17,65);
+  const barX=17,barY=74,barGap=7,barW=37,maxH=26;
   for(let i=0;i<5;i++){
-    const bh=8+i*5;
-    ctx.fillStyle=i<bars?(bars>=4?"#b7d58b":"#79bd87"):"#203528";
+    const bh=7+i*4.5;
+    ctx.fillStyle=i<bars?(locked?"#c5e5a2":bars>=3?"#a9d18c":"#79bd87"):"#203528";
     ctx.fillRect(barX+i*(barW+barGap),barY+maxH-bh,barW,bh);
     ctx.strokeStyle="#345440";
     ctx.lineWidth=1;
     ctx.strokeRect(barX+i*(barW+barGap),barY+maxH-bh,barW,bh);
   }
-  ctx.textAlign="right";
-  ctx.fillStyle=bars>=4?"#b7d58b":bars>=2?"#8ac59b":"#bd8a60";
-  ctx.font="bold 14px monospace";
-  ctx.fillText(bars>=5?"NEAR LOCK":bars>=3?"CARRIER FOUND":bars>=1?"WEAK CARRIER":"SCANNING",w-18,58);
-  ctx.strokeStyle=bars>=4?"#8dbf83":"#3c7450";
+
+  ctx.textAlign="center";
+  ctx.fillStyle=locked?"#c5e5a2":bars>=2?"#8ac59b":"#bd9a72";
+  ctx.font="bold 12px monospace";
+  ctx.fillText(status,w/2,121);
+
+  // Strong mission carriers produce a tighter trace; weak or unknown
+  // transmissions break up into static rather than a directional arrow.
+  ctx.strokeStyle=locked?"#b7d58b":"#4f986b";
   ctx.lineWidth=2;
   ctx.beginPath();
-  const amplitude=2+(1-strength)*13;
+  const amplitude=2+interference*18;
+  const phase=seconds*12;
   for(let x=16;x<w-16;x+=2){
-    const noise=(Math.sin(x*.105+phase)*.55+
+    const staticWave=(Math.sin(x*.105+phase)*.55+
       Math.sin(x*.037-phase*1.7)*.3+
       Math.sin(x*.31+phase*.6)*.15)*amplitude;
-    const y=h*.66+noise;
+    const carrier=channel.id==="mission"
+      ?Math.sin(x*.09+phase)*missionStrength*3
+      :channel.id==="unlisted"?Math.sin(x*.16+phase*1.7)*unlistedBurst*8:0;
+    const dropout=channel.id==="unlisted"&&unlistedBurst<.08&&x%22<4
+      ?Math.sin(x*1.8+phase)*9:0;
+    const y=h*.68+staticWave+carrier+dropout;
     if(x===16)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   }
   ctx.stroke();
+
   ctx.textAlign="center";
   ctx.fillStyle="#8ac59b";
-  ctx.font="bold 12px monospace";
-  ctx.fillText(bars>=4?"SIGNAL STABILIZING":bars>=2?"MOVE TOWARD STRONGER SIGNAL":"SEARCH FOR A CARRIER",w/2,h-20);
+  ctx.font="bold 10px monospace";
+  ctx.fillText(channel.id==="mission"
+    ?locked?"CARRIER STABLE":"SEARCH FOR STRONGER CARRIER"
+    :channel.id==="unlisted"
+      ?"LISTENING BETWEEN STATIONS":"BAND CLEAR · NO TRANSMISSION",
+    w/2,h-31);
+  ctx.fillStyle="#567b5d";
+  ctx.font="bold 9px monospace";
+  ctx.fillText("R · TUNE BAND",w/2,h-14);
   radioRadarTexture.needsUpdate=true;
+}
+
+function cycleRadioChannel(){
+  if(!radioCollected||equippedTool!=="radio")return false;
+  radioChannelIndex=(radioChannelIndex+1)%RADIO_CHANNELS.length;
+  drawHandheldRadioRadar(true);
+  return true;
 }
 
 const audio=new HorrorAudio();
@@ -1843,6 +1899,7 @@ function resetMissionState(){
     log:[]
   };
   radioCollected=false;
+  radioChannelIndex=0;
   equippedTool="flashlight";
   radioViewmodel.visible=false;
   player.proceduralArmFlashlight.visible=true;
@@ -8782,7 +8839,7 @@ function updateEquipmentStatus(){
   equipmentStatus.hidden=!available;
   if(!available)return;
   equipmentStatus.textContent=equippedTool==="radio"
-    ?"SIGNAL RADIO · Q TO SWITCH TO FLASHLIGHT"
+    ?"SIGNAL RADIO · R TO TUNE · Q TO SWITCH TO FLASHLIGHT"
     :"FLASHLIGHT · Q TO SWITCH TO RADIO";
 }
 
@@ -9980,13 +10037,17 @@ document.addEventListener("keydown",e=>{
       e.preventDefault();
       setEquippedTool(equippedTool==="radio"?"flashlight":"radio");
     }
-  }else if(e.code==="KeyM" && !controlsOpen){ muted=audio.toggleMute(); }
-  else if(e.code==="KeyN" && !e.repeat){
+  }else if(e.code==="KeyR" && !e.repeat && gameStarted && !controlsOpen && radioCollected && equippedTool==="radio"){
+    e.preventDefault();
+    cycleRadioChannel();
+  }else if(e.code==="KeyM" && !controlsOpen){
+    muted=audio.toggleMute();
+  }else if(e.code==="KeyN" && !e.repeat){
     if(gameStarted && !controlsOpen){
       e.preventDefault();
       toggleMultiplayerMap();
     }
-  }  }else if(e.code==="Tab"){
+  }else if(e.code==="Tab"){
     e.preventDefault();
     controlsOpen?hideControls():showControls();
   }
