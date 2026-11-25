@@ -7,6 +7,7 @@ const main = read("../main.js");
 const player = read("../player.js");
 const readme = read("../README.md");
 const world = read("../world.js");
+const world = read("../world.js");
 
 assert.doesNotMatch(index, /phone/i, "the phone interface and its styling must be completely removed");
 assert.doesNotMatch(index, /adminIcon/i, "the old phone launcher control must be removed");
@@ -33,6 +34,16 @@ assert.match(index, /\.adminOverlay\{position:fixed/, "developer tools must be a
 assert.match(main, /radioChannelIndex=0/, "new runs must start on the mission receiver band");
 assert.match(main, /breakerRoomDoorOpen:Boolean\(world\.breakerRoomDoor\?\.targetOpen\)/, "saves must remember whether the breaker-room entrance was left open");
 assert.match(main, /breakerRoomDoorOpen:Boolean\(save\?\.breakerRoomDoorOpen\)/, "loading must pass the saved breaker-room entrance state into restoration");
+assert.match(world, /BreakerCabinetHousing/, "breaker switches must be housed in detailed electrical cabinets");
+assert.match(world, /BreakerRoomCableTray/, "the breaker room must have overhead cable infrastructure");
+assert.match(world, /BreakerRoomAisleDeckPlate/, "the room must have a defined central service aisle");
+assert.match(world, /BreakerRoomScopeScreen/, "the far wall must have a signal-monitor focal point");
+assert.match(world, /BreakerRoomAnalogGauge/, "the signal console must include physical analog instrumentation");
+assert.match(world, /BreakerRoomToolTrolley/, "the room must include a restrained abandoned-maintenance prop");
+assert.match(world, /BreakerRoomCableDrum/, "the room must include secondary environmental dressing");
+assert.match(world, /this\.breakerRoomDoor\.group\.getObjectByName\("RoomDoorServicePlate"\)\?\.visible=false/, "the breaker room must not show the generic service sign");
+assert.match(world, /this\.breakerRoomAlarmMaterial\.emissiveIntensity/, "the room warning beacon must have an animated light state");
+assert.match(world, /for\(let row=0;row<4;row\+\+\)/, "the redesign must preserve all eight breaker interaction positions");
 assert.match(world, /roomDoor\.openProgress=roomDoor\.targetOpen\?1:0/, "loading must restore the breaker-room door transform immediately");
 assert.match(world, /roomDoor\.collisionBounds/, "restored door state must also restore collision");
 assert.match(main, /glitchMatch=rawCommand\.match/, "the admin GLITCH command must accept a transmission headline and body");
