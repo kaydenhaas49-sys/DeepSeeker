@@ -803,6 +803,22 @@ export class World {
   }
 
   restoreMaintenancePuzzleState(state={}){
+    // The breaker-room entrance also powers its lights. Restore the door's
+    // target and completed animation together so reloads do not strand the
+    // player in a dark room or leave a closed collision box on an open door.
+    const roomDoor=this.breakerRoomDoor;
+    if(roomDoor){
+      roomDoor.targetOpen=Boolean(state.breakerRoomDoorOpen);
+      roomDoor.openProgress=roomDoor.targetOpen?1:0;
+      if(roomDoor.group){
+        roomDoor.group.rotation.y=roomDoor.openProgress*Math.PI*.49*roomDoor.rotationSign;
+      }
+      if(roomDoor.closedCollisionBounds&&roomDoor.collisionBounds){
+        Object.assign(roomDoor.collisionBounds,roomDoor.openProgress>.82
+          ?{minX:1e9,maxX:1e9+1,minZ:1e9,maxZ:1e9+1}
+          :roomDoor.closedCollisionBounds);
+      }
+    }
     if(state.unlocked){
       this.completeMaintenancePuzzle(this.maintenancePuzzleType);
       return;
