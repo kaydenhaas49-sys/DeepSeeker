@@ -41,7 +41,7 @@ assert.match(world, /BreakerRoomScopeScreen/, "the far wall must have a signal-m
 assert.match(world, /BreakerRoomAnalogGauge/, "the signal console must include physical analog instrumentation");
 assert.match(world, /BreakerRoomToolTrolley/, "the room must include a restrained abandoned-maintenance prop");
 assert.match(world, /BreakerRoomCableDrum/, "the room must include secondary environmental dressing");
-assert.match(world, /this\.breakerRoomDoor\.group\.getObjectByName\("RoomDoorServicePlate"\)\?\.visible=false/, "the breaker room must not show the generic service sign");
+assert.match(world, /if\(breakerDoorPlate\)breakerDoorPlate\.visible=false/, "the breaker room must not show the generic service sign");
 assert.match(world, /this\.breakerRoomAlarmMaterial\.emissiveIntensity/, "the room warning beacon must have an animated light state");
 assert.match(world, /for\(let row=0;row<4;row\+\+\)/, "the redesign must preserve all eight breaker interaction positions");
 assert.match(world, /roomDoor\.openProgress=roomDoor\.targetOpen\?1:0/, "loading must restore the breaker-room door transform immediately");
