@@ -591,6 +591,58 @@ export class World {
       wallCtx.fillStyle="rgba(22,25,21,"+(.08+Math.random()*.12).toFixed(3)+")";
       wallCtx.fillRect(x,0,1+Math.random()*3,512);
     }
+
+    // Decades of leaks have left broad damp blooms, soot, mineral streaks,
+    // and patches where the old paint has lifted away from the concrete.
+    for(let stain=0;stain<46;stain++){
+      const x=Math.random()*512,y=90+Math.random()*420;
+      const width=18+Math.random()*82,height=12+Math.random()*54;
+      const shade=wallCtx.createRadialGradient(x,y,2,x,y,width);
+      shade.addColorStop(0,"rgba(17,23,19,"+(.20+Math.random()*.16).toFixed(3)+")");
+      shade.addColorStop(.62,"rgba(25,31,25,.12)");
+      shade.addColorStop(1,"rgba(25,31,25,0)");
+      wallCtx.fillStyle=shade;
+      wallCtx.beginPath();
+      wallCtx.ellipse(x,y,width,height,Math.random()*.6,0,Math.PI*2);
+      wallCtx.fill();
+    }
+    for(let drip=0;drip<150;drip++){
+      const x=Math.random()*512,y=70+Math.random()*360;
+      const length=12+Math.random()*120;
+      wallCtx.strokeStyle=drip%4===0?"rgba(12,18,15,.24)":"rgba(19,27,21,.12)";
+      wallCtx.lineWidth=.6+Math.random()*2.2;
+      wallCtx.beginPath();
+      wallCtx.moveTo(x,y);
+      wallCtx.lineTo(x+(Math.random()-.5)*5,Math.min(510,y+length));
+      wallCtx.stroke();
+    }
+    for(let peel=0;peel<30;peel++){
+      const x=Math.random()*500,y=100+Math.random()*390;
+      const width=5+Math.random()*25,height=4+Math.random()*17;
+      wallCtx.beginPath();
+      wallCtx.moveTo(x,y);
+      wallCtx.lineTo(x+width*.35,y-height*.45);
+      wallCtx.lineTo(x+width,y+height*.12);
+      wallCtx.lineTo(x+width*.72,y+height);
+      wallCtx.lineTo(x+width*.12,y+height*.7);
+      wallCtx.closePath();
+      wallCtx.fillStyle=peel%3===0?"rgba(151,151,127,.20)":"rgba(13,19,15,.30)";
+      wallCtx.fill();
+      wallCtx.strokeStyle="rgba(184,177,144,.12)";
+      wallCtx.lineWidth=1;
+      wallCtx.stroke();
+    }
+    wallCtx.strokeStyle="rgba(12,17,14,.32)";
+    wallCtx.lineWidth=1.4;
+    for(let crack=0;crack<18;crack++){
+      const x=Math.random()*512,y=130+Math.random()*340;
+      wallCtx.beginPath();
+      wallCtx.moveTo(x,y);
+      wallCtx.lineTo(x+(Math.random()-.5)*12,y+10+Math.random()*18);
+      wallCtx.lineTo(x+(Math.random()-.5)*20,y+28+Math.random()*30);
+      wallCtx.stroke();
+    }
+
     wallCtx.strokeStyle="rgba(18,22,19,.32)";
     wallCtx.lineWidth=2;
     for(let y=0;y<=512;y+=128){
@@ -604,20 +656,52 @@ export class World {
     const wallMaterial=new THREE.MeshStandardMaterial({
       map:wallTexture,color:0xffffff,roughness:.97,metalness:.03
     });
+    const ceilingCanvas=document.createElement("canvas");
+    ceilingCanvas.width=512;ceilingCanvas.height=512;
+    const ceilingCtx=ceilingCanvas.getContext("2d");
+    ceilingCtx.fillStyle="#242b27";
+    ceilingCtx.fillRect(0,0,512,512);
+    for(let stain=0;stain<38;stain++){
+      const x=Math.random()*512,y=Math.random()*512;
+      const radius=18+Math.random()*92;
+      const damp=ceilingCtx.createRadialGradient(x,y,2,x,y,radius);
+      damp.addColorStop(0,"rgba(8,14,11,.64)");
+      damp.addColorStop(.72,"rgba(13,20,16,.30)");
+      damp.addColorStop(1,"rgba(13,20,16,0)");
+      ceilingCtx.fillStyle=damp;
+      ceilingCtx.beginPath();
+      ceilingCtx.ellipse(x,y,radius,radius*(.35+Math.random()*.45),Math.random(),0,Math.PI*2);
+      ceilingCtx.fill();
+    }
+    ceilingCtx.strokeStyle="rgba(8,13,10,.52)";
+    ceilingCtx.lineWidth=2;
+    for(let crack=0;crack<24;crack++){
+      const x=Math.random()*512,y=Math.random()*512;
+      ceilingCtx.beginPath();
+      ceilingCtx.moveTo(x,y);
+      ceilingCtx.lineTo(x+(Math.random()-.5)*28,y+12+Math.random()*26);
+      ceilingCtx.lineTo(x+(Math.random()-.5)*45,y+32+Math.random()*48);
+      ceilingCtx.stroke();
+    }
+    const ceilingTexture=new THREE.CanvasTexture(ceilingCanvas);
+    ceilingTexture.colorSpace=THREE.SRGBColorSpace;
+    ceilingTexture.wrapS=THREE.RepeatWrapping;
+    ceilingTexture.wrapT=THREE.RepeatWrapping;
+    ceilingTexture.repeat.set(5,4);
     const ceilingMaterial=new THREE.MeshStandardMaterial({
-      color:0x343a36,roughness:.95,metalness:.12
+      map:ceilingTexture,color:0xb3b8ad,roughness:.99,metalness:0
     });
     const structuralMetal=new THREE.MeshStandardMaterial({
-      color:0x555d58,roughness:.76,metalness:.48
+      color:0x414944,roughness:.91,metalness:.24
     });
     const darkMetal=new THREE.MeshStandardMaterial({
-      color:0x242b28,roughness:.86,metalness:.35
+      color:0x191f1c,roughness:.97,metalness:.18
     });
     const cabinetMaterial=new THREE.MeshStandardMaterial({
-      color:0x46504a,roughness:.78,metalness:.42
+      color:0x353e38,roughness:.94,metalness:.19
     });
     const cabinetFaceMaterial=new THREE.MeshStandardMaterial({
-      color:0x303936,roughness:.82,metalness:.28
+      color:0x252d29,roughness:.96,metalness:.12
     });
     const rustMaterial=new THREE.MeshStandardMaterial({
       color:0x704a36,roughness:.91,metalness:.16
@@ -755,6 +839,43 @@ export class World {
         centerX-2.48,.029,partitionZ-1.5-grate*1.35,structuralMetal);
     }
 
+    // Oil, grit, old plaster and broken hardware have collected along the
+    // walls. Keep the center strip clear so none of this blocks movement.
+    const floorGrimeMaterials=[
+      new THREE.MeshStandardMaterial({color:0x171d19,roughness:1,transparent:true,opacity:.48,depthWrite:false}),
+      new THREE.MeshStandardMaterial({color:0x3b3024,roughness:1,transparent:true,opacity:.34,depthWrite:false}),
+      new THREE.MeshStandardMaterial({color:0x252b27,roughness:.94,transparent:true,opacity:.38,depthWrite:false})
+    ];
+    for(let stain=0;stain<28;stain++){
+      const side=stain%2===0?-1:1;
+      const x=centerX+side*(2.65+((stain*29)%84)/10);
+      const z=partitionZ-1.7-((stain*17)%Math.max(1,Math.floor(depth*10-3)))/10;
+      const patch=new THREE.Mesh(
+        new THREE.CircleGeometry(1,7+(stain%5)),
+        floorGrimeMaterials[stain%floorGrimeMaterials.length]
+      );
+      patch.name="BreakerRoomOilStain";
+      patch.rotation.x=-Math.PI/2;
+      patch.rotation.z=(stain%7)*.19;
+      patch.position.set(x,.023+(stain%3)*.002,z);
+      patch.scale.set(.18+(stain%4)*.12,.12+(stain%5)*.07,1);
+      patch.renderOrder=1;
+      group.add(patch);
+    }
+    for(let shard=0;shard<32;shard++){
+      const side=shard%2===0?-1:1;
+      const x=centerX+side*(2.8+((shard*31)%78)/10);
+      const z=partitionZ-1.8-((shard*13)%Math.max(1,Math.floor(depth*10-3)))/10;
+      const width=.055+(shard%4)*.025;
+      const height=.025+(shard%3)*.018;
+      const depthPiece=.07+(shard%5)*.035;
+      const material=shard%3===0?rustMaterial:darkMetal;
+      const debris=addBox("BreakerRoomDebris",width,height,depthPiece,
+        x,height*.5+.012,z,material);
+      debris.rotation.y=(shard%9)*.31;
+      debris.rotation.z=(shard%5-2)*.12;
+    }
+
     // Cable trays run the length of both cabinet banks. Repeated cross-rungs
     // and conduits visibly connect the switchgear instead of floating panels.
     for(const side of [-1,1]){
@@ -789,7 +910,24 @@ export class World {
     for(let rib=0;rib<5;rib++){
       const z=partitionZ-2.3-rib*((depth-4.6)/4);
       addBox("BreakerRoomLightHousing",4.95,.12,.58,centerX,3.61,z,darkMetal);
-      addBox("BreakerRoomFluorescentStrip",4.58,.028,.34,centerX,3.535,z,this.breakerRoomLightMaterial);
+      const fixtureFailed=rib===1||rib===4;
+      if(fixtureFailed){
+        addBox("BreakerRoomDeadFluorescentSection",4.58,.028,.34,centerX,3.535,z,darkMetal);
+        // Broken diffuser fragments remain caught in the housing.
+        for(let fragment=0;fragment<3;fragment++){
+          const shard=new THREE.Mesh(
+            new THREE.BoxGeometry(.34,.018,.07),
+            structuralMetal
+          );
+          shard.name="BreakerRoomBrokenLightGlass";
+          shard.position.set(centerX-1.15+fragment*1.12,3.515,z+(fragment%2?.12:-.12));
+          shard.rotation.x=(fragment-1)*.16;
+          shard.rotation.y=fragment*.22;
+          group.add(shard);
+        }
+      }else{
+        addBox("BreakerRoomFluorescentStrip",4.58,.028,.34,centerX,3.535,z,this.breakerRoomLightMaterial);
+      }
       addBox("BreakerRoomFixtureDiffuserLeft",.045,.035,.40,centerX-2.30,3.53,z,structuralMetal);
       addBox("BreakerRoomFixtureDiffuserRight",.045,.035,.40,centerX+2.30,3.53,z,structuralMetal);
       if(rib===0||rib===3){
@@ -899,6 +1037,24 @@ export class World {
       cabinetStatus.position.set(-.53,1.03,.371);
       root.add(cabinetStatus);
 
+      // Rust has crept through the seams and runoff has stained the lower
+      // cabinet edges. The meter glass and lever stay completely unobstructed.
+      for(let streak=0;streak<3;streak++){
+        const side=streak%2===0?-1:1;
+        const runoff=addBox("BreakerCabinetRustRunoff",
+          .022+(streak%2)*.018,.16+(streak%3)*.055,.012,
+          side*(.49+(streak%2)*.12),.66+(streak%2)*.24,.386,
+          rustMaterial,root);
+        runoff.rotation.z=(streak-1)*.045;
+      }
+      for(let chip=0;chip<2;chip++){
+        const paintLoss=addBox("BreakerCabinetPaintLoss",
+          .12+(chip*.035),.045,.018,
+          chip===0?-.61:.59,.22+chip*.11,.377,
+          rustMaterial,root);
+        paintLoss.rotation.z=(chip===0?-.12:.16);
+      }
+
       // Short drops connect each cabinet to the overhead cable tray.
       addPipe("BreakerCabinetConduit",
         new THREE.Vector3(spec.x,2.13,spec.z),
@@ -941,6 +1097,25 @@ export class World {
     scopeCtx.stroke();
     scopeCtx.strokeStyle="rgba(115,203,186,.22)";
     scopeCtx.beginPath();scopeCtx.moveTo(24,150);scopeCtx.lineTo(616,150);scopeCtx.stroke();
+    // The old display has dead scan lines, a burned patch, and a cracked
+    // corner of glass; the carrier trace still bleeds through underneath.
+    for(let line=5;line<256;line+=9){
+      scopeCtx.fillStyle="rgba(0,0,0,.16)";
+      scopeCtx.fillRect(0,line,640,1);
+    }
+    scopeCtx.fillStyle="rgba(0,0,0,.42)";
+    scopeCtx.fillRect(462,0,178,256);
+    scopeCtx.fillStyle="rgba(13,37,31,.42)";
+    scopeCtx.fillRect(475,36,165,9);
+    scopeCtx.strokeStyle="rgba(190,216,196,.40)";
+    scopeCtx.lineWidth=1.5;
+    scopeCtx.beginPath();
+    scopeCtx.moveTo(586,8);scopeCtx.lineTo(565,44);scopeCtx.lineTo(576,68);
+    scopeCtx.lineTo(548,92);scopeCtx.lineTo(557,124);scopeCtx.stroke();
+    scopeCtx.beginPath();
+    scopeCtx.moveTo(565,44);scopeCtx.lineTo(538,32);scopeCtx.lineTo(526,9);
+    scopeCtx.moveTo(576,68);scopeCtx.lineTo(606,82);scopeCtx.lineTo(629,108);
+    scopeCtx.stroke();
     const scopeTexture=new THREE.CanvasTexture(scopeCanvas);
     scopeTexture.colorSpace=THREE.SRGBColorSpace;
     const scopeScreenMaterial=new THREE.MeshBasicMaterial({
@@ -998,11 +1173,16 @@ export class World {
     // cue without blocking either the aisle or any interactable.
     const cartX=centerX+10.6,cartZ=backZ+3.4;
     addBox("BreakerRoomToolTrolleyLowerShelf",1.02,.08,.66,cartX,.43,cartZ,darkMetal);
-    addBox("BreakerRoomToolTrolleyTop",1.12,.08,.72,cartX,.91,cartZ,structuralMetal);
+    const trolleyTop=addBox("BreakerRoomToolTrolleyTop",1.12,.08,.72,cartX,.91,cartZ,structuralMetal);
+    trolleyTop.rotation.z=-.035;
     addBox("BreakerRoomToolTrolleyDrawer",.92,.37,.58,cartX,.67,cartZ,cabinetMaterial);
+    addBox("BreakerRoomTrolleyRustPatch",.38,.13,.018,
+      cartX+.25,.95,cartZ+.37,rustMaterial);
     addBox("BreakerRoomToolTrolleyHandle",.74,.045,.045,cartX,.83,cartZ+.33,rustMaterial);
     for(const side of [-1,1]){
       for(const front of [-1,1]){
+        // One caster has snapped off; the frame sits slightly unevenly.
+        if(side===1&&front===-1)continue;
         const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.095,.095,.075,12),rubberMaterial);
         wheel.name="BreakerRoomTrolleyWheel";
         wheel.rotation.z=Math.PI*.5;
@@ -1010,6 +1190,13 @@ export class World {
         group.add(wheel);
       }
     }
+    const brokenCaster=new THREE.Mesh(
+      new THREE.CylinderGeometry(.035,.035,.15,8),rustMaterial
+    );
+    brokenCaster.name="BreakerRoomBrokenTrolleyCaster";
+    brokenCaster.rotation.z=Math.PI*.5;
+    brokenCaster.position.set(cartX+.43,.10,cartZ-.25);
+    group.add(brokenCaster);
 
     // A loose cable drum sits against the opposite wall; it is deliberately
     // low and out of the route, like equipment left during a rushed repair.
@@ -1033,6 +1220,9 @@ export class World {
     addPipe("BreakerRoomLooseCable",
       new THREE.Vector3(drumX,.12,drumZ),
       new THREE.Vector3(drumX+1.1,.08,drumZ+1.1),.025,rubberMaterial);
+    addPipe("BreakerRoomExposedCopperWire",
+      new THREE.Vector3(drumX+1.1,.08,drumZ+1.1),
+      new THREE.Vector3(drumX+1.45,.055,drumZ+1.45),.009,rustMaterial);
 
     // A cool signal source balances the warm fluorescent light; it only wakes
     // when the entrance door is open, just like the room's overhead fixtures.

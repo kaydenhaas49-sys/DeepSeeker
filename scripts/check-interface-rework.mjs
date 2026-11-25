@@ -40,6 +40,12 @@ assert.match(world, /BreakerRoomScopeScreen/, "the far wall must have a signal-m
 assert.match(world, /BreakerRoomAnalogGauge/, "the signal console must include physical analog instrumentation");
 assert.match(world, /BreakerRoomToolTrolley/, "the room must include a restrained abandoned-maintenance prop");
 assert.match(world, /BreakerRoomCableDrum/, "the room must include secondary environmental dressing");
+assert.match(world, /wallCtx\.ellipse/, "the room walls must show visible paint and water damage");
+assert.match(world, /BreakerRoomDeadFluorescentSection/, "some ceiling fixtures must be visibly failed");
+assert.match(world, /BreakerRoomOilStain/, "the floor must carry aged grime and oil staining");
+assert.match(world, /BreakerCabinetRustRunoff/, "the breaker cabinets must show corrosion");
+assert.match(world, /BreakerRoomBrokenTrolleyCaster/, "the abandoned maintenance trolley must be damaged");
+assert.match(world, /ceilingTexture/, "the ceiling must show long-term water damage");
 assert.doesNotMatch(world, /signCanvas|roomDoorSignMaterial|RoomDoorServicePlate|breakerNoteMaterial|BreakerResetNoteBoard|BreakerResetSequence|BreakerMathExpression|fillText\(|strokeText\(/, "the world must contain no in-world signs, written puzzle instructions, or text-rendered labels");
 assert.match(world, /BREAKER_METER_READINGS/, "the breaker puzzle must use physical meter readings instead of equations");
 assert.match(world, /breakerGaugeMaterials/, "breaker meter faces must be generated without text");
