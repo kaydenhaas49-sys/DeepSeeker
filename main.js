@@ -138,57 +138,38 @@ const SIGNAL_GLITCH_FRAGMENTS=Object.freeze([
   "IT IS ALREADY OPEN","LOOK AWAY FROM THE SCREEN","THE SCREEN IS LOOKING BACK","END OF MESSAGE",
 ]);
 
-const SIGNAL_ZALGO_ABOVE=Object.freeze([
-  "\u0300","\u0301","\u0302","\u0303","\u0304","\u0305",
-  "\u0306","\u0307","\u0308","\u0309","\u030A","\u030B",
-  "\u030C","\u030F","\u0311","\u0312","\u0313","\u0314",
-  "\u033D","\u0342","\u0344","\u0350"
-]);
-const SIGNAL_ZALGO_THROUGH=Object.freeze([
-  "\u0334","\u0335","\u0336","\u0337","\u0338"
-]);
-const SIGNAL_ZALGO_BELOW=Object.freeze([
-  "\u0316","\u0317","\u0318","\u0319","\u031C","\u031D",
-  "\u031E","\u031F","\u0320","\u0323","\u0324","\u0325",
-  "\u0326","\u0327","\u0328","\u0329","\u032A","\u032B",
-  "\u032C","\u032D","\u032E","\u0330","\u0331","\u0332",
-  "\u0333"
-]);
-
-function corruptSignalText(value){
-  const pick=marks=>marks[Math.floor(Math.random()*marks.length)];
-  return [...String(value??"")].map(character=>{
-    if(!/[A-Z0-9]/i.test(character))return character;
-
-    let corrupted=character;
-    const aboveCount=1+(Math.random()<.52?1:0)+(Math.random()<.12?1:0);
-    const belowCount=Math.random()<.28?0:1+(Math.random()<.34?1:0);
-    for(let i=0;i<aboveCount;i++)corrupted+=pick(SIGNAL_ZALGO_ABOVE);
-    if(Math.random()<.34)corrupted+=pick(SIGNAL_ZALGO_THROUGH);
-    for(let i=0;i<belowCount;i++)corrupted+=pick(SIGNAL_ZALGO_BELOW);
-    return corrupted;
-  }).join("");
-}
-
 function populateSignalGlitchNoise(){
   if(!signalGlitchNoise)return;
   const fragment=document.createDocumentFragment();
-  for(let i=0;i<22;i++){
+  const phrases=SIGNAL_GLITCH_FRAGMENTS.slice();
+
+  // Shuffle the phrase bank so every transmission has a different field of text.
+  for(let i=phrases.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [phrases[i],phrases[j]]=[phrases[j],phrases[i]];
+  }
+
+  for(let i=0;i<100;i++){
     const item=document.createElement("span");
+    const phrase=phrases[i%phrases.length];
     item.className="signalGlitchFragment";
-    const phrase=SIGNAL_GLITCH_FRAGMENTS[Math.floor(Math.random()*SIGNAL_GLITCH_FRAGMENTS.length)];
-    item.textContent=corruptSignalText(phrase);
-    item.setAttribute("aria-label",phrase);
-    item.style.left=(Math.random()*94)+"%";
+    item.textContent=phrase;
+    item.style.left=(Math.random()*96)+"%";
     item.style.top=(Math.random()*96)+"%";
-    item.style.setProperty("--signal-duration",(5.2+Math.random()*5.8)+"s");
-    item.style.setProperty("--signal-delay",(-Math.random()*11)+"s");
-    item.style.setProperty("--signal-spacing",(1+Math.random()*3)+"px");
-    const driftX=(12+Math.random()*34)*(Math.random()<.5?-1:1);
-    const driftY=(10+Math.random()*28)*(Math.random()<.5?-1:1);
-    item.style.setProperty("--signal-drift-x",driftX+"px");
-    item.style.setProperty("--signal-drift-y",driftY+"px");
-    if(Math.random()<.22)item.style.filter="blur(1px)";
+
+    const duration=8+Math.random()*14;
+    item.style.setProperty("--signal-duration",duration.toFixed(2)+"s");
+    item.style.setProperty("--signal-delay",(-Math.random()*duration).toFixed(2)+"s");
+    item.style.setProperty("--signal-spacing",(0.4+Math.random()*1.8).toFixed(2)+"px");
+    item.style.setProperty("--signal-size",(8+Math.random()*5).toFixed(1)+"px");
+    item.style.setProperty("--signal-opacity",(0.10+Math.random()*0.19).toFixed(3));
+
+    const driftX=(18+Math.random()*76)*(Math.random()<.5?-1:1);
+    const driftY=(12+Math.random()*58)*(Math.random()<.5?-1:1);
+    item.style.setProperty("--signal-drift-x",driftX.toFixed(1)+"px");
+    item.style.setProperty("--signal-drift-y",driftY.toFixed(1)+"px");
+    item.style.setProperty("--signal-rotation",((Math.random()-.5)*8).toFixed(2)+"deg");
+    if(Math.random()<.16)item.classList.add("signalGlitchFragmentDim");
     fragment.appendChild(item);
   }
   signalGlitchNoise.replaceChildren(fragment);

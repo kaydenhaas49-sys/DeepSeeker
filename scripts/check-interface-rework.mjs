@@ -18,6 +18,9 @@ assert.match(main, /signalGlitchDetail\.textContent/, "signal transmissions must
 assert.match(main, /function showHouseIntroTransmission/, "the opening tutorial must use a signal transmission");
 assert.match(main, /RADIO_CHANNELS/, "the handheld receiver must expose tunable channels");
 assert.match(main, /function cycleRadioChannel/, "the player must be able to cycle receiver channels");
+assert.match(main, /for\(let i=0;i<100;i\+\+\)/, "each transmission must create one hundred background fragments");
+assert.match(index, /@keyframes signalFragmentPhase/, "background fragments must phase in and out while moving");
+assert.doesNotMatch(index, /signalGlitchMessage::before|signalGlitchMessage::after/, "decorative duplicate headline text must be removed");
 assert.match(main, /KeyR/, "receiver tuning must have a keyboard binding");
 assert.match(index, /<span class="key">R<\/span>/, "the controls panel must explain receiver tuning");
 assert.match(main, /e\.code==="F3"/, "developer tools must have a separate developer-only shortcut");

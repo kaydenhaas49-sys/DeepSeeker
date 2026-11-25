@@ -51,16 +51,17 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
     linear-gradient(90deg,rgba(0,0,0,.68),transparent 22% 78%,rgba(0,0,0,.68));
   box-shadow:inset 0 0 0 1px rgba(100,24,31,.10),inset 0 0 150px rgba(0,0,0,.96);
 }
-#signalGlitchNoise{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.72}
+#signalGlitchNoise{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.9}
 .signalGlitchFragment{
-  position:absolute;display:block;max-width:30vw;overflow:visible;white-space:nowrap;line-height:1.8;
-  color:rgba(128,61,66,.25);font:500 9px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;
-  letter-spacing:var(--signal-spacing,2px);text-shadow:0 0 8px rgba(68,0,7,.34);
+  position:absolute;display:block;max-width:42vw;overflow:visible;white-space:nowrap;line-height:1.8;
+  color:rgba(151,77,85,.28);font:500 var(--signal-size,10px)/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:var(--signal-spacing,1px);text-shadow:0 0 10px rgba(95,0,9,.42);
   opacity:0;will-change:opacity,transform;
-  animation:signalFragmentFade var(--signal-duration,7s) ease-in-out var(--signal-delay,0s) infinite;
+  animation:signalFragmentPhase var(--signal-duration,12s) ease-in-out var(--signal-delay,0s) infinite;
 }
-.signalGlitchFragment:nth-child(3n){color:rgba(112,68,70,.19);font-size:10px}
-.signalGlitchFragment:nth-child(4n){color:rgba(103,34,41,.25);filter:blur(.45px)}
+.signalGlitchFragment:nth-child(3n){color:rgba(178,103,108,.26)}
+.signalGlitchFragment:nth-child(4n){color:rgba(116,52,59,.32)}
+.signalGlitchFragmentDim{color:rgba(122,66,70,.18)!important;filter:blur(.35px)}
 .signalGlitchCore{
   position:relative;z-index:3;width:min(900px,90vw);padding:clamp(22px,5vw,58px);
   box-sizing:border-box;text-align:center;
@@ -79,27 +80,14 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 #signalGlitchDetail{max-width:min(680px,100%);margin:20px auto 0;color:rgba(184,130,130,.88);font:500 clamp(13px,1.7vw,17px)/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.7px;text-shadow:0 2px 14px #000;white-space:pre-wrap;overflow-wrap:anywhere;opacity:0;transform:translateY(8px);transition:opacity .28s ease .12s,transform .28s ease .12s}
 #signalGlitchDetail[hidden]{display:none}
 #signalGlitch.active #signalGlitchDetail:not([hidden]){opacity:1;transform:none}
-#signalGlitchMessage::before,#signalGlitchMessage::after{
-  content:attr(data-text);position:absolute;inset:0;overflow:hidden;pointer-events:none;
-  white-space:inherit;overflow-wrap:inherit;
-}
-#signalGlitchMessage::before{
-  color:#6e252d;opacity:.68;transform:translateX(-2px);mix-blend-mode:screen;
-  clip-path:inset(0 0 68% 0);animation:signalSliceRed 2.5s steps(2,end) infinite;
-}
-#signalGlitchMessage::after{
-  color:#a35f63;opacity:.48;transform:translateX(2px);mix-blend-mode:screen;
-  clip-path:inset(72% 0 0 0);animation:signalSliceWhite 2.9s steps(2,end) infinite;
-}
 #signalGlitch.active .signalGlitchCore{animation:signalCoreEnter .38s steps(3,end) both}
-@keyframes signalFragmentFade{
-  0%,100%{opacity:0;transform:translate3d(0,18px,0) skewX(-5deg) scale(.98)}
-  18%{opacity:0;transform:translate3d(0,12px,0) skewX(-3deg) scale(.99)}
-  34%{opacity:.13;transform:translate3d(calc(var(--signal-drift-x,18px)*-.22),calc(var(--signal-drift-y,-16px)*-.12),0) skewX(2deg) scale(1)}
-  52%{opacity:.22;transform:translate3d(var(--signal-drift-x,18px),var(--signal-drift-y,-16px),0) skewX(-2deg) scale(1.01)}
-  74%{opacity:.07;transform:translate3d(calc(var(--signal-drift-x,18px)*-.35),calc(var(--signal-drift-y,-16px)*.5),0) skewX(3deg) scale(1)}
-  90%{opacity:.15;transform:translate3d(calc(var(--signal-drift-x,18px)*.22),calc(var(--signal-drift-y,-16px)*-.3),0) skewX(-2deg) scale(.99)}
-  98%{opacity:0;transform:translate3d(0,-14px,0) skewX(3deg) scale(.98)}
+@keyframes signalFragmentPhase{
+  0%,100%{opacity:0;transform:translate3d(0,0,0) rotate(var(--signal-rotation,0deg)) scale(.96)}
+  12%{opacity:0;transform:translate3d(0,7px,0) rotate(var(--signal-rotation,0deg)) scale(.97)}
+  28%{opacity:calc(var(--signal-opacity,.18)*.62);transform:translate3d(calc(var(--signal-drift-x,30px)*-.18),calc(var(--signal-drift-y,-24px)*-.18),0) rotate(var(--signal-rotation,0deg)) scale(1)}
+  49%{opacity:var(--signal-opacity,.18);transform:translate3d(var(--signal-drift-x,30px),var(--signal-drift-y,-24px),0) rotate(var(--signal-rotation,0deg)) scale(1.025)}
+  69%{opacity:calc(var(--signal-opacity,.18)*.76);transform:translate3d(calc(var(--signal-drift-x,30px)*-.24),calc(var(--signal-drift-y,-24px)*.22),0) rotate(var(--signal-rotation,0deg)) scale(1.01)}
+  86%{opacity:0;transform:translate3d(calc(var(--signal-drift-x,30px)*.42),calc(var(--signal-drift-y,-24px)*-.35),0) rotate(var(--signal-rotation,0deg)) scale(.98)}
 }
 @keyframes signalCoreFlicker{
   0%,89%,92%,95%,98%,100%{opacity:1;filter:none}
@@ -107,17 +95,6 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
   91%{opacity:.9;transform:translateX(-1px)}
   94%{opacity:.48;filter:blur(.6px)}
   97%{opacity:.82;transform:translateX(1px)}
-}
-@keyframes signalSliceRed{
-  0%,84%,100%{clip-path:inset(0 0 84% 0);transform:translate(-2px,-1px)}
-  86%{clip-path:inset(22% 0 52% 0);transform:translate(4px,1px)}
-  88%{clip-path:inset(66% 0 16% 0);transform:translate(-4px,0)}
-  90%{clip-path:inset(0 0 84% 0);transform:translate(2px,1px)}
-}
-@keyframes signalSliceWhite{
-  0%,78%,100%{clip-path:inset(82% 0 0 0);transform:translate(2px,1px)}
-  80%{clip-path:inset(42% 0 39% 0);transform:translate(-4px,-1px)}
-  82%{clip-path:inset(86% 0 3% 0);transform:translate(4px,0)}
 }
 @keyframes signalCoreEnter{
   0%{opacity:0;transform:scale(1.018) skewX(4deg);filter:blur(4px)}
@@ -132,7 +109,6 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 }
 @media(prefers-reduced-motion:reduce){
   #signalGlitch::before,.signalGlitchFragment,#signalGlitchMessage,
-  #signalGlitchMessage::before,#signalGlitchMessage::after,
   #signalGlitch.active .signalGlitchCore{animation:none!important}
   .signalGlitchFragment{opacity:.06}
 }
