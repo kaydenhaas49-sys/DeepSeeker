@@ -19,5 +19,5 @@ assert.match(main, /RADIO_CHANNELS/, "the handheld receiver must expose tunable 
 assert.match(main, /function cycleRadioChannel/, "the player must be able to cycle receiver channels");
 assert.match(main, /KeyR/, "receiver tuning must have a keyboard binding");
 assert.match(index, /<span class="key">R<\/span>/, "the controls panel must explain receiver tuning");
-assert.match(main, /KeyF3/, "developer tools must have a separate developer-only shortcut");
+assert.match(main, /e\.code==="F3"/, "developer tools must have a separate developer-only shortcut");
 console.log("Interface migration checks passed.");
