@@ -39,6 +39,10 @@ assert.match(world, /BreakerRoomCableTray/, "the breaker room must have overhead
 assert.match(world, /BreakerRoomAisleDeckPlate/, "the room must have a defined central service aisle");
 assert.match(world, /BreakerRoomScopeScreen/, "the far wall must have a signal-monitor focal point");
 assert.match(world, /BreakerRoomRearHeader[^\n]*wallMaterial/, "the rear wall cap beside the exit must match the room walls");
+assert.match(world, /MaintenanceRoomBackWallLeft/, "the wall beside the maintenance exit must use the room's aged wallpaper");
+assert.match(world, /MaintenanceRoomBackWallRight/, "the opposite side of the maintenance exit must use the room's aged wallpaper");
+assert.match(world, /MaintenanceRoomBackDoorLintel/, "the wall above the maintenance exit must use the room's aged wallpaper");
+assert.match(world, /wallSection\.material=wallMaterial/, "the exit surround must share the actual breaker-room wall material");
 assert.match(world, /BreakerRoomAnalogGauge/, "the signal console must include physical analog instrumentation");
 assert.match(world, /BreakerRoomToolTrolley/, "the room must include a restrained abandoned-maintenance prop");
 assert.match(world, /BreakerRoomCableDrum/, "the room must include secondary environmental dressing");
@@ -66,7 +70,14 @@ assert.match(index, /BETA TEST COMPLETE/, "the completion screen must state that
 assert.match(index, /DeepSeeker is still in development, and more levels are coming\./, "the completion screen must explain that more levels are in development");
 assert.match(main, /function showBetaCompletionScreen/, "the exit must route to the plain beta-completion screen");
 assert.match(main, /if\(demo\)\{\s*showBetaCompletionScreen\(\{broadcast\}\);/, "demo completion must not use the stylized victory ending");
-assert.doesNotMatch(storyMission, /poolroomsDoorCard|_addSign\(gate|GateTopSignalPlate|GateTopSignalSegment/, "the sealed exit must have no top sign or signal plate");
+assert.match(main, /function triggerMissionEnding\(\{broadcast=true\}=\{\}\)[\s\S]*?showBetaCompletionScreen\(\{broadcast\}\)/, "the actual Poolrooms exit must display the beta completion screen");
+assert.match(main, /world\.js\?v=20261125-beta-exit-wall-fix/, "the changed world module must not use a stale cache key");
+assert.match(main, /storyMission\.js\?v=20261125-beta-exit-wall-fix/, "the changed story mission module must not use a stale cache key");
+assert.match(index, /main\.js\?v=20261125-beta-exit-wall-fix/, "the changed game entrypoint must not use a stale cache key");
+assert.doesNotMatch(storyMission, /poolroomsDoorCard|poolroomsExitCard|_addSign\(gate|_addSign\(group|GateTopSignalPlate|GateTopSignalSegment|SIGNAL EXIT|PRESS E TO FINISH/, "the exits must have no text signs or decorative sign plates");
+assert.match(storyMission, /this\.poolroomsExitMesh=exitPortal\.exitMesh/, "the actual portal surface must be stored as the exit interaction target");
+assert.match(storyMission, /this\.poolroomsExitMesh\.userData\.interactable/, "the visible portal surface itself must carry the interaction");
+assert.match(storyMission, /return this\.poolroomsExitMesh \|\| null/, "the interaction system must raycast the real exit surface");
 assert.match(storyMission, /PoolroomsGateLintel[^\n]*gateMat/, "the exit-door lintel must use the same finish as its side walls");
 assert.match(storyMission, /poolroomsDoorInteractable/, "the actual gate panel must remain interactable without a sign");
 assert.match(storyMission, /GateDoorLeaf/, "interaction must be attached to the sealed gate leaves");

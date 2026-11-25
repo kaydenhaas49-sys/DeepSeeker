@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261101-darker-env";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261125-beta-exit-wall-fix";
 import { createTextures } from "./textures.js?v=20261030-finish-pass7";
 import { Player } from "./player.js?v=20261102-hand-beam-qte-fix";
 import { HorrorAudio } from "./audio.js?v=20261030-finish-pass7";
@@ -19,7 +19,7 @@ import { SecurityCameraSystem } from "./securityCameras.js?v=20261030-finish-pas
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261030-finish-pass7";
 import { SpiderHunter } from "./spiderHunter.js?v=20261030-finish-pass7";
 import { SpiderSurfaceController } from "./spiderSurface.js?v=20261102-hand-beam-qte-fix";
-import { StoryMissionWorld } from "./storyMission.js?v=20261030-finish-pass7";
+import { StoryMissionWorld } from "./storyMission.js?v=20261125-beta-exit-wall-fix";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -2019,8 +2019,7 @@ function triggerMissionEnding({broadcast=true}={}){
   if(!poolroomsActive||gameEnded)return;
   missionState.poolroomsExitReached=true;
   recordMissionLog("THE SOURCE","You found the end of the transmission. It was waiting for you.");
-  if(broadcast)multiplayer.broadcastWorldEvent("mission_ending","campaign",missionStateSnapshot());
-  beginGameEnding();
+  showBetaCompletionScreen({broadcast});
 }
 // Retain the apartment in memory if a save slot actually uses this level.
 let initialHouseRequired=false;
@@ -3715,7 +3714,7 @@ const multiplayer=new Multiplayer({
     if(event?.type==="mission_ending"){
       if(!multiplayer.isWorldAuthority()){
         restoreMissionState(event.payload||{});
-        beginGameEnding();
+        showBetaCompletionScreen({broadcast:false});
       }
       return;
     }

@@ -382,7 +382,7 @@ function buildProceduralSignalPortal(parent,x,y,z,rotationY=Math.PI) {
   add("SignalExitFrameRight",0.15,2.78,0.28,0.96,1.39,0,frameMat,0.025);
   add("SignalExitFrameHeader",2.06,0.16,0.28,0,2.70,0,frameMat,0.025);
   add("SignalExitThreshold",1.98,0.10,0.34,0,0.05,0.02,frameMat,0.016);
-  addDeviceMesh(portal,"SignalExitVoid",new THREE.PlaneGeometry(1.70,2.48),
+  const exitMesh=addDeviceMesh(portal,"SignalExitVoid",new THREE.PlaneGeometry(1.70,2.48),
     darkMat,0,1.24,0.08);
   add("SignalExitInnerTrimLeft",0.035,2.42,0.04,-0.84,1.24,0.105,cyanMat,0.008);
   add("SignalExitInnerTrimRight",0.035,2.42,0.04,0.84,1.24,0.105,cyanMat,0.008);
@@ -412,7 +412,7 @@ function buildProceduralSignalPortal(parent,x,y,z,rotationY=Math.PI) {
   light.castShadow=false;
   portal.add(light);
   portal.userData.procedural=true;
-  return {root:portal,bars,light};
+  return {root:portal,bars,light,exitMesh};
 }
 
 function placeModelOnFloor(model, { x = 0, z = 0, scale = 1, rotationY = 0 } = {}) {
@@ -446,7 +446,7 @@ export class StoryMissionWorld {
     this.relayCards = [];
     this.relayDevices = [];
     this.poolroomsDoorInteractable = null;
-    this.poolroomsExitCard = null;
+    this.poolroomsExitMesh = null;
     this.poolroomsLoaded = false;
     this.poolroomsLoadPromise = null;
     this.signalBeacons = [];
@@ -869,13 +869,11 @@ export class StoryMissionWorld {
     const exitPortal=buildProceduralSignalPortal(group,12.15,-0.08,17.02,Math.PI);
     this.portalSignalBars=exitPortal.bars;
     this.portalSignalLight=exitPortal.light;
-    this.poolroomsExitCard = this._addSign(group, {
-      x: 10.15, y: 1.8, z: 16.82, rotationY: Math.PI,
-      width: 1.4, height: 0.76,
-      title: "SIGNAL EXIT", subtitle: "PRESS E TO FINISH", status: "OPEN",
-      interactable: { type: "poolroomsExit", prompt: "Follow the signal to the exit" },
-      register: false,
-    });
+    this.poolroomsExitMesh=exitPortal.exitMesh;
+    this.poolroomsExitMesh.userData.interactable={
+      type:"poolroomsExit",
+      prompt:"Finish the beta test",
+    };
     this.poolroomsLoaded = true;
   }
 
@@ -884,6 +882,6 @@ export class StoryMissionWorld {
   }
 
   getPoolroomsExitInteractable() {
-    return this.poolroomsExitCard?.mesh || null;
+    return this.poolroomsExitMesh || null;
   }
 }

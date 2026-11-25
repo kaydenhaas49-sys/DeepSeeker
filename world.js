@@ -656,6 +656,14 @@ export class World {
     const wallMaterial=new THREE.MeshStandardMaterial({
       map:wallTexture,color:0xffffff,roughness:.97,metalness:.03
     });
+    for(const name of [
+      "MaintenanceRoomBackWallLeft",
+      "MaintenanceRoomBackWallRight",
+      "MaintenanceRoomBackDoorLintel"
+    ]){
+      const wallSection=this.maintenanceRoomGroup?.getObjectByName(name);
+      if(wallSection)wallSection.material=wallMaterial;
+    }
     const ceilingCanvas=document.createElement("canvas");
     ceilingCanvas.width=512;ceilingCanvas.height=512;
     const ceilingCtx=ceilingCanvas.getContext("2d");
