@@ -40,7 +40,12 @@ assert.match(world, /BreakerRoomScopeScreen/, "the far wall must have a signal-m
 assert.match(world, /BreakerRoomAnalogGauge/, "the signal console must include physical analog instrumentation");
 assert.match(world, /BreakerRoomToolTrolley/, "the room must include a restrained abandoned-maintenance prop");
 assert.match(world, /BreakerRoomCableDrum/, "the room must include secondary environmental dressing");
-assert.match(world, /if\(breakerDoorPlate\)breakerDoorPlate\.visible=false/, "the breaker room must not show the generic service sign");
+assert.doesNotMatch(world, /signCanvas|roomDoorSignMaterial|RoomDoorServicePlate|breakerNoteMaterial|BreakerResetNoteBoard|BreakerResetSequence|BreakerMathExpression|fillText\(|strokeText\(/, "the world must contain no in-world signs, written puzzle instructions, or text-rendered labels");
+assert.match(world, /BREAKER_METER_READINGS/, "the breaker puzzle must use physical meter readings instead of equations");
+assert.match(world, /breakerGaugeMaterials/, "breaker meter faces must be generated without text");
+assert.match(world, /BreakerMeterFace/, "each breaker cabinet must display a physical analog meter face");
+assert.match(world, /meter\.reading\/10/, "analog needle positions must represent each breaker reading");
+assert.match(main, /COMPARE THE BREAKER METERS AND SWITCH THEM FROM LOWEST TO HIGHEST/, "the player guidance must describe the new meter-based puzzle");
 assert.match(world, /this\.breakerRoomAlarmMaterial\.emissiveIntensity/, "the room warning beacon must have an animated light state");
 assert.match(world, /for\(let row=0;row<4;row\+\+\)/, "the redesign must preserve all eight breaker interaction positions");
 assert.match(world, /roomDoor\.openProgress=roomDoor\.targetOpen\?1:0/, "loading must restore the breaker-room door transform immediately");
