@@ -106,6 +106,7 @@ const eventText=document.getElementById("event");
 const signalGlitchOverlay=document.getElementById("signalGlitch");
 const signalGlitchNoise=document.getElementById("signalGlitchNoise");
 const signalGlitchMessage=document.getElementById("signalGlitchMessage");
+const signalGlitchDetail=document.getElementById("signalGlitchDetail");
 let signalGlitchTimer=0;
 let signalGlitchGeneration=0;
 
@@ -193,15 +194,20 @@ function populateSignalGlitchNoise(){
   signalGlitchNoise.replaceChildren(fragment);
 }
 
-function showSignalGlitch(message,_detail="",duration=3600){
+function showSignalGlitch(message,detail="",duration=3600){
   if(!signalGlitchOverlay||!signalGlitchMessage||!signalGlitchNoise)return;
   const headline=String(message||"UNKNOWN SIGNAL").trim().slice(0,100).toUpperCase();
+  const body=String(detail??"").trim().slice(0,420);
   const generation=++signalGlitchGeneration;
   window.clearTimeout(signalGlitchTimer);
 
   signalGlitchMessage.textContent=headline;
   signalGlitchMessage.dataset.text=headline;
   signalGlitchMessage.classList.toggle("long",headline.length>26);
+  if(signalGlitchDetail){
+    signalGlitchDetail.textContent=body;
+    signalGlitchDetail.hidden=!body;
+  }
   populateSignalGlitchNoise();
   signalGlitchOverlay.setAttribute("aria-hidden","false");
   signalGlitchOverlay.classList.remove("active");
@@ -251,16 +257,6 @@ const tutorialGuideStep=document.getElementById("tutorialGuideStep");
 const tutorialGuideAction=document.getElementById("tutorialGuideAction");
 const tutorialGuideHint=document.getElementById("tutorialGuideHint");
 const vignette=document.getElementById("vignette");
-const phone=document.getElementById("phone");
-const phoneAppName=document.getElementById("phoneAppName");
-const phoneDepth=document.getElementById("phoneDepth");
-const phoneDepthLabel=document.getElementById("phoneDepthLabel");
-const phoneCardTitle=document.getElementById("phoneCardTitle");
-const phoneCardText=document.getElementById("phoneCardText");
-const phoneStory=document.getElementById("phoneStory");
-const deepseekerIcon=document.getElementById("deepseekerIcon");
-const phoneHome=document.getElementById("phoneHome");
-const adminIcon=document.getElementById("adminIcon");
 const adminOverlay=document.getElementById("adminOverlay");
 const adminAuthCard=document.getElementById("adminAuthCard");
 const adminPanelCard=document.getElementById("adminPanelCard");
@@ -1860,7 +1856,6 @@ function recordMissionLog(title,text){
   if(missionState.log.some(item=>item.title===cleanTitle))return;
   missionState.log.push({title:cleanTitle,text:String(text||"").slice(0,180)});
   missionState.log=missionState.log.slice(-12);
-  renderStoryLog();
 }
 
 function getMissionTarget(){
@@ -1892,7 +1887,6 @@ function updateMissionObjective(){
   const target=getMissionTarget();
   const label=target?.hint||"SEARCH THE BACKROOMS FOR A SIGNAL.";
   if(objective&&objective.textContent!==label)objective.textContent=label;
-  if(phoneCardText&&phoneCardText.textContent!==label)phoneCardText.textContent=label;
 }
 
 function activateMissionRelay(index,{broadcast=true}={}){
@@ -1900,7 +1894,7 @@ function activateMissionRelay(index,{broadcast=true}={}){
   if(!Number.isInteger(index)||index<0||index>=3||missionState.relays[index])return false;
   missionState.relays[index]=true;
   const details=[
-    ["FIELD RADIO RESTORED","The radio finally clears. M's voice breaks through the static."],
+    ["FIELD RADIO RESTORED","The radio finally clears. A fragment of M's transmission breaks through the static."],
     ["RELAY TWO ONLINE","The second relay repeats a message from the maintenance room."],
     ["RELAY THREE ONLINE","The last relay locks onto a signal beyond the Poolrooms door."]
   ][index];
@@ -1973,7 +1967,6 @@ async function enterPoolroomsLevel({broadcast=true}={}){
   }
   storyMissionWorld.syncState(missionState,{poolroomsActive:true,missionVisible:false});
   objective.textContent="FOLLOW THE DIM BLUE LIGHTS ALONG THE DRY DECK · FIND THE SOURCE OF THE SIGNAL.";
-  if(phoneCardText)phoneCardText.textContent=objective.textContent;
   eventText.textContent="THE POOLROOMS · SIGNAL LOCKED";
   eventText.style.opacity="1";
   player.lock();
@@ -3236,7 +3229,8 @@ function applySavedGame(data){
       ensureTutorialOpenRoom();
       // A save made during the chase resumes at the approach lesson so the
       // scripted spider encounter can be initialized cleanly after reload.
-      const resumeStage=Math.min(savedTutorialStage,7);
+      const migratedTutorialStage=(savedTutorialStage===5||savedTutorialStage===6)?7:savedTutorialStage;
+      const resumeStage=Math.min(migratedTutorialStage,7);
       if(resumeStage<=3){
         tutorialLightsOutState="on";
         tutorialLightsOutElapsed=0;
@@ -5123,7 +5117,7 @@ function setHouseMode(enabled,options={}){
     objective.textContent="Find the magazine on the couch. Press E to interact with it.";
     eventText.textContent="APARTMENT LEVEL";
     eventText.style.opacity="1";
-    showHouseIntroPhoneMessage();
+    showHouseIntroTransmission();
     setTimeout(()=>{eventText.style.opacity="0";},1400);
   }else{
     renderer.setPixelRatio(currentPixelRatio);
@@ -6410,8 +6404,6 @@ function updateTutorialGuide(){
     2:["CROUCH","CTRL","Hold CTRL."],
     3:["SPRINT","SHIFT","Hold SHIFT to run."],
     4:["FLASHLIGHT","F","Press F."],
-    5:["PHONE","P","Press P to open your phone."],
-    6:["MESSAGE","P","Read M's note, then close the phone."],
     7:["APPROACH","W A S D","Go toward the figure."],
     8:["RUN","SHIFT","Run. Don't stop."]
   };
@@ -6421,7 +6413,8 @@ function updateTutorialGuide(){
     return;
   }
 
-  tutorialGuideStep.textContent=String(houseTutorialStage).padStart(2,"0")+"/08";
+  const visibleStep=houseTutorialStage>=7?houseTutorialStage-2:houseTutorialStage;
+  tutorialGuideStep.textContent=String(visibleStep).padStart(2,"0")+"/06";
   tutorialGuideAction.textContent=lesson[0]+" · "+lesson[1];
   tutorialGuideHint.textContent=lesson[2];
   tutorialGuide.style.opacity="1";
@@ -6488,14 +6481,6 @@ function setHouseTutorialStage(stage){
     flashlight.intensity=0;
     objective.textContent="TURN THE FLASHLIGHT ON · F";
     showHouseTutorialMessage("F · FLASHLIGHT",1500);
-  }else if(stage===5){
-    objective.textContent="OPEN THE DEEPSEEKER PHONE · P";
-    showHouseTutorialMessage("P · OPEN PHONE",1500);
-    eventText.textContent="BADGE AI ONLINE";
-    eventText.style.opacity="1";
-  }else if(stage===6){
-    objective.textContent="READ M'S MESSAGE, THEN CLOSE THE PHONE · P";
-    showHouseTutorialMessage("CHECK THE DEEPSEEKER.",1700);
   }else if(stage===7){
     objective.textContent="MOVE TOWARD THE FIGURE AT THE END OF THE ROOM.";
     if(!houseTutorialSpiderPrepared){
@@ -8320,9 +8305,7 @@ let pulse=0;
 let nextEvent=24+Math.random()*16;
 let eventCooldown=0;
 let muted=false;
-let phoneOpen=false;
 
-let deepseekerAppOpen=false;
 let adminUnlocked=false;
 let adminFlyEnabled=false;
 let adminTool=null;
@@ -8761,46 +8744,16 @@ const STORY = [
 
 
 
-function escapeStoryHtml(value){
-  return String(value??"").replace(/[&<>"']/g,char=>({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    "\"":"&quot;",
-    "'":"&#39;"
-  })[char]);
-}
-
-function renderStoryLog(){
-  const unlocked=STORY.slice(0,storyStage+1);
-  const storyHtml=unlocked.map(entry=>
-    '<div class="storyEntry">'+
-      '<div class="storyMeta">'+escapeStoryHtml(entry.title)+' · DEPTH '+entry.depth+'</div>'+
-      '<div class="storyText">'+escapeStoryHtml(entry.text)+'</div>'+
-    '</div>'
-  ).join("");
-  const missionHtml=missionState.log.map(entry=>
-    '<div class="storyEntry">'+
-      '<div class="storyMeta">'+escapeStoryHtml(entry.title)+' · FIELD LOG</div>'+
-      '<div class="storyText">'+escapeStoryHtml(entry.text)+'</div>'+
-    '</div>'
-  ).join("");
-  phoneStory.innerHTML=storyHtml+missionHtml;
-}
-
 function applyStoryStage(index, announce=true){
   storyStage=index;
   const entry=STORY[storyStage];
-  phoneDepth.textContent=String(entry.depth);
-  phoneCardText.textContent=entry.objective;
   objective.textContent=entry.objective;
-  renderStoryLog();
 
   if(announce && storyStage>0){
     showSignalGlitch(
-      entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "NEW NOTE FROM ????",
+      entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "UNKNOWN TRANSMISSION",
       entry.text,
-      3400
+      4200
     );
     eventText.style.opacity="0";
   }
@@ -8888,41 +8841,17 @@ function toggleFlashlight(){
   multiplayer.sendState(true);
 
   if(tutorialOpenRoomActive && !houseMode && gameStarted && houseTutorialStage===4 && flashlightOn){
-    setHouseTutorialStage(5);
+    setHouseTutorialStage(7);
   }
 }
-function refreshPhoneContent(){
-  phoneAppName.textContent="DEEPSEEKER";
-  phoneDepth.textContent=String(STORY[storyStage].depth);
-  phoneDepthLabel.textContent="DEPTH";
-  phoneCardTitle.textContent="CURRENT OBJECTIVE";
-  phoneCardText.textContent=STORY[storyStage].objective;
-  renderStoryLog();
-}
-
-function showHouseIntroPhoneMessage(){
-  if(houseIntroMessageShown) return;
+function showHouseIntroTransmission(){
+  if(houseIntroMessageShown)return;
   houseIntroMessageShown=true;
-
-  phoneOpen=true;
-  deepseekerAppOpen=true;
-  phone.classList.add("open","app-open");
-  phone.setAttribute("aria-hidden","false");
-  crosshair.style.display="none";
-
-  phoneAppName.textContent="MESSAGE FROM ????";
-  phoneDepth.textContent="!";
-  phoneDepthLabel.textContent="NEW MESSAGE";
-  phoneCardTitle.textContent="KEEP MOVING";
-  phoneCardText.textContent="You're in the Backrooms. Have a look around. Press F to try your flashlight.";
-
-  renderStoryLog();
-  phoneStory.insertAdjacentHTML("afterbegin",`
-    <div class="storyEntry">
-      <div class="storyMeta">???? · ENTRY TUTORIAL</div>
-      <div class="storyText">You're in the Backrooms. Have a look around. Press F to try your flashlight.</div>
-    </div>
-  `);
+  showSignalGlitch(
+    "UNKNOWN TRANSMISSION",
+    "You are in the Backrooms. Have a look around. Press F to try your flashlight.",
+    4200
+  );
 }
 
 function setAdminStatus(message){
