@@ -3655,7 +3655,7 @@ const multiplayer=new Multiplayer({
       const result=world.activateBreaker(Number(event.payload?.index));
       if(result.complete&&multiplayer.isWorldAuthority()){
         missionState.breakerSolved=true;
-        recordMissionLog("MAINTENANCE POWER RESTORED","Eight equations brought the breaker room back online.");
+        recordMissionLog("MAINTENANCE POWER RESTORED","The eight breakers came online by following their meter readings from lowest to highest.");
         refreshMissionState({broadcast:true});
         if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
       }
@@ -3861,7 +3861,7 @@ const interaction=new InteractionSystem({
       const door=target.doorState;
       if(!door)return false;
       if(door.requiresPower&&!door.unlocked){
-        const message="NO POWER. ENTER THE BREAKER ROOM AND SOLVE THE EQUATIONS.";
+        const message="NO POWER. COMPARE THE BREAKER METERS AND SWITCH THEM FROM LOWEST TO HIGHEST.";
         eventText.textContent=message;eventText.style.opacity="1";
         setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2600);
         return true;
@@ -3889,14 +3889,14 @@ const interaction=new InteractionSystem({
       }
       if(result.complete&&multiplayer.isWorldAuthority()){
         missionState.breakerSolved=true;
-        recordMissionLog("MAINTENANCE POWER RESTORED","Eight equations brought the breaker room back online.");
+        recordMissionLog("MAINTENANCE POWER RESTORED","The eight breakers came online by following their meter readings from lowest to highest.");
         refreshMissionState({broadcast:true});
         if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
       }
       const message=result.complete
         ?"POWER RESTORED. MAINTENANCE DOOR UNLOCKED."
         :result.correct
-          ?"CORRECT. SOLVE THE NEXT EQUATION AND KEEP THE ANSWERS IN ORDER."
+          ?"METER ACCEPTED. FIND THE NEXT LOWEST READING."
           :"WRONG ORDER. ALL BREAKERS RESET; THE LIGHTS CUT OUT.";
       eventText.textContent=message;eventText.style.opacity="1";
       setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2300);
