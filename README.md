@@ -22,8 +22,8 @@ The old Godot prototype and unrelated reference-project files are not part of th
 ## Campaign progression
 
 The classroom/playtest demo follows players through three signal relays
-and the eight-breaker maintenance puzzle. Restoring all three relays and
-solving the breakers powers the sealed Poolrooms gate and triggers the
+and the indoor play centre. Restoring all three relays opens the route to
+its colourful play structure; press the showtime button and escape the mascot to release the
 confetti "DEMO COMPLETE" screen. The Poolrooms themselves are intentionally
 reserved for a future update and are not accessible in this build.
 

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261125-beta-exit-wall-fix";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261125-play-centre-monster";
 import { createTextures } from "./textures.js?v=20261030-finish-pass7";
 import { Player } from "./player.js?v=20261102-hand-beam-qte-fix";
 import { HorrorAudio } from "./audio.js?v=20261030-finish-pass7";
@@ -1914,10 +1914,10 @@ function getMissionTarget(){
   if(!missionState.breakerSolved&&!world.maintenanceDoor?.unlocked){
     return {
       x:-80,z:MAP_MIN_CHUNK*CHUNK_SIZE+3,
-      hint:"ALL RELAYS ONLINE · FIND THE MAINTENANCE ROOM AND SOLVE THE EIGHT BREAKERS"
+      hint:"ALL RELAYS ONLINE · ENTER THE MAINTENANCE WING AND FIND THE INDOOR PLAY CENTRE"
     };
   }
-  return {x:-80,z:-472,title:"POOLROOMS DOOR",hint:"POWER RESTORED · RETURN TO THE POOLROOMS DOOR"};
+  return {x:-80,z:-472,title:"POOLROOMS DOOR",hint:"THE PLAY CENTRE IS CLEAR · RETURN TO THE POOLROOMS DOOR"};
 }
 
 function updateMissionObjective(){
@@ -1928,6 +1928,28 @@ function updateMissionObjective(){
   const target=getMissionTarget();
   const label=target?.hint||"SEARCH THE BACKROOMS FOR A SIGNAL.";
   if(objective&&objective.textContent!==label)objective.textContent=label;
+}
+
+function activatePlayCentreEncounter({broadcast=true}={}){
+  if(!multiplayer.isWorldAuthority())return false;
+  if(!world.startPlayCentreEncounter())return false;
+  world.completeMaintenancePuzzle("breakers");
+  missionState.breakerSolved=true;
+  recordMissionLog(
+    "THE SHOWTIME BUTTON",
+    "The play centre came alive. Something stepped down from the climbing frame, and the far exit released."
+  );
+  showSignalGlitch(
+    "THE PLAY CENTRE IS AWAKE",
+    "The button released the exit. Something is moving behind you.",
+    4200
+  );
+  refreshMissionState({broadcast});
+  if(broadcast&&multiplayer?.socket?.readyState===WebSocket.OPEN){
+    multiplayer.broadcastWorldEvent("maintenance_puzzle_solved","maintenance-puzzle",{playCentre:true});
+  }
+  if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
+  return true;
 }
 
 function activateMissionRelay(index,{broadcast=true}={}){
@@ -3652,20 +3674,20 @@ const multiplayer=new Multiplayer({
       if(changed&&gameStarted&&!houseMode)saveGame(undefined,{confirmOverwrite:false});
       return;
     }
-    if(event?.type==="maintenance_breaker_action"){
-      if(String(event.playerId||"")===String(multiplayer.playerId||""))return;
-      const result=world.activateBreaker(Number(event.payload?.index));
-      if(result.complete&&multiplayer.isWorldAuthority()){
-        missionState.breakerSolved=true;
-        recordMissionLog("MAINTENANCE POWER RESTORED","The eight breakers came online by following their meter readings from lowest to highest.");
-        refreshMissionState({broadcast:true});
-        if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
-      }
+    if(event?.type==="play_centre_start_attempt"){
+      if(multiplayer.isWorldAuthority())activatePlayCentreEncounter({broadcast:true});
       return;
     }
     if(event?.type==="maintenance_puzzle_solved"){
       if(String(event.playerId||"")===String(multiplayer.playerId||""))return;
+      world.startPlayCentreEncounter();
       world.completeMaintenancePuzzle("breakers");
+      missionState.breakerSolved=true;
+      recordMissionLog(
+        "THE SHOWTIME BUTTON",
+        "The play centre came alive. Something stepped down from the climbing frame, and the far exit released."
+      );
+      refreshMissionState({broadcast:false});
       return;
     }
     if(event?.type==="maintenance_door_toggle"){
@@ -3863,7 +3885,7 @@ const interaction=new InteractionSystem({
       const door=target.doorState;
       if(!door)return false;
       if(door.requiresPower&&!door.unlocked){
-        const message="NO POWER. COMPARE THE BREAKER METERS AND SWITCH THEM FROM LOWEST TO HIGHEST.";
+        const message="THE EXIT IS LOCKED. FIND THE SHOWTIME BUTTON INSIDE THE PLAY CENTRE.";
         eventText.textContent=message;eventText.style.opacity="1";
         setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2600);
         return true;
@@ -3878,30 +3900,20 @@ const interaction=new InteractionSystem({
         });
       }
       const message=door===world.breakerRoomDoor
-        ?(door.targetOpen?"THE BREAKER ROOM OPENS.":"THE BREAKER ROOM DOOR CLOSES.")
+        ?(door.targetOpen?"THE PLAY CENTRE OPENS.":"THE PLAY CENTRE DOOR CLOSES.")
         :(door.targetOpen?"THE DOOR OPENS.":"THE DOOR CLOSES.");
       eventText.textContent=message;eventText.style.opacity="1";
       setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},1600);
       return true;
     }
-    if(target.type==="roomBreaker"){
-      const result=world.activateBreaker(target.breakerIndex);
-      if(multiplayer?.socket?.readyState===WebSocket.OPEN){
-        multiplayer.broadcastWorldEvent("maintenance_breaker_action","maintenance-puzzle",{index:target.breakerIndex});
+    if(target.type==="playCentreStart"){
+      if(multiplayer.isWorldAuthority()){
+        activatePlayCentreEncounter({broadcast:true});
+      }else{
+        multiplayer.broadcastWorldEvent("play_centre_start_attempt","maintenance-puzzle",{});
+        eventText.textContent="SHOWTIME REQUEST SENT.";
+        eventText.style.opacity="1";
       }
-      if(result.complete&&multiplayer.isWorldAuthority()){
-        missionState.breakerSolved=true;
-        recordMissionLog("MAINTENANCE POWER RESTORED","The eight breakers came online by following their meter readings from lowest to highest.");
-        refreshMissionState({broadcast:true});
-        if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
-      }
-      const message=result.complete
-        ?"POWER RESTORED. MAINTENANCE DOOR UNLOCKED."
-        :result.correct
-          ?"METER ACCEPTED. FIND THE NEXT LOWEST READING."
-          :"WRONG ORDER. ALL BREAKERS RESET; THE LIGHTS CUT OUT.";
-      eventText.textContent=message;eventText.style.opacity="1";
-      setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2300);
       return true;
     }
     if(target.type==="storyRelay"){
@@ -3917,7 +3929,7 @@ const interaction=new InteractionSystem({
     }
     if(target.type==="poolroomsDoor"){
       if(!missionState.poolroomsUnlocked){
-        eventText.textContent="THE DOOR HAS NO POWER · RESTORE ALL THREE RELAYS AND SOLVE THE EIGHT BREAKERS.";
+        eventText.textContent="THE DOOR HAS NO POWER · RESTORE ALL THREE RELAYS AND ESCAPE THE PLAY CENTRE.";
         eventText.style.opacity="1";
         return true;
       }
@@ -10521,6 +10533,7 @@ function animate(){
 
   // Animate room doors and update their colliders before player movement.
   world.updateRoomDoors(dt);
+  world.updatePlayCentre(dt,player.pos.x,player.pos.z,gameStarted&&!houseMode&&!poolroomsActive&&!tutorialOpenRoomActive);
 
   player.inputEnabled=(
     gameStarted &&

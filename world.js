@@ -46,20 +46,6 @@ const ROOM_DOOR_HEIGHT=2.85;
 const ROOM_WALL_THICKNESS=0.24;
 const ROOM_HEIGHT=3.35;
 const OUTER_ROOM_DOOR=Object.freeze({cx:-2,cz:-3,localX:12});
-// Each physical meter has a different reading. Players compare the needles
-// and switch the cabinets from the lowest reading to the highest; no written
-// equations, labels or instruction boards are placed in the room.
-const BREAKER_METER_READINGS=Object.freeze([
-  Object.freeze({index:1,reading:3}),
-  Object.freeze({index:2,reading:4.5}),
-  Object.freeze({index:3,reading:6}),
-  Object.freeze({index:4,reading:7.5}),
-  Object.freeze({index:5,reading:4}),
-  Object.freeze({index:6,reading:2}),
-  Object.freeze({index:7,reading:8.5}),
-  Object.freeze({index:8,reading:10}),
-]);
-
 function isProtectedRouteCell(gx,gz){
   return (
     (gz >= 7 && gz <= 9 && gx >= -23 && gx <= 23) ||
@@ -359,72 +345,25 @@ export class World {
     this.roomDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x77786f,roughness:0.68,metalness:0.34});
     this.roomDoorGlassMaterial=new THREE.MeshStandardMaterial({color:0x27312f,roughness:0.3,metalness:0.05});
     this.breakerRoomLightMaterial=new THREE.MeshStandardMaterial({
-      color:0x353328,emissive:0x000000,emissiveIntensity:0,roughness:0.4
+      color:0x353328,emissive:0x000000,emissiveIntensity:0,roughness:.4
     });
     this.breakerRoomLights=[];
     this.roomDoors=[];
     this.breakerSwitches=[];
     this.breakerProgress=0;
-    this.breakerSequence=BREAKER_METER_READINGS.slice().sort((a,b)=>a.reading-b.reading).map(meter=>meter.index);
     this.breakerFailTimer=0;
     this.maintenanceDoor=null;
-    this.maintenancePuzzleType="breakers";
+    this.maintenancePuzzleType="breakers"; // retained only for old save compatibility
     this.maintenancePuzzleSeed=1;
     this.maintenanceEntryDoor=null;
     this.breakerRoomDoor=null;
     this.breakerRoomGroup=null;
     this.breakerRoomBounds=[];
     this.maintenanceRoomGroup=null;
+    this.breakerRoomAlarmMaterial=null;
+    this.playCentreState=null;
+    this.playCentreButton=null;
 
-    this.breakerPanelMaterial=new THREE.MeshStandardMaterial({color:0x35372f,roughness:0.83,metalness:0.08});
-    this.breakerHandleMaterial=new THREE.MeshStandardMaterial({color:0x97988a,roughness:0.7,metalness:0.25});
-    this.breakerLampOffMaterial=new THREE.MeshStandardMaterial({color:0x4d2822,emissive:0x40100a,emissiveIntensity:0.35});
-    this.breakerLampOnMaterial=new THREE.MeshStandardMaterial({color:0x9bd78b,emissive:0x42ff40,emissiveIntensity:1.15});
-    this.breakerGaugeMaterials=[];
-    for(const meter of BREAKER_METER_READINGS){
-      const canvas=document.createElement("canvas");
-      canvas.width=256;canvas.height=256;
-      const ctx=canvas.getContext("2d");
-      const cx=128,cy=128;
-      ctx.clearRect(0,0,256,256);
-      ctx.fillStyle="#0d1512";
-      ctx.beginPath();ctx.arc(cx,cy,119,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle="rgba(104,139,119,.5)";
-      ctx.lineWidth=3;
-      ctx.beginPath();ctx.arc(cx,cy,111,0,Math.PI*2);ctx.stroke();
-      const start=Math.PI*.75,sweep=Math.PI*1.5;
-      ctx.strokeStyle="rgba(125,165,143,.86)";
-      ctx.lineCap="square";
-      for(let tick=0;tick<=10;tick++){
-        const angle=start+sweep*(tick/10);
-        const inner=tick%2===0?82:90;
-        const outer=101;
-        ctx.lineWidth=tick%2===0?4:2;
-        ctx.beginPath();
-        ctx.moveTo(cx+Math.cos(angle)*inner,cy+Math.sin(angle)*inner);
-        ctx.lineTo(cx+Math.cos(angle)*outer,cy+Math.sin(angle)*outer);
-        ctx.stroke();
-      }
-      const angle=start+sweep*(meter.reading/10);
-      const needleX=cx+Math.cos(angle)*75;
-      const needleY=cy+Math.sin(angle)*75;
-      ctx.strokeStyle="#e6aa56";
-      ctx.lineWidth=7;
-      ctx.lineCap="round";
-      ctx.shadowColor="rgba(218,148,68,.6)";
-      ctx.shadowBlur=8;
-      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(needleX,needleY);ctx.stroke();
-      ctx.shadowBlur=0;
-      ctx.fillStyle="#e6aa56";
-      ctx.beginPath();ctx.arc(cx,cy,10,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle="#202c27";
-      ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fill();
-      const texture=new THREE.CanvasTexture(canvas);
-      texture.colorSpace=THREE.SRGBColorSpace;
-      this.breakerGaugeMaterials.push(
-        new THREE.MeshBasicMaterial({map:texture,transparent:true,side:THREE.DoubleSide,toneMapped:false})
-      );
-    }
     // Ceiling fixtures use a tiny real-light budget. They only activate when
     // the player's camera is actually looking toward them.
     this.fixtureLights = [];
@@ -557,14 +496,14 @@ export class World {
       doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:true,ownerChunk:null
     },this.boundaryWallBounds);
 
-    this.breakerRoomGroup=new THREE.Group();this.breakerRoomGroup.name="BreakerControlRoom";
-    this.breakerRoomGroup.visible=this.maintenancePuzzleType==="breakers";room.add(this.breakerRoomGroup);
-    this.buildBreakerControlRoom(centerX,backZ);
-    if(this.maintenancePuzzleType==="breakers")this.boundaryWallBounds.push(...this.breakerRoomBounds);
+    this.breakerRoomGroup=new THREE.Group();this.breakerRoomGroup.name="IndoorPlayCentre";
+    this.breakerRoomGroup.visible=true;room.add(this.breakerRoomGroup);
+    this.buildIndoorPlayCentre(centerX,backZ);
+    this.boundaryWallBounds.push(...this.breakerRoomBounds);
 
   }
 
-  buildBreakerControlRoom(centerX,backZ){
+  buildIndoorPlayCentre(centerX,backZ){
     this.breakerRoomBounds=[];
     this.breakerSwitches=[];
     this.breakerRoomLights=[];
@@ -574,88 +513,131 @@ export class World {
     const partitionZ=this.maintenanceRoomFrontZ-35.5;
     const depth=partitionZ-backZ,midZ=(partitionZ+backZ)*.5;
 
-    // A separate visual language for this room: old painted steel, oxidized
-    // hardware, dark rubber cable runs and a few restrained signal colours.
+    // Bright, clean plastic and padded finishes make the room feel welcoming
+    // before the mascot wakes up. The shapes and layout are original to DeepSeeker.
+    const mat=(color,roughness=.72,metalness=0,emissive=0,emissiveIntensity=0)=>
+      new THREE.MeshStandardMaterial({color,roughness,metalness,emissive,emissiveIntensity});
+    const pink=mat(0xff72a7,.48,0,.320b5b,.12);
+    const coral=mat(0xff946f,.55,0,0x5b1807,.08);
+    const yellow=mat(0xffd45e,.52,0,0x5a3a08,.08);
+    const mint=mat(0x81e4c1,.62,0,0x0e4834,.06);
+    const cyan=mat(0x5fc9e8,.48,0,0x07384d,.10);
+    const purple=mat(0xa38be8,.52,0,0x251052,.08);
+    const navy=mat(0x344b76,.72);
+    const cream=mat(0xffefcf,.78);
+    const white=mat(0xfff8e8,.35);
+    const dark=mat(0x18192b,.25);
+    const rubber=mat(0x30364a,.88);
+    const clearPlastic=new THREE.MeshStandardMaterial({
+      color:0x9ee5ec,roughness:.22,metalness:.04,transparent:true,opacity:.42,
+      side:THREE.DoubleSide,depthWrite:false
+    });
+    const foam=mat(0xf5d2dc,.93);
+    const lightStrip=new THREE.MeshStandardMaterial({
+      color:0xfff0c2,emissive:0xffc76a,emissiveIntensity:0,roughness:.35
+    });
+    this.breakerRoomLightMaterial=lightStrip;
+
     const wallCanvas=document.createElement("canvas");
-    wallCanvas.width=512;wallCanvas.height=512;
+    wallCanvas.width=512;wallCanvas.height=256;
     const wallCtx=wallCanvas.getContext("2d");
-    wallCtx.fillStyle="#555b50";wallCtx.fillRect(0,0,512,512);
-    for(let i=0;i<4200;i++){
-      const v=55+Math.floor(Math.random()*45);
-      wallCtx.fillStyle="rgba("+v+","+Math.floor(v*1.02)+","+Math.floor(v*.88)+","+(.035+Math.random()*.09).toFixed(3)+")";
-      const x=Math.random()*512,y=Math.random()*512;
-      wallCtx.fillRect(x,y,1+Math.random()*3,1+Math.random()*4);
+    wallCtx.fillStyle="#d9eee5";wallCtx.fillRect(0,0,512,256);
+    const wallBands=["#f49bb8","#f4d16d","#8ed8c0","#8ccfe8","#b8a5ee"];
+    for(let i=0;i<wallBands.length;i++){
+      wallCtx.fillStyle=wallBands[i];
+      wallCtx.fillRect(i*106,0,66,256);
     }
-    for(let i=0;i<36;i++){
-      const x=(i*83+19)%512;
-      wallCtx.fillStyle="rgba(22,25,21,"+(.08+Math.random()*.12).toFixed(3)+")";
-      wallCtx.fillRect(x,0,1+Math.random()*3,512);
-    }
-
-    // Decades of leaks have left broad damp blooms, soot, mineral streaks,
-    // and patches where the old paint has lifted away from the concrete.
-    for(let stain=0;stain<46;stain++){
-      const x=Math.random()*512,y=90+Math.random()*420;
-      const width=18+Math.random()*82,height=12+Math.random()*54;
-      const shade=wallCtx.createRadialGradient(x,y,2,x,y,width);
-      shade.addColorStop(0,"rgba(17,23,19,"+(.20+Math.random()*.16).toFixed(3)+")");
-      shade.addColorStop(.62,"rgba(25,31,25,.12)");
-      shade.addColorStop(1,"rgba(25,31,25,0)");
-      wallCtx.fillStyle=shade;
-      wallCtx.beginPath();
-      wallCtx.ellipse(x,y,width,height,Math.random()*.6,0,Math.PI*2);
-      wallCtx.fill();
-    }
-    for(let drip=0;drip<150;drip++){
-      const x=Math.random()*512,y=70+Math.random()*360;
-      const length=12+Math.random()*120;
-      wallCtx.strokeStyle=drip%4===0?"rgba(12,18,15,.24)":"rgba(19,27,21,.12)";
-      wallCtx.lineWidth=.6+Math.random()*2.2;
-      wallCtx.beginPath();
-      wallCtx.moveTo(x,y);
-      wallCtx.lineTo(x+(Math.random()-.5)*5,Math.min(510,y+length));
-      wallCtx.stroke();
-    }
-    for(let peel=0;peel<30;peel++){
-      const x=Math.random()*500,y=100+Math.random()*390;
-      const width=5+Math.random()*25,height=4+Math.random()*17;
-      wallCtx.beginPath();
-      wallCtx.moveTo(x,y);
-      wallCtx.lineTo(x+width*.35,y-height*.45);
-      wallCtx.lineTo(x+width,y+height*.12);
-      wallCtx.lineTo(x+width*.72,y+height);
-      wallCtx.lineTo(x+width*.12,y+height*.7);
-      wallCtx.closePath();
-      wallCtx.fillStyle=peel%3===0?"rgba(151,151,127,.20)":"rgba(13,19,15,.30)";
-      wallCtx.fill();
-      wallCtx.strokeStyle="rgba(184,177,144,.12)";
-      wallCtx.lineWidth=1;
-      wallCtx.stroke();
-    }
-    wallCtx.strokeStyle="rgba(12,17,14,.32)";
-    wallCtx.lineWidth=1.4;
-    for(let crack=0;crack<18;crack++){
-      const x=Math.random()*512,y=130+Math.random()*340;
-      wallCtx.beginPath();
-      wallCtx.moveTo(x,y);
-      wallCtx.lineTo(x+(Math.random()-.5)*12,y+10+Math.random()*18);
-      wallCtx.lineTo(x+(Math.random()-.5)*20,y+28+Math.random()*30);
-      wallCtx.stroke();
-    }
-
-    wallCtx.strokeStyle="rgba(18,22,19,.32)";
-    wallCtx.lineWidth=2;
-    for(let y=0;y<=512;y+=128){
-      wallCtx.beginPath();wallCtx.moveTo(0,y);wallCtx.lineTo(512,y);wallCtx.stroke();
+    for(let i=0;i<12;i++){
+      const x=(i*83+31)%512,y=(i*47+22)%256,r=12+(i%4)*7;
+      wallCtx.fillStyle=i%2===0?"rgba(255,255,255,.50)":"rgba(255,229,173,.58)";
+      wallCtx.beginPath();wallCtx.arc(x,y,r,0,Math.PI*2);wallCtx.fill();
     }
     const wallTexture=new THREE.CanvasTexture(wallCanvas);
     wallTexture.colorSpace=THREE.SRGBColorSpace;
     wallTexture.wrapS=THREE.RepeatWrapping;
     wallTexture.wrapT=THREE.RepeatWrapping;
-    wallTexture.repeat.set(7,2);
-    const wallMaterial=new THREE.MeshStandardMaterial({
-      map:wallTexture,color:0xffffff,roughness:.97,metalness:.03
+    wallTexture.repeat.set(5,2);
+    const wallMaterial=new THREE.MeshStandardMaterial({map:wallTexture,roughness:.82});
+    const ceilingCanvas=document.createElement("canvas");
+    ceilingCanvas.width=256;ceilingCanvas.height=256;
+    const ceilingCtx=ceilingCanvas.getContext("2d");
+    ceilingCtx.fillStyle="#f1e9db";ceilingCtx.fillRect(0,0,256,256);
+    for(let i=0;i<32;i++){
+      ceilingCtx.fillStyle=i%2===0?"rgba(245,151,184,.22)":"rgba(105,190,194,.20)";
+      ceilingCtx.fillRect((i*47)%256,(i*71)%256,18+(i%3)*12,3);
+    }
+    const ceilingTexture=new THREE.CanvasTexture(ceilingCanvas);
+    ceilingTexture.colorSpace=THREE.SRGBColorSpace;
+    ceilingTexture.wrapS=THREE.RepeatWrapping;
+    ceilingTexture.wrapT=THREE.RepeatWrapping;
+    ceilingTexture.repeat.set(5,3);
+    const ceilingMaterial=new THREE.MeshStandardMaterial({
+      map:ceilingTexture,roughness:.95,side:THREE.DoubleSide
     });
+    const frameMat=mat(0x47536f,.76,.08);
+    const darkPlastic=mat(0x39435c,.8,.04);
+    const slidePink=mat(0xf56c9e,.36,.04);
+    const slideBlue=mat(0x61cce6,.32,.04);
+    const stageMat=mat(0xffc96a,.5,0,0x754313,.12);
+    const exitGlow=mat(0x93f0b4,.28,0,0x31d978,.9);
+    const buttonMat=mat(0xffdf68,.30,0,0xff9d22,1.35);
+
+    const addBox=(name,sx,sy,sz,x,y,z,material,host=group)=>{
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
+      mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;
+      mesh.receiveShadow=true;mesh.userData.fixtureLightOccluder=true;
+      host.add(mesh);return mesh;
+    };
+    const addSphere=(name,r,x,y,z,material,scale=null,host=group)=>{
+      const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),material);
+      mesh.name=name;mesh.position.set(x,y,z);
+      if(scale)mesh.scale.set(scale[0],scale[1],scale[2]);
+      mesh.castShadow=false;mesh.receiveShadow=true;host.add(mesh);return mesh;
+    };
+    const addCylinder=(name,rTop,rBottom,height,x,y,z,material,host=group)=>{
+      const mesh=new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBottom,height,14),material);
+      mesh.name=name;mesh.position.set(x,y,z);
+      mesh.castShadow=false;mesh.receiveShadow=true;host.add(mesh);return mesh;
+    };
+    const addLink=(name,a,b,radius,material,host=group)=>{
+      const start=new THREE.Vector3(a[0],a[1],a[2]);
+      const end=new THREE.Vector3(b[0],b[1],b[2]);
+      const direction=end.clone().sub(start);
+      const mesh=new THREE.Mesh(
+        new THREE.CylinderGeometry(radius,radius,direction.length(),12),material
+      );
+      mesh.name=name;mesh.position.copy(start).add(end).multiplyScalar(.5);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
+      mesh.castShadow=false;mesh.receiveShadow=true;host.add(mesh);return mesh;
+    };
+    const addWall=(name,sx,sy,sz,x,y,z)=>{
+      addBox(name,sx,sy,sz,x,y,z,wallMaterial);
+      this.breakerRoomBounds.push({
+        minX:x-sx*.5,maxX:x+sx*.5,minZ:z-sz*.5,maxZ:z+sz*.5
+      });
+    };
+    const addSlide=(name,points,material,radius=.42)=>{
+      const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
+      const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,42,radius,12,false),material);
+      mesh.name=name;mesh.castShadow=false;mesh.receiveShadow=true;group.add(mesh);
+      return mesh;
+    };
+
+    // Enclosed architecture and collision bounds retain the old room footprint.
+    addWall("PlayCentreLeftWall",wallT,roomHeight,depth,leftX,roomHeight*.5,midZ);
+    addWall("PlayCentreRightWall",wallT,roomHeight,depth,rightX,roomHeight*.5,midZ);
+    const doorLeft=centerX-ROOM_DOOR_WIDTH*.5,doorRight=centerX+ROOM_DOOR_WIDTH*.5;
+    addWall("PlayCentreEntryWallLeft",doorLeft-leftX,roomHeight,wallT,
+      (leftX+doorLeft)*.5,roomHeight*.5,partitionZ);
+    addWall("PlayCentreEntryWallRight",rightX-doorRight,roomHeight,wallT,
+      (doorRight+rightX)*.5,roomHeight*.5,partitionZ);
+    addBox("PlayCentreEntryHeader",ROOM_DOOR_WIDTH,roomHeight-ROOM_DOOR_HEIGHT,wallT,
+      centerX,(roomHeight+ROOM_DOOR_HEIGHT)*.5,partitionZ,wallMaterial);
+    this.breakerRoomDoor=this.buildRoomDoor(group,centerX,partitionZ,{
+      doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:false,ownerChunk:null
+    },this.breakerRoomBounds);
+    addBox("PlayCentreCeiling",roomWidth,.12,depth-.15,centerX,3.82,midZ,ceilingMaterial);
+    addBox("PlayCentreCeilingBeam",roomWidth-.35,.10,.18,centerX,3.64,midZ,frameMat);
     for(const name of [
       "MaintenanceRoomBackWallLeft",
       "MaintenanceRoomBackWallRight",
@@ -664,599 +646,331 @@ export class World {
       const wallSection=this.maintenanceRoomGroup?.getObjectByName(name);
       if(wallSection)wallSection.material=wallMaterial;
     }
-    const ceilingCanvas=document.createElement("canvas");
-    ceilingCanvas.width=512;ceilingCanvas.height=512;
-    const ceilingCtx=ceilingCanvas.getContext("2d");
-    ceilingCtx.fillStyle="#242b27";
-    ceilingCtx.fillRect(0,0,512,512);
-    for(let stain=0;stain<38;stain++){
-      const x=Math.random()*512,y=Math.random()*512;
-      const radius=18+Math.random()*92;
-      const damp=ceilingCtx.createRadialGradient(x,y,2,x,y,radius);
-      damp.addColorStop(0,"rgba(8,14,11,.64)");
-      damp.addColorStop(.72,"rgba(13,20,16,.30)");
-      damp.addColorStop(1,"rgba(13,20,16,0)");
-      ceilingCtx.fillStyle=damp;
-      ceilingCtx.beginPath();
-      ceilingCtx.ellipse(x,y,radius,radius*(.35+Math.random()*.45),Math.random(),0,Math.PI*2);
-      ceilingCtx.fill();
+
+    // Soft, colourful floor tiles break up the large space without cluttering it.
+    addBox("PlayCentrePaddedFloor",roomWidth-.55,.08,depth-.55,centerX,-.055,midZ,foam);
+    const floorPalette=[pink,yellow,mint,cyan,purple,cream];
+    for(let row=0;row<8;row++){
+      for(let col=0;col<8;col++){
+        const x=centerX-11.2+col*3.2,z=backZ+1.55+row*3.0;
+        const tile=addBox("PlayCentreColourTile",2.84,.035,2.64,x,.012,z,
+          floorPalette[(row*3+col*2)%floorPalette.length]);
+        tile.rotation.y=((row+col)%2)*.035;
+      }
     }
-    ceilingCtx.strokeStyle="rgba(8,13,10,.52)";
-    ceilingCtx.lineWidth=2;
-    for(let crack=0;crack<24;crack++){
-      const x=Math.random()*512,y=Math.random()*512;
-      ceilingCtx.beginPath();
-      ceilingCtx.moveTo(x,y);
-      ceilingCtx.lineTo(x+(Math.random()-.5)*28,y+12+Math.random()*26);
-      ceilingCtx.lineTo(x+(Math.random()-.5)*45,y+32+Math.random()*48);
-      ceilingCtx.stroke();
+    for(let star=0;star<12;star++){
+      const x=centerX-10.5+(star%4)*7.0;
+      const z=backZ+3.0+Math.floor(star/4)*8.6;
+      const medallion=addSphere("PlayCentreFloorMedallion",.48,x,.045,z,
+        star%2===0?yellow:cream,[1,.045,1]);
+      medallion.material.side=THREE.DoubleSide;
     }
-    const ceilingTexture=new THREE.CanvasTexture(ceilingCanvas);
-    ceilingTexture.colorSpace=THREE.SRGBColorSpace;
-    ceilingTexture.wrapS=THREE.RepeatWrapping;
-    ceilingTexture.wrapT=THREE.RepeatWrapping;
-    ceilingTexture.repeat.set(5,4);
-    const ceilingMaterial=new THREE.MeshStandardMaterial({
-      map:ceilingTexture,color:0xb3b8ad,roughness:.99,metalness:0
-    });
-    const structuralMetal=new THREE.MeshStandardMaterial({
-      color:0x414944,roughness:.91,metalness:.24
-    });
-    const darkMetal=new THREE.MeshStandardMaterial({
-      color:0x191f1c,roughness:.97,metalness:.18
-    });
-    const cabinetMaterial=new THREE.MeshStandardMaterial({
-      color:0x353e38,roughness:.94,metalness:.19
-    });
-    const cabinetFaceMaterial=new THREE.MeshStandardMaterial({
-      color:0x252d29,roughness:.96,metalness:.12
-    });
-    const rustMaterial=new THREE.MeshStandardMaterial({
-      color:0x704a36,roughness:.91,metalness:.16
-    });
-    const rubberMaterial=new THREE.MeshStandardMaterial({
-      color:0x111715,roughness:.96,metalness:0
-    });
-    const walkwayMaterial=new THREE.MeshStandardMaterial({
-      color:0x333a36,roughness:.84,metalness:.42
-    });
-    const wornAmberMaterial=new THREE.MeshStandardMaterial({
-      color:0x927044,roughness:.92,metalness:.08
-    });
-    const diffuserMaterial=new THREE.MeshStandardMaterial({
-      color:0xffe7b7,emissive:0xffd28a,emissiveIntensity:.0,roughness:.35
-    });
-    const signalCyanMaterial=new THREE.MeshStandardMaterial({
-      color:0x79d7d0,emissive:0x27b9b3,emissiveIntensity:1.15,roughness:.38
-    });
-    const signalAmberMaterial=new THREE.MeshStandardMaterial({
-      color:0xe4aa56,emissive:0xb87526,emissiveIntensity:.8,roughness:.42
-    });
-    const signalRedMaterial=new THREE.MeshStandardMaterial({
-      color:0x9d4638,emissive:0x8e2116,emissiveIntensity:.35,roughness:.42
-    });
-    this.breakerRoomAlarmMaterial=signalRedMaterial;
 
-    const addBox=(name,sx,sy,sz,x,y,z,material,host=group)=>{
-      const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
-      mesh.name=name;
-      mesh.position.set(x,y,z);
-      mesh.castShadow=false;
-      mesh.receiveShadow=true;
-      mesh.userData.fixtureLightOccluder=true;
-      host.add(mesh);
-      return mesh;
-    };
-    const addPipe=(name,start,end,radius,material)=>{
-      const direction=end.clone().sub(start);
-      const length=direction.length();
-      const mesh=new THREE.Mesh(
-        new THREE.CylinderGeometry(radius,radius,length,8),
-        material
-      );
-      mesh.name=name;
-      mesh.position.copy(start).add(end).multiplyScalar(.5);
-      mesh.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0,1,0),direction.normalize()
-      );
-      mesh.castShadow=false;
-      mesh.receiveShadow=true;
-      mesh.userData.fixtureLightOccluder=true;
-      group.add(mesh);
-      return mesh;
-    };
-    const addWall=(name,sx,sy,sz,x,y,z)=>{
-      addBox(name,sx,sy,sz,x,y,z,wallMaterial);
-      this.breakerRoomBounds.push({
-        minX:x-sx*.5,maxX:x+sx*.5,minZ:z-sz*.5,maxZ:z+sz*.5
-      });
-    };
-
-    // Architectural shell: darker walls, a low protective kick plate and
-    // reinforced corners replace the empty yellow-room look.
-    addWall("BreakerRoomLeftWall",wallT,roomHeight,depth,leftX,roomHeight*.5,midZ);
-    addWall("BreakerRoomRightWall",wallT,roomHeight,depth,rightX,roomHeight*.5,midZ);
-    const doorLeft=centerX-ROOM_DOOR_WIDTH*.5;
-    const doorRight=centerX+ROOM_DOOR_WIDTH*.5;
-    addWall("BreakerRoomEntryPartitionLeft",doorLeft-leftX,roomHeight,wallT,
-      (leftX+doorLeft)*.5,roomHeight*.5,partitionZ);
-    addWall("BreakerRoomEntryPartitionRight",rightX-doorRight,roomHeight,wallT,
-      (doorRight+rightX)*.5,roomHeight*.5,partitionZ);
-    addBox("BreakerRoomEntryLintel",ROOM_DOOR_WIDTH,roomHeight-ROOM_DOOR_HEIGHT,wallT,
-      centerX,(roomHeight+ROOM_DOOR_HEIGHT)*.5,partitionZ,wallMaterial);
-    this.breakerRoomDoor=this.buildRoomDoor(group,centerX,partitionZ,{
-      doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:false,ownerChunk:null
-    },this.breakerRoomBounds);
-
-    addBox("BreakerRoomCeiling",roomWidth,.12,depth-.15,centerX,3.82,midZ,ceilingMaterial);
-    addBox("BreakerRoomFrontHeader",roomWidth-.25,.16,.24,centerX,3.58,partitionZ-.30,structuralMetal);
-    addBox("BreakerRoomRearHeader",roomWidth-.25,.16,.24,centerX,3.58,backZ+1.0,wallMaterial);
+    // Wall padding, murals and bright corner bumpers.
     for(const side of [-1,1]){
-      const x=centerX+side*(half-.22);
-      for(const z of [backZ+1.0,partitionZ-1.0]){
-        addBox("BreakerRoomCornerColumn",.30,3.82,.34,x,1.91,z,structuralMetal);
-        addBox("BreakerRoomColumnFoot",.48,.18,.48,x,.09,z,darkMetal);
-        addBox("BreakerRoomColumnCap",.46,.16,.45,x,3.70,z,darkMetal);
-      }
-      addBox("BreakerRoomWallBaseTrim",.14,.28,depth-1.1,
-        centerX+side*(half-.22),.17,midZ,structuralMetal);
-      addBox("BreakerRoomWallServiceRail",.10,.12,depth-2.0,
-        centerX+side*(half-.30),2.42,midZ,rustMaterial);
-    }
-
-    // A continuous service aisle gives the room a strong vanishing point.
-    // The plates sit almost flush so they never interfere with player movement.
-    for(let plate=0;plate<6;plate++){
-      const z=partitionZ-2.55-plate*3.82;
-      addBox("BreakerRoomAisleDeckPlate",4.12,.035,3.62,centerX,.028,z,walkwayMaterial);
-      for(const side of [-1,1]){
-        addBox("BreakerRoomAisleBolt",.045,.012,.045,
-          centerX+side*1.92,.052,z-1.55,structuralMetal);
-        addBox("BreakerRoomAisleBolt",.045,.012,.045,
-          centerX+side*1.92,.052,z+1.55,structuralMetal);
-      }
-    }
-    const aisleLineMaterial=wornAmberMaterial;
-    for(const side of [-1,1]){
-      addBox("BreakerRoomAisleEdgeMarking",.055,.008,depth-1.4,
-        centerX+side*2.20,.014,midZ,aisleLineMaterial);
-    }
-    const puddleMaterial=new THREE.MeshStandardMaterial({
-      color:0x192523,metalness:.46,roughness:.20,transparent:true,
-      opacity:.62,depthWrite:false
-    });
-    for(const [x,z,sx,sz] of [
-      [centerX-2.75,midZ+5.0,1.35,.58],
-      [centerX+2.72,midZ-4.2,1.05,.48],
-      [centerX+2.55,backZ+5.6,.72,.36],
-      [centerX-2.58,partitionZ-4.0,.65,.28]
-    ]){
-      const puddle=new THREE.Mesh(new THREE.CircleGeometry(1,28),puddleMaterial);
-      puddle.name="BreakerRoomFloorPuddle";
-      puddle.rotation.x=-Math.PI/2;
-      puddle.position.set(x,.013,z);
-      puddle.scale.set(sx,sz,1);
-      puddle.renderOrder=1;
-      group.add(puddle);
-    }
-    // A floor drain and a few inset grates add scale without filling the aisle.
-    addBox("BreakerRoomFloorDrain",.32,.018,depth-2.0,
-      centerX-2.48,.018,midZ,darkMetal);
-    for(let grate=0;grate<16;grate++){
-      addBox("BreakerRoomDrainSlot",.22,.009,.055,
-        centerX-2.48,.029,partitionZ-1.5-grate*1.35,structuralMetal);
-    }
-
-    // Oil, grit, old plaster and broken hardware have collected along the
-    // walls. Keep the center strip clear so none of this blocks movement.
-    const floorGrimeMaterials=[
-      new THREE.MeshStandardMaterial({color:0x171d19,roughness:1,transparent:true,opacity:.48,depthWrite:false}),
-      new THREE.MeshStandardMaterial({color:0x3b3024,roughness:1,transparent:true,opacity:.34,depthWrite:false}),
-      new THREE.MeshStandardMaterial({color:0x252b27,roughness:.94,transparent:true,opacity:.38,depthWrite:false})
-    ];
-    for(let stain=0;stain<28;stain++){
-      const side=stain%2===0?-1:1;
-      const x=centerX+side*(2.65+((stain*29)%84)/10);
-      const z=partitionZ-1.7-((stain*17)%Math.max(1,Math.floor(depth*10-3)))/10;
-      const patch=new THREE.Mesh(
-        new THREE.CircleGeometry(1,7+(stain%5)),
-        floorGrimeMaterials[stain%floorGrimeMaterials.length]
-      );
-      patch.name="BreakerRoomOilStain";
-      patch.rotation.x=-Math.PI/2;
-      patch.rotation.z=(stain%7)*.19;
-      patch.position.set(x,.023+(stain%3)*.002,z);
-      patch.scale.set(.18+(stain%4)*.12,.12+(stain%5)*.07,1);
-      patch.renderOrder=1;
-      group.add(patch);
-    }
-    for(let shard=0;shard<32;shard++){
-      const side=shard%2===0?-1:1;
-      const x=centerX+side*(2.8+((shard*31)%78)/10);
-      const z=partitionZ-1.8-((shard*13)%Math.max(1,Math.floor(depth*10-3)))/10;
-      const width=.055+(shard%4)*.025;
-      const height=.025+(shard%3)*.018;
-      const depthPiece=.07+(shard%5)*.035;
-      const material=shard%3===0?rustMaterial:darkMetal;
-      const debris=addBox("BreakerRoomDebris",width,height,depthPiece,
-        x,height*.5+.012,z,material);
-      debris.rotation.y=(shard%9)*.31;
-      debris.rotation.z=(shard%5-2)*.12;
-    }
-
-    // Cable trays run the length of both cabinet banks. Repeated cross-rungs
-    // and conduits visibly connect the switchgear instead of floating panels.
-    for(const side of [-1,1]){
-      const trayX=centerX+side*(half-.78);
-      addBox("BreakerRoomCableTray",.76,.20,depth-1.65,trayX,2.91,midZ,darkMetal);
-      addBox("BreakerRoomCableTrayCover",.80,.045,depth-1.62,trayX,3.035,midZ,structuralMetal);
-      for(const edge of [-1,1]){
-        addBox("BreakerRoomCableTraySide",.055,.22,depth-1.65,
-          trayX+edge*.37,2.91,midZ,structuralMetal);
-      }
-      for(let rung=0;rung<15;rung++){
-        addBox("BreakerRoomCableTrayRung",.68,.028,.07,trayX,2.96,
-          partitionZ-1.5-rung*((depth-3.0)/14),structuralMetal);
-      }
-      // A separate insulated feed follows the upper wall into the far relay rack.
-      addPipe("BreakerRoomWallConduit",
-        new THREE.Vector3(trayX,2.67,partitionZ-1.0),
-        new THREE.Vector3(trayX,2.67,backZ+1.4),.065,rustMaterial);
-    }
-    for(const offset of [-2.35,0,2.35]){
-      addPipe("BreakerRoomCeilingBus",
-        new THREE.Vector3(centerX+offset,3.66,partitionZ-1.0),
-        new THREE.Vector3(centerX+offset,3.66,backZ+1.0),.07,structuralMetal);
-    }
-    for(let beam=0;beam<6;beam++){
-      const z=partitionZ-1.9-beam*((depth-3.8)/5);
-      addBox("BreakerRoomCeilingCrossbeam",roomWidth-.42,.09,.14,centerX,3.70,z,structuralMetal);
-    }
-
-    // Five recessed fluorescent housings illuminate the aisle; the four real
-    // point lights stay deliberately budgeted for weaker hardware.
-    for(let rib=0;rib<5;rib++){
-      const z=partitionZ-2.3-rib*((depth-4.6)/4);
-      addBox("BreakerRoomLightHousing",4.95,.12,.58,centerX,3.61,z,darkMetal);
-      const fixtureFailed=rib===1||rib===4;
-      if(fixtureFailed){
-        addBox("BreakerRoomDeadFluorescentSection",4.58,.028,.34,centerX,3.535,z,darkMetal);
-        // Broken diffuser fragments remain caught in the housing.
-        for(let fragment=0;fragment<3;fragment++){
-          const shard=new THREE.Mesh(
-            new THREE.BoxGeometry(.34,.018,.07),
-            structuralMetal
-          );
-          shard.name="BreakerRoomBrokenLightGlass";
-          shard.position.set(centerX-1.15+fragment*1.12,3.515,z+(fragment%2?.12:-.12));
-          shard.rotation.x=(fragment-1)*.16;
-          shard.rotation.y=fragment*.22;
-          group.add(shard);
-        }
-      }else{
-        addBox("BreakerRoomFluorescentStrip",4.58,.028,.34,centerX,3.535,z,this.breakerRoomLightMaterial);
-      }
-      addBox("BreakerRoomFixtureDiffuserLeft",.045,.035,.40,centerX-2.30,3.53,z,structuralMetal);
-      addBox("BreakerRoomFixtureDiffuserRight",.045,.035,.40,centerX+2.30,3.53,z,structuralMetal);
-      if(rib===0||rib===3){
-        for(const side of [-1,1]){
-          const light=new THREE.PointLight(0xffe7ad,0,26,1.45);
-          light.name="BreakerRoomOverheadLight";
-          light.position.set(centerX+side*6.35,3.35,z);
-          light.visible=false;
-          light.castShadow=false;
-          group.add(light);
-          this.breakerRoomLights.push({light,baseIntensity:6.5,phase:rib*.83+(side>0?.45:0)});
+      const wallX=centerX+side*(half-.16);
+      for(let panel=0;panel<5;panel++){
+        const z=partitionZ-2.4-panel*4.65;
+        addBox("PlayCentreWallPad",.12,1.72,3.25,wallX,1.34,z,
+          floorPalette[(panel+(side>0?2:0))%floorPalette.length]);
+        addBox("PlayCentreWallStripe",.045,.12,3.08,
+          centerX+side*(half-.075),2.18,z,cream);
+        for(let dot=0;dot<3;dot++){
+          addSphere("PlayCentreWallBubble",.16,
+            centerX+side*(half-.055),.85+dot*.48,z-0.72+dot*.72,
+            dot%2===0?white:yellow,[.18,1,1]);
         }
       }
+      addBox("PlayCentreWallBumper",.24,.38,depth-1.0,wallX,.22,midZ,
+        side>0?coral:cyan);
     }
 
-    // One exposed ceiling service void and two sagging cable runs make the
-    // place feel neglected, while keeping the rest of the ceiling deliberate.
-    addBox("BreakerRoomOpenCeilingServiceVoid",2.6,.035,1.45,
-      centerX+7.2,3.746,midZ-.8,darkMetal);
-    for(let cable=0; cable<3; cable++){
-      const x=centerX+6.35+cable*.28;
-      const curve=new THREE.CatmullRomCurve3([
-        new THREE.Vector3(x,3.66,midZ+1.8),
-        new THREE.Vector3(x+.12,3.26,midZ+1.3),
-        new THREE.Vector3(x-.08,3.17,midZ+.15),
-        new THREE.Vector3(x+.20,3.51,midZ-.8)
-      ]);
-      const wire=new THREE.Mesh(new THREE.TubeGeometry(curve,20,.026,6,false),rubberMaterial);
-      wire.name="BreakerRoomHangingCable";
-      wire.castShadow=false;
-      wire.receiveShadow=true;
-      group.add(wire);
-    }
-
-    // Eight individual cabinets preserve every existing puzzle hit target.
-    // The old flat wall boxes become recessed, bolted electrical enclosures.
-    const zStart=partitionZ-3.6,zSpacing=5.3,positions=[];
-    const leftFaceX=leftX+wallT*.5+.11;
-    const rightFaceX=rightX-wallT*.5-.11;
-    for(let row=0;row<4;row++){
-      positions.push({index:row+1,x:leftFaceX,z:zStart-row*zSpacing,face:Math.PI*.5});
-      positions.push({index:row+5,x:rightFaceX,z:zStart-row*zSpacing,face:-Math.PI*.5});
-    }
-    for(const spec of positions){
-      const root=new THREE.Group();
-      root.name="MaintenanceBreaker"+spec.index;
-      root.position.set(spec.x,0,spec.z);
-      root.rotation.y=spec.face;
-      group.add(root);
-
-      const housing=new THREE.Mesh(new THREE.BoxGeometry(1.52,2.08,.42),cabinetMaterial);
-      housing.name="BreakerCabinetHousing";
-      housing.position.set(0,1.04,-.005);
-      housing.castShadow=false;
-      root.add(housing);
-      const doorFrame=new THREE.Mesh(new THREE.BoxGeometry(1.17,1.72,.10),structuralMetal);
-      doorFrame.name="BreakerCabinetDoorFrame";
-      doorFrame.position.set(0,1.05,.225);
-      root.add(doorFrame);
-      const panel=new THREE.Mesh(new THREE.BoxGeometry(1.04,1.58,.12),cabinetFaceMaterial);
-      panel.name="BreakerPanelHousing";
-      panel.position.set(0,1.05,.292);
-      root.add(panel);
-
-      const gaugeBezel=new THREE.Mesh(
-        new THREE.CircleGeometry(.385,40),structuralMetal
-      );
-      gaugeBezel.name="BreakerMeterBezel";
-      gaugeBezel.position.set(0,1.42,.354);
-      root.add(gaugeBezel);
-      const gaugeFace=new THREE.Mesh(
-        new THREE.PlaneGeometry(.70,.70),this.breakerGaugeMaterials[spec.index-1]
-      );
-      gaugeFace.name="BreakerMeterFace";
-      gaugeFace.position.set(0,1.42,.365);
-      root.add(gaugeFace);
-
-      const handle=new THREE.Mesh(new THREE.BoxGeometry(.12,.36,.085),this.breakerHandleMaterial);
-      handle.name="BreakerLever";
-      handle.position.set(0,.91,.375);
-      handle.rotation.z=.42;
-      root.add(handle);
-      const lamp=new THREE.Mesh(new THREE.SphereGeometry(.085,12,10),this.breakerLampOffMaterial);
-      lamp.name="BreakerStatusLamp";
-      lamp.position.set(0,1.68,.37);
-      root.add(lamp);
-
-      // Cooling slots and visible fasteners give each cabinet a believable scale.
-      for(let vent=0;vent<4;vent++){
-        const slot=new THREE.Mesh(new THREE.BoxGeometry(.56,.018,.025),darkMetal);
-        slot.name="BreakerCabinetVent";
-        slot.position.set(0,.48+vent*.055,.37);
-        root.add(slot);
-      }
-      for(const side of [-1,1]){
-        for(const y of [.30,1.80]){
-          const bolt=new THREE.Mesh(new THREE.SphereGeometry(.027,8,6),rustMaterial);
-          bolt.name="BreakerCabinetFastener";
-          bolt.position.set(side*.68,y,.30);
-          root.add(bolt);
-        }
-      }
-      const cabinetStatus=new THREE.Mesh(
-        new THREE.BoxGeometry(.035,.48,.025),signalAmberMaterial
-      );
-      cabinetStatus.name="BreakerCabinetStatusBar";
-      cabinetStatus.position.set(-.53,1.03,.371);
-      root.add(cabinetStatus);
-
-      // Rust has crept through the seams and runoff has stained the lower
-      // cabinet edges. The meter glass and lever stay completely unobstructed.
-      for(let streak=0;streak<3;streak++){
-        const side=streak%2===0?-1:1;
-        const runoff=addBox("BreakerCabinetRustRunoff",
-          .022+(streak%2)*.018,.16+(streak%3)*.055,.012,
-          side*(.49+(streak%2)*.12),.66+(streak%2)*.24,.386,
-          rustMaterial,root);
-        runoff.rotation.z=(streak-1)*.045;
-      }
-      for(let chip=0;chip<2;chip++){
-        const paintLoss=addBox("BreakerCabinetPaintLoss",
-          .12+(chip*.035),.045,.018,
-          chip===0?-.61:.59,.22+chip*.11,.377,
-          rustMaterial,root);
-        paintLoss.rotation.z=(chip===0?-.12:.16);
-      }
-
-      // Short drops connect each cabinet to the overhead cable tray.
-      addPipe("BreakerCabinetConduit",
-        new THREE.Vector3(spec.x,2.13,spec.z),
-        new THREE.Vector3(spec.x,2.72,spec.z),.045,structuralMetal);
-
-      const state={...spec,group:root,handle,lamp,ownerChunk:null,active:false};
-      root.userData.interactable={
-        type:"roomBreaker",
-        prompt:"Flip breaker "+spec.index+" after comparing its meter reading",
-        breakerIndex:spec.index,
-        breakerState:state
-      };
-      this.breakerSwitches.push(state);
-    }
-
-    // A single signal console above the far door gives the room a clear focal
-    // point. Its readout belongs to the world, not another decorative sign.
-    const scopeCanvas=document.createElement("canvas");
-    scopeCanvas.width=640;scopeCanvas.height=256;
-    const scopeCtx=scopeCanvas.getContext("2d");
-    scopeCtx.fillStyle="#06100f";
-    scopeCtx.fillRect(0,0,640,256);
-    scopeCtx.strokeStyle="rgba(76,161,150,.22)";
-    scopeCtx.lineWidth=1;
-    for(let x=0;x<=640;x+=32){
-      scopeCtx.beginPath();scopeCtx.moveTo(x,0);scopeCtx.lineTo(x,256);scopeCtx.stroke();
-    }
-    for(let y=0;y<=256;y+=32){
-      scopeCtx.beginPath();scopeCtx.moveTo(0,y);scopeCtx.lineTo(640,y);scopeCtx.stroke();
-    }
-    scopeCtx.strokeStyle="#79e4d1";
-    scopeCtx.lineWidth=3;
-    scopeCtx.beginPath();
-    for(let x=0;x<=590;x+=3){
-      const envelope=Math.sin(x*.016)*.10+Math.sin(x*.047)*.055;
-      const pulse=Math.sin(x*.11)*(.04+Math.abs(Math.sin(x*.027))*.13);
-      const y=150+(envelope+pulse)*210;
-      if(x===0)scopeCtx.moveTo(x+24,y);else scopeCtx.lineTo(x+24,y);
-    }
-    scopeCtx.stroke();
-    scopeCtx.strokeStyle="rgba(115,203,186,.22)";
-    scopeCtx.beginPath();scopeCtx.moveTo(24,150);scopeCtx.lineTo(616,150);scopeCtx.stroke();
-    // The old display has dead scan lines, a burned patch, and a cracked
-    // corner of glass; the carrier trace still bleeds through underneath.
-    for(let line=5;line<256;line+=9){
-      scopeCtx.fillStyle="rgba(0,0,0,.16)";
-      scopeCtx.fillRect(0,line,640,1);
-    }
-    scopeCtx.fillStyle="rgba(0,0,0,.42)";
-    scopeCtx.fillRect(462,0,178,256);
-    scopeCtx.fillStyle="rgba(13,37,31,.42)";
-    scopeCtx.fillRect(475,36,165,9);
-    scopeCtx.strokeStyle="rgba(190,216,196,.40)";
-    scopeCtx.lineWidth=1.5;
-    scopeCtx.beginPath();
-    scopeCtx.moveTo(586,8);scopeCtx.lineTo(565,44);scopeCtx.lineTo(576,68);
-    scopeCtx.lineTo(548,92);scopeCtx.lineTo(557,124);scopeCtx.stroke();
-    scopeCtx.beginPath();
-    scopeCtx.moveTo(565,44);scopeCtx.lineTo(538,32);scopeCtx.lineTo(526,9);
-    scopeCtx.moveTo(576,68);scopeCtx.lineTo(606,82);scopeCtx.lineTo(629,108);
-    scopeCtx.stroke();
-    const scopeTexture=new THREE.CanvasTexture(scopeCanvas);
-    scopeTexture.colorSpace=THREE.SRGBColorSpace;
-    const scopeScreenMaterial=new THREE.MeshBasicMaterial({
-      map:scopeTexture,toneMapped:false
-    });
-    const scopeHousing=addBox("BreakerRoomSignalConsole",5.55,.98,.26,
-      centerX,3.32,backZ+.20,cabinetMaterial);
-    scopeHousing.material=cabinetMaterial;
-    addBox("BreakerRoomSignalConsoleBezel",3.78,.70,.08,
-      centerX,3.32,backZ+.36,darkMetal);
-    const scopeScreen=new THREE.Mesh(new THREE.PlaneGeometry(3.58,.55),scopeScreenMaterial);
-    scopeScreen.name="BreakerRoomScopeScreen";
-    scopeScreen.position.set(centerX,3.32,backZ+.405);
-    group.add(scopeScreen);
-
-    for(const side of [-1,1]){
-      const gaugeX=centerX+side*2.25;
-      const gaugeFace=new THREE.Mesh(new THREE.CircleGeometry(.275,32),darkMetal);
-      gaugeFace.name="BreakerRoomAnalogGauge";
-      gaugeFace.position.set(gaugeX,3.32,backZ+.355);
-      group.add(gaugeFace);
-      const gaugeRing=new THREE.Mesh(new THREE.RingGeometry(.275,.315,32),structuralMetal);
-      gaugeRing.name="BreakerRoomGaugeRim";
-      gaugeRing.position.set(gaugeX,3.32,backZ+.37);
-      group.add(gaugeRing);
-      const needle=new THREE.Mesh(new THREE.BoxGeometry(.018,.19,.018),signalAmberMaterial);
-      needle.name="BreakerRoomGaugeNeedle";
-      needle.position.set(gaugeX,3.32,backZ+.39);
-      needle.rotation.z=side*.38;
-      group.add(needle);
-      for(let tick=0;tick<7;tick++){
-        const angle=(-.95+tick*.31);
-        const mark=new THREE.Mesh(new THREE.BoxGeometry(.018,.065,.012),signalCyanMaterial);
-        mark.name="BreakerRoomGaugeMark";
-        mark.position.set(
-          gaugeX+Math.sin(angle)*.205,
-          3.32+Math.cos(angle)*.205,
-          backZ+.39
+    // Overhead pastel beams, pennants and warm globe lights.
+    const pennantMaterials=[pink,yellow,mint,cyan,purple,coral];
+    for(let strand=0;strand<3;strand++){
+      const z=partitionZ-4.0-strand*((depth-8.0)/2);
+      addLink("PlayCentreBuntingCord",
+        [centerX-11.4,3.34,z],[centerX+11.4,3.34,z],.018,frameMat);
+      for(let flag=0;flag<12;flag++){
+        const x=centerX-10.4+flag*1.88;
+        const pennant=new THREE.Mesh(
+          new THREE.ConeGeometry(.22,.48,3),
+          pennantMaterials[(flag+strand)%pennantMaterials.length]
         );
-        mark.rotation.z=-angle;
-        group.add(mark);
+        pennant.name="PlayCentreBunting";
+        pennant.position.set(x,3.08,z);
+        pennant.rotation.z=Math.PI;
+        group.add(pennant);
       }
     }
-    for(let indicator=0;indicator<8;indicator++){
-      const material=indicator===0?signalRedMaterial:
-        indicator===1?signalAmberMaterial:
-        indicator===7?signalCyanMaterial:this.breakerLampOffMaterial;
-      const led=new THREE.Mesh(new THREE.SphereGeometry(.045,10,8),material);
-      led.name="BreakerRoomRelayIndicator";
-      led.position.set(centerX-1.42+indicator*.405,2.79,backZ+.38);
-      group.add(led);
+    for(let lightIndex=0;lightIndex<6;lightIndex++){
+      const x=centerX-9.3+(lightIndex%3)*9.3;
+      const z=partitionZ-3.7-Math.floor(lightIndex/3)*(depth-7.4);
+      addCylinder("PlayCentreGlobeSocket",.12,.12,.12,x,3.48,z,frameMat);
+      const globe=addSphere("PlayCentreGlobe",.17,x,3.30,z,
+        lightStrip,[1,1,1]);
+      const light=new THREE.PointLight(
+        [0xffc8d9,0xffe2a0,0x9debd7,0x9cddff,0xc7b6ff,0xffd0a6][lightIndex],
+        0,12,1.65
+      );
+      light.name="PlayCentreColourLight";
+      light.position.set(x,3.16,z);light.visible=false;light.castShadow=false;
+      group.add(light);
+      this.breakerRoomLights.push({light,baseIntensity:2.3,phase:lightIndex*.67});
+      if(lightIndex===0)this.breakerRoomLightMaterial=globe.material;
     }
 
-    // One old service trolley, pushed into the corner, supplies a human scale
-    // cue without blocking either the aisle or any interactable.
-    const cartX=centerX+10.6,cartZ=backZ+3.4;
-    addBox("BreakerRoomToolTrolleyLowerShelf",1.02,.08,.66,cartX,.43,cartZ,darkMetal);
-    const trolleyTop=addBox("BreakerRoomToolTrolleyTop",1.12,.08,.72,cartX,.91,cartZ,structuralMetal);
-    trolleyTop.rotation.z=-.035;
-    addBox("BreakerRoomToolTrolleyDrawer",.92,.37,.58,cartX,.67,cartZ,cabinetMaterial);
-    addBox("BreakerRoomTrolleyRustPatch",.38,.13,.018,
-      cartX+.25,.95,cartZ+.37,rustMaterial);
-    addBox("BreakerRoomToolTrolleyHandle",.74,.045,.045,cartX,.83,cartZ+.33,rustMaterial);
+    // A two-level climbing frame with padded columns, bridges, ladders and slides.
     for(const side of [-1,1]){
-      for(const front of [-1,1]){
-        // One caster has snapped off; the frame sits slightly unevenly.
-        if(side===1&&front===-1)continue;
-        const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.095,.095,.075,12),rubberMaterial);
-        wheel.name="BreakerRoomTrolleyWheel";
-        wheel.rotation.z=Math.PI*.5;
-        wheel.position.set(cartX+side*.43,.12,cartZ+front*.25);
-        group.add(wheel);
+      const frameX=centerX+side*5.4,frameZ=midZ-1.0;
+      const corners=[
+        [frameX-1.95,frameZ-1.75],[frameX+1.95,frameZ-1.75],
+        [frameX-1.95,frameZ+1.75],[frameX+1.95,frameZ+1.75]
+      ];
+      corners.forEach((p,i)=>{
+        addCylinder("PlayCentreFoamSupport",.17,.22,2.9,p[0],1.45,p[1],
+          floorPalette[(i+(side>0?2:0))%floorPalette.length]);
+        addSphere("PlayCentreSupportCap",.24,p[0],2.95,p[1],yellow,[1,.48,1]);
+      });
+      addBox("PlayCentreRaisedDeck",4.25,.24,4.05,frameX,1.72,frameZ,
+        side<0?pink:cyan);
+      addBox("PlayCentreUpperDeckMat",3.92,.06,3.72,frameX,1.87,frameZ,
+        side<0?yellow:mint);
+      for(const railSide of [-1,1]){
+        addBox("PlayCentreSafetyRail",.13,.34,3.55,
+          frameX+railSide*1.96,2.17,frameZ,cream);
+        addBox("PlayCentreSafetyRail",3.8,.34,.13,
+          frameX,2.17,frameZ+railSide*1.84,cream);
+      }
+      for(let rung=0;rung<7;rung++){
+        const y=.30+rung*.23;
+        addLink("PlayCentreClimbingLadderRung",
+          [frameX+side*2.18,y,frameZ+.35],
+          [frameX+side*2.18,y,frameZ+1.42],.035,yellow);
+      }
+      for(let net=0;net<6;net++){
+        const x=frameX-1.65+net*.66;
+        addLink("PlayCentreRopeNet",
+          [x,2.04,frameZ-1.88],[x,2.04,frameZ+1.88],.018,white);
       }
     }
-    const brokenCaster=new THREE.Mesh(
-      new THREE.CylinderGeometry(.035,.035,.15,8),rustMaterial
+    addBox("PlayCentreSkyBridge",7.0,.18,1.45,centerX,2.66,midZ-1.0,purple);
+    for(let post=0;post<4;post++){
+      const x=centerX-3.1+(post%2)*6.2;
+      const z=midZ-1.0+(post<2?-0.55:.55);
+      addCylinder("PlayCentreBridgePost",.075,.075,1.45,x,1.95,z,cream);
+    }
+
+    // Enclosed tube slides curve down from the raised decks into padded landing zones.
+    addSlide("PlayCentrePinkTubeSlide",[
+      [centerX-5.4,2.05,midZ-2.4],
+      [centerX-7.2,1.85,midZ-3.2],
+      [centerX-8.0,1.1,midZ-4.4],
+      [centerX-7.5,.42,midZ-5.2]
+    ],slidePink,.48);
+    addSlide("PlayCentreBlueTubeSlide",[
+      [centerX+5.4,2.05,midZ-2.1],
+      [centerX+7.1,1.85,midZ-1.0],
+      [centerX+8.0,1.12,midZ+.5],
+      [centerX+7.1,.42,midZ+1.7]
+    ],slideBlue,.48);
+    addSlide("PlayCentreCrawlTunnel",[
+      [centerX-9.5,1.05,midZ+2.0],
+      [centerX-7.6,1.30,midZ+2.3],
+      [centerX-5.7,1.18,midZ+3.2]
+    ],clearPlastic,.62);
+
+    // Ball pit with soft walls and a dense mix of bright plastic balls.
+    const pitX=centerX-8.4,pitZ=midZ+5.45;
+    addBox("PlayCentreBallPitFloor",6.0,.22,4.9,pitX,.17,pitZ,purple);
+    addBox("PlayCentreBallPitWall",6.0,.72,.22,pitX,.40,pitZ-2.45,pink);
+    addBox("PlayCentreBallPitWall",6.0,.72,.22,pitX,.40,pitZ+2.45,yellow);
+    addBox("PlayCentreBallPitWall",.22,.72,4.9,pitX-2.9,.40,pitZ,cyan);
+    addBox("PlayCentreBallPitWall",.22,.72,4.9,pitX+2.9,.40,pitZ,mint);
+    const ballMats=[pink,yellow,mint,cyan,purple,cream,coral];
+    for(let ball=0;ball<88;ball++){
+      const angle=ball*2.399963;
+      const radius=.22+((ball*17)%23)/100;
+      const x=pitX+Math.cos(angle)*(1.0+((ball*7)%11)/10);
+      const z=pitZ+Math.sin(angle)*(.55+((ball*13)%14)/10);
+      const y=.34+((ball*19)%5)*.105;
+      addSphere("PlayCentreBall",radius,x,y,z,ballMats[ball%ballMats.length]);
+    }
+
+    // Oversized foam blocks, balancing rollers and a padded rainbow arch.
+    for(let block=0;block<10;block++){
+      const x=centerX+((block%5)-2)*1.05;
+      const z=partitionZ-7.1-Math.floor(block/5)*1.05;
+      const cube=addBox("PlayCentreFoamBlock",.94,.78,.94,x,.39,z,
+        floorPalette[block%floorPalette.length]);
+      cube.rotation.y=(block%3)*.18;
+    }
+    for(let roller=0;roller<4;roller++){
+      const x=centerX+9.4,z=midZ+5.5+roller*1.55;
+      const mesh=addCylinder("PlayCentreFoamRoller",.42,.42,1.65,x,.45,z,
+        roller%2===0?coral:yellow);
+      mesh.rotation.z=Math.PI*.5;
+    }
+    const archCurve=new THREE.CatmullRomCurve3([
+      new THREE.Vector3(centerX-3.6,.12,partitionZ-1.6),
+      new THREE.Vector3(centerX-3.2,2.4,partitionZ-2.3),
+      new THREE.Vector3(centerX,3.0,partitionZ-2.8),
+      new THREE.Vector3(centerX+3.2,2.4,partitionZ-2.3),
+      new THREE.Vector3(centerX+3.6,.12,partitionZ-1.6)
+    ]);
+    const rainbow=new THREE.Mesh(new THREE.TubeGeometry(archCurve,40,.14,10,false),coral);
+    rainbow.name="PlayCentreRainbowArch";group.add(rainbow);
+
+    // The large mascot looks like a cheerful display character until it moves.
+    const mascotRoot=new THREE.Group();
+    mascotRoot.name="PlayCentreMascot";
+    mascotRoot.position.set(centerX+8.0,0,backZ+6.2);
+    group.add(mascotRoot);
+    const mascotBody=addSphere("MascotBody",.58,0,1.32,0,cyan,[.88,1.38,.72],mascotRoot);
+    const belly=addSphere("MascotBelly",.43,0,1.30,.45,yellow,[.92,1.12,.24],mascotRoot);
+    const mascotHead=new THREE.Group();
+    mascotHead.name="MascotHead";mascotHead.position.set(0,2.53,.02);
+    mascotRoot.add(mascotHead);
+    addSphere("MascotHeadShape",.77,0,0,0,pink,[1.06,.94,.91],mascotHead);
+    addSphere("MascotMuzzle",.38,0,-.22,.63,cream,[1.15,.72,.48],mascotHead);
+    addSphere("MascotNose",.13,0,-.12,.91,coral,[1.12,.78,.66],mascotHead);
+    for(const side of [-1,1]){
+      addSphere("MascotEar",.30,side*.53,.70,-.02,purple,[.66,1.55,.58],mascotHead);
+      addSphere("MascotInnerEar",.15,side*.53,.72,.28,pink,[.52,1.45,.30],mascotHead);
+      addSphere("MascotEyeWhite",.19,side*.29,.13,.70,white,[1,1,.48],mascotHead);
+      addSphere("MascotEyePupil",.105,side*.29,.11,.89,dark,[.85,1,.55],mascotHead);
+      addSphere("MascotCheek",.14,side*.49,-.22,.71,coral,[1,.78,.40],mascotHead);
+    }
+    const smileCurve=new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-.30,-.40,.92),
+      new THREE.Vector3(-.12,-.51,1.02),
+      new THREE.Vector3(.10,-.51,1.02),
+      new THREE.Vector3(.30,-.40,.92)
+    ]);
+    const smile=new THREE.Mesh(new THREE.TubeGeometry(smileCurve,18,.035,7,false),dark);
+    smile.name="MascotSmile";mascotHead.add(smile);
+    const mascotArms=[];
+    for(const side of [-1,1]){
+      const arm=new THREE.Group();
+      arm.name=side<0?"MascotLeftArm":"MascotRightArm";
+      arm.position.set(side*.48,1.88,0);
+      mascotRoot.add(arm);
+      addLink("MascotUpperArm",[0,0,0],[side*.12,-.70,.05],.19,pink,arm);
+      addSphere("MascotElbow",.22,side*.12,-.70,.05,coral,null,arm);
+      addLink("MascotForearm",[side*.12,-.70,.05],[side*.25,-1.30,.17],.16,pink,arm);
+      addSphere("MascotHand",.30,side*.25,-1.38,.20,yellow,[1.15,.88,.72],arm);
+      for(let finger=0;finger<3;finger++){
+        addSphere("MascotFinger",.105,
+          side*.25+(finger-1)*.15,-1.57,.28,yellow,[1,.72,1],arm);
+      }
+      mascotArms.push(arm);
+    }
+    for(const side of [-1,1]){
+      addLink("MascotLeg",[side*.24,.78,0],[side*.31,.18,.08],.21,purple,mascotRoot);
+      addSphere("MascotShoe",.30,side*.31,.13,.22,coral,[1.25,.58,1.5],mascotRoot);
+    }
+    addSphere("MascotChestBadge",.16,0,1.70,.55,white,[1,1,.25],mascotRoot);
+
+    // A large showtime plunger starts the encounter and releases the far exit.
+    const buttonRoot=new THREE.Group();
+    buttonRoot.name="PlayCentreShowtimeButton";
+    buttonRoot.position.set(centerX-8.7,0,partitionZ-3.75);
+    group.add(buttonRoot);
+    addBox("ShowtimePedestal",.95,.78,.95,0,.39,0,purple,buttonRoot);
+    addBox("ShowtimePedestalTop",1.10,.12,1.10,0,.83,0,cream,buttonRoot);
+    const button=addCylinder("ShowtimeButton",.34,.40,.34,0,1.04,0,buttonMat,buttonRoot);
+    button.position.y=1.08;
+    addSphere("ShowtimeButtonCap",.32,0,1.25,0,yellow,[1,.35,1],buttonRoot);
+    const buttonGlow=new THREE.PointLight(0xffcc63,1.1,5,1.8);
+    buttonGlow.name="ShowtimeButtonGlow";
+    buttonGlow.position.set(0,1.42,0);buttonRoot.add(buttonGlow);
+    buttonRoot.userData.interactable={
+      type:"playCentreStart",
+      prompt:"Press the showtime button",
+    };
+    this.playCentreButton=buttonRoot;
+
+    // Decorative shapes and padded stage make the mascot part of the room.
+    addCylinder("MascotDisplayStage",1.75,1.75,.26,
+      centerX+8.0,.13,backZ+6.2,stageMat);
+    addBox("MascotDisplayBackdrop",4.2,3.2,.20,
+      centerX+8.0,1.82,backZ+7.6,purple);
+    for(let star=0;star<5;star++){
+      addSphere("PlayCentreBackdropDot",.18,
+        centerX+6.5+star*.75,2.65+(star%2)*.28,backZ+7.47,
+        star%2===0?yellow:cream,[1,.35,.25]);
+    }
+
+    this.playCentreState={
+      centerX,backZ,partitionZ,
+      minX:leftX+1.3,maxX:rightX-1.3,
+      minZ:backZ+1.3,maxZ:partitionZ-1.3,
+      monsterRoot,monsterHead,mascotArms,
+      buttonRoot,button,buttonGlow,
+      started:false,sequenceActive:false,escaped:false,
+      playerEntered:false,elapsed:0
+    };
+    this.breakerRoomAlarmMaterial=buttonMat;
+    this.breakerRoomBeacon=null;
+  }
+
+  startPlayCentreEncounter(){
+    const state=this.playCentreState;
+    if(!state||state.started||state.escaped)return false;
+    state.started=true;
+    state.sequenceActive=true;
+    state.elapsed=0;
+    state.monsterRoot.visible=true;
+    state.monsterRoot.position.set(
+      state.centerX+8.0,0,state.backZ+6.2
     );
-    brokenCaster.name="BreakerRoomBrokenTrolleyCaster";
-    brokenCaster.rotation.z=Math.PI*.5;
-    brokenCaster.position.set(cartX+.43,.10,cartZ-.25);
-    group.add(brokenCaster);
-
-    // A loose cable drum sits against the opposite wall; it is deliberately
-    // low and out of the route, like equipment left during a rushed repair.
-    const drumX=centerX-10.5,drumZ=backZ+3.2;
-    const drumCore=new THREE.Mesh(new THREE.CylinderGeometry(.39,.39,.52,24),rustMaterial);
-    drumCore.name="BreakerRoomCableDrum";
-    drumCore.rotation.z=Math.PI*.5;
-    drumCore.position.set(drumX,.42,drumZ);
-    group.add(drumCore);
-    for(const side of [-1,1]){
-      const flange=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.07,24),structuralMetal);
-      flange.name="BreakerRoomCableDrumFlange";
-      flange.rotation.z=Math.PI*.5;
-      flange.position.set(drumX+side*.29,.42,drumZ);
-      group.add(flange);
-      const hub=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,.085,16),darkMetal);
-      hub.rotation.z=Math.PI*.5;
-      hub.position.set(drumX+side*.33,.42,drumZ);
-      group.add(hub);
+    state.monsterHead.rotation.set(0,0,0);
+    if(state.buttonRoot){
+      state.buttonRoot.visible=false;
     }
-    addPipe("BreakerRoomLooseCable",
-      new THREE.Vector3(drumX,.12,drumZ),
-      new THREE.Vector3(drumX+1.1,.08,drumZ+1.1),.025,rubberMaterial);
-    addPipe("BreakerRoomExposedCopperWire",
-      new THREE.Vector3(drumX+1.1,.08,drumZ+1.1),
-      new THREE.Vector3(drumX+1.45,.055,drumZ+1.45),.009,rustMaterial);
+    return true;
+  }
 
-    // A cool signal source balances the warm fluorescent light; it only wakes
-    // when the entrance door is open, just like the room's overhead fixtures.
-    const signalLight=new THREE.PointLight(0x64c7c1,0,11,1.8);
-    signalLight.name="BreakerRoomSignalGlow";
-    signalLight.position.set(centerX,2.82,backZ+2.1);
-    signalLight.visible=false;
-    signalLight.castShadow=false;
-    group.add(signalLight);
-    this.breakerRoomLights.push({
-      light:signalLight,baseIntensity:1.35,phase:1.8
+  updatePlayCentre(dt,px,pz,enabled=true){
+    const state=this.playCentreState;
+    if(!state||!enabled)return;
+    const inside=px>state.minX&&px<state.maxX&&pz>state.minZ&&pz<state.maxZ;
+    if(inside)state.playerEntered=true;
+    if(!state.playerEntered||state.escaped)return;
+    state.elapsed+=dt;
+    const mascot=state.monsterRoot;
+    const head=state.monsterHead;
+    const moving=state.sequenceActive;
+    const time=state.elapsed;
+    head.rotation.y=moving?Math.sin(time*3.2)*.08:Math.sin(time*1.2)*.12;
+    head.rotation.z=Math.sin(time*(moving?8.0:1.5))*(moving?.045:.018);
+    mascot.position.y=Math.sin(time*(moving?10.0:1.7))*(moving?.075:.025);
+    state.mascotArms.forEach((arm,index)=>{
+      arm.rotation.z=(index===0?-1:1)*Math.sin(time*(moving?8.5:1.3))*(moving?.42:.035);
+      arm.rotation.x=Math.sin(time*(moving?7.0:1.0)+index)*.10;
     });
+    if(!moving)return;
+    const dx=px-mascot.position.x,dz=pz-mascot.position.z;
+    const distance=Math.hypot(dx,dz);
+    if(distance>.85){
+      const speed=2.75;
+      const step=Math.min(distance-.72,speed*dt);
+      mascot.position.x+=dx/distance*step;
+      mascot.position.z+=dz/distance*step;
+      mascot.position.x=THREE.MathUtils.clamp(mascot.position.x,state.minX,state.maxX);
+      mascot.position.z=THREE.MathUtils.clamp(mascot.position.z,state.minZ,state.maxZ);
+      mascot.rotation.y=Math.atan2(dx,dz);
+    }
+    const leftRoom=px<state.minX-.6||px>state.maxX+.6||
+      pz<state.minZ-.8||pz>state.maxZ+.8;
+    if(leftRoom&&this.maintenanceDoor?.openProgress>.70){
+      state.sequenceActive=false;
+      state.escaped=true;
+      mascot.visible=false;
+    }
+  }
 
-    const beaconHousing=addBox("BreakerRoomWarningBeaconHousing",.28,.10,.28,
-      centerX+5.1,3.22,backZ+2.0,darkMetal);
-    const beacon=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),signalRedMaterial);
-    beacon.name="BreakerRoomWarningBeacon";
-    beacon.position.set(centerX+5.1,3.34,backZ+2.0);
-    group.add(beacon);
-    this.breakerRoomBeacon=beacon;
-    this.breakerRoomAlarmMaterial=signalRedMaterial;
-
-    // Maintain all eight puzzle hit targets and the same sorted-answer logic.
-    // The new geometry is visual dressing only; no breaker positions or types
-    // are changed, so existing saves and interaction code remain compatible.
-  }  buildRoomDoor(parent,centerX,frontZ,options={},boundsTarget=null){
+  buildRoomDoor(parent,centerX,frontZ,options={},boundsTarget=null){
     const doorWidth=ROOM_DOOR_WIDTH,doorHeight=options.doorHeight||ROOM_DOOR_HEIGHT;
     const frameMat=this.roomDoorTrimMaterial,metalMat=this.roomDoorMetalMaterial;
     const addBox=(name,sx,sy,sz,x,y,z,material,host=parent)=>{
@@ -1391,10 +1105,13 @@ export class World {
     }
     this.boundaryWallBounds.push(...this.breakerRoomBounds);
     if(this.breakerRoomGroup)this.breakerRoomGroup.visible=true;
-    for(const item of this.breakerSwitches){
-      if(!item?.group)continue;
-      item.group.visible=true;item.active=false;
-      item.handle.rotation.z=.42;item.lamp.material=this.breakerLampOffMaterial;
+    if(this.playCentreState){
+      this.playCentreState.started=false;
+      this.playCentreState.sequenceActive=false;
+      this.playCentreState.escaped=false;
+      this.playCentreState.playerEntered=false;
+      if(this.playCentreState.monsterRoot)this.playCentreState.monsterRoot.visible=true;
+      if(this.playCentreState.buttonRoot)this.playCentreState.buttonRoot.visible=true;
     }
   }
 
@@ -1417,53 +1134,31 @@ export class World {
     }
     if(state.unlocked){
       this.completeMaintenancePuzzle(this.maintenancePuzzleType);
+      if(this.playCentreState){
+        this.playCentreState.started=true;
+        this.playCentreState.sequenceActive=false;
+        this.playCentreState.escaped=true;
+        if(this.playCentreState.monsterRoot)this.playCentreState.monsterRoot.visible=false;
+        if(this.playCentreState.buttonRoot)this.playCentreState.buttonRoot.visible=false;
+      }
       return;
     }
-    this.breakerProgress=this.maintenancePuzzleType==="breakers"
-      ?THREE.MathUtils.clamp(Math.floor(Number(state.breakerProgress)||0),0,this.breakerSequence.length)
-      :0;
-    for(const item of this.breakerSwitches){
-      const active=this.breakerProgress>0&&this.breakerSequence.slice(0,this.breakerProgress).includes(item.index);
-      item.active=active;
-      item.handle.rotation.z=active?-.42:.42;
-      item.lamp.material=active?this.breakerLampOnMaterial:this.breakerLampOffMaterial;
-      item.group.visible=this.maintenancePuzzleType==="breakers";
+    this.breakerProgress=0;
+    if(this.playCentreState){
+      this.playCentreState.started=false;
+      this.playCentreState.sequenceActive=false;
+      this.playCentreState.escaped=false;
+      this.playCentreState.playerEntered=false;
+      if(this.playCentreState.monsterRoot)this.playCentreState.monsterRoot.visible=true;
+      if(this.playCentreState.buttonRoot)this.playCentreState.buttonRoot.visible=true;
     }
   }
 
   completeMaintenancePuzzle(type=this.maintenancePuzzleType){
     if(type!==this.maintenancePuzzleType||!this.maintenanceDoor)return false;
     this.maintenanceDoor.unlocked=true;this.maintenanceDoor.targetOpen=true;
-    if(type==="breakers"){
-      this.breakerProgress=this.breakerSequence.length;
-      for(const item of this.breakerSwitches){item.active=true;item.handle.rotation.z=-.42;item.lamp.material=this.breakerLampOnMaterial;}
-    }
     if(this.maintenanceDoor.interactable)this.maintenanceDoor.interactable.prompt="Open door";
     return true;
-  }
-
-  activateBreaker(index){
-    if(this.maintenancePuzzleType!=="breakers")return {correct:false,complete:false,wrongPuzzle:true};
-    if(!this.maintenanceDoor)return {correct:false,complete:false,missingDoor:true};
-    if(this.maintenanceDoor.unlocked)return {correct:true,complete:true,alreadyPowered:true};
-    const switchState=this.breakerSwitches.find(item=>item.index===index);
-    if(!switchState)return {correct:false,complete:false,missingSwitch:true};
-    if(index!==this.breakerSequence[this.breakerProgress]){
-      this.breakerProgress=0;this.breakerFailTimer=1.8;
-      for(const item of this.breakerSwitches){
-        item.active=false;item.handle.rotation.z=.42;item.lamp.material=this.breakerLampOffMaterial;
-      }
-      return {correct:false,complete:false,progress:0};
-    }
-    this.breakerProgress++;
-    switchState.active=true;switchState.handle.rotation.z=-.42;
-    switchState.lamp.material=this.breakerLampOnMaterial;
-    if(this.breakerProgress>=this.breakerSequence.length){
-      this.breakerProgress=this.breakerSequence.length;
-      this.completeMaintenancePuzzle("breakers");
-      return {correct:true,complete:true,progress:this.breakerProgress};
-    }
-    return {correct:true,complete:false,progress:this.breakerProgress};
   }
 
   // -- chunk lifecycle -------------------------------------------------------
@@ -1668,9 +1363,10 @@ export class World {
     this.breakerRoomLightMaterial.emissiveIntensity=breakerRoomLightsOn?1.05:0;
     const lightFlickerTime=performance.now()*.004;
     if(this.breakerRoomAlarmMaterial){
-      this.breakerRoomAlarmMaterial.emissiveIntensity=breakerRoomLightsOn
-        ?(.48+.22*Math.sin(lightFlickerTime*.8))
-        :.10;
+      const active=Boolean(this.playCentreState?.sequenceActive);
+      this.breakerRoomAlarmMaterial.emissiveIntensity=active
+        ?(1.0+.35*Math.sin(lightFlickerTime*2.2))
+        :(.70+.12*Math.sin(lightFlickerTime*.8));
     }
     for(const item of this.breakerRoomLights){
       item.light.visible=breakerRoomLightsOn;
@@ -1690,9 +1386,9 @@ export class World {
       }
       if(door.interactable){
         door.interactable.prompt=door.requiresPower&&!door.unlocked
-          ?"Compare the breaker meters"
+          ?"Find the showtime button"
           :door===this.breakerRoomDoor
-            ?(door.targetOpen?"Close breaker room":"Enter breaker room")
+            ?(door.targetOpen?"Close play centre":"Enter play centre")
             :(door.targetOpen?"Close door":"Open door");
       }
     }
@@ -1908,9 +1604,8 @@ export class World {
   getInteractables() {
     return [
       ...this.roomDoors.filter(door=>door.group?.parent&&(door!==this.breakerRoomDoor||this.maintenancePuzzleType==="breakers")).map(door=>door.group),
-      ...(this.maintenancePuzzleType==="breakers"
-        ?this.breakerSwitches.filter(item=>item.group?.parent&&item.group.visible).map(item=>item.group)
-        :[]),
+      ...(this.playCentreButton?.parent&&this.playCentreButton.visible&&!this.playCentreState?.started
+        ?[this.playCentreButton]:[]),
     ];
   }
 
