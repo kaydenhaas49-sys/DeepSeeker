@@ -3169,6 +3169,7 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
     maintenancePuzzleSeed:world.maintenancePuzzleSeed,
     maintenanceDoorUnlocked:Boolean(world.maintenanceDoor?.unlocked),
     maintenanceBreakerProgress:world.breakerProgress,
+    breakerRoomDoorOpen:Boolean(world.breakerRoomDoor?.targetOpen),
     missionState:missionStateSnapshot(),
   };
 
@@ -3409,7 +3410,8 @@ function applyMaintenancePuzzleConfiguration(type,seed,state={}){
   world.setMaintenancePuzzleType(puzzleType,parsedSeed);
   world.restoreMaintenancePuzzleState({
     unlocked:Boolean(state.unlocked??state.maintenanceDoorUnlocked),
-    breakerProgress:Number(state.breakerProgress??state.maintenanceBreakerProgress)||0
+    breakerProgress:Number(state.breakerProgress??state.maintenanceBreakerProgress)||0,
+    breakerRoomDoorOpen:Boolean(state.breakerRoomDoorOpen)
   });
   try{localStorage.setItem(MAINTENANCE_PUZZLE_LAST_KEY,puzzleType);}catch{}
 }
@@ -3429,12 +3431,16 @@ function configureMaintenancePuzzleForRun(save=null,{broadcast=true}={}){
   const seed=Number.isFinite(storedSeed)&&storedSeed>=0
     ?(storedSeed>>>0):(Math.floor(Math.random()*0xffffffff)>>>0);
   applyMaintenancePuzzleConfiguration(type,seed,{
-    unlocked:Boolean(save?.maintenanceDoorUnlocked),breakerProgress:save?.maintenanceBreakerProgress
+    unlocked:Boolean(save?.maintenanceDoorUnlocked),
+    breakerProgress:save?.maintenanceBreakerProgress,
+    breakerRoomDoorOpen:Boolean(save?.breakerRoomDoorOpen)
   });
   if(broadcast&&multiplayer?.socket?.readyState===WebSocket.OPEN&&multiplayer.isWorldAuthority()){
     multiplayer.broadcastWorldEvent("maintenance_puzzle_select","maintenance-puzzle",{
       type:world.maintenancePuzzleType,seed:world.maintenancePuzzleSeed,
-      unlocked:Boolean(world.maintenanceDoor?.unlocked),breakerProgress:world.breakerProgress
+      unlocked:Boolean(world.maintenanceDoor?.unlocked),
+      breakerProgress:world.breakerProgress,
+      breakerRoomDoorOpen:Boolean(world.breakerRoomDoor?.targetOpen)
     });
   }
 }
@@ -3861,6 +3867,9 @@ const interaction=new InteractionSystem({
         return true;
       }
       target.toggle();
+      if(door===world.breakerRoomDoor&&gameStarted){
+        void saveGame(undefined,{confirmOverwrite:false});
+      }
       if((door===world.maintenanceDoor||door===world.breakerRoomDoor)&&multiplayer?.socket?.readyState===WebSocket.OPEN){
         multiplayer.broadcastWorldEvent("maintenance_door_toggle","maintenance-puzzle",{
           open:door.targetOpen,door:door===world.breakerRoomDoor?"breaker-room":"maintenance"
@@ -9769,14 +9778,15 @@ adminPasswordInput.addEventListener("keydown",e=>{ if(e.code==="Enter"){ e.preve
 adminLockButton.addEventListener("click",lockAdminAccess);
 function runAdminCommand(){
   if(!adminUnlocked)return;
-  const command=(adminCommandInput.value||"").trim().toLowerCase().replace(/\s+/g," ");
+  const rawCommand=(adminCommandInput.value||"").trim().replace(/\s+/g," ");
+  const command=rawCommand.toLowerCase();
   adminCommandInput.value="";
   if(!command){
     adminPanelStatus.textContent="ENTER A COMMAND · TYPE HELP";
     return;
   }
   if(command==="help"||command==="?"){
-    adminPanelStatus.textContent="AVAILABLE: GLITCH · TESTMAP · HELP";
+    adminPanelStatus.textContent="AVAILABLE: GLITCH [HEADLINE | MESSAGE] · TESTMAP · HELP";
     return;
   }
   if(["testmap","test map","backrooms test"].includes(command)){
@@ -9787,13 +9797,15 @@ function runAdminCommand(){
     if(!exitAdminBackroomsTestMap())setAdminStatus("TEST MAP IS NOT ACTIVE");
     return;
   }
-  if(["glitch","signal glitch","test glitch","test signal","signal test"].includes(command)){
-    showSignalGlitch(
-      "SIGNAL TEST",
-      "MANUAL ADMIN OVERRIDE // THIS IS NOT A STORY EVENT",
-      5200
-    );
-    adminPanelStatus.textContent="SIGNAL GLITCH TEST TRIGGERED · LOCAL ONLY";
+  const glitchMatch=rawCommand.match(/^(?:glitch|signal glitch|test glitch|test signal|signal test|transmission|test transmission)(?:\s+([\s\S]+))?$/i);
+  if(glitchMatch){
+    const supplied=String(glitchMatch[1]||"");
+    const [headlineInput,...messageParts]=supplied.split("|");
+    const headline=headlineInput.trim()||"UNKNOWN TRANSMISSION";
+    const detail=messageParts.join("|").trim()||
+      (supplied.trim()?"MANUAL FIELD TRANSMISSION // SIGNAL ACQUIRED":"MANUAL ADMIN TEST // TRANSMISSION CHANNEL OPEN");
+    showSignalGlitch(headline,detail,6500);
+    adminPanelStatus.textContent="TRANSMISSION DISPLAYED · LOCAL ONLY";
     return;
   }
   adminPanelStatus.textContent="UNKNOWN COMMAND · TYPE HELP";
