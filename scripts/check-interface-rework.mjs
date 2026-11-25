@@ -7,6 +7,7 @@ const main = read("../main.js");
 const player = read("../player.js");
 const readme = read("../README.md");
 const world = read("../world.js");
+const storyMission = read("../storyMission.js");
 
 assert.doesNotMatch(index, /phone/i, "the phone interface and its styling must be completely removed");
 assert.doesNotMatch(index, /adminIcon/i, "the old phone launcher control must be removed");
@@ -37,6 +38,7 @@ assert.match(world, /BreakerCabinetHousing/, "breaker switches must be housed in
 assert.match(world, /BreakerRoomCableTray/, "the breaker room must have overhead cable infrastructure");
 assert.match(world, /BreakerRoomAisleDeckPlate/, "the room must have a defined central service aisle");
 assert.match(world, /BreakerRoomScopeScreen/, "the far wall must have a signal-monitor focal point");
+assert.match(world, /BreakerRoomRearHeader[^\n]*wallMaterial/, "the rear wall cap beside the exit must match the room walls");
 assert.match(world, /BreakerRoomAnalogGauge/, "the signal console must include physical analog instrumentation");
 assert.match(world, /BreakerRoomToolTrolley/, "the room must include a restrained abandoned-maintenance prop");
 assert.match(world, /BreakerRoomCableDrum/, "the room must include secondary environmental dressing");
@@ -59,4 +61,13 @@ assert.match(world, /roomDoor\.collisionBounds/, "restored door state must also 
 assert.match(main, /glitchMatch=rawCommand\.match/, "the admin GLITCH command must accept a transmission headline and body");
 assert.match(main, /showSignalGlitch\(headline,detail,6500\)/, "the admin command must render through the full transmission overlay");
 assert.match(index, /maxlength="560"/, "the transmission command must allow a headline and message body");
+assert.match(index, /id="betaCompletionScreen"/, "the exit must show a dedicated beta-completion screen");
+assert.match(index, /BETA TEST COMPLETE/, "the completion screen must state that the beta test is complete");
+assert.match(index, /DeepSeeker is still in development, and more levels are coming\./, "the completion screen must explain that more levels are in development");
+assert.match(main, /function showBetaCompletionScreen/, "the exit must route to the plain beta-completion screen");
+assert.match(main, /if\(demo\)\{\s*showBetaCompletionScreen\(\{broadcast\}\);/, "demo completion must not use the stylized victory ending");
+assert.doesNotMatch(storyMission, /poolroomsDoorCard|_addSign\(gate|GateTopSignalPlate|GateTopSignalSegment/, "the sealed exit must have no top sign or signal plate");
+assert.match(storyMission, /PoolroomsGateLintel[^\n]*gateMat/, "the exit-door lintel must use the same finish as its side walls");
+assert.match(storyMission, /poolroomsDoorInteractable/, "the actual gate panel must remain interactable without a sign");
+assert.match(storyMission, /GateDoorLeaf/, "interaction must be attached to the sealed gate leaves");
 console.log("Interface migration checks passed.");

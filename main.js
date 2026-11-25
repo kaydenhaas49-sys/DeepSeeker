@@ -74,6 +74,9 @@ const homeScreen=document.getElementById("homeScreen");
 const lobbyScreen=document.getElementById("lobbyScreen");
 const betaTestScreen=document.getElementById("betaTestScreen");
 const betaTestContinueButton=document.getElementById("betaTestContinueButton");
+const betaCompletionScreen=document.getElementById("betaCompletionScreen");
+const betaCompletionReturnButton=document.getElementById("betaCompletionReturnButton");
+betaCompletionReturnButton?.addEventListener("click",()=>{location.href=location.pathname;});
 const arachnophobiaWarning=document.getElementById("arachnophobiaWarning");
 const arachnophobiaModeButton=document.getElementById("arachnophobiaModeButton");
 const arachnophobiaContinueButton=document.getElementById("arachnophobiaContinueButton");
@@ -8472,7 +8475,46 @@ function beginGameEnding(){
   },6500);
 }
 
+function showBetaCompletionScreen({broadcast=true}={}){
+  if(gameEnded||!gameStarted||!betaCompletionScreen) return false;
+
+  gameEnded=true;
+  pauseMenuOpen=false;
+  pauseOverlay?.classList.remove("visible");
+  pauseOverlay?.setAttribute("aria-hidden","true");
+  player.inputEnabled=false;
+  player.keys.clear();
+  player.vel.set(0,0,0);
+  spiderActive=false;
+  spiderSpawnPending=false;
+  spiderJumpscareTimer=0;
+  spiderBehaviorState="idle";
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
+  normalSpiderHunter.hide();
+  flashlightOn=false;
+  flashlight.visible=false;
+  player.setFlashlightVisual(false);
+
+  if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
+  controlsOpen=false;
+  chatOpen=false;
+  controls.classList.add("hidden");
+  crosshair.style.display="none";
+  overlay.classList.add("hidden");
+  betaCompletionScreen.classList.remove("hidden");
+  betaCompletionScreen.setAttribute("aria-hidden","false");
+
+  if(broadcast) multiplayer.broadcastWorldEvent("demo_complete","ending",{});
+  return true;
+}
+
 function beginVictoryEnding({broadcast=true,demo=false}={}){
+  if(demo){
+    showBetaCompletionScreen({broadcast});
+    return;
+  }
   if(gameEnded||!gameStarted) return;
 
   gameEnded=true;

@@ -351,10 +351,6 @@ function buildProceduralPoolroomsGateDoor(parent) {
   }
 
   add("GateCentreSeam",0.032,2.43,0.04,0,1.35,0.205,darkMat,0.006);
-  add("GateTopSignalPlate",0.52,0.12,0.04,0,2.48,0.232,frameMat,0.008);
-  for(const x of [-0.20,-0.10,0,0.10,0.20]){
-    add("GateTopSignalSegment",0.045,0.035,0.012,x,2.48,0.259,cyanMat,0.005);
-  }
   for(const x of [-0.76,0.76]){
     add("GateVerticalSignalStrip",0.024,2.20,0.025,x,1.36,0.228,cyanMat,0.006);
     addDeviceMesh(door,"GateWarningLamp",new THREE.SphereGeometry(0.035,12,8),
@@ -449,7 +445,7 @@ export class StoryMissionWorld {
     this.interactables = [];
     this.relayCards = [];
     this.relayDevices = [];
-    this.poolroomsDoorCard = null;
+    this.poolroomsDoorInteractable = null;
     this.poolroomsExitCard = null;
     this.poolroomsLoaded = false;
     this.poolroomsLoadPromise = null;
@@ -639,12 +635,17 @@ export class StoryMissionWorld {
     };
     this.world.boundaryWallBounds.push(...this.gateSideBounds, this.gateDoorBounds);
 
-    buildProceduralPoolroomsGateDoor(gate);
-    this.poolroomsDoorCard = this._addSign(gate, {
-      x: -1.86, y: 2.0, z: 0.235, width: 1.42, height: 0.78,
-      title: "POOLROOMS", subtitle: "SIGNAL SOURCE", status: "LOCKED",
-      interactable: { type: "poolroomsDoor", prompt: "Open the Poolrooms door" },
-    });
+    // Keep the sealed exit free of signage. The physical door leaves receive
+    // the interaction target, so no invisible sign or overlay is needed.
+    const gateDoor = buildProceduralPoolroomsGateDoor(gate);
+    this.poolroomsDoorInteractable = {
+      type: "poolroomsDoor",
+      prompt: "The Poolrooms door has no power",
+    };
+    for (const leaf of gateDoor.children.filter(child => child.name === "GateDoorLeaf")) {
+      leaf.userData.interactable = this.poolroomsDoorInteractable;
+      this.interactables.push(leaf);
+    }
 
     this._buildPoolroomsArchitecture();
     this.syncState({ relays: [false, false, false], breakerSolved: false });
@@ -765,12 +766,9 @@ export class StoryMissionWorld {
       // Picking up the first radio removes its whole pedestal from the world.
       if (i === 0 && device?.root?.parent) device.root.parent.visible = !active;
     }
-    if (this.poolroomsDoorCard) {
-      this._updateCard(this.poolroomsDoorCard, "POOLROOMS",
-        unlocked ? "FINISH DEMO" : "3 RELAYS + BREAKERS",
-        unlocked ? "GATE SEALED" : "LOCKED");
-      this.poolroomsDoorCard.mesh.userData.interactable.prompt = unlocked
-        ? "Finish the demo"
+    if (this.poolroomsDoorInteractable) {
+      this.poolroomsDoorInteractable.prompt = unlocked
+        ? "Finish the beta test"
         : "The Poolrooms door has no power";
     }
     // The Poolrooms are future content. Even after the demo objectives are

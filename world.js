@@ -782,7 +782,7 @@ export class World {
 
     addBox("BreakerRoomCeiling",roomWidth,.12,depth-.15,centerX,3.82,midZ,ceilingMaterial);
     addBox("BreakerRoomFrontHeader",roomWidth-.25,.16,.24,centerX,3.58,partitionZ-.30,structuralMetal);
-    addBox("BreakerRoomRearHeader",roomWidth-.25,.16,.24,centerX,3.58,backZ+1.0,structuralMetal);
+    addBox("BreakerRoomRearHeader",roomWidth-.25,.16,.24,centerX,3.58,backZ+1.0,wallMaterial);
     for(const side of [-1,1]){
       const x=centerX+side*(half-.22);
       for(const z of [backZ+1.0,partitionZ-1.0]){
