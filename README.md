@@ -49,6 +49,9 @@ download or copying into the assets folder is needed.
 - **N** — multiplayer map
 - **Tab** — controls
 
+## Field receiver
+
+Restoring the first signal relay unlocks the handheld receiver. `Q` swaps it with the flashlight, and `R` cycles three bands: the active mission carrier, intermittent unlisted transmissions, and a quiet comparison band. The receiver shows carrier strength without giving exact bearings or coordinates.
 ## Run locally
 
 Because the game uses ES modules and fetches assets, serve the repository over HTTP instead of opening `index.html` directly. One simple option is:

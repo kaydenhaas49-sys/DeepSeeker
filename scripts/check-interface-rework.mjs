@@ -20,4 +20,10 @@ assert.match(main, /function cycleRadioChannel/, "the player must be able to cyc
 assert.match(main, /KeyR/, "receiver tuning must have a keyboard binding");
 assert.match(index, /<span class="key">R<\/span>/, "the controls panel must explain receiver tuning");
 assert.match(main, /e\.code==="F3"/, "developer tools must have a separate developer-only shortcut");
+assert.doesNotMatch(main, /phone/i, "the active game code must contain no phone system references");
+assert.doesNotMatch(player, /phone/i, "player input must contain no phone overlay references");
+assert.doesNotMatch(readme, /phone/i, "documentation must not describe the retired phone system");
+assert.doesNotMatch(main, /Press P to open|READ M'S MESSAGE|OPEN THE DEEPSEEKER PHONE/i, "the tutorial must no longer teach the retired phone");
+assert.match(index, /\.adminOverlay\{position:fixed/, "developer tools must be a standalone overlay");
+assert.match(main, /radioChannelIndex=0/, "new runs must start on the mission receiver band");
 console.log("Interface migration checks passed.");
