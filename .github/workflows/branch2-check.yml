@@ -2,7 +2,7 @@ name: Validate BRANCH2 JavaScript
 
 on:
   push:
-    branches: ["BRANCH2", "work/remove-phone-upgrade-field-receiver"]
+    branches: ["BRANCH2", "work/remove-phone-upgrade-field-receiver", "work/play-centre-monster"]
   pull_request:
     branches: ["BRANCH2"]
   workflow_dispatch:

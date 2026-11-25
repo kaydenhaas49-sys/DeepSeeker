@@ -923,9 +923,11 @@ export class World {
       state.centerX+8.0,0,state.backZ+6.2
     );
     state.monsterHead.rotation.set(0,0,0);
-    if(state.buttonRoot){
-      state.buttonRoot.visible=false;
+    if(state.button){
+      state.button.position.y=.88;
+      state.button.material.color.setHex(0xf58ab4);
     }
+    if(state.buttonGlow)state.buttonGlow.intensity=.12;
     return true;
   }
 
@@ -959,8 +961,8 @@ export class World {
       mascot.position.z=THREE.MathUtils.clamp(mascot.position.z,state.minZ,state.maxZ);
       mascot.rotation.y=Math.atan2(dx,dz);
     }
-    const leftRoom=px<state.minX-.6||px>state.maxX+.6||
-      pz<state.minZ-.8||pz>state.maxZ+.8;
+    const leftRoom=px<state.minX-2.8||px>state.maxX+2.8||
+      pz<state.backZ-.85||pz>state.partitionZ+1.65;
     if(leftRoom&&this.maintenanceDoor?.openProgress>.70){
       state.sequenceActive=false;
       state.escaped=true;
@@ -1077,6 +1079,11 @@ export class World {
       this.playCentreState.playerEntered=false;
       if(this.playCentreState.monsterRoot)this.playCentreState.monsterRoot.visible=true;
       if(this.playCentreState.buttonRoot)this.playCentreState.buttonRoot.visible=true;
+      if(this.playCentreState.button){
+        this.playCentreState.button.position.y=1.08;
+        this.playCentreState.button.material.color.setHex(0xffdf68);
+      }
+      if(this.playCentreState.buttonGlow)this.playCentreState.buttonGlow.intensity=1.1;
     }
   }
 
@@ -1102,7 +1109,12 @@ export class World {
         this.playCentreState.sequenceActive=false;
         this.playCentreState.escaped=true;
         if(this.playCentreState.monsterRoot)this.playCentreState.monsterRoot.visible=false;
-        if(this.playCentreState.buttonRoot)this.playCentreState.buttonRoot.visible=false;
+        if(this.playCentreState.buttonRoot)this.playCentreState.buttonRoot.visible=true;
+        if(this.playCentreState.button){
+          this.playCentreState.button.position.y=.88;
+          this.playCentreState.button.material.color.setHex(0xf58ab4);
+        }
+        if(this.playCentreState.buttonGlow)this.playCentreState.buttonGlow.intensity=.12;
       }
       return;
     }

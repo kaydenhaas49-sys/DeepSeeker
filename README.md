@@ -22,7 +22,10 @@ The old Godot prototype and unrelated reference-project files are not part of th
 ## Campaign progression
 
 The classroom/playtest demo follows players through three signal relays
-and the indoor play centre. Restoring all three relays opens the route to its colourful play structure. Press the showtime button, escape the mascot, and reach the far exit to continue toward the Poolrooms.a future update and are not accessible in this build.
+and the indoor play centre. Restoring all three relays opens the route into
+its colourful play structure. Press the showtime button, escape the mascot,
+and reach the far exit to continue toward the Poolrooms. The Poolrooms are
+planned as a later update and are not accessible in this build.
 
 Decorative assets load automatically from 3DAssets.dev's CC0 CDN. They are
 optional during boot, so a failed prop request cannot block the main menu or

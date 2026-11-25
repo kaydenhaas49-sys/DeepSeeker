@@ -1939,11 +1939,12 @@ function activatePlayCentreEncounter({broadcast=true}={}){
     "THE SHOWTIME BUTTON",
     "The play centre came alive. Something stepped down from the climbing frame, and the far exit released."
   );
-  showSignalGlitch(
-    "THE PLAY CENTRE IS AWAKE",
-    "The button released the exit. Something is moving behind you.",
-    4200
-  );
+  const message="THE SHOWTIME BUTTON PRESSES IN. SOMETHING MOVES BEHIND YOU.";
+  eventText.textContent=message;
+  eventText.style.opacity="1";
+  setTimeout(()=>{
+    if(eventText.textContent===message)eventText.style.opacity="0";
+  },2600);
   refreshMissionState({broadcast});
   if(broadcast&&multiplayer?.socket?.readyState===WebSocket.OPEN){
     multiplayer.broadcastWorldEvent("maintenance_puzzle_solved","maintenance-puzzle",{playCentre:true});
