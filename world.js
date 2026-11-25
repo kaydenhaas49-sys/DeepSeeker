@@ -701,9 +701,10 @@ export class World {
       doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:false,ownerChunk:null
     },this.breakerRoomBounds);
     // The visual story is told by the room itself, not generic service plates.
-    this.breakerRoomDoor.group.getObjectByName("RoomDoorServicePlate")?.visible=false;
-    this.maintenanceDoor?.group?.getObjectByName("RoomDoorServicePlate") &&
-      (this.maintenanceDoor.group.getObjectByName("RoomDoorServicePlate").visible=false);
+    const breakerDoorPlate=this.breakerRoomDoor.group.getObjectByName("RoomDoorServicePlate");
+    if(breakerDoorPlate)breakerDoorPlate.visible=false;
+    const maintenanceDoorPlate=this.maintenanceDoor?.group?.getObjectByName("RoomDoorServicePlate");
+    if(maintenanceDoorPlate)maintenanceDoorPlate.visible=false;
 
     addBox("BreakerRoomCeiling",roomWidth,.12,depth-.15,centerX,3.82,midZ,ceilingMaterial);
     addBox("BreakerRoomFrontHeader",roomWidth-.25,.16,.24,centerX,3.58,partitionZ-.30,structuralMetal);
