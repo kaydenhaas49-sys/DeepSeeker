@@ -7,7 +7,6 @@ const main = read("../main.js");
 const player = read("../player.js");
 const readme = read("../README.md");
 const world = read("../world.js");
-const world = read("../world.js");
 
 assert.doesNotMatch(index, /phone/i, "the phone interface and its styling must be completely removed");
 assert.doesNotMatch(index, /adminIcon/i, "the old phone launcher control must be removed");
