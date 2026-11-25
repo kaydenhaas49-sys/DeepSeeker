@@ -4256,7 +4256,7 @@ function flashLobbyNameSaved(){
 }
 
 function openChat(){
-  if(!gameStarted || phoneOpen || controlsOpen) return;
+  if(!gameStarted || controlsOpen || adminOverlay.classList.contains("open")) return;
   chatOpen=true;
   chatPanel.classList.add("visible","open");
   clearTimeout(chatHideTimer);
@@ -4273,7 +4273,7 @@ function closeChat(resume=true){
   chatHideTimer=setTimeout(()=>{
     if(!chatOpen) chatPanel.classList.remove("visible");
   },4500);
-  if(resume && gameStarted && !phoneOpen && !controlsOpen) player.lock();
+  if(resume && gameStarted && !controlsOpen && !adminOverlay.classList.contains("open")) player.lock();
 }
 
 const houseDoors=[];
@@ -8350,15 +8350,11 @@ function beginGameEnding(){
   }
 
   controlsOpen=false;
-  phoneOpen=false;
-  deepseekerAppOpen=false;
   chatOpen=false;
   pauseMenuOpen=false;
   pauseOverlay?.classList.remove("visible");
   pauseOverlay?.setAttribute("aria-hidden","true");
   controls.classList.add("hidden");
-  phone.classList.remove("open","app-open");
-  phone.setAttribute("aria-hidden","true");
   crosshair.style.display="none";
 
   if(!endingOverlay){
@@ -8453,12 +8449,8 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
 
   if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
   controlsOpen=false;
-  phoneOpen=false;
-  deepseekerAppOpen=false;
   chatOpen=false;
   controls.classList.add("hidden");
-  phone.classList.remove("open","app-open");
-  phone.setAttribute("aria-hidden","true");
   crosshair.style.display="none";
   overlay.classList.add("hidden");
 
@@ -8859,7 +8851,8 @@ function setAdminStatus(message){
   if(adminPanelStatus) adminPanelStatus.textContent=message;
 }
 function openAdminAccess(){
-  if(!phoneOpen) return;
+  if(!gameStarted || gameEnded)return;
+  if(controlsOpen)hideControls();
   player.keys.clear();
   player.vel.set(0,0,0);
   if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
@@ -8876,6 +8869,10 @@ function closeAdminAccess(){
   adminOverlay.setAttribute("aria-hidden","true");
   adminPasswordInput.value="";
 }
+const closeAdminAndResume=()=>{
+  closeAdminAccess();
+  if(gameStarted&&!gameEnded&&!controlsOpen)player.lock();
+};
 function setAdminFlyEnabled(enabled){
   if(enabled && (!adminUnlocked || !gameStarted || houseMode || gameEnded)){
     adminFlyEnabled=false;
@@ -8925,7 +8922,7 @@ function clearAdminProjectiles(){
   adminProjectiles.length=0;
 }
 function fireAdminWater(kind){
-  if(!adminUnlocked || !gameStarted || phoneOpen) return;
+  if(!adminUnlocked || !gameStarted || gameEnded || adminOverlay.classList.contains("open")) return;
   const direction=new THREE.Vector3();
   camera.getWorldDirection(direction);
   const isRpg=kind==="waterRpg";
@@ -9538,7 +9535,7 @@ function teleportAdminToExit(){
   world.update(player.pos.x,player.pos.z);
 
   closeAdminAccess();
-  if(phoneOpen) togglePhone();
+  player.lock();
   eventText.textContent="ADMIN TELEPORT · MAINTENANCE DOOR AHEAD";
   eventText.style.opacity="1";
   setTimeout(()=>{eventText.style.opacity="0";},2200);
@@ -9622,70 +9619,12 @@ function teleportAdminToRadio(){
 
   world.update(player.pos.x,player.pos.z);
   closeAdminAccess();
-  if(phoneOpen){
-    phoneOpen=false;
-    deepseekerAppOpen=false;
-    phone.classList.remove("open","app-open");
-    phone.setAttribute("aria-hidden","true");
-  }
   crosshair.style.display="none";
   player.lock();
   eventText.textContent="ADMIN TELEPORT · FIELD RADIO AHEAD";
   eventText.style.opacity="1";
   setTimeout(()=>{if(eventText.textContent==="ADMIN TELEPORT · FIELD RADIO AHEAD")eventText.style.opacity="0";},2200);
 }
-
-function togglePhone(){
-  phoneOpen=!phoneOpen;
-  // Skip the phone launcher: open straight into DEEPSEEKER every time.
-  deepseekerAppOpen=phoneOpen;
-  phone.classList.toggle("open",phoneOpen);
-  phone.classList.toggle("app-open",phoneOpen);
-  phone.setAttribute("aria-hidden",String(!phoneOpen));
-
-  if(phoneOpen){
-    if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
-    crosshair.style.display="none";
-    refreshPhoneContent();
-
-    if(tutorialOpenRoomActive && !houseMode && gameStarted && houseTutorialStage===5){
-      setHouseTutorialStage(6);
-    }
-  }else{
-    adminOverlay.classList.remove("open");
-    adminOverlay.setAttribute("aria-hidden","true");
-
-    if(tutorialOpenRoomActive && !houseMode && gameStarted){
-      if(houseTutorialStage===0){
-        setHouseTutorialStage(1);
-      }else if(houseTutorialStage===6){
-        setHouseTutorialStage(7);
-      }
-    }
-
-    if(!controlsOpen) player.lock();
-  }
-}
-
-function openDeepSeekerApp(){
-  if(!phoneOpen) return;
-  deepseekerAppOpen=true;
-  phone.classList.add("app-open");
-}
-
-const phoneSaveStatus=document.getElementById("phoneSaveStatus");
-document.querySelectorAll(".phoneSaveSlot").forEach(button=>{
-  button.addEventListener("click",async()=>{
-    const slot=normalizeSaveSlot(button.dataset.slot);
-    if(phoneSaveStatus) phoneSaveStatus.textContent=`SAVING SLOT ${slot}…`;
-    const saved=await saveGame(slot);
-    if(phoneSaveStatus){
-      phoneSaveStatus.textContent=saved
-        ? `SAVED TO SLOT ${slot}`
-        : `SAVE FAILED — SLOT ${slot}`;
-    }
-  });
-});
 
 // NEW GAME uses the document-level capture handler above so the menu can safely rebuild its DOM.
 
@@ -9772,15 +9711,8 @@ chatInput.addEventListener("keydown",e=>{
   }
 });
 
-deepseekerIcon.addEventListener("click",openDeepSeekerApp);
-phoneHome.addEventListener("click",()=>{
-  if(!phoneOpen) return;
-  deepseekerAppOpen=false;
-  phone.classList.remove("app-open");
-});
-adminIcon.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); openAdminAccess(); });
-adminCloseButton.addEventListener("click",closeAdminAccess);
-adminAdminCloseButton.addEventListener("click",closeAdminAccess);
+adminCloseButton.addEventListener("click",closeAdminAndResume);
+adminAdminCloseButton.addEventListener("click",closeAdminAndResume);
 adminUnlockButton.addEventListener("click",()=>{
   if(adminPasswordInput.value===ADMIN_PASSWORD){
     adminUnlocked=true;
@@ -9837,15 +9769,7 @@ adminFlyButton.addEventListener("click",()=>{
   if(!adminUnlocked) return;
   const enabling=!adminFlyEnabled;
   if(!setAdminFlyEnabled(enabling)||!enabling)return;
-  // The phone disables player.inputEnabled. Close it immediately after flight
-  // is enabled so keyboard movement actually reaches Player.update().
   closeAdminAccess();
-  if(phoneOpen){
-    phoneOpen=false;
-    deepseekerAppOpen=false;
-    phone.classList.remove("open","app-open");
-    phone.setAttribute("aria-hidden","true");
-  }
   crosshair.style.display="none";
   player.lock();
 });
@@ -9911,14 +9835,14 @@ overlay.addEventListener("click",(e)=>{
 });
 
 renderer.domElement.addEventListener("mousedown",e=>{
-  if(e.button===0 && adminUnlocked && adminTool && gameStarted && !phoneOpen){
+  if(e.button===0 && adminUnlocked && adminTool && gameStarted && !adminOverlay.classList.contains("open")){
     fireAdminWater(adminTool);
     e.preventDefault();
   }
 });
 
 renderer.domElement.addEventListener("click",()=>{
-  if(gameStarted && !phoneOpen && !controlsOpen && !chatOpen && document.pointerLockElement!==renderer.domElement){
+  if(gameStarted && !controlsOpen && !chatOpen && !adminOverlay.classList.contains("open") && document.pointerLockElement!==renderer.domElement){
     audio.start();
     player.lock();
   }
@@ -9950,7 +9874,7 @@ document.addEventListener("pointerlockchange",()=>{
     return;
   }
 
-  if(!controlsOpen && !phoneOpen && !chatOpen){
+  if(!controlsOpen && !chatOpen && !adminOverlay.classList.contains("open")){
     if(locked){
       overlay.classList.add("hidden");
     }else if(gameStarted && !gameEnded){
@@ -9958,13 +9882,7 @@ document.addEventListener("pointerlockchange",()=>{
     }
   }
   crosshair.style.display=locked && !chatOpen?"block":"none";
-  if(locked && phoneOpen){
-    phoneOpen=false;
-    deepseekerAppOpen=false;
-    phone.classList.remove("open","app-open");
-    phone.setAttribute("aria-hidden","true");
-  }
-});
+  });
 
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden){
@@ -9979,8 +9897,8 @@ document.addEventListener("visibilitychange",()=>{
     gameStarted &&
     !gameEnded &&
     !controlsOpen &&
-    !phoneOpen &&
     !chatOpen &&
+    !adminOverlay.classList.contains("open") &&
     document.pointerLockElement!==renderer.domElement
   ){
     showPauseMenu();
@@ -9994,8 +9912,19 @@ document.addEventListener("keydown",e=>{
     return;
   }
 
-  if(adminOverlay?.classList.contains("open")) return;
+  if(adminOverlay?.classList.contains("open")){
+    if(e.code==="Escape"){
+      e.preventDefault();
+      closeAdminAndResume();
+    }
+    return;
+  }
   if(gameEnded) return;
+  if(e.code==="F3"&&!e.repeat&&gameStarted){
+    e.preventDefault();
+    openAdminAccess();
+    return;
+  }
 
   if(securityCameras.active){
     if(e.code==="Escape"){
@@ -10024,7 +9953,7 @@ document.addEventListener("keydown",e=>{
     return;
   }
 
-  if(e.code==="Enter" && !e.repeat && gameStarted && !phoneOpen && !controlsOpen && !chatOpen){
+  if(e.code==="Enter" && !e.repeat && gameStarted && !controlsOpen && !chatOpen){
     e.preventDefault();
     openChat();
     return;
@@ -10035,35 +9964,30 @@ document.addEventListener("keydown",e=>{
   if(e.code==="Escape"&&gameStarted&&!gameEnded){
     e.preventDefault();
     if(controlsOpen){hideControls();player.lock();return;}
-    if(phoneOpen){togglePhone();return;}
     showPauseMenu();
     return;
   }
 
-  if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen && !chatOpen){
+  if(e.code==="KeyE" && !e.repeat && !controlsOpen && !chatOpen){
     if(interaction.interact()){
       return;
     }
-  }else if(e.code==="KeyF" && gameStarted && !phoneOpen && !controlsOpen){
+  }else if(e.code==="KeyF" && gameStarted && !controlsOpen){
     if(equippedTool==="radio")setEquippedTool("flashlight",{turnOnFlashlight:false});
     toggleFlashlight();
-  }else if(e.code==="KeyQ" && !e.repeat && gameStarted && !phoneOpen && !controlsOpen){
+  }else if(e.code==="KeyQ" && !e.repeat && gameStarted && !controlsOpen){
     if(radioCollected){
       e.preventDefault();
       setEquippedTool(equippedTool==="radio"?"flashlight":"radio");
     }
-  }else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
+  }else if(e.code==="KeyM" && !controlsOpen){ muted=audio.toggleMute(); }
   else if(e.code==="KeyN" && !e.repeat){
-    if(gameStarted && !phoneOpen && !controlsOpen){
+    if(gameStarted && !controlsOpen){
       e.preventDefault();
       toggleMultiplayerMap();
     }
-  }else if(e.code==="KeyP" && !e.repeat){
-    if(controlsOpen) hideControls();
-    else togglePhone();
-  }else if(e.code==="Tab"){
+  }  }else if(e.code==="Tab"){
     e.preventDefault();
-    if(phoneOpen) return;
     controlsOpen?hideControls():showControls();
   }
 });
@@ -10505,7 +10429,6 @@ function animate(){
     gameStarted &&
     !gameEnded &&
     !pauseMenuOpen &&
-    !phoneOpen &&
     !controlsOpen &&
     !chatOpen &&
     !securityCameras.active &&
