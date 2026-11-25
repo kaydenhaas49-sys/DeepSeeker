@@ -44,9 +44,8 @@ download or copying into the assets folder is needed.
 - **W A S D** — move
 - **Shift** — sprint
 - **Ctrl** — crouch
-- **Space** — jump
 - **F** — flashlight
-- **P** — phone
+- **R** — tune the field receiver (when equipped)
 - **N** — multiplayer map
 - **Tab** — controls
 
