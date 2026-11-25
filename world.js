@@ -903,7 +903,7 @@ export class World {
       centerX,backZ,partitionZ,
       minX:leftX+1.3,maxX:rightX-1.3,
       minZ:backZ+1.3,maxZ:partitionZ-1.3,
-      monsterRoot,monsterHead,mascotArms,
+      monsterRoot:mascotRoot,monsterHead:mascotHead,mascotArms,
       buttonRoot,button,buttonGlow,
       started:false,sequenceActive:false,escaped:false,
       playerEntered:false,elapsed:0
