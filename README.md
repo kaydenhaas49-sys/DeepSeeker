@@ -65,3 +65,17 @@ Then open http://localhost:8000. This starts the static web server only; multipl
 ## Assets and licensing
 
 Keep the individual `THIRD_PARTY_LICENSE_*.txt` files with the assets they cover. The spider model is loaded from `assets/Spider-Psionic.zip`.
+
+## Indoor play-centre models
+
+The indoor play-centre uses individually loaded GLB props from the 3DAssets.dev
+“Trampoline Park and Soft Play” pack. The models are published under CC0 1.0
+Universal and are loaded with Three.js GLTFLoader. A procedural local fallback
+remains visible until every model has loaded, so blocked or unavailable CDN
+requests do not break the room.
+
+- Soft Play Frame Tower with Slide — https://3dassets.dev/assets/trampoline-park-and-soft-play-soft-play-frame-tower-wi-509d6838
+- Ball Pit Frame with Balls — https://3dassets.dev/assets/trampoline-park-and-soft-play-ball-pit-frame-with-ball-2c1d5d6a
+- Foam Pit Frame with Foam Cubes — https://3dassets.dev/assets/trampoline-park-and-soft-play-foam-pit-frame-with-cube-e95382a8
+- Crawl Tunnel — https://3dassets.dev/assets/trampoline-park-and-soft-play-crawl-tunnel-5b9b0685
+- Padded Step Block Set — https://3dassets.dev/assets/trampoline-park-and-soft-play-padded-step-block-set-9e83671b

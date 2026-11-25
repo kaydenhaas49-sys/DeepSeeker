@@ -40,6 +40,11 @@ assert.match(world, /PlayCentrePinkTubeSlide/, "the play centre must include tub
 assert.match(world, /PlayCentreRaisedDeck/, "the play centre must include a multi-level climbing structure");
 assert.match(world, /PlayCentreBunting/, "the play centre must feel bright and playful");
 assert.match(world, /PlayCentreMascot/, "the room must contain an original mascot creature");
+assert.match(world, /PLAY_CENTRE_ASSETS/, "the play centre must load production GLB models");
+assert.match(world, /loadPlayCentreModels\(/, "the play-centre model loader must be wired into the room");
+assert.match(world, /PlayCentreEquipmentProxies/, "the room must retain a local fallback while GLBs load");
+assert.match(world, /new RoundedBoxGeometry/, "soft-play props must use rounded geometry rather than sharp blockout cubes");
+assert.match(world, /bumpMap=fabricBump/, "soft-play fabric materials must include surface relief");
 assert.match(world, /startPlayCentreEncounter\(\)/, "the showtime button must start the mascot encounter");
 assert.match(world, /updatePlayCentre\(dt,px,pz,enabled=true\)/, "the mascot must animate and pursue the player during the escape");
 assert.match(world, /type:"playCentreStart"/, "the play centre must expose a single showtime interaction");

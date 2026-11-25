@@ -1,6 +1,8 @@
 // world.js — seeded RNG, chunk layout generation, chunk meshes, chunk manager.
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createTextures } from "./textures.js?v=20261030-finish-pass6";
 
 export const CELL = 4; // meters per grid cell
@@ -46,6 +48,27 @@ const ROOM_DOOR_HEIGHT=2.85;
 const ROOM_WALL_THICKNESS=0.24;
 const ROOM_HEIGHT=3.35;
 const OUTER_ROOM_DOOR=Object.freeze({cx:-2,cz:-3,localX:12});
+const PLAY_CENTRE_ASSETS=Object.freeze({
+  tower:"https://cdn.3dassets.dev/assets/34619/v1/model.glb",
+  ballPit:"https://cdn.3dassets.dev/assets/34620/v1/model.glb",
+  foamPit:"https://cdn.3dassets.dev/assets/34614/v1/model.glb",
+  crawlTunnel:"https://cdn.3dassets.dev/assets/34622/v1/model.glb",
+  stepBlocks:"https://cdn.3dassets.dev/assets/34624/v1/model.glb",
+});
+const PLAY_CENTRE_MODEL_CACHE=new Map();
+function loadPlayCentreModelScene(key){
+  const url=PLAY_CENTRE_ASSETS[key];
+  if(!url)return Promise.reject(new Error("Unknown play-centre model: "+key));
+  if(!PLAY_CENTRE_MODEL_CACHE.has(url)){
+    const loader=new GLTFLoader();
+    const pending=loader.loadAsync(url).then(result=>result.scene).catch(error=>{
+      PLAY_CENTRE_MODEL_CACHE.delete(url);
+      throw error;
+    });
+    PLAY_CENTRE_MODEL_CACHE.set(url,pending);
+  }
+  return PLAY_CENTRE_MODEL_CACHE.get(url);
+}
 function isProtectedRouteCell(gx,gz){
   return (
     (gz >= 7 && gz <= 9 && gx >= -23 && gx <= 23) ||
@@ -506,6 +529,14 @@ export class World {
     this.breakerRoomBounds=[];
     this.breakerRoomLights=[];
     const group=this.breakerRoomGroup;
+    const equipmentProxyRoot=new THREE.Group();
+    equipmentProxyRoot.name="PlayCentreEquipmentProxies";
+    group.add(equipmentProxyRoot);
+    const modelAssetRoot=new THREE.Group();
+    modelAssetRoot.name="PlayCentreModelAssets";
+    modelAssetRoot.visible=false;
+    group.add(modelAssetRoot);
+    let propHost=group;
     const wallT=.22,roomHeight=3.95,roomWidth=26.4,half=roomWidth*.5;
     const leftX=centerX-half,rightX=centerX+half;
     const partitionZ=this.maintenanceRoomFrontZ-35.5;
@@ -513,87 +544,164 @@ export class World {
 
     // Bright, clean plastic and padded finishes make the room feel welcoming
     // before the mascot wakes up. The shapes and layout are original to DeepSeeker.
-    const mat=(color,roughness=.72,metalness=0,emissive=0,emissiveIntensity=0)=>
-      new THREE.MeshStandardMaterial({color,roughness,metalness,emissive,emissiveIntensity});
-    const pink=mat(0xff72a7,.48,0,0x320b5b,.12);
-    const coral=mat(0xff946f,.55,0,0x5b1807,.08);
-    const yellow=mat(0xffd45e,.52,0,0x5a3a08,.08);
-    const mint=mat(0x81e4c1,.62,0,0x0e4834,.06);
-    const cyan=mat(0x5fc9e8,.48,0,0x07384d,.10);
-    const purple=mat(0xa38be8,.52,0,0x251052,.08);
+    // Woven fabric maps give the padded surfaces subtle fibre relief.
+    const fabricCanvas=document.createElement("canvas");
+    fabricCanvas.width=fabricCanvas.height=512;
+    const fabricCtx=fabricCanvas.getContext("2d");
+    fabricCtx.fillStyle="#e5e2dc";fabricCtx.fillRect(0,0,512,512);
+    let fabricSeed=0x41c6ce57;
+    const fabricRandom=()=>{
+      fabricSeed=(Math.imul(fabricSeed,1664525)+1013904223)>>>0;
+      return fabricSeed/4294967296;
+    };
+    for(let i=0;i<12500;i++){
+      const v=fabricRandom();
+      fabricCtx.fillStyle=v>.52?"rgba(255,255,255,.19)":"rgba(65,62,57,.10)";
+      fabricCtx.fillRect(fabricRandom()*512,fabricRandom()*512,.55+fabricRandom()*1.6,.55+fabricRandom()*1.4);
+    }
+    fabricCtx.strokeStyle="rgba(75,70,66,.16)";fabricCtx.lineWidth=1;
+    for(let y=32;y<512;y+=64){fabricCtx.beginPath();fabricCtx.moveTo(0,y);fabricCtx.lineTo(512,y);fabricCtx.stroke();}
+    const fabricMap=new THREE.CanvasTexture(fabricCanvas);
+    fabricMap.colorSpace=THREE.SRGBColorSpace;fabricMap.wrapS=fabricMap.wrapT=THREE.RepeatWrapping;
+    fabricMap.anisotropy=Math.min(this.maxAnisotropy,8);
+    const fabricBumpCanvas=document.createElement("canvas");
+    fabricBumpCanvas.width=fabricBumpCanvas.height=512;
+    const fabricBumpCtx=fabricBumpCanvas.getContext("2d");
+    fabricBumpCtx.fillStyle="#808080";fabricBumpCtx.fillRect(0,0,512,512);
+    for(let i=0;i<15000;i++){
+      const v=100+Math.floor(fabricRandom()*56);
+      fabricBumpCtx.fillStyle="rgb("+v+","+v+","+v+")";
+      fabricBumpCtx.fillRect(fabricRandom()*512,fabricRandom()*512,1,1);
+    }
+    fabricBumpCtx.strokeStyle="rgba(235,235,235,.55)";fabricBumpCtx.lineWidth=1;
+    for(let x=16;x<512;x+=64){fabricBumpCtx.beginPath();fabricBumpCtx.moveTo(x,0);fabricBumpCtx.lineTo(x,512);fabricBumpCtx.stroke();}
+    const fabricBump=new THREE.CanvasTexture(fabricBumpCanvas);
+    fabricBump.wrapS=fabricBump.wrapT=THREE.RepeatWrapping;fabricBump.anisotropy=Math.min(this.maxAnisotropy,8);
+
+    const mat=(color,roughness=.72,metalness=0,emissive=0,emissiveIntensity=0,fabric=false)=>{
+      const material=new THREE.MeshStandardMaterial({color,roughness,metalness,emissive,emissiveIntensity});
+      if(fabric){material.map=fabricMap;material.bumpMap=fabricBump;material.bumpScale=.028;}
+      return material;
+    };
+    const pink=mat(0xff72a7,.91,0,0x320b5b,.035,true);
+    const coral=mat(0xff946f,.90,0,0x5b1807,.025,true);
+    const yellow=mat(0xffd45e,.88,0,0x5a3a08,.025,true);
+    const mint=mat(0x81e4c1,.94,0,0x0e4834,.02,true);
+    const cyan=mat(0x5fc9e8,.90,0,0x07384d,.035,true);
+    const purple=mat(0xa38be8,.90,0,0x251052,.025,true);
     const navy=mat(0x344b76,.72);
-    const cream=mat(0xffefcf,.78);
+    const cream=mat(0xffefcf,.92,0,0,0,true);
     const white=mat(0xfff8e8,.35);
     const dark=mat(0x18192b,.25);
     const rubber=mat(0x30364a,.88);
-    const clearPlastic=new THREE.MeshStandardMaterial({
-      color:0x9ee5ec,roughness:.22,metalness:.04,transparent:true,opacity:.42,
-      side:THREE.DoubleSide,depthWrite:false
+    const clearPlastic=new THREE.MeshPhysicalMaterial({
+      color:0xbbeef0,roughness:.16,metalness:.02,transparent:true,opacity:.34,
+      transmission:.22,thickness:.12,ior:1.42,side:THREE.DoubleSide,depthWrite:false
     });
-    const foam=mat(0xf5d2dc,.93);
+    const foam=mat(0xf5d2dc,.96,0,0,0,true);
     const lightStrip=new THREE.MeshStandardMaterial({
-      color:0xfff0c2,emissive:0xffc76a,emissiveIntensity:0,roughness:.35
+      color:0xfff0c2,emissive:0xffc76a,emissiveIntensity:0,roughness:.3
     });
     this.breakerRoomLightMaterial=lightStrip;
 
+    // Layered wall vinyl: muted pastel panels, mural shapes and fine surface wear.
     const wallCanvas=document.createElement("canvas");
-    wallCanvas.width=512;wallCanvas.height=256;
+    wallCanvas.width=1024;wallCanvas.height=512;
     const wallCtx=wallCanvas.getContext("2d");
-    wallCtx.fillStyle="#d9eee5";wallCtx.fillRect(0,0,512,256);
-    const wallBands=["#f49bb8","#f4d16d","#8ed8c0","#8ccfe8","#b8a5ee"];
-    for(let i=0;i<wallBands.length;i++){
-      wallCtx.fillStyle=wallBands[i];
-      wallCtx.fillRect(i*106,0,66,256);
+    const wallBase=wallCtx.createLinearGradient(0,0,0,512);
+    wallBase.addColorStop(0,"#f1eee6");wallBase.addColorStop(.72,"#dcebe3");wallBase.addColorStop(1,"#bdc9be");
+    wallCtx.fillStyle=wallBase;wallCtx.fillRect(0,0,1024,512);
+    const wallBands=["#e9a6bd","#efce83","#9acbb8","#91bfd1","#b9add8"];
+    for(let i=0;i<5;i++){
+      const x=i*205,band=wallCtx.createLinearGradient(x,0,x+115,0);
+      band.addColorStop(0,"rgba(255,255,255,.02)");band.addColorStop(.5,wallBands[i]);band.addColorStop(1,"rgba(255,255,255,.02)");
+      wallCtx.fillStyle=band;wallCtx.fillRect(x+42,0,112,512);
+      wallCtx.fillStyle="rgba(255,255,255,.32)";wallCtx.fillRect(x+42,0,4,512);
+      wallCtx.fillStyle="rgba(55,64,62,.10)";wallCtx.fillRect(x+150,0,2,512);
     }
-    for(let i=0;i<12;i++){
-      const x=(i*83+31)%512,y=(i*47+22)%256,r=12+(i%4)*7;
-      wallCtx.fillStyle=i%2===0?"rgba(255,255,255,.50)":"rgba(255,229,173,.58)";
-      wallCtx.beginPath();wallCtx.arc(x,y,r,0,Math.PI*2);wallCtx.fill();
+    wallCtx.fillStyle="rgba(255,255,255,.22)";wallCtx.fillRect(0,28,1024,5);wallCtx.fillRect(0,479,1024,7);
+    for(let i=0;i<38;i++){
+      const x=(i*173+71)%1024,y=(i*97+39)%512,r=10+(i%6)*7;
+      wallCtx.beginPath();wallCtx.arc(x,y,r,0,Math.PI*2);
+      wallCtx.fillStyle=i%3===0?"rgba(255,255,255,.22)":"rgba(244,190,139,.18)";wallCtx.fill();
+    }
+    for(let i=0;i<9000;i++){
+      const v=fabricRandom();
+      wallCtx.fillStyle=v>.52?"rgba(255,255,255,.055)":"rgba(45,55,48,.045)";
+      wallCtx.fillRect(fabricRandom()*1024,fabricRandom()*512,.6+fabricRandom()*1.2,.6+fabricRandom()*1.2);
     }
     const wallTexture=new THREE.CanvasTexture(wallCanvas);
-    wallTexture.colorSpace=THREE.SRGBColorSpace;
-    wallTexture.wrapS=THREE.RepeatWrapping;
-    wallTexture.wrapT=THREE.RepeatWrapping;
-    wallTexture.repeat.set(5,2);
-    const wallMaterial=new THREE.MeshStandardMaterial({map:wallTexture,roughness:.82});
+    wallTexture.colorSpace=THREE.SRGBColorSpace;wallTexture.wrapS=wallTexture.wrapT=THREE.RepeatWrapping;
+    wallTexture.repeat.set(5,2);wallTexture.anisotropy=Math.min(this.maxAnisotropy,8);
+    const wallBumpCanvas=document.createElement("canvas");
+    wallBumpCanvas.width=1024;wallBumpCanvas.height=512;
+    const wallBumpCtx=wallBumpCanvas.getContext("2d");
+    wallBumpCtx.fillStyle="#808080";wallBumpCtx.fillRect(0,0,1024,512);
+    for(let i=0;i<18000;i++){
+      const v=116+Math.floor(fabricRandom()*32);
+      wallBumpCtx.fillStyle="rgb("+v+","+v+","+v+")";
+      wallBumpCtx.fillRect(fabricRandom()*1024,fabricRandom()*512,1,1);
+    }
+    wallBumpCtx.strokeStyle="rgba(240,240,240,.4)";wallBumpCtx.lineWidth=2;
+    for(let x=0;x<=1024;x+=205){wallBumpCtx.beginPath();wallBumpCtx.moveTo(x,0);wallBumpCtx.lineTo(x,512);wallBumpCtx.stroke();}
+    const wallBump=new THREE.CanvasTexture(wallBumpCanvas);
+    wallBump.wrapS=wallBump.wrapT=THREE.RepeatWrapping;wallBump.repeat.set(5,2);
+    const wallMaterial=new THREE.MeshStandardMaterial({map:wallTexture,bumpMap:wallBump,bumpScale:.045,roughness:.93});
+
+    // Ceiling tiles have proper panel bevels, fasteners and slight staining.
     const ceilingCanvas=document.createElement("canvas");
-    ceilingCanvas.width=256;ceilingCanvas.height=256;
+    ceilingCanvas.width=ceilingCanvas.height=512;
     const ceilingCtx=ceilingCanvas.getContext("2d");
-    ceilingCtx.fillStyle="#f1e9db";ceilingCtx.fillRect(0,0,256,256);
-    for(let i=0;i<32;i++){
-      ceilingCtx.fillStyle=i%2===0?"rgba(245,151,184,.22)":"rgba(105,190,194,.20)";
-      ceilingCtx.fillRect((i*47)%256,(i*71)%256,18+(i%3)*12,3);
+    ceilingCtx.fillStyle="#ddd9cf";ceilingCtx.fillRect(0,0,512,512);
+    const tileSize=128;
+    for(let ty=0;ty<4;ty++)for(let tx=0;tx<4;tx++){
+      const x=tx*tileSize,y=ty*tileSize,shade=178+((tx*7+ty*11)%13);
+      ceilingCtx.fillStyle="rgb("+shade+","+(shade-3)+","+(shade-13)+")";
+      ceilingCtx.fillRect(x+4,y+4,tileSize-8,tileSize-8);
+      const bevel=ceilingCtx.createLinearGradient(x,y,x+tileSize,y+tileSize);
+      bevel.addColorStop(0,"rgba(255,255,255,.42)");bevel.addColorStop(.48,"rgba(255,255,255,.02)");bevel.addColorStop(1,"rgba(35,34,31,.28)");
+      ceilingCtx.fillStyle=bevel;ceilingCtx.fillRect(x+4,y+4,tileSize-8,tileSize-8);
+      ceilingCtx.fillStyle="rgba(35,34,31,.34)";ceilingCtx.fillRect(x,y,tileSize,4);ceilingCtx.fillRect(x,y,4,tileSize);
+      ceilingCtx.fillStyle="rgba(245,243,231,.44)";ceilingCtx.fillRect(x+4,y+4,tileSize-8,2);ceilingCtx.fillRect(x+4,y+4,2,tileSize-8);
+      for(const [sx,sy] of [[12,12],[tileSize-12,12],[12,tileSize-12],[tileSize-12,tileSize-12]]){
+        ceilingCtx.beginPath();ceilingCtx.arc(x+sx,y+sy,2.2,0,Math.PI*2);
+        ceilingCtx.fillStyle="rgba(70,70,65,.30)";ceilingCtx.fill();
+      }
+    }
+    for(let i=0;i<28;i++){
+      const x=fabricRandom()*512,y=fabricRandom()*512,r=5+fabricRandom()*25;
+      const stain=ceilingCtx.createRadialGradient(x,y,0,x,y,r);
+      stain.addColorStop(0,"rgba(99,91,70,.12)");stain.addColorStop(1,"rgba(99,91,70,0)");
+      ceilingCtx.fillStyle=stain;ceilingCtx.fillRect(x-r,y-r,r*2,r*2);
     }
     const ceilingTexture=new THREE.CanvasTexture(ceilingCanvas);
-    ceilingTexture.colorSpace=THREE.SRGBColorSpace;
-    ceilingTexture.wrapS=THREE.RepeatWrapping;
-    ceilingTexture.wrapT=THREE.RepeatWrapping;
+    ceilingTexture.colorSpace=THREE.SRGBColorSpace;ceilingTexture.wrapS=ceilingTexture.wrapT=THREE.RepeatWrapping;
     ceilingTexture.repeat.set(5,3);
-    const ceilingMaterial=new THREE.MeshStandardMaterial({
-      map:ceilingTexture,roughness:.95,side:THREE.DoubleSide
-    });
+    const ceilingMaterial=new THREE.MeshStandardMaterial({map:ceilingTexture,roughness:.96,side:THREE.DoubleSide});
     const frameMat=mat(0x47536f,.76,.08);
     const darkPlastic=mat(0x39435c,.8,.04);
-    const slidePink=mat(0xf56c9e,.36,.04);
-    const slideBlue=mat(0x61cce6,.32,.04);
+    const slidePink=mat(0xf56c9e,.31,.04);
+    const slideBlue=mat(0x61cce6,.28,.04);
     const stageMat=mat(0xffc96a,.5,0,0x754313,.12);
     const exitGlow=mat(0x93f0b4,.28,0,0x31d978,.9);
     const buttonMat=mat(0xffdf68,.30,0,0xff9d22,1.35);
-
     const addBox=(name,sx,sy,sz,x,y,z,material,host=group)=>{
-      const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
+      const rounded=/PlayCentre(?:ColourTile|WallPad|WallBumper|RaisedDeck|UpperDeckMat|SafetyRail|BallPit|FoamBlock|FoamRoller|Showtime|MascotDisplayStage)/.test(name);
+      const bevel=Math.min(.075,sx*.22,sy*.22,sz*.22);
+      const geometry=rounded&&bevel>.004?new RoundedBoxGeometry(sx,sy,sz,3,bevel):new THREE.BoxGeometry(sx,sy,sz);
+      const mesh=new THREE.Mesh(geometry,material);
       mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;
       mesh.receiveShadow=true;mesh.userData.fixtureLightOccluder=true;
       host.add(mesh);return mesh;
     };
     const addSphere=(name,r,x,y,z,material,scale=null,host=group)=>{
-      const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),material);
+      const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,32,24),material);
       mesh.name=name;mesh.position.set(x,y,z);
       if(scale)mesh.scale.set(scale[0],scale[1],scale[2]);
       mesh.castShadow=false;mesh.receiveShadow=true;host.add(mesh);return mesh;
     };
     const addCylinder=(name,rTop,rBottom,height,x,y,z,material,host=group)=>{
-      const mesh=new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBottom,height,14),material);
+      const mesh=new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBottom,height,28),material);
       mesh.name=name;mesh.position.set(x,y,z);
       mesh.castShadow=false;mesh.receiveShadow=true;host.add(mesh);return mesh;
     };
@@ -602,7 +710,7 @@ export class World {
       const end=new THREE.Vector3(b[0],b[1],b[2]);
       const direction=end.clone().sub(start);
       const mesh=new THREE.Mesh(
-        new THREE.CylinderGeometry(radius,radius,direction.length(),12),material
+        new THREE.CylinderGeometry(radius,radius,direction.length(),24),material
       );
       mesh.name=name;mesh.position.copy(start).add(end).multiplyScalar(.5);
       mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
@@ -616,8 +724,8 @@ export class World {
     };
     const addSlide=(name,points,material,radius=.42)=>{
       const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
-      const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,42,radius,12,false),material);
-      mesh.name=name;mesh.castShadow=false;mesh.receiveShadow=true;group.add(mesh);
+      const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,72,radius,18,false),material);
+      mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;propHost.add(mesh);
       return mesh;
     };
 
@@ -644,6 +752,26 @@ export class World {
       const wallSection=this.maintenanceRoomGroup?.getObjectByName(name);
       if(wallSection)wallSection.material=wallMaterial;
     }
+
+    const signCanvas=document.createElement("canvas");
+    signCanvas.width=1024;signCanvas.height=256;
+    const signCtx=signCanvas.getContext("2d");
+    const signGradient=signCtx.createLinearGradient(0,0,1024,256);
+    signGradient.addColorStop(0,"#e888a9");signGradient.addColorStop(.48,"#eabf68");signGradient.addColorStop(1,"#6db7ba");
+    signCtx.fillStyle="#282c3a";signCtx.fillRect(0,0,1024,256);
+    signCtx.fillStyle=signGradient;signCtx.fillRect(12,12,1000,232);
+    signCtx.strokeStyle="rgba(255,255,255,.72)";signCtx.lineWidth=8;signCtx.strokeRect(24,24,976,208);
+    signCtx.textAlign="center";signCtx.textBaseline="middle";signCtx.font="900 102px system-ui, sans-serif";
+    signCtx.fillStyle="#fff5df";signCtx.shadowColor="rgba(28,22,34,.55)";signCtx.shadowBlur=12;
+    signCtx.fillText("HAPPY HOLLOW",512,106);
+    signCtx.shadowBlur=0;signCtx.font="600 28px system-ui, sans-serif";signCtx.fillStyle="#2c3543";
+    signCtx.fillText("PLAY • LAUGH • STAY AWHILE",512,187);
+    const signTexture=new THREE.CanvasTexture(signCanvas);signTexture.colorSpace=THREE.SRGBColorSpace;
+    const signFrame=new THREE.Mesh(new THREE.BoxGeometry(8.55,2.22,.16),frameMat);
+    signFrame.name="PlayCentreFeatureSignFrame";signFrame.position.set(centerX,2.83,backZ+.17);group.add(signFrame);
+    const signMesh=new THREE.Mesh(new THREE.PlaneGeometry(8.25,1.92),
+      new THREE.MeshStandardMaterial({map:signTexture,roughness:.78,emissive:0x292018,emissiveIntensity:.22}));
+    signMesh.name="PlayCentreFeatureSign";signMesh.position.set(centerX,2.83,backZ+.263);group.add(signMesh);
 
     // Soft, colourful floor tiles break up the large space without cluttering it.
     addBox("PlayCentrePaddedFloor",roomWidth-.55,.08,depth-.55,centerX,-.055,midZ,foam);
@@ -709,15 +837,18 @@ export class World {
         lightStrip,[1,1,1]);
       const light=new THREE.PointLight(
         [0xffc8d9,0xffe2a0,0x9debd7,0x9cddff,0xc7b6ff,0xffd0a6][lightIndex],
-        0,12,1.65
+        0,17,1.55
       );
       light.name="PlayCentreColourLight";
       light.position.set(x,3.16,z);light.visible=false;light.castShadow=false;
       group.add(light);
-      this.breakerRoomLights.push({light,baseIntensity:2.3,phase:lightIndex*.67});
+      this.breakerRoomLights.push({light,baseIntensity:2.65,phase:lightIndex*.67});
       if(lightIndex===0)this.breakerRoomLightMaterial=globe.material;
     }
 
+    // Keep the hand-built scene as an offline fallback. It is hidden only after
+    // every production model loads, so the room never appears half-built.
+    propHost=equipmentProxyRoot;
     // A two-level climbing frame with padded columns, bridges, ladders and slides.
     for(const side of [-1,1]){
       const frameX=centerX+side*5.4,frameZ=midZ-1.0;
@@ -819,56 +950,107 @@ export class World {
     const rainbow=new THREE.Mesh(new THREE.TubeGeometry(archCurve,40,.14,10,false),coral);
     rainbow.name="PlayCentreRainbowArch";group.add(rainbow);
 
-    // The large mascot looks like a cheerful display character until it moves.
+    // The mascot remains custom and animated; only the playground props are replaced.
+    propHost=group;
+
+    // Custom soft-play mascot: oversized plush head, stitched torso and padded limbs.
     const mascotRoot=new THREE.Group();
     mascotRoot.name="PlayCentreMascot";
     mascotRoot.position.set(centerX+8.0,0,backZ+6.2);
     group.add(mascotRoot);
-    const mascotBody=addSphere("MascotBody",.58,0,1.32,0,cyan,[.88,1.38,.72],mascotRoot);
-    const belly=addSphere("MascotBelly",.43,0,1.30,.45,yellow,[.92,1.12,.24],mascotRoot);
+    const mascotBodyMaterial=mat(0x55a9bb,.96,0,0,0,true);
+    const mascotHeadMaterial=mat(0xe38aaa,.95,0,0,0,true);
+    const mascotLimbMaterial=mat(0x4e9fb2,.96,0,0,0,true);
+    const mascotPatchMaterial=mat(0xf5e6c9,.98,0,0,0,true);
+    const mascotTrimMaterial=mat(0x7b6cb2,.95,0,0,0,true);
+    const glossy=new THREE.MeshPhysicalMaterial({color:0x211622,roughness:.12,metalness:0,clearcoat:.9,clearcoatRoughness:.08});
+    addSphere("MascotBody",.64,0,1.27,0,mascotBodyMaterial,[1.0,1.42,.80],mascotRoot);
+    addSphere("MascotBelly",.47,0,1.23,.48,mascotPatchMaterial,[1.05,1.18,.24],mascotRoot);
+    const bellySeamCurve=new THREE.EllipseCurve(0,0,.42,.51,0,Math.PI*2,false,0);
+    const bellySeam=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(bellySeamCurve.getPoints(64)),64,.018,8,false),mascotTrimMaterial);
+    bellySeam.name="MascotBellyStitch";bellySeam.position.set(0,1.24,.695);mascotRoot.add(bellySeam);
+
     const mascotHead=new THREE.Group();
-    mascotHead.name="MascotHead";mascotHead.position.set(0,2.53,.02);
-    mascotRoot.add(mascotHead);
-    addSphere("MascotHeadShape",.77,0,0,0,pink,[1.06,.94,.91],mascotHead);
-    addSphere("MascotMuzzle",.38,0,-.22,.63,cream,[1.15,.72,.48],mascotHead);
-    addSphere("MascotNose",.13,0,-.12,.91,coral,[1.12,.78,.66],mascotHead);
+    mascotHead.name="MascotHead";mascotHead.position.set(0,2.52,.02);mascotRoot.add(mascotHead);
+    addSphere("MascotHeadShape",.82,0,0,0,mascotHeadMaterial,[1.12,1.02,.96],mascotHead);
+    addSphere("MascotForeheadPatch",.37,0,.52,.48,mascotPatchMaterial,[1.12,.48,.22],mascotHead);
+    addSphere("MascotMuzzleLeft",.27,-.20,-.20,.70,mascotPatchMaterial,[1.12,.83,.52],mascotHead);
+    addSphere("MascotMuzzleRight",.27,.20,-.20,.70,mascotPatchMaterial,[1.12,.83,.52],mascotHead);
+    const mascotNose=addSphere("MascotNose",.145,0,-.11,.99,coral,[1.12,.78,.74],mascotHead);
+    mascotNose.material=mat(0xff6f82,.22,0,0x2b0810,.08);
+    addSphere("MascotMouth",.23,0,-.43,.80,dark,[1.42,.67,.30],mascotHead);
+    addBox("MascotFrontToothLeft",.13,.17,.07,-.105,-.40,1.005,white,mascotHead);
+    addBox("MascotFrontToothRight",.13,.17,.07,.105,-.40,1.005,white,mascotHead);
+    const mascotEyeIris=[];
+    const browMaterial=mat(0x68405d,.94,0,0,0,true);
     for(const side of [-1,1]){
-      addSphere("MascotEar",.30,side*.53,.70,-.02,purple,[.66,1.55,.58],mascotHead);
-      addSphere("MascotInnerEar",.15,side*.53,.72,.28,pink,[.52,1.45,.30],mascotHead);
-      addSphere("MascotEyeWhite",.19,side*.29,.13,.70,white,[1,1,.48],mascotHead);
-      addSphere("MascotEyePupil",.105,side*.29,.11,.89,dark,[.85,1,.55],mascotHead);
-      addSphere("MascotCheek",.14,side*.49,-.22,.71,coral,[1,.78,.40],mascotHead);
+      const ear=new THREE.Group();ear.name=side<0?"MascotLeftEar":"MascotRightEar";
+      ear.position.set(side*.58,.60,-.02);ear.rotation.z=side<0?-.22:.16;mascotHead.add(ear);
+      addSphere("MascotEarOuter",.31,0,.48,0,mascotTrimMaterial,[.72,1.92,.62],ear);
+      addSphere("MascotEarInner",.19,0,.49,.16,mascotHeadMaterial,[.62,1.55,.40],ear);
+      addSphere("MascotEarTip",.13,0,.86,.02,mascotPatchMaterial,[.48,.72,.46],ear);
+      addSphere("MascotEyeSocket",.255,side*.31,.12,.66,mascotTrimMaterial,[1.08,1.18,.40],mascotHead);
+      addSphere("MascotEyeWhite",.205,side*.31,.12,.77,white,[1,1.08,.45],mascotHead);
+      const irisMaterial=new THREE.MeshStandardMaterial({color:0xe9b74e,roughness:.24,emissive:0x241100,emissiveIntensity:.16});
+      mascotEyeIris.push(irisMaterial);
+      addSphere("MascotEyeIris",.125,side*.31,.105,.875,irisMaterial,[1,1,.42],mascotHead);
+      addSphere("MascotEyePupil",.072,side*.31,.09,.923,glossy,[1,1,.38],mascotHead);
+      addSphere("MascotEyeCatchlight",.042,side*.275,.165,.95,white,[1,1,.45],mascotHead);
+      addSphere("MascotCheek",.145,side*.54,-.24,.70,coral,[1.1,.8,.38],mascotHead);
+      const browCurve=new THREE.CatmullRomCurve3([
+        new THREE.Vector3(side*.53,.36,.76),new THREE.Vector3(side*.34,.45,.82),new THREE.Vector3(side*.15,.39,.84)
+      ]);
+      const brow=new THREE.Mesh(new THREE.TubeGeometry(browCurve,20,.045,10,false),browMaterial);
+      brow.name="MascotEyebrow";mascotHead.add(brow);
     }
     const smileCurve=new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-.30,-.40,.92),
-      new THREE.Vector3(-.12,-.51,1.02),
-      new THREE.Vector3(.10,-.51,1.02),
-      new THREE.Vector3(.30,-.40,.92)
+      new THREE.Vector3(-.34,-.40,.91),new THREE.Vector3(-.20,-.49,1.00),
+      new THREE.Vector3(0,-.53,1.035),new THREE.Vector3(.20,-.49,1.00),new THREE.Vector3(.34,-.40,.91)
     ]);
-    const smile=new THREE.Mesh(new THREE.TubeGeometry(smileCurve,18,.035,7,false),dark);
+    const smile=new THREE.Mesh(new THREE.TubeGeometry(smileCurve,36,.028,10,false),glossy);
     smile.name="MascotSmile";mascotHead.add(smile);
+
+    const addMascotCapsule=(name,a,b,radius,material,host)=>{
+      const start=new THREE.Vector3(a[0],a[1],a[2]),end=new THREE.Vector3(b[0],b[1],b[2]);
+      const direction=end.clone().sub(start),length=direction.length();
+      const capsule=new THREE.Mesh(new THREE.CapsuleGeometry(radius,Math.max(.01,length-radius*2),8,24),material);
+      capsule.name=name;capsule.position.copy(start).add(end).multiplyScalar(.5);
+      capsule.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
+      capsule.castShadow=true;capsule.receiveShadow=true;host.add(capsule);return capsule;
+    };
     const mascotArms=[];
     for(const side of [-1,1]){
-      const arm=new THREE.Group();
-      arm.name=side<0?"MascotLeftArm":"MascotRightArm";
-      arm.position.set(side*.48,1.88,0);
-      mascotRoot.add(arm);
-      addLink("MascotUpperArm",[0,0,0],[side*.12,-.70,.05],.19,pink,arm);
-      addSphere("MascotElbow",.22,side*.12,-.70,.05,coral,null,arm);
-      addLink("MascotForearm",[side*.12,-.70,.05],[side*.25,-1.30,.17],.16,pink,arm);
-      addSphere("MascotHand",.30,side*.25,-1.38,.20,yellow,[1.15,.88,.72],arm);
-      for(let finger=0;finger<3;finger++){
-        addSphere("MascotFinger",.105,
-          side*.25+(finger-1)*.15,-1.57,.28,yellow,[1,.72,1],arm);
+      const arm=new THREE.Group();arm.name=side<0?"MascotLeftArm":"MascotRightArm";
+      arm.position.set(side*.52,1.88,.02);mascotRoot.add(arm);
+      addMascotCapsule("MascotUpperArm",[0,0,0],[side*.13,-.68,.08],.19,mascotLimbMaterial,arm);
+      addSphere("MascotElbow",.205,side*.13,-.68,.08,coral,null,arm);
+      addMascotCapsule("MascotForearm",[side*.13,-.68,.08],[side*.28,-1.28,.18],.165,mascotHeadMaterial,arm);
+      const cuff=addCylinder("MascotWristCuff",.17,.17,.13,side*.28,-1.24,.18,cream,arm);
+      cuff.rotation.z=side*.12;
+      addSphere("MascotHand",.31,side*.28,-1.43,.20,yellow,[1.18,.92,.80],arm);
+      for(let finger=0;finger<4;finger++){
+        addSphere("MascotFinger",.085,side*.28+(finger-1.5)*.13,-1.60,.28,yellow,[.9,1.0,.9],arm);
       }
       mascotArms.push(arm);
     }
     for(const side of [-1,1]){
-      addLink("MascotLeg",[side*.24,.78,0],[side*.31,.18,.08],.21,purple,mascotRoot);
-      addSphere("MascotShoe",.30,side*.31,.13,.22,coral,[1.25,.58,1.5],mascotRoot);
+      addMascotCapsule("MascotLeg",[side*.25,.80,0],[side*.31,.22,.09],.22,mascotTrimMaterial,mascotRoot);
+      const shoe=addBox("MascotShoe",.66,.28,.84,side*.34,.14,.28,coral,mascotRoot);
+      shoe.rotation.y=side*.10;
+      addSphere("MascotShoeToe",.24,side*.34,.12,.62,yellow,[1.25,.68,1.35],mascotRoot);
     }
-    addSphere("MascotChestBadge",.16,0,1.70,.55,white,[1,1,.25],mascotRoot);
-
+    addSphere("MascotTail",.23,0,.95,-.56,mascotPatchMaterial,[1.12,1,.84],mascotRoot);
+    addSphere("MascotChestBadge",.19,0,1.71,.67,yellow,[1,1,.32],mascotRoot);
+    const badgeCanvas=document.createElement("canvas");badgeCanvas.width=badgeCanvas.height=128;
+    const badgeCtx=badgeCanvas.getContext("2d");
+    badgeCtx.fillStyle="#e9b957";badgeCtx.fillRect(0,0,128,128);
+    badgeCtx.strokeStyle="#fff2d1";badgeCtx.lineWidth=9;badgeCtx.strokeRect(8,8,112,112);
+    badgeCtx.fillStyle="#3f4b61";badgeCtx.font="900 78px system-ui";badgeCtx.textAlign="center";badgeCtx.textBaseline="middle";
+    badgeCtx.fillText("H",64,65);
+    const badgeTexture=new THREE.CanvasTexture(badgeCanvas);badgeTexture.colorSpace=THREE.SRGBColorSpace;
+    const badgeFace=new THREE.Mesh(new THREE.PlaneGeometry(.34,.34),
+      new THREE.MeshStandardMaterial({map:badgeTexture,roughness:.52,emissive:0x201500,emissiveIntensity:.16}));
+    badgeFace.name="MascotBadgeLetter";badgeFace.position.set(0,1.71,.77);mascotRoot.add(badgeFace);
     // A large showtime plunger starts the encounter and releases the far exit.
     const buttonRoot=new THREE.Group();
     buttonRoot.name="PlayCentreShowtimeButton";
@@ -904,12 +1086,47 @@ export class World {
       minX:leftX+1.3,maxX:rightX-1.3,
       minZ:backZ+1.3,maxZ:partitionZ-1.3,
       monsterRoot:mascotRoot,monsterHead:mascotHead,mascotArms,
+      mascotEyes:mascotEyeIris,
       buttonRoot,button,buttonGlow,
       started:false,sequenceActive:false,escaped:false,
       playerEntered:false,elapsed:0
     };
     this.breakerRoomAlarmMaterial=buttonMat;
     this.breakerRoomBeacon=null;
+    this.loadPlayCentreModels({
+      parent:group,proxyRoot:equipmentProxyRoot,assetRoot:modelAssetRoot,
+      centerX,midZ,partitionZ,pitX,pitZ
+    });
+  }
+
+  loadPlayCentreModels({parent,proxyRoot,assetRoot,centerX,midZ,partitionZ,pitX,pitZ}){
+    const modelKeys=["tower","ballPit","foamPit","crawlTunnel","stepBlocks"];
+    Promise.all(modelKeys.map(key=>loadPlayCentreModelScene(key))).then(models=>{
+      if(!parent.parent)return;
+      const [tower,ballPit,foamPit,crawlTunnel,stepBlocks]=models;
+      const addModel=(source,name,x,y,z,scale,rotationY=0)=>{
+        const instance=source.clone(true);
+        instance.name=name;instance.position.set(x,y,z);instance.rotation.y=rotationY;
+        instance.scale.setScalar(scale);
+        instance.traverse(node=>{
+          if(!node.isMesh)return;
+          node.castShadow=true;node.receiveShadow=true;node.frustumCulled=true;
+        });
+        assetRoot.add(instance);
+      };
+      addModel(tower,"PlayCentreTowerLeft",centerX-5.25,0,midZ-1.6,1.10,0);
+      addModel(tower,"PlayCentreTowerRight",centerX+5.25,0,midZ-1.6,1.10,Math.PI);
+      addModel(ballPit,"PlayCentreBallPitModel",pitX,0,pitZ,1.45,0);
+      addModel(foamPit,"PlayCentreFoamPitModel",centerX+8.25,0,midZ+5.35,1.08,0);
+      addModel(crawlTunnel,"PlayCentreCrawlTunnelModel",centerX-7.6,0,midZ+.75,1.15,Math.PI*.5);
+      addModel(stepBlocks,"PlayCentrePaddedStepBlocks",centerX+.15,0,partitionZ-7.15,1.18,0);
+      assetRoot.visible=true;proxyRoot.visible=false;
+      parent.userData.playCentreProductionAssetsLoaded=true;
+      console.info("[DeepSeeker] Indoor play-centre GLB assets loaded.");
+    }).catch(error=>{
+      assetRoot.visible=false;proxyRoot.visible=true;
+      console.warn("[DeepSeeker] Play-centre models unavailable; keeping the local fallback props.",error);
+    });
   }
 
   startPlayCentreEncounter(){
@@ -923,6 +1140,10 @@ export class World {
       state.centerX+8.0,0,state.backZ+6.2
     );
     state.monsterHead.rotation.set(0,0,0);
+    state.mascotEyes?.forEach(iris=>{
+      iris.emissive.setHex(0xa71b34);
+      iris.emissiveIntensity=1.25;
+    });
     if(state.button){
       state.button.position.y=.88;
       state.button.material.color.setHex(0xf58ab4);
@@ -1084,6 +1305,10 @@ export class World {
         this.playCentreState.button.material.color.setHex(0xffdf68);
       }
       if(this.playCentreState.buttonGlow)this.playCentreState.buttonGlow.intensity=1.1;
+      this.playCentreState.mascotEyes?.forEach(iris=>{
+        iris.emissive.setHex(0x241100);
+        iris.emissiveIntensity=.16;
+      });
     }
   }
 
