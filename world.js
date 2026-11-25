@@ -46,15 +46,18 @@ const ROOM_DOOR_HEIGHT=2.85;
 const ROOM_WALL_THICKNESS=0.24;
 const ROOM_HEIGHT=3.35;
 const OUTER_ROOM_DOOR=Object.freeze({cx:-2,cz:-3,localX:12});
-const BREAKER_MATH_PROBLEMS=Object.freeze([
-  Object.freeze({index:1,expression:"18 ÷ 3",answer:6}),
-  Object.freeze({index:2,expression:"4 + 5",answer:9}),
-  Object.freeze({index:3,expression:"3 × 4",answer:12}),
-  Object.freeze({index:4,expression:"20 − 7",answer:13}),
-  Object.freeze({index:5,expression:"16 ÷ 2",answer:8}),
-  Object.freeze({index:6,expression:"30 ÷ 6",answer:5}),
-  Object.freeze({index:7,expression:"7 + 8",answer:15}),
-  Object.freeze({index:8,expression:"5 × 4",answer:20}),
+// Each physical meter has a different reading. Players compare the needles
+// and switch the cabinets from the lowest reading to the highest; no written
+// equations, labels or instruction boards are placed in the room.
+const BREAKER_METER_READINGS=Object.freeze([
+  Object.freeze({index:1,reading:3}),
+  Object.freeze({index:2,reading:4.5}),
+  Object.freeze({index:3,reading:6}),
+  Object.freeze({index:4,reading:7.5}),
+  Object.freeze({index:5,reading:4}),
+  Object.freeze({index:6,reading:2}),
+  Object.freeze({index:7,reading:8.5}),
+  Object.freeze({index:8,reading:10}),
 ]);
 
 function isProtectedRouteCell(gx,gz){
@@ -355,32 +358,6 @@ export class World {
     this.roomDoorTrimMaterial=new THREE.MeshStandardMaterial({color:0x484b43,roughness:0.9,metalness:0.08});
     this.roomDoorMetalMaterial=new THREE.MeshStandardMaterial({color:0x77786f,roughness:0.68,metalness:0.34});
     this.roomDoorGlassMaterial=new THREE.MeshStandardMaterial({color:0x27312f,roughness:0.3,metalness:0.05});
-    // Old enamel service plate: restrained lettering, screw heads and chipped paint
-    // make it read like building hardware instead of a clean UI label.
-    const signCanvas=document.createElement("canvas");
-    signCanvas.width=256;signCanvas.height=96;
-    const signCtx=signCanvas.getContext("2d");
-    signCtx.fillStyle="#51433a";signCtx.fillRect(0,0,256,96);
-    signCtx.fillStyle="#65564a";signCtx.fillRect(8,8,240,80);
-    signCtx.fillStyle="#403a32";signCtx.fillRect(14,14,228,68);
-    signCtx.fillStyle="#b9ad91";signCtx.font="bold 27px Arial, sans-serif";
-    signCtx.textAlign="left";signCtx.textBaseline="middle";signCtx.fillText("SERVICE",28,39);
-    signCtx.fillStyle="#aaa087";signCtx.font="11px Arial, sans-serif";
-    signCtx.fillText("AUTHORIZED PERSONNEL",29,62);
-    signCtx.fillStyle="#302c27";
-    for(const [x,y] of [[13,13],[243,13],[13,83],[243,83]]){
-      signCtx.beginPath();signCtx.arc(x,y,4,0,Math.PI*2);signCtx.fill();
-      signCtx.fillStyle="#928675";signCtx.fillRect(x-2,y-1,4,1);signCtx.fillStyle="#302c27";
-    }
-    signCtx.globalAlpha=.32;signCtx.fillStyle="#c0b49a";
-    for(let i=0;i<34;i++){
-      const x=(i*47+13)%250,y=(i*29+7)%90;
-      signCtx.fillRect(x,y,1+(i%4),1);
-    }
-    signCtx.globalAlpha=1;
-    const signTexture=new THREE.CanvasTexture(signCanvas);
-    signTexture.colorSpace=THREE.SRGBColorSpace;
-    this.roomDoorSignMaterial=new THREE.MeshStandardMaterial({map:signTexture,roughness:0.96,metalness:0.12,side:THREE.DoubleSide});
     this.breakerRoomLightMaterial=new THREE.MeshStandardMaterial({
       color:0x353328,emissive:0x000000,emissiveIntensity:0,roughness:0.4
     });
@@ -388,7 +365,7 @@ export class World {
     this.roomDoors=[];
     this.breakerSwitches=[];
     this.breakerProgress=0;
-    this.breakerSequence=BREAKER_MATH_PROBLEMS.slice().sort((a,b)=>a.answer-b.answer).map(problem=>problem.index);
+    this.breakerSequence=BREAKER_METER_READINGS.slice().sort((a,b)=>a.reading-b.reading).map(meter=>meter.index);
     this.breakerFailTimer=0;
     this.maintenanceDoor=null;
     this.maintenancePuzzleType="breakers";
@@ -399,36 +376,54 @@ export class World {
     this.breakerRoomBounds=[];
     this.maintenanceRoomGroup=null;
 
-    // Plain phenolic-style instruction label: small, flat, high contrast.
-    // The physical plate below is deliberately close to the wall surface.
-    const breakerCanvas=document.createElement("canvas");
-    breakerCanvas.width=512;breakerCanvas.height=128;
-    const breakerCtx=breakerCanvas.getContext("2d");
-    breakerCtx.fillStyle="#252823";breakerCtx.fillRect(0,0,512,128);
-    breakerCtx.fillStyle="#deddd2";breakerCtx.textAlign="left";breakerCtx.textBaseline="middle";
-    breakerCtx.font="bold 31px Arial, sans-serif";
-    breakerCtx.fillText("BREAKER RESET",24,43);
-    breakerCtx.font="22px Arial, sans-serif";
-    breakerCtx.fillText("LOWEST VALUE FIRST",24,88);
-    const breakerTexture=new THREE.CanvasTexture(breakerCanvas);
-    breakerTexture.colorSpace=THREE.SRGBColorSpace;
-    this.breakerNoteMaterial=new THREE.MeshBasicMaterial({map:breakerTexture,side:THREE.DoubleSide,toneMapped:false});
     this.breakerPanelMaterial=new THREE.MeshStandardMaterial({color:0x35372f,roughness:0.83,metalness:0.08});
     this.breakerHandleMaterial=new THREE.MeshStandardMaterial({color:0x97988a,roughness:0.7,metalness:0.25});
     this.breakerLampOffMaterial=new THREE.MeshStandardMaterial({color:0x4d2822,emissive:0x40100a,emissiveIntensity:0.35});
     this.breakerLampOnMaterial=new THREE.MeshStandardMaterial({color:0x9bd78b,emissive:0x42ff40,emissiveIntensity:1.15});
-    this.breakerMathLabelMaterials=[];
-    for(const problem of BREAKER_MATH_PROBLEMS){
-      const canvas=document.createElement("canvas");canvas.width=384;canvas.height=128;
+    this.breakerGaugeMaterials=[];
+    for(const meter of BREAKER_METER_READINGS){
+      const canvas=document.createElement("canvas");
+      canvas.width=256;canvas.height=256;
       const ctx=canvas.getContext("2d");
-      // Simple equipment label, like an engraved panel legend: no faux wear,
-      // nested borders, decorative stripes or extra filler text.
-      ctx.fillStyle="#242622";ctx.fillRect(0,0,384,128);
-      ctx.fillStyle="#e0dfd4";ctx.font="bold 42px Arial, sans-serif";
-      ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.fillText(problem.expression,192,64);
-      const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-      this.breakerMathLabelMaterials.push(new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,toneMapped:false}));
+      const cx=128,cy=128;
+      ctx.clearRect(0,0,256,256);
+      ctx.fillStyle="#0d1512";
+      ctx.beginPath();ctx.arc(cx,cy,119,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle="rgba(104,139,119,.5)";
+      ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(cx,cy,111,0,Math.PI*2);ctx.stroke();
+      const start=Math.PI*.75,sweep=Math.PI*1.5;
+      ctx.strokeStyle="rgba(125,165,143,.86)";
+      ctx.lineCap="square";
+      for(let tick=0;tick<=10;tick++){
+        const angle=start+sweep*(tick/10);
+        const inner=tick%2===0?82:90;
+        const outer=101;
+        ctx.lineWidth=tick%2===0?4:2;
+        ctx.beginPath();
+        ctx.moveTo(cx+Math.cos(angle)*inner,cy+Math.sin(angle)*inner);
+        ctx.lineTo(cx+Math.cos(angle)*outer,cy+Math.sin(angle)*outer);
+        ctx.stroke();
+      }
+      const angle=start+sweep*(meter.reading/10);
+      const needleX=cx+Math.cos(angle)*75;
+      const needleY=cy+Math.sin(angle)*75;
+      ctx.strokeStyle="#e6aa56";
+      ctx.lineWidth=7;
+      ctx.lineCap="round";
+      ctx.shadowColor="rgba(218,148,68,.6)";
+      ctx.shadowBlur=8;
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(needleX,needleY);ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.fillStyle="#e6aa56";
+      ctx.beginPath();ctx.arc(cx,cy,10,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#202c27";
+      ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fill();
+      const texture=new THREE.CanvasTexture(canvas);
+      texture.colorSpace=THREE.SRGBColorSpace;
+      this.breakerGaugeMaterials.push(
+        new THREE.MeshBasicMaterial({map:texture,transparent:true,side:THREE.DoubleSide,toneMapped:false})
+      );
     }
     // Ceiling fixtures use a tiny real-light budget. They only activate when
     // the player's camera is actually looking toward them.
@@ -700,11 +695,6 @@ export class World {
     this.breakerRoomDoor=this.buildRoomDoor(group,centerX,partitionZ,{
       doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:false,ownerChunk:null
     },this.breakerRoomBounds);
-    // The visual story is told by the room itself, not generic service plates.
-    const breakerDoorPlate=this.breakerRoomDoor.group.getObjectByName("RoomDoorServicePlate");
-    if(breakerDoorPlate)breakerDoorPlate.visible=false;
-    const maintenanceDoorPlate=this.maintenanceDoor?.group?.getObjectByName("RoomDoorServicePlate");
-    if(maintenanceDoorPlate)maintenanceDoorPlate.visible=false;
 
     addBox("BreakerRoomCeiling",roomWidth,.12,depth-.15,centerX,3.82,midZ,ceilingMaterial);
     addBox("BreakerRoomFrontHeader",roomWidth-.25,.16,.24,centerX,3.58,partitionZ-.30,structuralMetal);
@@ -864,12 +854,18 @@ export class World {
       panel.position.set(0,1.05,.292);
       root.add(panel);
 
-      const expression=new THREE.Mesh(
-        new THREE.PlaneGeometry(.87,.30),this.breakerMathLabelMaterials[spec.index-1]
+      const gaugeBezel=new THREE.Mesh(
+        new THREE.CircleGeometry(.385,40),structuralMetal
       );
-      expression.name="BreakerMathExpression";
-      expression.position.set(0,1.44,.357);
-      root.add(expression);
+      gaugeBezel.name="BreakerMeterBezel";
+      gaugeBezel.position.set(0,1.42,.354);
+      root.add(gaugeBezel);
+      const gaugeFace=new THREE.Mesh(
+        new THREE.PlaneGeometry(.70,.70),this.breakerGaugeMaterials[spec.index-1]
+      );
+      gaugeFace.name="BreakerMeterFace";
+      gaugeFace.position.set(0,1.42,.365);
+      root.add(gaugeFace);
 
       const handle=new THREE.Mesh(new THREE.BoxGeometry(.12,.36,.085),this.breakerHandleMaterial);
       handle.name="BreakerLever";
@@ -911,7 +907,7 @@ export class World {
       const state={...spec,group:root,handle,lamp,ownerChunk:null,active:false};
       root.userData.interactable={
         type:"roomBreaker",
-        prompt:"Flip breaker "+spec.index+" after solving its equation",
+        prompt:"Flip breaker "+spec.index+" after comparing its meter reading",
         breakerIndex:spec.index,
         breakerState:state
       };
@@ -933,12 +929,6 @@ export class World {
     for(let y=0;y<=256;y+=32){
       scopeCtx.beginPath();scopeCtx.moveTo(0,y);scopeCtx.lineTo(640,y);scopeCtx.stroke();
     }
-    scopeCtx.fillStyle="#8bc5b8";
-    scopeCtx.font="bold 22px monospace";
-    scopeCtx.fillText("CARRIER MONITOR",24,34);
-    scopeCtx.fillStyle="#668d82";
-    scopeCtx.font="15px monospace";
-    scopeCtx.fillText("RELAY LINK  /  SEARCHING",24,58);
     scopeCtx.strokeStyle="#79e4d1";
     scopeCtx.lineWidth=3;
     scopeCtx.beginPath();
@@ -1086,9 +1076,6 @@ export class World {
     addBox("RoomDoorVisionFrameTop",.44,.045,.035,doorWidth*.5,doorHeight*.72+.255,.088,metalMat,pivot);
     addBox("RoomDoorVisionFrameBottom",.44,.045,.035,doorWidth*.5,doorHeight*.72-.255,.088,metalMat,pivot);
     addBox("RoomDoorHandle",.24,.055,.06,doorWidth*.73,doorHeight*.48,.10,metalMat,pivot);
-    const sign=new THREE.Mesh(new THREE.PlaneGeometry(.64,.17),this.roomDoorSignMaterial);
-    sign.name="RoomDoorServicePlate";sign.position.set(doorWidth*.5,doorHeight*.9,.071);pivot.add(sign);
-
     const bounds={minX:centerX-doorWidth*.5,maxX:centerX+doorWidth*.5,minZ:frontZ-.10,maxZ:frontZ+.10};
     const state={
       group:pivot,ownerChunk:options.ownerChunk||null,centerX,frontZ,doorZ:frontZ,face:1,doorWidth,doorHeight,
@@ -1169,20 +1156,16 @@ export class World {
       root.position.set(spec.x,0,spec.z);roomGroup.add(root);
       const panel=new THREE.Mesh(new THREE.BoxGeometry(.78,1.18,.18),this.breakerPanelMaterial);
       panel.name="BreakerPanelHousing";panel.position.set(0,1.02,0);root.add(panel);
-      const label=new THREE.Mesh(new THREE.PlaneGeometry(.34,.17),this.breakerNumberMaterials[spec.index-1]);
-      label.position.set(0,1.36,.096);root.add(label);
+      const gauge=new THREE.Mesh(
+        new THREE.PlaneGeometry(.54,.54),this.breakerGaugeMaterials[spec.index-1]
+      );
+      gauge.position.set(0,1.36,.096);root.add(gauge);
       const handle=new THREE.Mesh(new THREE.BoxGeometry(.10,.32,.08),this.breakerHandleMaterial);
       handle.name="BreakerLever";handle.position.set(0,.98,.15);handle.rotation.z=.42;root.add(handle);
       const active=this.maintenanceDoor?.unlocked || this.breakerSequence.slice(0,this.breakerProgress).includes(spec.index);
       const lamp=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),active?this.breakerLampOnMaterial:this.breakerLampOffMaterial);
       lamp.name="BreakerStatusLamp";lamp.position.set(0,1.52,.11);root.add(lamp);
       if(active)handle.rotation.z=-.42;
-      if(spec.index===3){
-        const board=new THREE.Mesh(new THREE.BoxGeometry(1.85,.76,.10),this.breakerPanelMaterial);
-        board.name="BreakerResetNoteBoard";board.position.set(0,2.02,.015);root.add(board);
-        const note=new THREE.Mesh(new THREE.PlaneGeometry(1.70,.63),this.breakerNoteMaterial);
-        note.name="BreakerResetSequence";note.position.set(0,2.02,.073);root.add(note);
-      }
       const state={...spec,group:root,handle,lamp,ownerChunk:null,active};
       root.userData.interactable={
         type:"roomBreaker",prompt:"Flip breaker "+spec.index,
@@ -1509,7 +1492,7 @@ export class World {
       }
       if(door.interactable){
         door.interactable.prompt=door.requiresPower&&!door.unlocked
-          ?"Solve the breaker equations"
+          ?"Compare the breaker meters"
           :door===this.breakerRoomDoor
             ?(door.targetOpen?"Close breaker room":"Enter breaker room")
             :(door.targetOpen?"Close door":"Open door");
