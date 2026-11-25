@@ -8,6 +8,7 @@ const player = read("../player.js");
 const readme = read("../README.md");
 
 assert.doesNotMatch(index, /phone/i, "the phone interface and its styling must be completely removed");
+assert.doesNotMatch(index, /adminIcon/i, "the old phone launcher control must be removed");
 assert.doesNotMatch(main, /phoneOpen|deepseekerAppOpen|togglePhone|phoneStory|phoneCardText|showHouseIntroPhoneMessage/, "gameplay code must not depend on the phone");
 assert.doesNotMatch(player, /phones/i, "player input comments must no longer refer to a phone overlay");
 assert.doesNotMatch(readme, /\bP\s+—\s+phone/i, "the controls guide must not advertise a phone");
