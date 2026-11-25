@@ -45,6 +45,7 @@ assert.match(world, /loadPlayCentreModels\(/, "the play-centre model loader must
 assert.match(world, /PlayCentreEquipmentProxies/, "the room must retain a local fallback while GLBs load");
 assert.match(world, /new RoundedBoxGeometry/, "soft-play props must use rounded geometry rather than sharp blockout cubes");
 assert.match(world, /bumpMap=fabricBump/, "soft-play fabric materials must include surface relief");
+assert.match(world, /bellySeamPoints=.*new THREE\.Vector3/, "the mascot seam curve must use valid 3D points");
 assert.match(world, /startPlayCentreEncounter\(\)/, "the showtime button must start the mascot encounter");
 assert.match(world, /updatePlayCentre\(dt,px,pz,enabled=true\)/, "the mascot must animate and pursue the player during the escape");
 assert.match(world, /type:"playCentreStart"/, "the play centre must expose a single showtime interaction");

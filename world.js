@@ -967,7 +967,8 @@ export class World {
     addSphere("MascotBody",.64,0,1.27,0,mascotBodyMaterial,[1.0,1.42,.80],mascotRoot);
     addSphere("MascotBelly",.47,0,1.23,.48,mascotPatchMaterial,[1.05,1.18,.24],mascotRoot);
     const bellySeamCurve=new THREE.EllipseCurve(0,0,.42,.51,0,Math.PI*2,false,0);
-    const bellySeam=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(bellySeamCurve.getPoints(64)),64,.018,8,false),mascotTrimMaterial);
+    const bellySeamPoints=bellySeamCurve.getPoints(64).map(point=>new THREE.Vector3(point.x,point.y,0));
+    const bellySeam=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(bellySeamPoints),64,.018,8,false),mascotTrimMaterial);
     bellySeam.name="MascotBellyStitch";bellySeam.position.set(0,1.24,.695);mascotRoot.add(bellySeam);
 
     const mascotHead=new THREE.Group();
