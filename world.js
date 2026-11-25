@@ -349,7 +349,6 @@ export class World {
     });
     this.breakerRoomLights=[];
     this.roomDoors=[];
-    this.breakerSwitches=[];
     this.breakerProgress=0;
     this.breakerFailTimer=0;
     this.maintenanceDoor=null;
@@ -505,7 +504,6 @@ export class World {
 
   buildIndoorPlayCentre(centerX,backZ){
     this.breakerRoomBounds=[];
-    this.breakerSwitches=[];
     this.breakerRoomLights=[];
     const group=this.breakerRoomGroup;
     const wallT=.22,roomHeight=3.95,roomWidth=26.4,half=roomWidth*.5;
@@ -517,7 +515,7 @@ export class World {
     // before the mascot wakes up. The shapes and layout are original to DeepSeeker.
     const mat=(color,roughness=.72,metalness=0,emissive=0,emissiveIntensity=0)=>
       new THREE.MeshStandardMaterial({color,roughness,metalness,emissive,emissiveIntensity});
-    const pink=mat(0xff72a7,.48,0,.320b5b,.12);
+    const pink=mat(0xff72a7,.48,0,0x320b5b,.12);
     const coral=mat(0xff946f,.55,0,0x5b1807,.08);
     const yellow=mat(0xffd45e,.52,0,0x5a3a08,.08);
     const mint=mat(0x81e4c1,.62,0,0x0e4834,.06);
@@ -1054,39 +1052,6 @@ export class World {
     }
   }
 
-  buildMaintenanceBreakers(roomGroup,centerX,backZ){
-    const switchZ=backZ+ROOM_WALL_THICKNESS*.5+.09;
-    const positions=[
-      {index:1,x:centerX-2.65,z:switchZ},
-      {index:2,x:centerX,z:switchZ},
-      {index:3,x:centerX+2.65,z:switchZ}
-    ];
-    roomGroup.userData.breakerSwitches=[];
-    for(const spec of positions){
-      const root=new THREE.Group();root.name="MaintenanceBreaker"+spec.index;
-      root.visible=this.maintenancePuzzleType==="breakers";
-      root.position.set(spec.x,0,spec.z);roomGroup.add(root);
-      const panel=new THREE.Mesh(new THREE.BoxGeometry(.78,1.18,.18),this.breakerPanelMaterial);
-      panel.name="BreakerPanelHousing";panel.position.set(0,1.02,0);root.add(panel);
-      const gauge=new THREE.Mesh(
-        new THREE.PlaneGeometry(.54,.54),this.breakerGaugeMaterials[spec.index-1]
-      );
-      gauge.position.set(0,1.36,.096);root.add(gauge);
-      const handle=new THREE.Mesh(new THREE.BoxGeometry(.10,.32,.08),this.breakerHandleMaterial);
-      handle.name="BreakerLever";handle.position.set(0,.98,.15);handle.rotation.z=.42;root.add(handle);
-      const active=this.maintenanceDoor?.unlocked || this.breakerSequence.slice(0,this.breakerProgress).includes(spec.index);
-      const lamp=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),active?this.breakerLampOnMaterial:this.breakerLampOffMaterial);
-      lamp.name="BreakerStatusLamp";lamp.position.set(0,1.52,.11);root.add(lamp);
-      if(active)handle.rotation.z=-.42;
-      const state={...spec,group:root,handle,lamp,ownerChunk:null,active};
-      root.userData.interactable={
-        type:"roomBreaker",prompt:"Flip breaker "+spec.index,
-        breakerIndex:spec.index,breakerState:state
-      };
-      roomGroup.userData.breakerSwitches.push(state);
-    }
-  }
-
   setMaintenancePuzzleType(_type,seed=1){
     this.maintenancePuzzleType="breakers";
     this.maintenancePuzzleSeed=(Number(seed)>>>0);
@@ -1116,9 +1081,7 @@ export class World {
   }
 
   restoreMaintenancePuzzleState(state={}){
-    // The breaker-room entrance also powers its lights. Restore the door's
-    // target and completed animation together so reloads do not strand the
-    // player in a dark room or leave a closed collision box on an open door.
+    // Restore the play-centre entrance and exit state alongside their colliders.
     const roomDoor=this.breakerRoomDoor;
     if(roomDoor){
       roomDoor.targetOpen=Boolean(state.breakerRoomDoorOpen);
@@ -1181,7 +1144,6 @@ export class World {
       state.ownerChunk=group;
       wallBounds.push(state.collisionBounds);
     }
-    this.breakerSwitches.push(...(group.userData.breakerSwitches||[]));
     this.root.add(group);
     this.chunks.set(cellKey(cx,cz),{data,group,wallBounds});
   }
@@ -1204,7 +1166,6 @@ export class World {
       item.light.parent && this.root.children.includes(item.light.parent)
     );
     this.roomDoors=this.roomDoors.filter(door=>door.ownerChunk!==entry.group);
-    this.breakerSwitches=this.breakerSwitches.filter(item=>item.ownerChunk!==entry.group);
     this.chunks.delete(key);
   }
 
@@ -1437,7 +1398,6 @@ export class World {
 
     group.userData.roomWallBounds=[];
     group.userData.roomDoorStates=[];
-    group.userData.breakerSwitches=[];
     const floor=new THREE.Mesh(this.floorGeo,this.materials.floor);
     floor.position.set(ox+mid,0,oz+mid);
     floor.name="BackroomsFloor";
@@ -1603,7 +1563,7 @@ export class World {
   // atmosphere layer, so expose safe empty/no-op APIs for those callers.
   getInteractables() {
     return [
-      ...this.roomDoors.filter(door=>door.group?.parent&&(door!==this.breakerRoomDoor||this.maintenancePuzzleType==="breakers")).map(door=>door.group),
+      ...this.roomDoors.filter(door=>door.group?.parent).map(door=>door.group),
       ...(this.playCentreButton?.parent&&this.playCentreButton.visible&&!this.playCentreState?.started
         ?[this.playCentreButton]:[]),
     ];

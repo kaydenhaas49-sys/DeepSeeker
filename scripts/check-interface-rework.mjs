@@ -54,8 +54,6 @@ assert.match(main, /ALL RELAYS ONLINE · ENTER THE MAINTENANCE WING AND FIND THE
 assert.match(world, /this\.breakerRoomAlarmMaterial\.emissiveIntensity/, "the showtime light must pulse during the encounter");
 assert.match(world, /roomDoor\.openProgress=roomDoor\.targetOpen\?1:0/, "loading must restore the play-centre entrance door transform immediately");
 assert.match(world, /roomDoor\.collisionBounds/, "restored door state must also restore collision");
-assert.match(world, /roomDoor\.openProgress=roomDoor\.targetOpen\?1:0/, "loading must restore the breaker-room door transform immediately");
-assert.match(world, /roomDoor\.collisionBounds/, "restored door state must also restore collision");
 assert.match(main, /glitchMatch=rawCommand\.match/, "the admin GLITCH command must accept a transmission headline and body");
 assert.match(main, /showSignalGlitch\(headline,detail,6500\)/, "the admin command must render through the full transmission overlay");
 assert.match(index, /maxlength="560"/, "the transmission command must allow a headline and message body");
