@@ -420,7 +420,7 @@ export class Player {
     }
 
     // Keyboard movement can continue when pointer lock is unavailable, but
-    // main.js disables input while menus, phones, controls, or other overlays
+    // main.js disables input while menus, controls, and other overlays
     // are active.
     const k = this.keys;
     const active = this.movementActive;

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261101-darker-env";
+import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, mulberry32 } from "./world.js?v=20261125-beta-exit-wall-fix";
 import { createTextures } from "./textures.js?v=20261030-finish-pass7";
 import { Player } from "./player.js?v=20261102-hand-beam-qte-fix";
 import { HorrorAudio } from "./audio.js?v=20261030-finish-pass7";
@@ -19,7 +19,7 @@ import { SecurityCameraSystem } from "./securityCameras.js?v=20261030-finish-pas
 import { createFunnyDuckEntity, getArachnophobiaMode, setArachnophobiaMode, preloadBiscuitTexture } from "./entityMode.js?v=20261030-finish-pass7";
 import { SpiderHunter } from "./spiderHunter.js?v=20261030-finish-pass7";
 import { SpiderSurfaceController } from "./spiderSurface.js?v=20261102-hand-beam-qte-fix";
-import { StoryMissionWorld } from "./storyMission.js?v=20261030-finish-pass7";
+import { StoryMissionWorld } from "./storyMission.js?v=20261125-beta-exit-wall-fix";
 
 let arachnophobiaMode=getArachnophobiaMode();
 
@@ -74,6 +74,9 @@ const homeScreen=document.getElementById("homeScreen");
 const lobbyScreen=document.getElementById("lobbyScreen");
 const betaTestScreen=document.getElementById("betaTestScreen");
 const betaTestContinueButton=document.getElementById("betaTestContinueButton");
+const betaCompletionScreen=document.getElementById("betaCompletionScreen");
+const betaCompletionReturnButton=document.getElementById("betaCompletionReturnButton");
+betaCompletionReturnButton?.addEventListener("click",()=>{location.href=location.pathname;});
 const arachnophobiaWarning=document.getElementById("arachnophobiaWarning");
 const arachnophobiaModeButton=document.getElementById("arachnophobiaModeButton");
 const arachnophobiaContinueButton=document.getElementById("arachnophobiaContinueButton");
@@ -106,6 +109,7 @@ const eventText=document.getElementById("event");
 const signalGlitchOverlay=document.getElementById("signalGlitch");
 const signalGlitchNoise=document.getElementById("signalGlitchNoise");
 const signalGlitchMessage=document.getElementById("signalGlitchMessage");
+const signalGlitchDetail=document.getElementById("signalGlitchDetail");
 let signalGlitchTimer=0;
 let signalGlitchGeneration=0;
 
@@ -137,71 +141,57 @@ const SIGNAL_GLITCH_FRAGMENTS=Object.freeze([
   "IT IS ALREADY OPEN","LOOK AWAY FROM THE SCREEN","THE SCREEN IS LOOKING BACK","END OF MESSAGE",
 ]);
 
-const SIGNAL_ZALGO_ABOVE=Object.freeze([
-  "\u0300","\u0301","\u0302","\u0303","\u0304","\u0305",
-  "\u0306","\u0307","\u0308","\u0309","\u030A","\u030B",
-  "\u030C","\u030F","\u0311","\u0312","\u0313","\u0314",
-  "\u033D","\u0342","\u0344","\u0350"
-]);
-const SIGNAL_ZALGO_THROUGH=Object.freeze([
-  "\u0334","\u0335","\u0336","\u0337","\u0338"
-]);
-const SIGNAL_ZALGO_BELOW=Object.freeze([
-  "\u0316","\u0317","\u0318","\u0319","\u031C","\u031D",
-  "\u031E","\u031F","\u0320","\u0323","\u0324","\u0325",
-  "\u0326","\u0327","\u0328","\u0329","\u032A","\u032B",
-  "\u032C","\u032D","\u032E","\u0330","\u0331","\u0332",
-  "\u0333"
-]);
-
-function corruptSignalText(value){
-  const pick=marks=>marks[Math.floor(Math.random()*marks.length)];
-  return [...String(value??"")].map(character=>{
-    if(!/[A-Z0-9]/i.test(character))return character;
-
-    let corrupted=character;
-    const aboveCount=1+(Math.random()<.52?1:0)+(Math.random()<.12?1:0);
-    const belowCount=Math.random()<.28?0:1+(Math.random()<.34?1:0);
-    for(let i=0;i<aboveCount;i++)corrupted+=pick(SIGNAL_ZALGO_ABOVE);
-    if(Math.random()<.34)corrupted+=pick(SIGNAL_ZALGO_THROUGH);
-    for(let i=0;i<belowCount;i++)corrupted+=pick(SIGNAL_ZALGO_BELOW);
-    return corrupted;
-  }).join("");
-}
-
 function populateSignalGlitchNoise(){
   if(!signalGlitchNoise)return;
   const fragment=document.createDocumentFragment();
-  for(let i=0;i<22;i++){
+  const phrases=SIGNAL_GLITCH_FRAGMENTS.slice();
+
+  // Shuffle the phrase bank so every transmission has a different field of text.
+  for(let i=phrases.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [phrases[i],phrases[j]]=[phrases[j],phrases[i]];
+  }
+
+  for(let i=0;i<100;i++){
     const item=document.createElement("span");
+    const phrase=phrases[i%phrases.length];
     item.className="signalGlitchFragment";
-    const phrase=SIGNAL_GLITCH_FRAGMENTS[Math.floor(Math.random()*SIGNAL_GLITCH_FRAGMENTS.length)];
-    item.textContent=corruptSignalText(phrase);
-    item.setAttribute("aria-label",phrase);
-    item.style.left=(Math.random()*94)+"%";
+    item.textContent=phrase;
+    item.style.left=(Math.random()*96)+"%";
     item.style.top=(Math.random()*96)+"%";
-    item.style.setProperty("--signal-duration",(5.2+Math.random()*5.8)+"s");
-    item.style.setProperty("--signal-delay",(-Math.random()*11)+"s");
-    item.style.setProperty("--signal-spacing",(1+Math.random()*3)+"px");
-    const driftX=(12+Math.random()*34)*(Math.random()<.5?-1:1);
-    const driftY=(10+Math.random()*28)*(Math.random()<.5?-1:1);
-    item.style.setProperty("--signal-drift-x",driftX+"px");
-    item.style.setProperty("--signal-drift-y",driftY+"px");
-    if(Math.random()<.22)item.style.filter="blur(1px)";
+
+    const duration=8+Math.random()*14;
+    item.style.setProperty("--signal-duration",duration.toFixed(2)+"s");
+    item.style.setProperty("--signal-delay",(-Math.random()*duration).toFixed(2)+"s");
+    item.style.setProperty("--signal-spacing",(0.4+Math.random()*1.8).toFixed(2)+"px");
+    item.style.setProperty("--signal-size",(8+Math.random()*5).toFixed(1)+"px");
+    item.style.setProperty("--signal-opacity",(0.10+Math.random()*0.19).toFixed(3));
+
+    const driftX=(18+Math.random()*76)*(Math.random()<.5?-1:1);
+    const driftY=(12+Math.random()*58)*(Math.random()<.5?-1:1);
+    item.style.setProperty("--signal-drift-x",driftX.toFixed(1)+"px");
+    item.style.setProperty("--signal-drift-y",driftY.toFixed(1)+"px");
+    item.style.setProperty("--signal-rotation",((Math.random()-.5)*8).toFixed(2)+"deg");
+    if(Math.random()<.16)item.classList.add("signalGlitchFragmentDim");
     fragment.appendChild(item);
   }
   signalGlitchNoise.replaceChildren(fragment);
 }
 
-function showSignalGlitch(message,_detail="",duration=3600){
+function showSignalGlitch(message,detail="",duration=3600){
   if(!signalGlitchOverlay||!signalGlitchMessage||!signalGlitchNoise)return;
   const headline=String(message||"UNKNOWN SIGNAL").trim().slice(0,100).toUpperCase();
+  const body=String(detail??"").trim().slice(0,420);
   const generation=++signalGlitchGeneration;
   window.clearTimeout(signalGlitchTimer);
 
   signalGlitchMessage.textContent=headline;
   signalGlitchMessage.dataset.text=headline;
   signalGlitchMessage.classList.toggle("long",headline.length>26);
+  if(signalGlitchDetail){
+    signalGlitchDetail.textContent=body;
+    signalGlitchDetail.hidden=!body;
+  }
   populateSignalGlitchNoise();
   signalGlitchOverlay.setAttribute("aria-hidden","false");
   signalGlitchOverlay.classList.remove("active");
@@ -242,7 +232,7 @@ tutorialGuide.style.cssText=[
 ].join(";");
 tutorialGuide.innerHTML=
   '<div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:8px">'+
-    '<span id="tutorialGuideStep" style="font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.5px;color:#7f7c69">01/09</span>'+
+    '<span id="tutorialGuideStep" style="font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.5px;color:#7f7c69">01/06</span>'+
   '</div>'+
   '<div id="tutorialGuideAction" style="font-size:15px;letter-spacing:1.4px;color:#eee8cb"></div>'+
   '<div id="tutorialGuideHint" style="margin-top:6px;font-size:10px;line-height:1.45;letter-spacing:.8px;color:#9f9a84"></div>';
@@ -251,16 +241,6 @@ const tutorialGuideStep=document.getElementById("tutorialGuideStep");
 const tutorialGuideAction=document.getElementById("tutorialGuideAction");
 const tutorialGuideHint=document.getElementById("tutorialGuideHint");
 const vignette=document.getElementById("vignette");
-const phone=document.getElementById("phone");
-const phoneAppName=document.getElementById("phoneAppName");
-const phoneDepth=document.getElementById("phoneDepth");
-const phoneDepthLabel=document.getElementById("phoneDepthLabel");
-const phoneCardTitle=document.getElementById("phoneCardTitle");
-const phoneCardText=document.getElementById("phoneCardText");
-const phoneStory=document.getElementById("phoneStory");
-const deepseekerIcon=document.getElementById("deepseekerIcon");
-const phoneHome=document.getElementById("phoneHome");
-const adminIcon=document.getElementById("adminIcon");
 const adminOverlay=document.getElementById("adminOverlay");
 const adminAuthCard=document.getElementById("adminAuthCard");
 const adminPanelCard=document.getElementById("adminPanelCard");
@@ -1699,69 +1679,125 @@ for(let i=0;i<4;i++){
 addRadioViewPart(new THREE.TorusGeometry(0.055,0.006,7,18),radioEdgeMaterial,
   "HandheldRadioShoulderStrapLoop",-0.045,0.185,-0.020,[Math.PI/2,0,0]);
 
+const RADIO_CHANNELS=Object.freeze([
+  {id:"mission",label:"CH 01 · MISSION"},
+  {id:"unlisted",label:"CH 02 · UNLISTED"},
+  {id:"quiet",label:"CH 03 · QUIET"}
+]);
+let radioChannelIndex=0;
 let radioRadarLastDraw=0;
 function drawHandheldRadioRadar(force=false){
-  if(!radioCollected || equippedTool!=="radio" || !radioRadarContext) return;
+  if(!radioCollected || equippedTool!=="radio" || !radioRadarContext)return;
   const now=performance.now();
-  if(!force && now-radioRadarLastDraw<110) return;
+  if(!force && now-radioRadarLastDraw<110)return;
   radioRadarLastDraw=now;
+
   const ctx=radioRadarContext;
   const w=radioRadarCanvas.width,h=radioRadarCanvas.height;
+  const channel=RADIO_CHANNELS[radioChannelIndex];
+  const target=channel.id==="mission"&&typeof getMissionTarget==="function"
+    ?getMissionTarget():null;
+  const playerPos=player?.pos;
+  const distance=target&&playerPos
+    ?Math.hypot((playerPos.x??0)-target.x,(playerPos.z??0)-target.z)
+    :Infinity;
+  const missionStrength=Number.isFinite(distance)
+    ?THREE.MathUtils.clamp(1-distance/115,0,1):0;
+
+  // CH 02 hears occasional unlisted carrier bursts. These are deliberately
+  // unlocated and never advance or change the campaign mission.
+  const seconds=now*.001;
+  const burstWave=.5+.5*Math.sin(seconds*.83+Math.sin(seconds*.19)*.8);
+  const unlistedBurst=burstWave>.90?THREE.MathUtils.clamp((burstWave-.90)/.10,0,1):0;
+  const rawStrength=channel.id==="mission"
+    ?missionStrength
+    :channel.id==="unlisted"?unlistedBurst*.82:0;
+  const interference=channel.id==="mission"
+    ?THREE.MathUtils.clamp(.18+(1-missionStrength)*.56,.18,.82)
+    :channel.id==="unlisted"?.92:.98;
+  const noise=(Math.sin(seconds*17.1)+Math.sin(seconds*37.7+1.2)*.55)*.025*interference;
+  const strength=THREE.MathUtils.clamp(rawStrength+noise,0,1);
+  const bars=Math.max(0,Math.min(5,Math.floor(strength*5+.15)));
+  const locked=channel.id==="mission"&&missionStrength>=.94&&bars===5;
+  const status=channel.id==="mission"
+    ?locked?"SIGNAL LOCKED":bars>=3?"CARRIER PRESENT":bars>=1?"WEAK CARRIER":"SCANNING"
+    :channel.id==="unlisted"
+      ?bars>=3?"UNLISTED CARRIER":bars>=1?"FRAGMENTARY BURST":"NO CARRIER"
+      :"NO CARRIER";
+
   ctx.fillStyle="#06100b";
   ctx.fillRect(0,0,w,h);
   ctx.strokeStyle="#294d36";
   ctx.lineWidth=2;
   ctx.strokeRect(5,5,w-10,h-10);
 
-  // Signal strength rises as the player gets closer to the current mission relay.
-  // It never gives a bearing or exact distance; it behaves like an old receiver.
-  const target=typeof getMissionTarget==="function"?getMissionTarget():null;
-  const playerPos=player?.pos;
-  const distance=target&&playerPos
-    ?Math.hypot((playerPos.x??0)-target.x,(playerPos.z??0)-target.z)
-    :Infinity;
-  const strength=Number.isFinite(distance)
-    ?THREE.MathUtils.clamp(1-distance/115,0,1):0;
-  const bars=Math.max(0,Math.min(5,Math.ceil(strength*5)));
-  const phase=now*.012;
   ctx.textAlign="center";
   ctx.fillStyle="#85b991";
-  ctx.font="bold 17px monospace";
-  ctx.fillText("FIELD RECEIVER",w/2,30);
+  ctx.font="bold 15px monospace";
+  ctx.fillText("FIELD RECEIVER",w/2,26);
+  ctx.fillStyle="#567b5d";
+  ctx.font="bold 11px monospace";
+  ctx.fillText(channel.label,w/2,45);
+
   ctx.textAlign="left";
   ctx.fillStyle="#45634b";
-  ctx.font="bold 12px monospace";
-  ctx.fillText("CARRIER",18,57);
-  const barX=18,barY=67,barGap=7,barW=37,maxH=30;
+  ctx.font="bold 11px monospace";
+  ctx.fillText("CARRIER",17,65);
+  const barX=17,barY=74,barGap=7,barW=37,maxH=26;
   for(let i=0;i<5;i++){
-    const bh=8+i*5;
-    ctx.fillStyle=i<bars?(bars>=4?"#b7d58b":"#79bd87"):"#203528";
+    const bh=7+i*4.5;
+    ctx.fillStyle=i<bars?(locked?"#c5e5a2":bars>=3?"#a9d18c":"#79bd87"):"#203528";
     ctx.fillRect(barX+i*(barW+barGap),barY+maxH-bh,barW,bh);
     ctx.strokeStyle="#345440";
     ctx.lineWidth=1;
     ctx.strokeRect(barX+i*(barW+barGap),barY+maxH-bh,barW,bh);
   }
-  ctx.textAlign="right";
-  ctx.fillStyle=bars>=4?"#b7d58b":bars>=2?"#8ac59b":"#bd8a60";
-  ctx.font="bold 14px monospace";
-  ctx.fillText(bars>=5?"NEAR LOCK":bars>=3?"CARRIER FOUND":bars>=1?"WEAK CARRIER":"SCANNING",w-18,58);
-  ctx.strokeStyle=bars>=4?"#8dbf83":"#3c7450";
+
+  ctx.textAlign="center";
+  ctx.fillStyle=locked?"#c5e5a2":bars>=2?"#8ac59b":"#bd9a72";
+  ctx.font="bold 12px monospace";
+  ctx.fillText(status,w/2,121);
+
+  // Strong mission carriers produce a tighter trace; weak or unknown
+  // transmissions break up into static rather than a directional arrow.
+  ctx.strokeStyle=locked?"#b7d58b":"#4f986b";
   ctx.lineWidth=2;
   ctx.beginPath();
-  const amplitude=2+(1-strength)*13;
+  const amplitude=2+interference*18;
+  const phase=seconds*12;
   for(let x=16;x<w-16;x+=2){
-    const noise=(Math.sin(x*.105+phase)*.55+
+    const staticWave=(Math.sin(x*.105+phase)*.55+
       Math.sin(x*.037-phase*1.7)*.3+
       Math.sin(x*.31+phase*.6)*.15)*amplitude;
-    const y=h*.66+noise;
+    const carrier=channel.id==="mission"
+      ?Math.sin(x*.09+phase)*missionStrength*3
+      :channel.id==="unlisted"?Math.sin(x*.16+phase*1.7)*unlistedBurst*8:0;
+    const dropout=channel.id==="unlisted"&&unlistedBurst<.08&&x%22<4
+      ?Math.sin(x*1.8+phase)*9:0;
+    const y=h*.68+staticWave+carrier+dropout;
     if(x===16)ctx.moveTo(x,y);else ctx.lineTo(x,y);
   }
   ctx.stroke();
+
   ctx.textAlign="center";
   ctx.fillStyle="#8ac59b";
-  ctx.font="bold 12px monospace";
-  ctx.fillText(bars>=4?"SIGNAL STABILIZING":bars>=2?"MOVE TOWARD STRONGER SIGNAL":"SEARCH FOR A CARRIER",w/2,h-20);
+  ctx.font="bold 10px monospace";
+  ctx.fillText(channel.id==="mission"
+    ?locked?"CARRIER STABLE":"SEARCH FOR STRONGER CARRIER"
+    :channel.id==="unlisted"
+      ?"LISTENING BETWEEN STATIONS":"BAND CLEAR · NO TRANSMISSION",
+    w/2,h-31);
+  ctx.fillStyle="#567b5d";
+  ctx.font="bold 9px monospace";
+  ctx.fillText("R · TUNE BAND",w/2,h-14);
   radioRadarTexture.needsUpdate=true;
+}
+
+function cycleRadioChannel(){
+  if(!radioCollected||equippedTool!=="radio")return false;
+  radioChannelIndex=(radioChannelIndex+1)%RADIO_CHANNELS.length;
+  drawHandheldRadioRadar(true);
+  return true;
 }
 
 const audio=new HorrorAudio();
@@ -1847,6 +1883,7 @@ function resetMissionState(){
     log:[]
   };
   radioCollected=false;
+  radioChannelIndex=0;
   equippedTool="flashlight";
   radioViewmodel.visible=false;
   player.proceduralArmFlashlight.visible=true;
@@ -1860,7 +1897,6 @@ function recordMissionLog(title,text){
   if(missionState.log.some(item=>item.title===cleanTitle))return;
   missionState.log.push({title:cleanTitle,text:String(text||"").slice(0,180)});
   missionState.log=missionState.log.slice(-12);
-  renderStoryLog();
 }
 
 function getMissionTarget(){
@@ -1892,7 +1928,6 @@ function updateMissionObjective(){
   const target=getMissionTarget();
   const label=target?.hint||"SEARCH THE BACKROOMS FOR A SIGNAL.";
   if(objective&&objective.textContent!==label)objective.textContent=label;
-  if(phoneCardText&&phoneCardText.textContent!==label)phoneCardText.textContent=label;
 }
 
 function activateMissionRelay(index,{broadcast=true}={}){
@@ -1900,7 +1935,7 @@ function activateMissionRelay(index,{broadcast=true}={}){
   if(!Number.isInteger(index)||index<0||index>=3||missionState.relays[index])return false;
   missionState.relays[index]=true;
   const details=[
-    ["FIELD RADIO RESTORED","The radio finally clears. M's voice breaks through the static."],
+    ["FIELD RADIO RESTORED","The radio finally clears. A fragment of M's transmission breaks through the static."],
     ["RELAY TWO ONLINE","The second relay repeats a message from the maintenance room."],
     ["RELAY THREE ONLINE","The last relay locks onto a signal beyond the Poolrooms door."]
   ][index];
@@ -1973,7 +2008,6 @@ async function enterPoolroomsLevel({broadcast=true}={}){
   }
   storyMissionWorld.syncState(missionState,{poolroomsActive:true,missionVisible:false});
   objective.textContent="FOLLOW THE DIM BLUE LIGHTS ALONG THE DRY DECK · FIND THE SOURCE OF THE SIGNAL.";
-  if(phoneCardText)phoneCardText.textContent=objective.textContent;
   eventText.textContent="THE POOLROOMS · SIGNAL LOCKED";
   eventText.style.opacity="1";
   player.lock();
@@ -1985,8 +2019,7 @@ function triggerMissionEnding({broadcast=true}={}){
   if(!poolroomsActive||gameEnded)return;
   missionState.poolroomsExitReached=true;
   recordMissionLog("THE SOURCE","You found the end of the transmission. It was waiting for you.");
-  if(broadcast)multiplayer.broadcastWorldEvent("mission_ending","campaign",missionStateSnapshot());
-  beginGameEnding();
+  showBetaCompletionScreen({broadcast});
 }
 // Retain the apartment in memory if a save slot actually uses this level.
 let initialHouseRequired=false;
@@ -3138,6 +3171,7 @@ async function saveGame(slot=selectedSaveSlot,{confirmOverwrite=true}={}){
     maintenancePuzzleSeed:world.maintenancePuzzleSeed,
     maintenanceDoorUnlocked:Boolean(world.maintenanceDoor?.unlocked),
     maintenanceBreakerProgress:world.breakerProgress,
+    breakerRoomDoorOpen:Boolean(world.breakerRoomDoor?.targetOpen),
     missionState:missionStateSnapshot(),
   };
 
@@ -3236,7 +3270,8 @@ function applySavedGame(data){
       ensureTutorialOpenRoom();
       // A save made during the chase resumes at the approach lesson so the
       // scripted spider encounter can be initialized cleanly after reload.
-      const resumeStage=Math.min(savedTutorialStage,7);
+      const migratedTutorialStage=(savedTutorialStage===5||savedTutorialStage===6)?7:savedTutorialStage;
+      const resumeStage=Math.min(migratedTutorialStage,7);
       if(resumeStage<=3){
         tutorialLightsOutState="on";
         tutorialLightsOutElapsed=0;
@@ -3377,7 +3412,8 @@ function applyMaintenancePuzzleConfiguration(type,seed,state={}){
   world.setMaintenancePuzzleType(puzzleType,parsedSeed);
   world.restoreMaintenancePuzzleState({
     unlocked:Boolean(state.unlocked??state.maintenanceDoorUnlocked),
-    breakerProgress:Number(state.breakerProgress??state.maintenanceBreakerProgress)||0
+    breakerProgress:Number(state.breakerProgress??state.maintenanceBreakerProgress)||0,
+    breakerRoomDoorOpen:Boolean(state.breakerRoomDoorOpen)
   });
   try{localStorage.setItem(MAINTENANCE_PUZZLE_LAST_KEY,puzzleType);}catch{}
 }
@@ -3397,12 +3433,16 @@ function configureMaintenancePuzzleForRun(save=null,{broadcast=true}={}){
   const seed=Number.isFinite(storedSeed)&&storedSeed>=0
     ?(storedSeed>>>0):(Math.floor(Math.random()*0xffffffff)>>>0);
   applyMaintenancePuzzleConfiguration(type,seed,{
-    unlocked:Boolean(save?.maintenanceDoorUnlocked),breakerProgress:save?.maintenanceBreakerProgress
+    unlocked:Boolean(save?.maintenanceDoorUnlocked),
+    breakerProgress:save?.maintenanceBreakerProgress,
+    breakerRoomDoorOpen:Boolean(save?.breakerRoomDoorOpen)
   });
   if(broadcast&&multiplayer?.socket?.readyState===WebSocket.OPEN&&multiplayer.isWorldAuthority()){
     multiplayer.broadcastWorldEvent("maintenance_puzzle_select","maintenance-puzzle",{
       type:world.maintenancePuzzleType,seed:world.maintenancePuzzleSeed,
-      unlocked:Boolean(world.maintenanceDoor?.unlocked),breakerProgress:world.breakerProgress
+      unlocked:Boolean(world.maintenanceDoor?.unlocked),
+      breakerProgress:world.breakerProgress,
+      breakerRoomDoorOpen:Boolean(world.breakerRoomDoor?.targetOpen)
     });
   }
 }
@@ -3617,7 +3657,7 @@ const multiplayer=new Multiplayer({
       const result=world.activateBreaker(Number(event.payload?.index));
       if(result.complete&&multiplayer.isWorldAuthority()){
         missionState.breakerSolved=true;
-        recordMissionLog("MAINTENANCE POWER RESTORED","Eight equations brought the breaker room back online.");
+        recordMissionLog("MAINTENANCE POWER RESTORED","The eight breakers came online by following their meter readings from lowest to highest.");
         refreshMissionState({broadcast:true});
         if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
       }
@@ -3674,7 +3714,7 @@ const multiplayer=new Multiplayer({
     if(event?.type==="mission_ending"){
       if(!multiplayer.isWorldAuthority()){
         restoreMissionState(event.payload||{});
-        beginGameEnding();
+        showBetaCompletionScreen({broadcast:false});
       }
       return;
     }
@@ -3823,12 +3863,15 @@ const interaction=new InteractionSystem({
       const door=target.doorState;
       if(!door)return false;
       if(door.requiresPower&&!door.unlocked){
-        const message="NO POWER. ENTER THE BREAKER ROOM AND SOLVE THE EQUATIONS.";
+        const message="NO POWER. COMPARE THE BREAKER METERS AND SWITCH THEM FROM LOWEST TO HIGHEST.";
         eventText.textContent=message;eventText.style.opacity="1";
         setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2600);
         return true;
       }
       target.toggle();
+      if(door===world.breakerRoomDoor&&gameStarted){
+        void saveGame(undefined,{confirmOverwrite:false});
+      }
       if((door===world.maintenanceDoor||door===world.breakerRoomDoor)&&multiplayer?.socket?.readyState===WebSocket.OPEN){
         multiplayer.broadcastWorldEvent("maintenance_door_toggle","maintenance-puzzle",{
           open:door.targetOpen,door:door===world.breakerRoomDoor?"breaker-room":"maintenance"
@@ -3848,14 +3891,14 @@ const interaction=new InteractionSystem({
       }
       if(result.complete&&multiplayer.isWorldAuthority()){
         missionState.breakerSolved=true;
-        recordMissionLog("MAINTENANCE POWER RESTORED","Eight equations brought the breaker room back online.");
+        recordMissionLog("MAINTENANCE POWER RESTORED","The eight breakers came online by following their meter readings from lowest to highest.");
         refreshMissionState({broadcast:true});
         if(gameStarted)void saveGame(undefined,{confirmOverwrite:false});
       }
       const message=result.complete
         ?"POWER RESTORED. MAINTENANCE DOOR UNLOCKED."
         :result.correct
-          ?"CORRECT. SOLVE THE NEXT EQUATION AND KEEP THE ANSWERS IN ORDER."
+          ?"METER ACCEPTED. FIND THE NEXT LOWEST READING."
           :"WRONG ORDER. ALL BREAKERS RESET; THE LIGHTS CUT OUT.";
       eventText.textContent=message;eventText.style.opacity="1";
       setTimeout(()=>{if(eventText.textContent===message)eventText.style.opacity="0";},2300);
@@ -4262,7 +4305,7 @@ function flashLobbyNameSaved(){
 }
 
 function openChat(){
-  if(!gameStarted || phoneOpen || controlsOpen) return;
+  if(!gameStarted || controlsOpen || adminOverlay.classList.contains("open")) return;
   chatOpen=true;
   chatPanel.classList.add("visible","open");
   clearTimeout(chatHideTimer);
@@ -4279,7 +4322,7 @@ function closeChat(resume=true){
   chatHideTimer=setTimeout(()=>{
     if(!chatOpen) chatPanel.classList.remove("visible");
   },4500);
-  if(resume && gameStarted && !phoneOpen && !controlsOpen) player.lock();
+  if(resume && gameStarted && !controlsOpen && !adminOverlay.classList.contains("open")) player.lock();
 }
 
 const houseDoors=[];
@@ -5123,7 +5166,7 @@ function setHouseMode(enabled,options={}){
     objective.textContent="Find the magazine on the couch. Press E to interact with it.";
     eventText.textContent="APARTMENT LEVEL";
     eventText.style.opacity="1";
-    showHouseIntroPhoneMessage();
+    showHouseIntroTransmission();
     setTimeout(()=>{eventText.style.opacity="0";},1400);
   }else{
     renderer.setPixelRatio(currentPixelRatio);
@@ -6410,8 +6453,6 @@ function updateTutorialGuide(){
     2:["CROUCH","CTRL","Hold CTRL."],
     3:["SPRINT","SHIFT","Hold SHIFT to run."],
     4:["FLASHLIGHT","F","Press F."],
-    5:["PHONE","P","Press P to open your phone."],
-    6:["MESSAGE","P","Read M's note, then close the phone."],
     7:["APPROACH","W A S D","Go toward the figure."],
     8:["RUN","SHIFT","Run. Don't stop."]
   };
@@ -6421,7 +6462,8 @@ function updateTutorialGuide(){
     return;
   }
 
-  tutorialGuideStep.textContent=String(houseTutorialStage).padStart(2,"0")+"/08";
+  const visibleStep=houseTutorialStage>=7?houseTutorialStage-2:houseTutorialStage;
+  tutorialGuideStep.textContent=String(visibleStep).padStart(2,"0")+"/06";
   tutorialGuideAction.textContent=lesson[0]+" · "+lesson[1];
   tutorialGuideHint.textContent=lesson[2];
   tutorialGuide.style.opacity="1";
@@ -6488,14 +6530,6 @@ function setHouseTutorialStage(stage){
     flashlight.intensity=0;
     objective.textContent="TURN THE FLASHLIGHT ON · F";
     showHouseTutorialMessage("F · FLASHLIGHT",1500);
-  }else if(stage===5){
-    objective.textContent="OPEN THE DEEPSEEKER PHONE · P";
-    showHouseTutorialMessage("P · OPEN PHONE",1500);
-    eventText.textContent="BADGE AI ONLINE";
-    eventText.style.opacity="1";
-  }else if(stage===6){
-    objective.textContent="READ M'S MESSAGE, THEN CLOSE THE PHONE · P";
-    showHouseTutorialMessage("CHECK THE DEEPSEEKER.",1700);
   }else if(stage===7){
     objective.textContent="MOVE TOWARD THE FIGURE AT THE END OF THE ROOM.";
     if(!houseTutorialSpiderPrepared){
@@ -8320,9 +8354,7 @@ let pulse=0;
 let nextEvent=24+Math.random()*16;
 let eventCooldown=0;
 let muted=false;
-let phoneOpen=false;
 
-let deepseekerAppOpen=false;
 let adminUnlocked=false;
 let adminFlyEnabled=false;
 let adminTool=null;
@@ -8367,15 +8399,11 @@ function beginGameEnding(){
   }
 
   controlsOpen=false;
-  phoneOpen=false;
-  deepseekerAppOpen=false;
   chatOpen=false;
   pauseMenuOpen=false;
   pauseOverlay?.classList.remove("visible");
   pauseOverlay?.setAttribute("aria-hidden","true");
   controls.classList.add("hidden");
-  phone.classList.remove("open","app-open");
-  phone.setAttribute("aria-hidden","true");
   crosshair.style.display="none";
 
   if(!endingOverlay){
@@ -8446,7 +8474,46 @@ function beginGameEnding(){
   },6500);
 }
 
+function showBetaCompletionScreen({broadcast=true}={}){
+  if(gameEnded||!gameStarted||!betaCompletionScreen) return false;
+
+  gameEnded=true;
+  pauseMenuOpen=false;
+  pauseOverlay?.classList.remove("visible");
+  pauseOverlay?.setAttribute("aria-hidden","true");
+  player.inputEnabled=false;
+  player.keys.clear();
+  player.vel.set(0,0,0);
+  spiderActive=false;
+  spiderSpawnPending=false;
+  spiderJumpscareTimer=0;
+  spiderBehaviorState="idle";
+  spiderEntity.visible=false;
+  spiderRevealLight.visible=false;
+  spiderRevealLight.intensity=0;
+  normalSpiderHunter.hide();
+  flashlightOn=false;
+  flashlight.visible=false;
+  player.setFlashlightVisual(false);
+
+  if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
+  controlsOpen=false;
+  chatOpen=false;
+  controls.classList.add("hidden");
+  crosshair.style.display="none";
+  overlay.classList.add("hidden");
+  betaCompletionScreen.classList.remove("hidden");
+  betaCompletionScreen.setAttribute("aria-hidden","false");
+
+  if(broadcast) multiplayer.broadcastWorldEvent("demo_complete","ending",{});
+  return true;
+}
+
 function beginVictoryEnding({broadcast=true,demo=false}={}){
+  if(demo){
+    showBetaCompletionScreen({broadcast});
+    return;
+  }
   if(gameEnded||!gameStarted) return;
 
   gameEnded=true;
@@ -8470,12 +8537,8 @@ function beginVictoryEnding({broadcast=true,demo=false}={}){
 
   if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
   controlsOpen=false;
-  phoneOpen=false;
-  deepseekerAppOpen=false;
   chatOpen=false;
   controls.classList.add("hidden");
-  phone.classList.remove("open","app-open");
-  phone.setAttribute("aria-hidden","true");
   crosshair.style.display="none";
   overlay.classList.add("hidden");
 
@@ -8761,46 +8824,16 @@ const STORY = [
 
 
 
-function escapeStoryHtml(value){
-  return String(value??"").replace(/[&<>"']/g,char=>({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    "\"":"&quot;",
-    "'":"&#39;"
-  })[char]);
-}
-
-function renderStoryLog(){
-  const unlocked=STORY.slice(0,storyStage+1);
-  const storyHtml=unlocked.map(entry=>
-    '<div class="storyEntry">'+
-      '<div class="storyMeta">'+escapeStoryHtml(entry.title)+' · DEPTH '+entry.depth+'</div>'+
-      '<div class="storyText">'+escapeStoryHtml(entry.text)+'</div>'+
-    '</div>'
-  ).join("");
-  const missionHtml=missionState.log.map(entry=>
-    '<div class="storyEntry">'+
-      '<div class="storyMeta">'+escapeStoryHtml(entry.title)+' · FIELD LOG</div>'+
-      '<div class="storyText">'+escapeStoryHtml(entry.text)+'</div>'+
-    '</div>'
-  ).join("");
-  phoneStory.innerHTML=storyHtml+missionHtml;
-}
-
 function applyStoryStage(index, announce=true){
   storyStage=index;
   const entry=STORY[storyStage];
-  phoneDepth.textContent=String(entry.depth);
-  phoneCardText.textContent=entry.objective;
   objective.textContent=entry.objective;
-  renderStoryLog();
 
   if(announce && storyStage>0){
     showSignalGlitch(
-      entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "NEW NOTE FROM ????",
+      entry.title==="DEEPSEEKER FILE 01" ? "FILE FOUND" : "UNKNOWN TRANSMISSION",
       entry.text,
-      3400
+      4200
     );
     eventText.style.opacity="0";
   }
@@ -8837,7 +8870,7 @@ function updateEquipmentStatus(){
   equipmentStatus.hidden=!available;
   if(!available)return;
   equipmentStatus.textContent=equippedTool==="radio"
-    ?"SIGNAL RADIO · Q TO SWITCH TO FLASHLIGHT"
+    ?"SIGNAL RADIO · R TO TUNE · Q TO SWITCH TO FLASHLIGHT"
     :"FLASHLIGHT · Q TO SWITCH TO RADIO";
 }
 
@@ -8888,41 +8921,17 @@ function toggleFlashlight(){
   multiplayer.sendState(true);
 
   if(tutorialOpenRoomActive && !houseMode && gameStarted && houseTutorialStage===4 && flashlightOn){
-    setHouseTutorialStage(5);
+    setHouseTutorialStage(7);
   }
 }
-function refreshPhoneContent(){
-  phoneAppName.textContent="DEEPSEEKER";
-  phoneDepth.textContent=String(STORY[storyStage].depth);
-  phoneDepthLabel.textContent="DEPTH";
-  phoneCardTitle.textContent="CURRENT OBJECTIVE";
-  phoneCardText.textContent=STORY[storyStage].objective;
-  renderStoryLog();
-}
-
-function showHouseIntroPhoneMessage(){
-  if(houseIntroMessageShown) return;
+function showHouseIntroTransmission(){
+  if(houseIntroMessageShown)return;
   houseIntroMessageShown=true;
-
-  phoneOpen=true;
-  deepseekerAppOpen=true;
-  phone.classList.add("open","app-open");
-  phone.setAttribute("aria-hidden","false");
-  crosshair.style.display="none";
-
-  phoneAppName.textContent="MESSAGE FROM ????";
-  phoneDepth.textContent="!";
-  phoneDepthLabel.textContent="NEW MESSAGE";
-  phoneCardTitle.textContent="KEEP MOVING";
-  phoneCardText.textContent="You're in the Backrooms. Have a look around. Press F to try your flashlight.";
-
-  renderStoryLog();
-  phoneStory.insertAdjacentHTML("afterbegin",`
-    <div class="storyEntry">
-      <div class="storyMeta">???? · ENTRY TUTORIAL</div>
-      <div class="storyText">You're in the Backrooms. Have a look around. Press F to try your flashlight.</div>
-    </div>
-  `);
+  showSignalGlitch(
+    "UNKNOWN TRANSMISSION",
+    "You are in the Backrooms. Have a look around. Press F to try your flashlight.",
+    4200
+  );
 }
 
 function setAdminStatus(message){
@@ -8930,7 +8939,10 @@ function setAdminStatus(message){
   if(adminPanelStatus) adminPanelStatus.textContent=message;
 }
 function openAdminAccess(){
-  if(!phoneOpen) return;
+  if(!gameStarted || gameEnded || pauseMenuOpen)return;
+  if(controlsOpen)hideControls();
+  if(chatOpen)closeChat(false);
+  if(multiplayerMapOpen)toggleMultiplayerMap(false);
   player.keys.clear();
   player.vel.set(0,0,0);
   if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
@@ -8947,6 +8959,10 @@ function closeAdminAccess(){
   adminOverlay.setAttribute("aria-hidden","true");
   adminPasswordInput.value="";
 }
+const closeAdminAndResume=()=>{
+  closeAdminAccess();
+  if(gameStarted&&!gameEnded&&!controlsOpen)player.lock();
+};
 function setAdminFlyEnabled(enabled){
   if(enabled && (!adminUnlocked || !gameStarted || houseMode || gameEnded)){
     adminFlyEnabled=false;
@@ -8996,7 +9012,7 @@ function clearAdminProjectiles(){
   adminProjectiles.length=0;
 }
 function fireAdminWater(kind){
-  if(!adminUnlocked || !gameStarted || phoneOpen) return;
+  if(!adminUnlocked || !gameStarted || gameEnded || adminOverlay.classList.contains("open")) return;
   const direction=new THREE.Vector3();
   camera.getWorldDirection(direction);
   const isRpg=kind==="waterRpg";
@@ -9609,7 +9625,7 @@ function teleportAdminToExit(){
   world.update(player.pos.x,player.pos.z);
 
   closeAdminAccess();
-  if(phoneOpen) togglePhone();
+  player.lock();
   eventText.textContent="ADMIN TELEPORT · MAINTENANCE DOOR AHEAD";
   eventText.style.opacity="1";
   setTimeout(()=>{eventText.style.opacity="0";},2200);
@@ -9693,70 +9709,12 @@ function teleportAdminToRadio(){
 
   world.update(player.pos.x,player.pos.z);
   closeAdminAccess();
-  if(phoneOpen){
-    phoneOpen=false;
-    deepseekerAppOpen=false;
-    phone.classList.remove("open","app-open");
-    phone.setAttribute("aria-hidden","true");
-  }
   crosshair.style.display="none";
   player.lock();
   eventText.textContent="ADMIN TELEPORT · FIELD RADIO AHEAD";
   eventText.style.opacity="1";
   setTimeout(()=>{if(eventText.textContent==="ADMIN TELEPORT · FIELD RADIO AHEAD")eventText.style.opacity="0";},2200);
 }
-
-function togglePhone(){
-  phoneOpen=!phoneOpen;
-  // Skip the phone launcher: open straight into DEEPSEEKER every time.
-  deepseekerAppOpen=phoneOpen;
-  phone.classList.toggle("open",phoneOpen);
-  phone.classList.toggle("app-open",phoneOpen);
-  phone.setAttribute("aria-hidden",String(!phoneOpen));
-
-  if(phoneOpen){
-    if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
-    crosshair.style.display="none";
-    refreshPhoneContent();
-
-    if(tutorialOpenRoomActive && !houseMode && gameStarted && houseTutorialStage===5){
-      setHouseTutorialStage(6);
-    }
-  }else{
-    adminOverlay.classList.remove("open");
-    adminOverlay.setAttribute("aria-hidden","true");
-
-    if(tutorialOpenRoomActive && !houseMode && gameStarted){
-      if(houseTutorialStage===0){
-        setHouseTutorialStage(1);
-      }else if(houseTutorialStage===6){
-        setHouseTutorialStage(7);
-      }
-    }
-
-    if(!controlsOpen) player.lock();
-  }
-}
-
-function openDeepSeekerApp(){
-  if(!phoneOpen) return;
-  deepseekerAppOpen=true;
-  phone.classList.add("app-open");
-}
-
-const phoneSaveStatus=document.getElementById("phoneSaveStatus");
-document.querySelectorAll(".phoneSaveSlot").forEach(button=>{
-  button.addEventListener("click",async()=>{
-    const slot=normalizeSaveSlot(button.dataset.slot);
-    if(phoneSaveStatus) phoneSaveStatus.textContent=`SAVING SLOT ${slot}…`;
-    const saved=await saveGame(slot);
-    if(phoneSaveStatus){
-      phoneSaveStatus.textContent=saved
-        ? `SAVED TO SLOT ${slot}`
-        : `SAVE FAILED — SLOT ${slot}`;
-    }
-  });
-});
 
 // NEW GAME uses the document-level capture handler above so the menu can safely rebuild its DOM.
 
@@ -9843,15 +9801,8 @@ chatInput.addEventListener("keydown",e=>{
   }
 });
 
-deepseekerIcon.addEventListener("click",openDeepSeekerApp);
-phoneHome.addEventListener("click",()=>{
-  if(!phoneOpen) return;
-  deepseekerAppOpen=false;
-  phone.classList.remove("app-open");
-});
-adminIcon.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); openAdminAccess(); });
-adminCloseButton.addEventListener("click",closeAdminAccess);
-adminAdminCloseButton.addEventListener("click",closeAdminAccess);
+adminCloseButton.addEventListener("click",closeAdminAndResume);
+adminAdminCloseButton.addEventListener("click",closeAdminAndResume);
 adminUnlockButton.addEventListener("click",()=>{
   if(adminPasswordInput.value===ADMIN_PASSWORD){
     adminUnlocked=true;
@@ -9868,14 +9819,15 @@ adminPasswordInput.addEventListener("keydown",e=>{ if(e.code==="Enter"){ e.preve
 adminLockButton.addEventListener("click",lockAdminAccess);
 function runAdminCommand(){
   if(!adminUnlocked)return;
-  const command=(adminCommandInput.value||"").trim().toLowerCase().replace(/\s+/g," ");
+  const rawCommand=(adminCommandInput.value||"").trim().replace(/\s+/g," ");
+  const command=rawCommand.toLowerCase();
   adminCommandInput.value="";
   if(!command){
     adminPanelStatus.textContent="ENTER A COMMAND · TYPE HELP";
     return;
   }
   if(command==="help"||command==="?"){
-    adminPanelStatus.textContent="AVAILABLE: GLITCH · TESTMAP · HELP";
+    adminPanelStatus.textContent="AVAILABLE: GLITCH [HEADLINE | MESSAGE] · TESTMAP · HELP";
     return;
   }
   if(["testmap","test map","backrooms test"].includes(command)){
@@ -9886,13 +9838,15 @@ function runAdminCommand(){
     if(!exitAdminBackroomsTestMap())setAdminStatus("TEST MAP IS NOT ACTIVE");
     return;
   }
-  if(["glitch","signal glitch","test glitch","test signal","signal test"].includes(command)){
-    showSignalGlitch(
-      "SIGNAL TEST",
-      "MANUAL ADMIN OVERRIDE // THIS IS NOT A STORY EVENT",
-      5200
-    );
-    adminPanelStatus.textContent="SIGNAL GLITCH TEST TRIGGERED · LOCAL ONLY";
+  const glitchMatch=rawCommand.match(/^(?:glitch|signal glitch|test glitch|test signal|signal test|transmission|test transmission)(?:\s+([\s\S]+))?$/i);
+  if(glitchMatch){
+    const supplied=String(glitchMatch[1]||"");
+    const [headlineInput,...messageParts]=supplied.split("|");
+    const headline=headlineInput.trim()||"UNKNOWN TRANSMISSION";
+    const detail=messageParts.join("|").trim()||
+      (supplied.trim()?"MANUAL FIELD TRANSMISSION // SIGNAL ACQUIRED":"MANUAL ADMIN TEST // TRANSMISSION CHANNEL OPEN");
+    showSignalGlitch(headline,detail,6500);
+    adminPanelStatus.textContent="TRANSMISSION DISPLAYED · LOCAL ONLY";
     return;
   }
   adminPanelStatus.textContent="UNKNOWN COMMAND · TYPE HELP";
@@ -9908,15 +9862,7 @@ adminFlyButton.addEventListener("click",()=>{
   if(!adminUnlocked) return;
   const enabling=!adminFlyEnabled;
   if(!setAdminFlyEnabled(enabling)||!enabling)return;
-  // The phone disables player.inputEnabled. Close it immediately after flight
-  // is enabled so keyboard movement actually reaches Player.update().
   closeAdminAccess();
-  if(phoneOpen){
-    phoneOpen=false;
-    deepseekerAppOpen=false;
-    phone.classList.remove("open","app-open");
-    phone.setAttribute("aria-hidden","true");
-  }
   crosshair.style.display="none";
   player.lock();
 });
@@ -9982,14 +9928,14 @@ overlay.addEventListener("click",(e)=>{
 });
 
 renderer.domElement.addEventListener("mousedown",e=>{
-  if(e.button===0 && adminUnlocked && adminTool && gameStarted && !phoneOpen){
+  if(e.button===0 && adminUnlocked && adminTool && gameStarted && !adminOverlay.classList.contains("open")){
     fireAdminWater(adminTool);
     e.preventDefault();
   }
 });
 
 renderer.domElement.addEventListener("click",()=>{
-  if(gameStarted && !phoneOpen && !controlsOpen && !chatOpen && document.pointerLockElement!==renderer.domElement){
+  if(gameStarted && !controlsOpen && !chatOpen && !adminOverlay.classList.contains("open") && document.pointerLockElement!==renderer.domElement){
     audio.start();
     player.lock();
   }
@@ -10021,7 +9967,7 @@ document.addEventListener("pointerlockchange",()=>{
     return;
   }
 
-  if(!controlsOpen && !phoneOpen && !chatOpen){
+  if(!controlsOpen && !chatOpen && !adminOverlay.classList.contains("open")){
     if(locked){
       overlay.classList.add("hidden");
     }else if(gameStarted && !gameEnded){
@@ -10029,13 +9975,7 @@ document.addEventListener("pointerlockchange",()=>{
     }
   }
   crosshair.style.display=locked && !chatOpen?"block":"none";
-  if(locked && phoneOpen){
-    phoneOpen=false;
-    deepseekerAppOpen=false;
-    phone.classList.remove("open","app-open");
-    phone.setAttribute("aria-hidden","true");
-  }
-});
+  });
 
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden){
@@ -10050,8 +9990,8 @@ document.addEventListener("visibilitychange",()=>{
     gameStarted &&
     !gameEnded &&
     !controlsOpen &&
-    !phoneOpen &&
     !chatOpen &&
+    !adminOverlay.classList.contains("open") &&
     document.pointerLockElement!==renderer.domElement
   ){
     showPauseMenu();
@@ -10065,8 +10005,19 @@ document.addEventListener("keydown",e=>{
     return;
   }
 
-  if(adminOverlay?.classList.contains("open")) return;
+  if(adminOverlay?.classList.contains("open")){
+    if(e.code==="Escape"){
+      e.preventDefault();
+      closeAdminAndResume();
+    }
+    return;
+  }
   if(gameEnded) return;
+  if(e.code==="F3"&&!e.repeat&&gameStarted&&!gameEnded&&!pauseMenuOpen&&!securityCameras.active&&!computerSystem.openState){
+    e.preventDefault();
+    openAdminAccess();
+    return;
+  }
 
   if(securityCameras.active){
     if(e.code==="Escape"){
@@ -10095,7 +10046,7 @@ document.addEventListener("keydown",e=>{
     return;
   }
 
-  if(e.code==="Enter" && !e.repeat && gameStarted && !phoneOpen && !controlsOpen && !chatOpen){
+  if(e.code==="Enter" && !e.repeat && gameStarted && !controlsOpen && !chatOpen){
     e.preventDefault();
     openChat();
     return;
@@ -10106,35 +10057,34 @@ document.addEventListener("keydown",e=>{
   if(e.code==="Escape"&&gameStarted&&!gameEnded){
     e.preventDefault();
     if(controlsOpen){hideControls();player.lock();return;}
-    if(phoneOpen){togglePhone();return;}
     showPauseMenu();
     return;
   }
 
-  if(e.code==="KeyE" && !e.repeat && !phoneOpen && !controlsOpen && !chatOpen){
+  if(e.code==="KeyE" && !e.repeat && !controlsOpen && !chatOpen){
     if(interaction.interact()){
       return;
     }
-  }else if(e.code==="KeyF" && gameStarted && !phoneOpen && !controlsOpen){
+  }else if(e.code==="KeyF" && gameStarted && !controlsOpen){
     if(equippedTool==="radio")setEquippedTool("flashlight",{turnOnFlashlight:false});
     toggleFlashlight();
-  }else if(e.code==="KeyQ" && !e.repeat && gameStarted && !phoneOpen && !controlsOpen){
+  }else if(e.code==="KeyQ" && !e.repeat && gameStarted && !controlsOpen){
     if(radioCollected){
       e.preventDefault();
       setEquippedTool(equippedTool==="radio"?"flashlight":"radio");
     }
-  }else if(e.code==="KeyM" && !phoneOpen && !controlsOpen){ muted=audio.toggleMute(); }
-  else if(e.code==="KeyN" && !e.repeat){
-    if(gameStarted && !phoneOpen && !controlsOpen){
+  }else if(e.code==="KeyR" && !e.repeat && gameStarted && !controlsOpen && radioCollected && equippedTool==="radio"){
+    e.preventDefault();
+    cycleRadioChannel();
+  }else if(e.code==="KeyM" && !controlsOpen){
+    muted=audio.toggleMute();
+  }else if(e.code==="KeyN" && !e.repeat){
+    if(gameStarted && !controlsOpen){
       e.preventDefault();
       toggleMultiplayerMap();
     }
-  }else if(e.code==="KeyP" && !e.repeat){
-    if(controlsOpen) hideControls();
-    else togglePhone();
   }else if(e.code==="Tab"){
     e.preventDefault();
-    if(phoneOpen) return;
     controlsOpen?hideControls():showControls();
   }
 });
@@ -10576,7 +10526,6 @@ function animate(){
     gameStarted &&
     !gameEnded &&
     !pauseMenuOpen &&
-    !phoneOpen &&
     !controlsOpen &&
     !chatOpen &&
     !securityCameras.active &&

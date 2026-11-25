@@ -51,16 +51,17 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
     linear-gradient(90deg,rgba(0,0,0,.68),transparent 22% 78%,rgba(0,0,0,.68));
   box-shadow:inset 0 0 0 1px rgba(100,24,31,.10),inset 0 0 150px rgba(0,0,0,.96);
 }
-#signalGlitchNoise{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.72}
+#signalGlitchNoise{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.9}
 .signalGlitchFragment{
-  position:absolute;display:block;max-width:30vw;overflow:visible;white-space:nowrap;line-height:1.8;
-  color:rgba(128,61,66,.25);font:500 9px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;
-  letter-spacing:var(--signal-spacing,2px);text-shadow:0 0 8px rgba(68,0,7,.34);
+  position:absolute;display:block;max-width:42vw;overflow:visible;white-space:nowrap;line-height:1.8;
+  color:rgba(151,77,85,.28);font:500 var(--signal-size,10px)/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:var(--signal-spacing,1px);text-shadow:0 0 10px rgba(95,0,9,.42);
   opacity:0;will-change:opacity,transform;
-  animation:signalFragmentFade var(--signal-duration,7s) ease-in-out var(--signal-delay,0s) infinite;
+  animation:signalFragmentPhase var(--signal-duration,12s) ease-in-out var(--signal-delay,0s) infinite;
 }
-.signalGlitchFragment:nth-child(3n){color:rgba(112,68,70,.19);font-size:10px}
-.signalGlitchFragment:nth-child(4n){color:rgba(103,34,41,.25);filter:blur(.45px)}
+.signalGlitchFragment:nth-child(3n){color:rgba(178,103,108,.26)}
+.signalGlitchFragment:nth-child(4n){color:rgba(116,52,59,.32)}
+.signalGlitchFragmentDim{color:rgba(122,66,70,.18)!important;filter:blur(.35px)}
 .signalGlitchCore{
   position:relative;z-index:3;width:min(900px,90vw);padding:clamp(22px,5vw,58px);
   box-sizing:border-box;text-align:center;
@@ -76,27 +77,17 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
   animation:signalCoreFlicker 3.8s steps(1,end) infinite;
 }
 #signalGlitchMessage.long{font-size:clamp(21px,4vw,46px);letter-spacing:clamp(1px,.35vw,5px)}
-#signalGlitchMessage::before,#signalGlitchMessage::after{
-  content:attr(data-text);position:absolute;inset:0;overflow:hidden;pointer-events:none;
-  white-space:inherit;overflow-wrap:inherit;
-}
-#signalGlitchMessage::before{
-  color:#6e252d;opacity:.68;transform:translateX(-2px);mix-blend-mode:screen;
-  clip-path:inset(0 0 68% 0);animation:signalSliceRed 2.5s steps(2,end) infinite;
-}
-#signalGlitchMessage::after{
-  color:#a35f63;opacity:.48;transform:translateX(2px);mix-blend-mode:screen;
-  clip-path:inset(72% 0 0 0);animation:signalSliceWhite 2.9s steps(2,end) infinite;
-}
+#signalGlitchDetail{max-width:min(680px,100%);margin:20px auto 0;color:rgba(184,130,130,.88);font:500 clamp(13px,1.7vw,17px)/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.7px;text-shadow:0 2px 14px #000;white-space:pre-wrap;overflow-wrap:anywhere;opacity:0;transform:translateY(8px);transition:opacity .28s ease .12s,transform .28s ease .12s}
+#signalGlitchDetail[hidden]{display:none}
+#signalGlitch.active #signalGlitchDetail:not([hidden]){opacity:1;transform:none}
 #signalGlitch.active .signalGlitchCore{animation:signalCoreEnter .38s steps(3,end) both}
-@keyframes signalFragmentFade{
-  0%,100%{opacity:0;transform:translate3d(0,18px,0) skewX(-5deg) scale(.98)}
-  18%{opacity:0;transform:translate3d(0,12px,0) skewX(-3deg) scale(.99)}
-  34%{opacity:.13;transform:translate3d(calc(var(--signal-drift-x,18px)*-.22),calc(var(--signal-drift-y,-16px)*-.12),0) skewX(2deg) scale(1)}
-  52%{opacity:.22;transform:translate3d(var(--signal-drift-x,18px),var(--signal-drift-y,-16px),0) skewX(-2deg) scale(1.01)}
-  74%{opacity:.07;transform:translate3d(calc(var(--signal-drift-x,18px)*-.35),calc(var(--signal-drift-y,-16px)*.5),0) skewX(3deg) scale(1)}
-  90%{opacity:.15;transform:translate3d(calc(var(--signal-drift-x,18px)*.22),calc(var(--signal-drift-y,-16px)*-.3),0) skewX(-2deg) scale(.99)}
-  98%{opacity:0;transform:translate3d(0,-14px,0) skewX(3deg) scale(.98)}
+@keyframes signalFragmentPhase{
+  0%,100%{opacity:0;transform:translate3d(0,0,0) rotate(var(--signal-rotation,0deg)) scale(.96)}
+  12%{opacity:0;transform:translate3d(0,7px,0) rotate(var(--signal-rotation,0deg)) scale(.97)}
+  28%{opacity:calc(var(--signal-opacity,.18)*.62);transform:translate3d(calc(var(--signal-drift-x,30px)*-.18),calc(var(--signal-drift-y,-24px)*-.18),0) rotate(var(--signal-rotation,0deg)) scale(1)}
+  49%{opacity:var(--signal-opacity,.18);transform:translate3d(var(--signal-drift-x,30px),var(--signal-drift-y,-24px),0) rotate(var(--signal-rotation,0deg)) scale(1.025)}
+  69%{opacity:calc(var(--signal-opacity,.18)*.76);transform:translate3d(calc(var(--signal-drift-x,30px)*-.24),calc(var(--signal-drift-y,-24px)*.22),0) rotate(var(--signal-rotation,0deg)) scale(1.01)}
+  86%{opacity:0;transform:translate3d(calc(var(--signal-drift-x,30px)*.42),calc(var(--signal-drift-y,-24px)*-.35),0) rotate(var(--signal-rotation,0deg)) scale(.98)}
 }
 @keyframes signalCoreFlicker{
   0%,89%,92%,95%,98%,100%{opacity:1;filter:none}
@@ -104,17 +95,6 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
   91%{opacity:.9;transform:translateX(-1px)}
   94%{opacity:.48;filter:blur(.6px)}
   97%{opacity:.82;transform:translateX(1px)}
-}
-@keyframes signalSliceRed{
-  0%,84%,100%{clip-path:inset(0 0 84% 0);transform:translate(-2px,-1px)}
-  86%{clip-path:inset(22% 0 52% 0);transform:translate(4px,1px)}
-  88%{clip-path:inset(66% 0 16% 0);transform:translate(-4px,0)}
-  90%{clip-path:inset(0 0 84% 0);transform:translate(2px,1px)}
-}
-@keyframes signalSliceWhite{
-  0%,78%,100%{clip-path:inset(82% 0 0 0);transform:translate(2px,1px)}
-  80%{clip-path:inset(42% 0 39% 0);transform:translate(-4px,-1px)}
-  82%{clip-path:inset(86% 0 3% 0);transform:translate(4px,0)}
 }
 @keyframes signalCoreEnter{
   0%{opacity:0;transform:scale(1.018) skewX(4deg);filter:blur(4px)}
@@ -129,7 +109,6 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 }
 @media(prefers-reduced-motion:reduce){
   #signalGlitch::before,.signalGlitchFragment,#signalGlitchMessage,
-  #signalGlitchMessage::before,#signalGlitchMessage::after,
   #signalGlitch.active .signalGlitchCore{animation:none!important}
   .signalGlitchFragment{opacity:.06}
 }
@@ -137,6 +116,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
   .signalGlitchCore{padding:24px 12px}
   .signalGlitchFragment{max-width:48vw;font-size:8px}
 }
+@media(max-width:600px){#signalGlitchDetail{font-size:12px;line-height:1.55;margin-top:14px}}
 #controlsPanel{position:fixed;inset:0;z-index:12;display:grid;place-items:center;background:rgba(0,0,0,.76);backdrop-filter:blur(7px);color:#ddd}
 #controlsPanel.hidden{display:none}
 #controlsBox{width:min(680px,calc(100vw - 42px));padding:28px;border:1px solid #fff2;border-radius:18px;background:#090b09f5;box-shadow:0 25px 100px #000}
@@ -222,6 +202,43 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
   overflow:auto;
 }
 #betaTestScreen.hidden{display:none}
+#betaCompletionScreen{
+  position:fixed;
+  inset:0;
+  z-index:20000;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  box-sizing:border-box;
+  background:#050605;
+  color:#f1f1eb;
+  text-align:center;
+}
+#betaCompletionScreen.hidden{display:none}
+#betaCompletionScreen section{width:min(680px,100%)}
+#betaCompletionScreen h1{
+  margin:0;
+  font:600 clamp(25px,5vw,42px)/1.2 system-ui,sans-serif;
+}
+#betaCompletionScreen p{
+  max-width:560px;
+  margin:20px auto 0;
+  color:#c6c8c1;
+  font:400 clamp(14px,2vw,17px)/1.65 system-ui,sans-serif;
+}
+#betaCompletionReturnButton{
+  margin-top:28px;
+  min-height:42px;
+  padding:10px 18px;
+  border:1px solid #62655f;
+  border-radius:2px;
+  background:transparent;
+  color:#f1f1eb;
+  font:500 11px system-ui,sans-serif;
+  letter-spacing:1px;
+  cursor:pointer;
+}
+#betaCompletionReturnButton:hover{background:#171a17}
 .betaTestCountdown{margin:-6px 0 0;color:#a9a187;font-size:10px;letter-spacing:1.2px;line-height:1.5}
 #betaTestContinueButton:disabled{opacity:.46;filter:saturate(.45);cursor:not-allowed;transform:none;box-shadow:none}
 .arachWarningCard{
@@ -320,32 +337,7 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 .lobbyHostBadge{font-size:8px;letter-spacing:2px;padding:5px 8px;border:1px solid rgba(216,201,138,.32);border-radius:99px;color:#d2c79d;background:rgba(216,201,138,.06)}
 .lobbyActions{display:grid;grid-template-columns:1fr 1fr;gap:9px;width:min(560px,90vw)}
 .lobbyActions .menuButton{width:100%}
-#phone{position:fixed;left:50%;bottom:6%;transform:translateX(-50%) translateY(115%);width:min(330px,82vw);aspect-ratio:.49;border:7px solid #090909;border-radius:30px;background:#050505;box-shadow:0 24px 80px #000,0 0 0 1px #ffffff16;z-index:15;opacity:0;pointer-events:none;transition:transform .22s ease,opacity .22s ease}
-#phone.open{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
-#phoneScreen{position:absolute;inset:7px;border-radius:22px;overflow:hidden;background:linear-gradient(180deg,#11130f 0%,#080907 100%);color:#dedbbf}
-#phoneNotch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:24px;border-radius:0 0 15px 15px;background:#050505;z-index:2}
-#phoneApp{padding:22px 20px}
-#phoneHomeScreen{padding:22px 18px;height:100%;box-sizing:border-box}
-#phoneApps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 12px}
-.phoneIcon{appearance:none;border:0;background:none;color:#d8d7c7;display:flex;flex-direction:column;align-items:center;gap:7px;font:inherit;cursor:pointer}
-.phoneIconBubble{width:58px;height:58px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(145deg,#aaa272,#54533e);box-shadow:0 6px 18px #0008,0 0 0 1px #ffffff12;font-size:20px;font-weight:700;color:#13140f}
-.phoneIconLabel{font-size:9px;letter-spacing:.5px;text-align:center}
-#phoneApp{display:none;padding:22px 20px}
-#phone.app-open #phoneHomeScreen{display:none}
-#phone.app-open #phoneApp{display:block}
-#phoneScreen::after{content:"";position:absolute;left:50%;bottom:7px;transform:translateX(-50%);width:105px;height:4px;border-radius:8px;background:#ffffff55;pointer-events:none}
-#phoneHome{display:block;position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:105px;height:16px;border:0;border-radius:8px;background:transparent;cursor:pointer;z-index:3;padding:0}
 
-#phoneAppName{font-size:11px;letter-spacing:4px;color:#aaa477;margin-bottom:8px}
-#phoneDepth{font-size:42px;letter-spacing:2px;font-weight:500;color:#f0eccf;margin:0}
-#phoneDepthLabel{font-size:10px;letter-spacing:3px;color:#6f705f;margin-bottom:24px}
-#phoneCard{border:1px solid #ffffff15;border-radius:14px;padding:15px;background:#ffffff06}
-#phoneCardTitle{font-size:11px;letter-spacing:2px;color:#aaa477;margin-bottom:8px}
-#phoneCardText{font-size:13px;line-height:1.55;color:#c6c5b6}
-#phoneSaveSlots{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
-#phoneSaveStatus{grid-column:1/-1;font-size:8px;letter-spacing:1.2px;color:#817d6c;text-align:center;min-height:12px}
-.phoneSaveSlot{padding:9px 6px;border:1px solid #ffffff14;border-radius:9px;background:#ffffff06;color:#aaa477;font:inherit;font-size:10px;letter-spacing:1px;cursor:pointer}
-.phoneSaveSlot:hover{background:#ffffff10;border-color:#d8c98a44}
 #saveSlots{width:min(420px,88vw);display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .saveSlotCard{min-width:0;padding:12px 9px;border:1px solid rgba(229,218,170,.14);border-radius:11px;background:#ffffff05;color:#c5bea4;text-align:left;transition:border-color .15s,background .15s,transform .15s}
 .saveSlotCard:hover{background:#ffffff09;transform:translateY(-1px)}
@@ -359,20 +351,10 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 .saveSlotActions button:hover{background:#ffffff10;border-color:#d8c98a44}
 .saveSlotActions button:disabled{opacity:.35;cursor:not-allowed}
 .lobbySaveChoice{margin-top:8px;font-size:11px;letter-spacing:1.4px;color:#aaa477}
-#phoneStory{margin-top:18px;max-height:235px;overflow:auto;padding-right:3px}
-#phoneStory::-webkit-scrollbar{width:3px}
-#phoneStory::-webkit-scrollbar-thumb{background:#ffffff18;border-radius:9px}
-.storyEntry{padding:12px 0;border-top:1px solid #ffffff10}
-.storyMeta{font-size:9px;letter-spacing:2px;color:#787866;margin-bottom:6px}
-.storyText{font-size:12px;line-height:1.55;color:#c8c7bb}
-.storyLocked{color:#57584e;font-size:10px;letter-spacing:1px;padding:8px 0}
 
-#phoneHome::after{content:"";position:absolute;left:0;top:6px;width:105px;height:4px;border-radius:8px;background:#ffffff55}
-#adminIcon{position:absolute;right:13px;bottom:30px;width:38px;height:38px;padding:0;border:1px solid #ffffff14;border-radius:12px;background:#ffffff06;color:#aaa477;font:inherit;font-size:12px;letter-spacing:1px;cursor:pointer;z-index:4;box-shadow:0 5px 15px #0006}
-#adminIcon:hover{background:#ffffff10;border-color:#d8c98a44}
-.adminOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;background:rgba(4,5,4,.92);z-index:8}
+.adminOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;overflow:auto;padding:20px;box-sizing:border-box;background:rgba(4,5,4,.94);z-index:12000}
 .adminOverlay.open{display:flex}
-.adminCard{width:100%;padding:16px;border:1px solid #ffffff14;border-radius:14px;background:#090a08;box-shadow:0 14px 34px #0008}
+.adminCard{width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;box-sizing:border-box;padding:18px;border:1px solid #ffffff14;border-radius:14px;background:#090a08;box-shadow:0 14px 34px #0008}
 .adminTitle{font-size:10px;letter-spacing:3px;color:#d8c98a;margin-bottom:8px}
 .adminSub{font-size:9px;line-height:1.5;color:#7d7d70;margin-bottom:12px}
 .adminInput{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ffffff14;border-radius:8px;background:#050605;color:#ece7cb;font:inherit;font-size:11px;outline:none}
@@ -390,7 +372,6 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 .adminHint{margin-top:9px;font-size:8px;line-height:1.45;color:#69695f}
 .adminPanel{display:none}
 .adminPanel.open{display:block}
-#phoneHint{position:fixed;left:50%;bottom:3%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#77745f;z-index:16;opacity:0;pointer-events:none;transition:opacity .2s}
 .usernameField{display:flex;flex-direction:column;gap:7px;width:min(420px,88vw)}
 .usernameLabel{color:#9f987f;font-size:9px;letter-spacing:1.8px;text-align:left}
 .usernameRow{display:flex;gap:8px;width:100%}
@@ -408,7 +389,6 @@ background:linear-gradient(90deg,transparent,rgba(216,201,138,.035),transparent)
 #chatInput{display:none;width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid rgba(216,201,138,.34);border-radius:10px;background:rgba(4,5,4,.95);color:#eee7cc;font:inherit;font-size:12px;outline:none;box-shadow:0 10px 30px #0008}
 #chatPanel.open #chatInput{display:block}
 #chatHint{margin-top:6px;font-size:9px;letter-spacing:1.5px;color:#8d8a76;text-shadow:0 1px 5px #000}
-#phone.open + #phoneHint{opacity:1}
 
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 @media(max-width:700px){.grid{grid-template-columns:1fr}.lobbySlots{grid-template-columns:1fr}}
@@ -481,11 +461,7 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
 <body>
 <div id="app"></div>
 <div id="crosshair"></div>
-<div id="phone" aria-hidden="true">
-  <div id="phoneScreen">
-    <div id="phoneNotch"></div>
-    <button id="adminIcon" type="button" aria-label="Open Admin">A</button>
-    <div id="adminOverlay" class="adminOverlay" aria-hidden="true">
+<div id="adminOverlay" class="adminOverlay" aria-hidden="true">
       <div id="adminAuthCard" class="adminCard">
         <div class="adminTitle">ADMIN ACCESS</div>
         <div class="adminSub">PASSWORD REQUIRED</div>
@@ -496,7 +472,7 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
       <div id="adminPanelCard" class="adminCard adminPanel">
         <div class="adminTitle">ADMIN</div>
         <div class="adminSub">TEST TOOLS · LOCAL ONLY</div>
-        <div class="adminCommandRow"><input id="adminCommandInput" class="adminInput" type="text" maxlength="48" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ENTER COMMAND"><button id="adminCommandRunButton" class="adminButton adminPrimary" type="button">RUN</button></div>
+        <div class="adminCommandRow"><input id="adminCommandInput" class="adminInput" type="text" maxlength="560" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="GLITCH HEADLINE | MESSAGE"><button id="adminCommandRunButton" class="adminButton adminPrimary" type="button">RUN</button></div>
         <div class="adminRow"><button id="adminFlyButton" class="adminButton" type="button">FLY: OFF</button><button id="adminTeleportExitButton" class="adminButton adminPrimary" type="button">TELEPORT TO EXIT</button></div>
         <div class="adminRow"><button id="adminTeleportRadioButton" class="adminButton adminPrimary" type="button">TELEPORT TO RADIO</button></div>
         <div class="adminRow"><button id="adminSpiderChaseButton" class="adminButton adminPrimary" type="button">SPAWN SPIDER / CHASE</button></div>
@@ -505,37 +481,10 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
         <div class="adminRow"><button id="adminClearWaterButton" class="adminButton" type="button">CLEAR WATER</button><button id="adminLockButton" class="adminButton" type="button">LOCK ADMIN</button></div>
         <button id="adminAdminCloseButton" class="adminButton adminCloseWide" type="button">CLOSE</button>
         <div id="adminPanelStatus" class="adminStatus"></div>
-        <div class="adminHint">COMMANDS: GLITCH · HELP. GLITCH RUNS A LOCAL SIGNAL TEST WITHOUT CHANGING STORY PROGRESS. FLY: WASD · SPACE UP · CTRL DOWN.</div>
+        <div class="adminHint">F3 · DEVELOPER TOOLS. GLITCH [HEADLINE | MESSAGE] · TESTMAP · HELP. FLY: WASD · SPACE UP · CTRL DOWN.</div>
       </div>
     </div>
-    <div id="phoneHomeScreen">
-      <div id="phoneApps">
-        <button class="phoneIcon" id="deepseekerIcon" type="button" aria-label="Open DEEPSEEKER">
-          <span class="phoneIconBubble">D</span>
-          <span class="phoneIconLabel">DEEPSEEKER</span>
-        </button>
-      </div>
-    </div>
-    <div id="phoneApp">
-      <div id="phoneAppName">DEEPSEEKER</div>
-      <div id="phoneDepth">0</div>
-      <div id="phoneDepthLabel">DEPTH</div>
-      <div id="phoneCard">
-        <div id="phoneCardTitle">CURRENT OBJECTIVE</div>
-        <div id="phoneCardText">Find a way out.</div>
-      </div>
-      <div id="phoneSaveSlots">
-        <div id="phoneSaveStatus">SELECT A SLOT TO SAVE</div>
-        <button class="phoneSaveSlot" data-slot="1" type="button">SAVE 1</button>
-        <button class="phoneSaveSlot" data-slot="2" type="button">SAVE 2</button>
-        <button class="phoneSaveSlot" data-slot="3" type="button">SAVE 3</button>
-      </div>
-      <div id="phoneStory"></div>
-      <button id="phoneHome" type="button" aria-label="Return to phone home"></button>
-    </div>
-  </div>
-</div>
-<div id="phoneHint">P — CLOSE PHONE · TAP HOME BAR TO RETURN</div>
+
 
 <div id="chatPanel">
   <div id="chatMessages"></div>
@@ -557,6 +506,7 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
   <div id="signalGlitchNoise" aria-hidden="true"></div>
   <div class="signalGlitchCore">
     <h1 id="signalGlitchMessage" data-text="">SIGNAL LOST</h1>
+    <p id="signalGlitchDetail" hidden></p>
   </div>
 </div>
   <div id="hudRight">
@@ -578,7 +528,7 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
       <div class="row"><span class="key">CTRL</span><span class="action">Crouch · slide while sprinting</span></div>
       <div class="row"><span class="key">F</span><span class="action">Toggle flashlight</span></div>
       <div class="row"><span class="key">Q</span><span class="action">Switch flashlight / signal radio (after pickup)</span></div>
-      <div class="row"><span class="key">P</span><span class="action">Phone</span></div>
+      <div class="row"><span class="key">R</span><span class="action">Tune field receiver (when equipped)</span></div>
       <div class="row"><span class="key">M</span><span class="action">Mute ambience</span></div>
       <div class="row"><span class="key">N</span><span class="action">Navigation map</span></div>
       <div class="row"><span class="key">TAB</span><span class="action">Controls</span></div>
@@ -625,6 +575,14 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
       <p id="betaTestCountdown" class="betaTestCountdown" aria-live="polite">Continue available in 5 seconds…</p>
       <button id="betaTestContinueButton" class="menuButton arachWarningContinue" type="button" disabled>GOT IT — CONTINUE</button>
     </div>
+  </div>
+
+  <div id="betaCompletionScreen" class="hidden" aria-hidden="true" role="dialog" aria-label="Beta test complete">
+    <section>
+      <h1>BETA TEST COMPLETE</h1>
+      <p>Thank you for playing. DeepSeeker is still in development, and more levels are coming.</p>
+      <button id="betaCompletionReturnButton" type="button">RETURN TO MENU</button>
+    </section>
   </div>
 
   <div id="arachnophobiaWarning" class="hidden" aria-hidden="true">
@@ -704,6 +662,6 @@ html.deepseeker-low #lobbyScreen{backdrop-filter:none}
   }
 }
 </script>
-<script type="module" src="./main.js?v=20261120-signal-headline-only"></script>
+<script type="module" src="./main.js?v=20261125-beta-exit-wall-fix"></script>
 </body>
 </html>
