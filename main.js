@@ -248,7 +248,7 @@ tutorialGuide.style.cssText=[
 ].join(";");
 tutorialGuide.innerHTML=
   '<div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:8px">'+
-    '<span id="tutorialGuideStep" style="font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.5px;color:#7f7c69">01/09</span>'+
+    '<span id="tutorialGuideStep" style="font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.5px;color:#7f7c69">01/06</span>'+
   '</div>'+
   '<div id="tutorialGuideAction" style="font-size:15px;letter-spacing:1.4px;color:#eee8cb"></div>'+
   '<div id="tutorialGuideHint" style="margin-top:6px;font-size:10px;line-height:1.45;letter-spacing:.8px;color:#9f9a84"></div>';
@@ -8908,8 +8908,10 @@ function setAdminStatus(message){
   if(adminPanelStatus) adminPanelStatus.textContent=message;
 }
 function openAdminAccess(){
-  if(!gameStarted || gameEnded)return;
+  if(!gameStarted || gameEnded || pauseMenuOpen)return;
   if(controlsOpen)hideControls();
+  if(chatOpen)closeChat(false);
+  if(multiplayerMapOpen)toggleMultiplayerMap(false);
   player.keys.clear();
   player.vel.set(0,0,0);
   if(document.pointerLockElement===renderer.domElement) document.exitPointerLock();
@@ -9977,7 +9979,7 @@ document.addEventListener("keydown",e=>{
     return;
   }
   if(gameEnded) return;
-  if(e.code==="F3"&&!e.repeat&&gameStarted){
+  if(e.code==="F3"&&!e.repeat&&gameStarted&&!gameEnded&&!pauseMenuOpen&&!securityCameras.active&&!computerSystem.openState){
     e.preventDefault();
     openAdminAccess();
     return;
