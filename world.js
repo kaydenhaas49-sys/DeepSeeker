@@ -384,6 +384,7 @@ export class World {
     this.maintenanceRoomGroup=null;
     this.breakerRoomAlarmMaterial=null;
     this.playCentreState=null;
+    this.playCentreTransform=null;
     this.playCentreButton=null;
 
     // Ceiling fixtures use a tiny real-light budget. They only activate when
@@ -480,7 +481,7 @@ export class World {
   }
 
   buildOuterMaintenanceRoom(centerX,minZ,boundaryThickness){
-    const roomWidth=32,roomDepth=60,roomHeight=4.25,wallT=ROOM_WALL_THICKNESS;
+    const roomWidth=48,roomDepth=72,roomHeight=4.25,wallT=ROOM_WALL_THICKNESS;
     const frontZ=minZ+boundaryThickness,backZ=frontZ-roomDepth,centerZ=(backZ+frontZ)*.5;
     this.maintenanceRoomFrontZ=frontZ;this.maintenanceRoomBackZ=backZ;
     this.maintenanceRoomCenterX=centerX;this.maintenanceRoomWidth=roomWidth;
@@ -1094,6 +1095,37 @@ export class World {
     };
     this.breakerRoomAlarmMaterial=buttonMat;
     this.breakerRoomBeacon=null;
+
+    // Expand the complete indoor playground while keeping its rear wall fixed.
+    // The 1.5x footprint makes the play area roughly 3.4x its previous floor area.
+    const playgroundScaleX=1.5,playgroundScaleZ=1.5;
+    this.playCentreTransform={
+      centerX,anchorZ:backZ,scaleX:playgroundScaleX,scaleZ:playgroundScaleZ
+    };
+    group.position.set(
+      centerX*(1-playgroundScaleX),0,backZ*(1-playgroundScaleZ)
+    );
+    group.scale.set(playgroundScaleX,1,playgroundScaleZ);
+
+    const transformBounds=bounds=>{
+      if(!bounds)return;
+      const minX=centerX+(bounds.minX-centerX)*playgroundScaleX;
+      const maxX=centerX+(bounds.maxX-centerX)*playgroundScaleX;
+      const minZ=backZ+(bounds.minZ-backZ)*playgroundScaleZ;
+      const maxZ=backZ+(bounds.maxZ-backZ)*playgroundScaleZ;
+      Object.assign(bounds,{
+        minX:Math.min(minX,maxX),maxX:Math.max(minX,maxX),
+        minZ:Math.min(minZ,maxZ),maxZ:Math.max(minZ,maxZ)
+      });
+    };
+    this.breakerRoomBounds.forEach(transformBounds);
+    if(this.breakerRoomDoor){
+      transformBounds(this.breakerRoomDoor.closedCollisionBounds);
+      this.breakerRoomDoor.frontZ=backZ+(partitionZ-backZ)*playgroundScaleZ;
+      this.breakerRoomDoor.doorZ=this.breakerRoomDoor.frontZ;
+      this.breakerRoomDoor.doorWidth*=playgroundScaleX;
+    }
+
     this.loadPlayCentreModels({
       parent:group,proxyRoot:equipmentProxyRoot,assetRoot:modelAssetRoot,
       centerX,midZ,partitionZ,pitX,pitZ
@@ -1156,7 +1188,13 @@ export class World {
   updatePlayCentre(dt,px,pz,enabled=true){
     const state=this.playCentreState;
     if(!state||!enabled)return;
-    const inside=px>state.minX&&px<state.maxX&&pz>state.minZ&&pz<state.maxZ;
+    const transform=this.playCentreTransform;
+    const playerX=transform
+      ?transform.centerX+(px-transform.centerX)/transform.scaleX:px;
+    const playerZ=transform
+      ?transform.anchorZ+(pz-transform.anchorZ)/transform.scaleZ:pz;
+    const inside=playerX>state.minX&&playerX<state.maxX&&
+      playerZ>state.minZ&&playerZ<state.maxZ;
     if(inside)state.playerEntered=true;
     if(!state.playerEntered||state.escaped)return;
     state.elapsed+=dt;
@@ -1172,7 +1210,7 @@ export class World {
       arm.rotation.x=Math.sin(time*(moving?7.0:1.0)+index)*.10;
     });
     if(!moving)return;
-    const dx=px-mascot.position.x,dz=pz-mascot.position.z;
+    const dx=playerX-mascot.position.x,dz=playerZ-mascot.position.z;
     const distance=Math.hypot(dx,dz);
     if(distance>.85){
       const speed=2.75;
@@ -1183,8 +1221,8 @@ export class World {
       mascot.position.z=THREE.MathUtils.clamp(mascot.position.z,state.minZ,state.maxZ);
       mascot.rotation.y=Math.atan2(dx,dz);
     }
-    const leftRoom=px<state.minX-2.8||px>state.maxX+2.8||
-      pz<state.backZ-.85||pz>state.partitionZ+1.65;
+    const leftRoom=playerX<state.minX-2.8||playerX>state.maxX+2.8||
+      playerZ<state.backZ-.85||playerZ>state.partitionZ+1.65;
     if(leftRoom&&this.maintenanceDoor?.openProgress>.70){
       state.sequenceActive=false;
       state.escaped=true;
