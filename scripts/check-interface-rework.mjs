@@ -68,9 +68,9 @@ assert.match(index, /DeepSeeker is still in development, and more levels are com
 assert.match(main, /function showBetaCompletionScreen/, "the exit must route to the plain beta-completion screen");
 assert.match(main, /if\(demo\)\{\s*showBetaCompletionScreen\(\{broadcast\}\);/, "demo completion must not use the stylized victory ending");
 assert.match(main, /function triggerMissionEnding\(\{broadcast=true\}=\{\}\)[\s\S]*?showBetaCompletionScreen\(\{broadcast\}\)/, "the actual Poolrooms exit must display the beta completion screen");
-assert.match(main, /world\.js\?v=20261125-play-centre-monster/, "the changed world module must not use a stale cache key");
+assert.match(main, /world\.js\?v=20261125-play-centre-visual-upgrade1/, "the changed world module must not use a stale cache key");
 assert.match(main, /storyMission\.js\?v=20261125-beta-exit-wall-fix/, "the changed story mission module must not use a stale cache key");
-assert.match(index, /main\.js\?v=20261125-play-centre-monster/, "the changed game entrypoint must not use a stale cache key");
+assert.match(index, /main\.js\?v=20261125-play-centre-visual-upgrade1/, "the changed game entrypoint must not use a stale cache key");
 assert.doesNotMatch(storyMission, /poolroomsDoorCard|poolroomsExitCard|_addSign\(gate|_addSign\(group|GateTopSignalPlate|GateTopSignalSegment|SIGNAL EXIT|PRESS E TO FINISH/, "the exits must have no text signs or decorative sign plates");
 assert.match(storyMission, /this\.poolroomsExitMesh=exitPortal\.exitMesh/, "the actual portal surface must be stored as the exit interaction target");
 assert.match(storyMission, /this\.poolroomsExitMesh\.userData\.interactable/, "the visible portal surface itself must carry the interaction");
