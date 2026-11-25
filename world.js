@@ -570,90 +570,504 @@ export class World {
   }
 
   buildBreakerControlRoom(centerX,backZ){
-    this.breakerRoomBounds=[];this.breakerSwitches=[];this.breakerRoomLights=[];
-    const group=this.breakerRoomGroup,wallT=.22,roomHeight=3.95,roomWidth=26.4,half=roomWidth*.5;
-    const leftX=centerX-half,rightX=centerX+half,partitionZ=this.maintenanceRoomFrontZ-35.5;
+    this.breakerRoomBounds=[];
+    this.breakerSwitches=[];
+    this.breakerRoomLights=[];
+    const group=this.breakerRoomGroup;
+    const wallT=.22,roomHeight=3.95,roomWidth=26.4,half=roomWidth*.5;
+    const leftX=centerX-half,rightX=centerX+half;
+    const partitionZ=this.maintenanceRoomFrontZ-35.5;
     const depth=partitionZ-backZ,midZ=(partitionZ+backZ)*.5;
-    const addBox=(name,sx,sy,sz,x,y,z,material)=>{
+
+    // A separate visual language for this room: old painted steel, oxidized
+    // hardware, dark rubber cable runs and a few restrained signal colours.
+    const wallCanvas=document.createElement("canvas");
+    wallCanvas.width=512;wallCanvas.height=512;
+    const wallCtx=wallCanvas.getContext("2d");
+    wallCtx.fillStyle="#555b50";wallCtx.fillRect(0,0,512,512);
+    for(let i=0;i<4200;i++){
+      const v=55+Math.floor(Math.random()*45);
+      wallCtx.fillStyle="rgba("+v+","+Math.floor(v*1.02)+","+Math.floor(v*.88)+","+(.035+Math.random()*.09).toFixed(3)+")";
+      const x=Math.random()*512,y=Math.random()*512;
+      wallCtx.fillRect(x,y,1+Math.random()*3,1+Math.random()*4);
+    }
+    for(let i=0;i<36;i++){
+      const x=(i*83+19)%512;
+      wallCtx.fillStyle="rgba(22,25,21,"+(.08+Math.random()*.12).toFixed(3)+")";
+      wallCtx.fillRect(x,0,1+Math.random()*3,512);
+    }
+    wallCtx.strokeStyle="rgba(18,22,19,.32)";
+    wallCtx.lineWidth=2;
+    for(let y=0;y<=512;y+=128){
+      wallCtx.beginPath();wallCtx.moveTo(0,y);wallCtx.lineTo(512,y);wallCtx.stroke();
+    }
+    const wallTexture=new THREE.CanvasTexture(wallCanvas);
+    wallTexture.colorSpace=THREE.SRGBColorSpace;
+    wallTexture.wrapS=THREE.RepeatWrapping;
+    wallTexture.wrapT=THREE.RepeatWrapping;
+    wallTexture.repeat.set(7,2);
+    const wallMaterial=new THREE.MeshStandardMaterial({
+      map:wallTexture,color:0xffffff,roughness:.97,metalness:.03
+    });
+    const ceilingMaterial=new THREE.MeshStandardMaterial({
+      color:0x343a36,roughness:.95,metalness:.12
+    });
+    const structuralMetal=new THREE.MeshStandardMaterial({
+      color:0x555d58,roughness:.76,metalness:.48
+    });
+    const darkMetal=new THREE.MeshStandardMaterial({
+      color:0x242b28,roughness:.86,metalness:.35
+    });
+    const cabinetMaterial=new THREE.MeshStandardMaterial({
+      color:0x46504a,roughness:.78,metalness:.42
+    });
+    const cabinetFaceMaterial=new THREE.MeshStandardMaterial({
+      color:0x303936,roughness:.82,metalness:.28
+    });
+    const rustMaterial=new THREE.MeshStandardMaterial({
+      color:0x704a36,roughness:.91,metalness:.16
+    });
+    const rubberMaterial=new THREE.MeshStandardMaterial({
+      color:0x111715,roughness:.96,metalness:0
+    });
+    const walkwayMaterial=new THREE.MeshStandardMaterial({
+      color:0x333a36,roughness:.84,metalness:.42
+    });
+    const wornAmberMaterial=new THREE.MeshStandardMaterial({
+      color:0x927044,roughness:.92,metalness:.08
+    });
+    const diffuserMaterial=new THREE.MeshStandardMaterial({
+      color:0xffe7b7,emissive:0xffd28a,emissiveIntensity:.0,roughness:.35
+    });
+    const signalCyanMaterial=new THREE.MeshStandardMaterial({
+      color:0x79d7d0,emissive:0x27b9b3,emissiveIntensity:1.15,roughness:.38
+    });
+    const signalAmberMaterial=new THREE.MeshStandardMaterial({
+      color:0xe4aa56,emissive:0xb87526,emissiveIntensity:.8,roughness:.42
+    });
+    const signalRedMaterial=new THREE.MeshStandardMaterial({
+      color:0x9d4638,emissive:0x8e2116,emissiveIntensity:.35,roughness:.42
+    });
+    this.breakerRoomAlarmMaterial=signalRedMaterial;
+
+    const addBox=(name,sx,sy,sz,x,y,z,material,host=group)=>{
       const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
-      mesh.name=name;mesh.position.set(x,y,z);mesh.castShadow=false;mesh.receiveShadow=true;
-      mesh.userData.fixtureLightOccluder=true;group.add(mesh);return mesh;
+      mesh.name=name;
+      mesh.position.set(x,y,z);
+      mesh.castShadow=false;
+      mesh.receiveShadow=true;
+      mesh.userData.fixtureLightOccluder=true;
+      host.add(mesh);
+      return mesh;
+    };
+    const addPipe=(name,start,end,radius,material)=>{
+      const direction=end.clone().sub(start);
+      const length=direction.length();
+      const mesh=new THREE.Mesh(
+        new THREE.CylinderGeometry(radius,radius,length,8),
+        material
+      );
+      mesh.name=name;
+      mesh.position.copy(start).add(end).multiplyScalar(.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0,1,0),direction.normalize()
+      );
+      mesh.castShadow=false;
+      mesh.receiveShadow=true;
+      mesh.userData.fixtureLightOccluder=true;
+      group.add(mesh);
+      return mesh;
     };
     const addWall=(name,sx,sy,sz,x,y,z)=>{
-      addBox(name,sx,sy,sz,x,y,z,this.materials.wall);
-      this.breakerRoomBounds.push({minX:x-sx*.5,maxX:x+sx*.5,minZ:z-sz*.5,maxZ:z+sz*.5});
+      addBox(name,sx,sy,sz,x,y,z,wallMaterial);
+      this.breakerRoomBounds.push({
+        minX:x-sx*.5,maxX:x+sx*.5,minZ:z-sz*.5,maxZ:z+sz*.5
+      });
     };
+
+    // Architectural shell: darker walls, a low protective kick plate and
+    // reinforced corners replace the empty yellow-room look.
     addWall("BreakerRoomLeftWall",wallT,roomHeight,depth,leftX,roomHeight*.5,midZ);
     addWall("BreakerRoomRightWall",wallT,roomHeight,depth,rightX,roomHeight*.5,midZ);
-    const doorLeft=centerX-ROOM_DOOR_WIDTH*.5,doorRight=centerX+ROOM_DOOR_WIDTH*.5;
-    addWall("BreakerRoomEntryPartitionLeft",doorLeft-leftX,roomHeight,wallT,(leftX+doorLeft)*.5,roomHeight*.5,partitionZ);
-    addWall("BreakerRoomEntryPartitionRight",rightX-doorRight,roomHeight,wallT,(doorRight+rightX)*.5,roomHeight*.5,partitionZ);
+    const doorLeft=centerX-ROOM_DOOR_WIDTH*.5;
+    const doorRight=centerX+ROOM_DOOR_WIDTH*.5;
+    addWall("BreakerRoomEntryPartitionLeft",doorLeft-leftX,roomHeight,wallT,
+      (leftX+doorLeft)*.5,roomHeight*.5,partitionZ);
+    addWall("BreakerRoomEntryPartitionRight",rightX-doorRight,roomHeight,wallT,
+      (doorRight+rightX)*.5,roomHeight*.5,partitionZ);
     addBox("BreakerRoomEntryLintel",ROOM_DOOR_WIDTH,roomHeight-ROOM_DOOR_HEIGHT,wallT,
-      centerX,(roomHeight+ROOM_DOOR_HEIGHT)*.5,partitionZ,this.materials.wall);
+      centerX,(roomHeight+ROOM_DOOR_HEIGHT)*.5,partitionZ,wallMaterial);
     this.breakerRoomDoor=this.buildRoomDoor(group,centerX,partitionZ,{
       doorHeight:ROOM_DOOR_HEIGHT,roomHeight,requiresPower:false,ownerChunk:null
     },this.breakerRoomBounds);
+    // The visual story is told by the room itself, not generic service plates.
+    this.breakerRoomDoor.group.getObjectByName("RoomDoorServicePlate")?.visible=false;
+    this.maintenanceDoor?.group?.getObjectByName("RoomDoorServicePlate") &&
+      (this.maintenanceDoor.group.getObjectByName("RoomDoorServicePlate").visible=false);
 
-    addBox("BreakerRoomCeiling",roomWidth,.10,depth-.15,centerX,3.82,midZ,this.materials.ceiling);
+    addBox("BreakerRoomCeiling",roomWidth,.12,depth-.15,centerX,3.82,midZ,ceilingMaterial);
+    addBox("BreakerRoomFrontHeader",roomWidth-.25,.16,.24,centerX,3.58,partitionZ-.30,structuralMetal);
+    addBox("BreakerRoomRearHeader",roomWidth-.25,.16,.24,centerX,3.58,backZ+1.0,structuralMetal);
+    for(const side of [-1,1]){
+      const x=centerX+side*(half-.22);
+      for(const z of [backZ+1.0,partitionZ-1.0]){
+        addBox("BreakerRoomCornerColumn",.30,3.82,.34,x,1.91,z,structuralMetal);
+        addBox("BreakerRoomColumnFoot",.48,.18,.48,x,.09,z,darkMetal);
+        addBox("BreakerRoomColumnCap",.46,.16,.45,x,3.70,z,darkMetal);
+      }
+      addBox("BreakerRoomWallBaseTrim",.14,.28,depth-1.1,
+        centerX+side*(half-.22),.17,midZ,structuralMetal);
+      addBox("BreakerRoomWallServiceRail",.10,.12,depth-2.0,
+        centerX+side*(half-.30),2.42,midZ,rustMaterial);
+    }
+
+    // A continuous service aisle gives the room a strong vanishing point.
+    // The plates sit almost flush so they never interfere with player movement.
+    for(let plate=0;plate<6;plate++){
+      const z=partitionZ-2.55-plate*3.82;
+      addBox("BreakerRoomAisleDeckPlate",4.12,.035,3.62,centerX,.028,z,walkwayMaterial);
+      for(const side of [-1,1]){
+        addBox("BreakerRoomAisleBolt",.045,.012,.045,
+          centerX+side*1.92,.052,z-1.55,structuralMetal);
+        addBox("BreakerRoomAisleBolt",.045,.012,.045,
+          centerX+side*1.92,.052,z+1.55,structuralMetal);
+      }
+    }
+    const aisleLineMaterial=wornAmberMaterial;
+    for(const side of [-1,1]){
+      addBox("BreakerRoomAisleEdgeMarking",.055,.008,depth-1.4,
+        centerX+side*2.20,.014,midZ,aisleLineMaterial);
+    }
+    const puddleMaterial=new THREE.MeshStandardMaterial({
+      color:0x192523,metalness:.46,roughness:.20,transparent:true,
+      opacity:.62,depthWrite:false
+    });
+    for(const [x,z,sx,sz] of [
+      [centerX-2.75,midZ+5.0,1.35,.58],
+      [centerX+2.72,midZ-4.2,1.05,.48],
+      [centerX+2.55,backZ+5.6,.72,.36],
+      [centerX-2.58,partitionZ-4.0,.65,.28]
+    ]){
+      const puddle=new THREE.Mesh(new THREE.CircleGeometry(1,28),puddleMaterial);
+      puddle.name="BreakerRoomFloorPuddle";
+      puddle.rotation.x=-Math.PI/2;
+      puddle.position.set(x,.013,z);
+      puddle.scale.set(sx,sz,1);
+      puddle.renderOrder=1;
+      group.add(puddle);
+    }
+    // A floor drain and a few inset grates add scale without filling the aisle.
+    addBox("BreakerRoomFloorDrain",.32,.018,depth-2.0,
+      centerX-2.48,.018,midZ,darkMetal);
+    for(let grate=0;grate<16;grate++){
+      addBox("BreakerRoomDrainSlot",.22,.009,.055,
+        centerX-2.48,.029,partitionZ-1.5-grate*1.35,structuralMetal);
+    }
+
+    // Cable trays run the length of both cabinet banks. Repeated cross-rungs
+    // and conduits visibly connect the switchgear instead of floating panels.
+    for(const side of [-1,1]){
+      const trayX=centerX+side*(half-.78);
+      addBox("BreakerRoomCableTray",.76,.20,depth-1.65,trayX,2.91,midZ,darkMetal);
+      addBox("BreakerRoomCableTrayCover",.80,.045,depth-1.62,trayX,3.035,midZ,structuralMetal);
+      for(const edge of [-1,1]){
+        addBox("BreakerRoomCableTraySide",.055,.22,depth-1.65,
+          trayX+edge*.37,2.91,midZ,structuralMetal);
+      }
+      for(let rung=0;rung<15;rung++){
+        addBox("BreakerRoomCableTrayRung",.68,.028,.07,trayX,2.96,
+          partitionZ-1.5-rung*((depth-3.0)/14),structuralMetal);
+      }
+      // A separate insulated feed follows the upper wall into the far relay rack.
+      addPipe("BreakerRoomWallConduit",
+        new THREE.Vector3(trayX,2.67,partitionZ-1.0),
+        new THREE.Vector3(trayX,2.67,backZ+1.4),.065,rustMaterial);
+    }
+    for(const offset of [-2.35,0,2.35]){
+      addPipe("BreakerRoomCeilingBus",
+        new THREE.Vector3(centerX+offset,3.66,partitionZ-1.0),
+        new THREE.Vector3(centerX+offset,3.66,backZ+1.0),.07,structuralMetal);
+    }
+    for(let beam=0;beam<6;beam++){
+      const z=partitionZ-1.9-beam*((depth-3.8)/5);
+      addBox("BreakerRoomCeilingCrossbeam",roomWidth-.42,.09,.14,centerX,3.70,z,structuralMetal);
+    }
+
+    // Five recessed fluorescent housings illuminate the aisle; the four real
+    // point lights stay deliberately budgeted for weaker hardware.
     for(let rib=0;rib<5;rib++){
-      const z=partitionZ-2.2-rib*((depth-4.4)/4);
-      const fixtureZ=z+.72;
-      addBox("BreakerRoomCeilingCrossbrace",roomWidth-.35,.10,.12,centerX,3.68,z,this.roomDoorMetalMaterial);
-      addBox("BreakerRoomFluorescentStrip",3.8,.06,.18,centerX,3.59,fixtureZ,this.breakerRoomLightMaterial);
-
-      // Keep the fluorescent strips across the ceiling, but use only four
-      // real point lights for the whole room. Ten overlapping point lights
-      // made every visible material expensive to shade on lower-end GPUs.
-      // Two lights on each of two rows still reach both breaker walls.
+      const z=partitionZ-2.3-rib*((depth-4.6)/4);
+      addBox("BreakerRoomLightHousing",4.95,.12,.58,centerX,3.61,z,darkMetal);
+      addBox("BreakerRoomFluorescentStrip",4.58,.028,.34,centerX,3.535,z,this.breakerRoomLightMaterial);
+      addBox("BreakerRoomFixtureDiffuserLeft",.045,.035,.40,centerX-2.30,3.53,z,structuralMetal);
+      addBox("BreakerRoomFixtureDiffuserRight",.045,.035,.40,centerX+2.30,3.53,z,structuralMetal);
       if(rib===0||rib===3){
         for(const side of [-1,1]){
           const light=new THREE.PointLight(0xffe7ad,0,26,1.45);
           light.name="BreakerRoomOverheadLight";
-          light.position.set(centerX+side*6.35,3.35,fixtureZ);
+          light.position.set(centerX+side*6.35,3.35,z);
           light.visible=false;
           light.castShadow=false;
           group.add(light);
-          this.breakerRoomLights.push({
-            light,
-            baseIntensity:6.5,
-            phase:rib*.83+(side>0?.45:0)
-          });
+          this.breakerRoomLights.push({light,baseIntensity:6.5,phase:rib*.83+(side>0?.45:0)});
         }
       }
     }
-    // Small flat instruction plate on the back wall, mounted at a believable
-    // working height rather than oversized and stranded near the ceiling.
-    const boardZ=backZ+.12;
-    addBox("BreakerMathInstructionBoard",1.90,.48,.025,centerX,2.82,boardZ,this.breakerPanelMaterial);
-    const instruction=new THREE.Mesh(new THREE.PlaneGeometry(1.84,.42),this.breakerNoteMaterial);
-    instruction.name="BreakerMathInstructions";instruction.position.set(centerX,2.82,backZ+.134);
-    instruction.castShadow=false;group.add(instruction);
 
-    const zStart=partitionZ-3.6,zSpacing=5.3;
-    const leftFaceX=leftX+wallT*.5+.11,rightFaceX=rightX-wallT*.5-.11,positions=[];
+    // One exposed ceiling service void and two sagging cable runs make the
+    // place feel neglected, while keeping the rest of the ceiling deliberate.
+    addBox("BreakerRoomOpenCeilingServiceVoid",2.6,.035,1.45,
+      centerX+7.2,3.746,midZ-.8,darkMetal);
+    for(let cable=0; cable<3; cable++){
+      const x=centerX+6.35+cable*.28;
+      const curve=new THREE.CatmullRomCurve3([
+        new THREE.Vector3(x,3.66,midZ+1.8),
+        new THREE.Vector3(x+.12,3.26,midZ+1.3),
+        new THREE.Vector3(x-.08,3.17,midZ+.15),
+        new THREE.Vector3(x+.20,3.51,midZ-.8)
+      ]);
+      const wire=new THREE.Mesh(new THREE.TubeGeometry(curve,20,.026,6,false),rubberMaterial);
+      wire.name="BreakerRoomHangingCable";
+      wire.castShadow=false;
+      wire.receiveShadow=true;
+      group.add(wire);
+    }
+
+    // Eight individual cabinets preserve every existing puzzle hit target.
+    // The old flat wall boxes become recessed, bolted electrical enclosures.
+    const zStart=partitionZ-3.6,zSpacing=5.3,positions=[];
+    const leftFaceX=leftX+wallT*.5+.11;
+    const rightFaceX=rightX-wallT*.5-.11;
     for(let row=0;row<4;row++){
       positions.push({index:row+1,x:leftFaceX,z:zStart-row*zSpacing,face:Math.PI*.5});
       positions.push({index:row+5,x:rightFaceX,z:zStart-row*zSpacing,face:-Math.PI*.5});
     }
     for(const spec of positions){
-      const root=new THREE.Group();root.name="MaintenanceBreaker"+spec.index;
-      root.position.set(spec.x,0,spec.z);root.rotation.y=spec.face;group.add(root);
-      const panel=new THREE.Mesh(new THREE.BoxGeometry(.94,1.32,.20),this.breakerPanelMaterial);
-      panel.name="BreakerPanelHousing";panel.position.set(0,1.02,0);root.add(panel);
-      const label=new THREE.Mesh(new THREE.PlaneGeometry(.86,.30),this.breakerMathLabelMaterials[spec.index-1]);
-      label.name="BreakerMathExpression";label.position.set(0,1.43,.112);root.add(label);
-      const handle=new THREE.Mesh(new THREE.BoxGeometry(.12,.36,.09),this.breakerHandleMaterial);
-      handle.name="BreakerLever";handle.position.set(0,.91,.16);handle.rotation.z=.42;root.add(handle);
-      const lamp=new THREE.Mesh(new THREE.SphereGeometry(.085,10,8),this.breakerLampOffMaterial);
-      lamp.name="BreakerStatusLamp";lamp.position.set(0,1.64,.11);root.add(lamp);
+      const root=new THREE.Group();
+      root.name="MaintenanceBreaker"+spec.index;
+      root.position.set(spec.x,0,spec.z);
+      root.rotation.y=spec.face;
+      group.add(root);
+
+      const housing=new THREE.Mesh(new THREE.BoxGeometry(1.52,2.08,.42),cabinetMaterial);
+      housing.name="BreakerCabinetHousing";
+      housing.position.set(0,1.04,-.005);
+      housing.castShadow=false;
+      root.add(housing);
+      const doorFrame=new THREE.Mesh(new THREE.BoxGeometry(1.17,1.72,.10),structuralMetal);
+      doorFrame.name="BreakerCabinetDoorFrame";
+      doorFrame.position.set(0,1.05,.225);
+      root.add(doorFrame);
+      const panel=new THREE.Mesh(new THREE.BoxGeometry(1.04,1.58,.12),cabinetFaceMaterial);
+      panel.name="BreakerPanelHousing";
+      panel.position.set(0,1.05,.292);
+      root.add(panel);
+
+      const expression=new THREE.Mesh(
+        new THREE.PlaneGeometry(.87,.30),this.breakerMathLabelMaterials[spec.index-1]
+      );
+      expression.name="BreakerMathExpression";
+      expression.position.set(0,1.44,.357);
+      root.add(expression);
+
+      const handle=new THREE.Mesh(new THREE.BoxGeometry(.12,.36,.085),this.breakerHandleMaterial);
+      handle.name="BreakerLever";
+      handle.position.set(0,.91,.375);
+      handle.rotation.z=.42;
+      root.add(handle);
+      const lamp=new THREE.Mesh(new THREE.SphereGeometry(.085,12,10),this.breakerLampOffMaterial);
+      lamp.name="BreakerStatusLamp";
+      lamp.position.set(0,1.68,.37);
+      root.add(lamp);
+
+      // Cooling slots and visible fasteners give each cabinet a believable scale.
+      for(let vent=0;vent<4;vent++){
+        const slot=new THREE.Mesh(new THREE.BoxGeometry(.56,.018,.025),darkMetal);
+        slot.name="BreakerCabinetVent";
+        slot.position.set(0,.48+vent*.055,.37);
+        root.add(slot);
+      }
+      for(const side of [-1,1]){
+        for(const y of [.30,1.80]){
+          const bolt=new THREE.Mesh(new THREE.SphereGeometry(.027,8,6),rustMaterial);
+          bolt.name="BreakerCabinetFastener";
+          bolt.position.set(side*.68,y,.30);
+          root.add(bolt);
+        }
+      }
+      const cabinetStatus=new THREE.Mesh(
+        new THREE.BoxGeometry(.035,.48,.025),signalAmberMaterial
+      );
+      cabinetStatus.name="BreakerCabinetStatusBar";
+      cabinetStatus.position.set(-.53,1.03,.371);
+      root.add(cabinetStatus);
+
+      // Short drops connect each cabinet to the overhead cable tray.
+      addPipe("BreakerCabinetConduit",
+        new THREE.Vector3(spec.x,2.13,spec.z),
+        new THREE.Vector3(spec.x,2.72,spec.z),.045,structuralMetal);
+
       const state={...spec,group:root,handle,lamp,ownerChunk:null,active:false};
-      root.userData.interactable={type:"roomBreaker",prompt:"Flip breaker "+spec.index+" after solving its equation",breakerIndex:spec.index,breakerState:state};
+      root.userData.interactable={
+        type:"roomBreaker",
+        prompt:"Flip breaker "+spec.index+" after solving its equation",
+        breakerIndex:spec.index,
+        breakerState:state
+      };
       this.breakerSwitches.push(state);
     }
-  }
 
+    // A single signal console above the far door gives the room a clear focal
+    // point. Its readout belongs to the world, not another decorative sign.
+    const scopeCanvas=document.createElement("canvas");
+    scopeCanvas.width=640;scopeCanvas.height=256;
+    const scopeCtx=scopeCanvas.getContext("2d");
+    scopeCtx.fillStyle="#06100f";
+    scopeCtx.fillRect(0,0,640,256);
+    scopeCtx.strokeStyle="rgba(76,161,150,.22)";
+    scopeCtx.lineWidth=1;
+    for(let x=0;x<=640;x+=32){
+      scopeCtx.beginPath();scopeCtx.moveTo(x,0);scopeCtx.lineTo(x,256);scopeCtx.stroke();
+    }
+    for(let y=0;y<=256;y+=32){
+      scopeCtx.beginPath();scopeCtx.moveTo(0,y);scopeCtx.lineTo(640,y);scopeCtx.stroke();
+    }
+    scopeCtx.fillStyle="#8bc5b8";
+    scopeCtx.font="bold 22px monospace";
+    scopeCtx.fillText("CARRIER MONITOR",24,34);
+    scopeCtx.fillStyle="#668d82";
+    scopeCtx.font="15px monospace";
+    scopeCtx.fillText("RELAY LINK  /  SEARCHING",24,58);
+    scopeCtx.strokeStyle="#79e4d1";
+    scopeCtx.lineWidth=3;
+    scopeCtx.beginPath();
+    for(let x=0;x<=590;x+=3){
+      const envelope=Math.sin(x*.016)*.10+Math.sin(x*.047)*.055;
+      const pulse=Math.sin(x*.11)*(.04+Math.abs(Math.sin(x*.027))*.13);
+      const y=150+(envelope+pulse)*210;
+      if(x===0)scopeCtx.moveTo(x+24,y);else scopeCtx.lineTo(x+24,y);
+    }
+    scopeCtx.stroke();
+    scopeCtx.strokeStyle="rgba(115,203,186,.22)";
+    scopeCtx.beginPath();scopeCtx.moveTo(24,150);scopeCtx.lineTo(616,150);scopeCtx.stroke();
+    const scopeTexture=new THREE.CanvasTexture(scopeCanvas);
+    scopeTexture.colorSpace=THREE.SRGBColorSpace;
+    const scopeScreenMaterial=new THREE.MeshBasicMaterial({
+      map:scopeTexture,toneMapped:false
+    });
+    const scopeHousing=addBox("BreakerRoomSignalConsole",5.55,.98,.26,
+      centerX,3.32,backZ+.20,cabinetMaterial);
+    scopeHousing.material=cabinetMaterial;
+    addBox("BreakerRoomSignalConsoleBezel",3.78,.70,.08,
+      centerX,3.32,backZ+.36,darkMetal);
+    const scopeScreen=new THREE.Mesh(new THREE.PlaneGeometry(3.58,.55),scopeScreenMaterial);
+    scopeScreen.name="BreakerRoomScopeScreen";
+    scopeScreen.position.set(centerX,3.32,backZ+.405);
+    group.add(scopeScreen);
 
-  buildRoomDoor(parent,centerX,frontZ,options={},boundsTarget=null){
+    for(const side of [-1,1]){
+      const gaugeX=centerX+side*2.25;
+      const gaugeFace=new THREE.Mesh(new THREE.CircleGeometry(.275,32),darkMetal);
+      gaugeFace.name="BreakerRoomAnalogGauge";
+      gaugeFace.position.set(gaugeX,3.32,backZ+.355);
+      group.add(gaugeFace);
+      const gaugeRing=new THREE.Mesh(new THREE.RingGeometry(.275,.315,32),structuralMetal);
+      gaugeRing.name="BreakerRoomGaugeRim";
+      gaugeRing.position.set(gaugeX,3.32,backZ+.37);
+      group.add(gaugeRing);
+      const needle=new THREE.Mesh(new THREE.BoxGeometry(.018,.19,.018),signalAmberMaterial);
+      needle.name="BreakerRoomGaugeNeedle";
+      needle.position.set(gaugeX,3.32,backZ+.39);
+      needle.rotation.z=side*.38;
+      group.add(needle);
+      for(let tick=0;tick<7;tick++){
+        const angle=(-.95+tick*.31);
+        const mark=new THREE.Mesh(new THREE.BoxGeometry(.018,.065,.012),signalCyanMaterial);
+        mark.name="BreakerRoomGaugeMark";
+        mark.position.set(
+          gaugeX+Math.sin(angle)*.205,
+          3.32+Math.cos(angle)*.205,
+          backZ+.39
+        );
+        mark.rotation.z=-angle;
+        group.add(mark);
+      }
+    }
+    for(let indicator=0;indicator<8;indicator++){
+      const material=indicator===0?signalRedMaterial:
+        indicator===1?signalAmberMaterial:
+        indicator===7?signalCyanMaterial:this.breakerLampOffMaterial;
+      const led=new THREE.Mesh(new THREE.SphereGeometry(.045,10,8),material);
+      led.name="BreakerRoomRelayIndicator";
+      led.position.set(centerX-1.42+indicator*.405,2.79,backZ+.38);
+      group.add(led);
+    }
+
+    // One old service trolley, pushed into the corner, supplies a human scale
+    // cue without blocking either the aisle or any interactable.
+    const cartX=centerX+10.6,cartZ=backZ+3.4;
+    addBox("BreakerRoomToolTrolleyLowerShelf",1.02,.08,.66,cartX,.43,cartZ,darkMetal);
+    addBox("BreakerRoomToolTrolleyTop",1.12,.08,.72,cartX,.91,cartZ,structuralMetal);
+    addBox("BreakerRoomToolTrolleyDrawer",.92,.37,.58,cartX,.67,cartZ,cabinetMaterial);
+    addBox("BreakerRoomToolTrolleyHandle",.74,.045,.045,cartX,.83,cartZ+.33,rustMaterial);
+    for(const side of [-1,1]){
+      for(const front of [-1,1]){
+        const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.095,.095,.075,12),rubberMaterial);
+        wheel.name="BreakerRoomTrolleyWheel";
+        wheel.rotation.z=Math.PI*.5;
+        wheel.position.set(cartX+side*.43,.12,cartZ+front*.25);
+        group.add(wheel);
+      }
+    }
+
+    // A loose cable drum sits against the opposite wall; it is deliberately
+    // low and out of the route, like equipment left during a rushed repair.
+    const drumX=centerX-10.5,drumZ=backZ+3.2;
+    const drumCore=new THREE.Mesh(new THREE.CylinderGeometry(.39,.39,.52,24),rustMaterial);
+    drumCore.name="BreakerRoomCableDrum";
+    drumCore.rotation.z=Math.PI*.5;
+    drumCore.position.set(drumX,.42,drumZ);
+    group.add(drumCore);
+    for(const side of [-1,1]){
+      const flange=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.07,24),structuralMetal);
+      flange.name="BreakerRoomCableDrumFlange";
+      flange.rotation.z=Math.PI*.5;
+      flange.position.set(drumX+side*.29,.42,drumZ);
+      group.add(flange);
+      const hub=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,.085,16),darkMetal);
+      hub.rotation.z=Math.PI*.5;
+      hub.position.set(drumX+side*.33,.42,drumZ);
+      group.add(hub);
+    }
+    addPipe("BreakerRoomLooseCable",
+      new THREE.Vector3(drumX,.12,drumZ),
+      new THREE.Vector3(drumX+1.1,.08,drumZ+1.1),.025,rubberMaterial);
+
+    // A cool signal source balances the warm fluorescent light; it only wakes
+    // when the entrance door is open, just like the room's overhead fixtures.
+    const signalLight=new THREE.PointLight(0x64c7c1,0,11,1.8);
+    signalLight.name="BreakerRoomSignalGlow";
+    signalLight.position.set(centerX,2.82,backZ+2.1);
+    signalLight.visible=false;
+    signalLight.castShadow=false;
+    group.add(signalLight);
+    this.breakerRoomLights.push({
+      light:signalLight,baseIntensity:1.35,phase:1.8
+    });
+
+    const beaconHousing=addBox("BreakerRoomWarningBeaconHousing",.28,.10,.28,
+      centerX+5.1,3.22,backZ+2.0,darkMetal);
+    const beacon=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),signalRedMaterial);
+    beacon.name="BreakerRoomWarningBeacon";
+    beacon.position.set(centerX+5.1,3.34,backZ+2.0);
+    group.add(beacon);
+    this.breakerRoomBeacon=beacon;
+    this.breakerRoomAlarmMaterial=signalRedMaterial;
+
+    // Maintain all eight puzzle hit targets and the same sorted-answer logic.
+    // The new geometry is visual dressing only; no breaker positions or types
+    // are changed, so existing saves and interaction code remain compatible.
+  }  buildRoomDoor(parent,centerX,frontZ,options={},boundsTarget=null){
     const doorWidth=ROOM_DOOR_WIDTH,doorHeight=options.doorHeight||ROOM_DOOR_HEIGHT;
     const frameMat=this.roomDoorTrimMaterial,metalMat=this.roomDoorMetalMaterial;
     const addBox=(name,sx,sy,sz,x,y,z,material,host=parent)=>{
