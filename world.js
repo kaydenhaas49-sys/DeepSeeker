@@ -1485,6 +1485,11 @@ export class World {
     );
     this.breakerRoomLightMaterial.emissiveIntensity=breakerRoomLightsOn?1.05:0;
     const lightFlickerTime=performance.now()*.004;
+    if(this.breakerRoomAlarmMaterial){
+      this.breakerRoomAlarmMaterial.emissiveIntensity=breakerRoomLightsOn
+        ?(.48+.22*Math.sin(lightFlickerTime*.8))
+        :.10;
+    }
     for(const item of this.breakerRoomLights){
       item.light.visible=breakerRoomLightsOn;
       item.light.intensity=breakerRoomLightsOn
