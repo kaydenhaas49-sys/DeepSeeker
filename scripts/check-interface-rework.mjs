@@ -6,6 +6,7 @@ const index = read("../index.html");
 const main = read("../main.js");
 const player = read("../player.js");
 const readme = read("../README.md");
+const world = read("../world.js");
 
 assert.doesNotMatch(index, /phone/i, "the phone interface and its styling must be completely removed");
 assert.doesNotMatch(index, /adminIcon/i, "the old phone launcher control must be removed");
@@ -30,4 +31,11 @@ assert.doesNotMatch(readme, /phone/i, "documentation must not describe the retir
 assert.doesNotMatch(main, /Press P to open|READ M'S MESSAGE|OPEN THE DEEPSEEKER PHONE/i, "the tutorial must no longer teach the retired phone");
 assert.match(index, /\.adminOverlay\{position:fixed/, "developer tools must be a standalone overlay");
 assert.match(main, /radioChannelIndex=0/, "new runs must start on the mission receiver band");
+assert.match(main, /breakerRoomDoorOpen:Boolean\(world\.breakerRoomDoor\?\.targetOpen\)/, "saves must remember whether the breaker-room entrance was left open");
+assert.match(main, /breakerRoomDoorOpen:Boolean\(save\?\.breakerRoomDoorOpen\)/, "loading must pass the saved breaker-room entrance state into restoration");
+assert.match(world, /roomDoor\.openProgress=roomDoor\.targetOpen\?1:0/, "loading must restore the breaker-room door transform immediately");
+assert.match(world, /roomDoor\.collisionBounds/, "restored door state must also restore collision");
+assert.match(main, /glitchMatch=rawCommand\.match/, "the admin GLITCH command must accept a transmission headline and body");
+assert.match(main, /showSignalGlitch\(headline,detail,6500\)/, "the admin command must render through the full transmission overlay");
+assert.match(index, /maxlength="560"/, "the transmission command must allow a headline and message body");
 console.log("Interface migration checks passed.");
