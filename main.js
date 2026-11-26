@@ -9210,6 +9210,7 @@ function createAdminBackroomsTestMapCrawler(){
     speed:.58,
     surfaceClearance,
     localBounds,
+    sampledBounds:new THREE.Box3(),
     projectedBounds:new THREE.Box3(),
     boundsCorner:new THREE.Vector3(),
     boundsRefreshElapsed:0,
@@ -9247,13 +9248,18 @@ function updateAdminBackroomsTestMapCrawler(dt){
     }
   }
 
-  // Re-sample the whole skinned rig after the walk mixer changes its pose.
-  // Box3's precise path uses SkinnedMesh.getVertexPosition in Three.js r165.
+  // Sample less often, then grow a conservative bounds envelope. The
+  // animated legs change the exact bounds every pose; shrinking the box on
+  // each sample made the whole spider bob as the walk cycle advanced.
+  // The envelope only expands, so the surface clearance and projected bounds
+  // stay stable once the walk animation has visited its full range.
   crawler.boundsRefreshElapsed+=delta;
-  if(crawler.boundsRefreshElapsed>=.08){
-    crawler.boundsRefreshElapsed=0;
-    measureAdminBackroomsSpiderLocalBounds(crawler.localBounds);
-    if(!crawler.localBounds.isEmpty() && Number.isFinite(crawler.localBounds.min.y)){
+  if(crawler.boundsRefreshElapsed>=.25){
+    crawler.boundsRefreshElapsed-=.25;
+    measureAdminBackroomsSpiderLocalBounds(crawler.sampledBounds);
+    if(!crawler.sampledBounds.isEmpty() &&
+       Number.isFinite(crawler.sampledBounds.min.y)){
+      crawler.localBounds.union(crawler.sampledBounds);
       crawler.surfaceClearance=Math.max(.45,.45-crawler.localBounds.min.y);
     }
   }
