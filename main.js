@@ -3541,6 +3541,14 @@ const multiplayer=new Multiplayer({
       }
       return;
     }
+    if(event?.type==="spider_caught"){
+      if(event.playerId!==multiplayer.getWorldAuthorityId()) return;
+      const payload=event.payload||{};
+      if(String(payload.targetPlayerId||"")===String(multiplayer.playerId||"")){
+        pendingRemoteSpiderCatch=payload;
+      }
+      return;
+    }
     if(event?.type==="spider_snapshot"){
       if(event.playerId!==multiplayer.getWorldAuthorityId()) return;
       const payload=event.payload||{};
@@ -5372,6 +5380,11 @@ let spiderBehaviorState="idle";
 let spiderBehaviorTime=0;
 let spiderAttackPlayed=false;
 let spiderActive=false;
+let spiderTargetPlayerId=null;
+let spiderRemoteCatchTimer=0;
+let spiderRemoteCatchTargetId=null;
+let pendingRemoteSpiderCatch=null;
+let spiderCaughtRemoteVictim=false;
 let spiderSyncElapsed=0;
 let spiderSyncAuthorityId=null;
 let spiderSyncNeedsInitial=true;
@@ -6409,10 +6422,31 @@ function findSpiderStalkSpawnPosition(
   return null;
 }
 
+function getSpiderHuntTarget(forceRandom=false){
+  const targets=multiplayer.getBackroomsPlayerTargets();
+  if(!targets.length){
+    spiderTargetPlayerId=null;
+    return null;
+  }
+
+  let target=forceRandom
+    ? null
+    : targets.find(candidate=>candidate.id===spiderTargetPlayerId);
+  if(!target){
+    target=targets[Math.floor(Math.random()*targets.length)];
+    spiderTargetPlayerId=target.id;
+  }
+  return target;
+}
+
 function startBackroomsStalker(){
   if(!gameStarted||houseMode||tutorialOpenRoomActive||
      !multiplayer.isWorldAuthority()||spiderActive)return false;
   if(!spiderLoaded){ensureSpiderLoading();return false;}
+  spiderTargetPlayerId=null;
+  getSpiderHuntTarget(true);
+  spiderRemoteCatchTimer=0;
+  spiderRemoteCatchTargetId=null;
   const spawn=findSpiderStalkSpawnPosition();
   if(!spawn)return false;
 
@@ -6489,6 +6523,7 @@ function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15,requireV
   const lookTarget=new THREE.Vector3(player.pos.x,SPIDER_GROUND_OFFSET,player.pos.z);
 
   spiderActive=true;
+  spiderTargetPlayerId=String(multiplayer.playerId||"local");
   spiderBehaviorState="peek";
   spiderBehaviorTime=0;
   spiderScareRevealTimer=0;
@@ -7003,7 +7038,8 @@ function findSpiderCaughtHeadBone(){
   return candidates[0]?.bone||null;
 }
 
-function startSpiderCatchFreeze(){
+function startSpiderCatchFreeze({remoteVictim=false}={}){
+  spiderCaughtRemoteVictim=remoteVictim;
   spiderCaughtFreezeTimer=SPIDER_CAUGHT_FREEZE_TIME;
   spiderCaughtFlashlightWasOn=flashlightOn;
   spiderCaughtPreviousTool=equippedTool;
@@ -7075,6 +7111,7 @@ function startSpiderCatchFreeze(){
 }
 
 function resetPlayerAfterSpiderCatch(){
+  spiderCaughtRemoteVictim=false;
   player.movementFrozen=false;
   spiderCaughtFreezeTimer=0;
   spiderCaughtFlashlightOverride=false;
@@ -7160,6 +7197,102 @@ function resetPlayerAfterSpiderCatch(){
   nextEvent=clock.elapsedTime+14+Math.random()*18;
   pulse=1;
   eventText.style.opacity="1";
+}
+
+function updateRemoteSpiderCatchFreeze(dt){
+  if(!spiderCaughtRemoteVictim || spiderCaughtFreezeTimer<=0) return;
+
+  player.movementFrozen=true;
+  player.vel.set(0,0,0);
+  player.keys.clear();
+  player.jumpY=0;
+  player.jumpVelocity=0;
+
+  const diveDistance=THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.78)*3.6;
+  const approachProgress=THREE.MathUtils.smoothstep(spiderCaughtElapsed,.78,2.38);
+  const startingGap=spiderCaughtPlayerPosition.distanceTo(spiderCaughtSpiderPosition);
+  const approachDistance=Math.max(0,startingGap+diveDistance-.82);
+  const spiderLungeDistance=approachProgress*approachDistance;
+  const dragDistance=
+    .48*THREE.MathUtils.smoothstep(spiderCaughtElapsed,2.62,2.92)+
+    .82*THREE.MathUtils.smoothstep(spiderCaughtElapsed,3.08,3.38)+
+    .76*THREE.MathUtils.smoothstep(spiderCaughtElapsed,3.62,3.92)+
+    .72*THREE.MathUtils.smoothstep(spiderCaughtElapsed,4.18,4.48);
+
+  player.pos.copy(spiderCaughtPlayerPosition).addScaledVector(
+    spiderCaughtRetreatDirection,
+    diveDistance-dragDistance
+  );
+  spiderEntity.position.copy(spiderCaughtSpiderPosition).addScaledVector(
+    spiderCaughtRetreatDirection,
+    spiderLungeDistance-dragDistance
+  );
+
+  spiderCaughtElapsed+=dt;
+  spiderCaughtFreezeTimer=Math.max(0,spiderCaughtFreezeTimer-dt);
+
+  const progress=THREE.MathUtils.clamp(
+    spiderCaughtElapsed/SPIDER_CAUGHT_FREEZE_TIME,0,1
+  );
+  const mouthYaw=Math.atan2(
+    player.pos.x-spiderEntity.position.x,
+    player.pos.z-spiderEntity.position.z
+  );
+  const yawDelta=Math.atan2(
+    Math.sin(mouthYaw-spiderCaughtStartYaw),
+    Math.cos(mouthYaw-spiderCaughtStartYaw)
+  );
+  player.yaw=spiderCaughtStartYaw+
+    yawDelta*THREE.MathUtils.smoothstep(spiderCaughtElapsed,0,.28)+
+    Math.sin(spiderCaughtElapsed*10)*.018;
+  player.pitch=THREE.MathUtils.clamp(
+    spiderCaughtStartPitch+
+      THREE.MathUtils.smoothstep(spiderCaughtElapsed,2.55,3.35)*.72,
+    -1.35,1.35
+  );
+  player.camera.position.y=spiderCaughtCameraStartY-
+    THREE.MathUtils.smoothstep(spiderCaughtElapsed,2.55,3.35)*.82;
+  player.camera.rotation.z=
+    THREE.MathUtils.smoothstep(spiderCaughtElapsed,2.55,3.35)*.18+
+    Math.sin(spiderCaughtElapsed*8.3)*.018;
+  spiderEntity.rotation.y=mouthYaw;
+
+  if(spiderCaughtBlackout){
+    spiderCaughtBlackout.style.opacity=String(
+      THREE.MathUtils.smoothstep(progress,.76,1)
+    );
+  }
+
+  if(spiderCaughtFreezeTimer<=0 || spiderCaughtElapsed>=SPIDER_CAUGHT_FREEZE_TIME){
+    resetPlayerAfterSpiderCatch();
+  }
+}
+
+function startRemoteSpiderCatch(target){
+  if(!target || target.local || !target.id || spiderRemoteCatchTimer>0) return false;
+
+  const targetPlayerId=String(target.id);
+  spiderRemoteCatchTargetId=targetPlayerId;
+  spiderRemoteCatchTimer=SPIDER_CAUGHT_FREEZE_TIME+.7;
+  spiderBehaviorState="caught";
+  normalSpiderHunter.path.length=0;
+  normalSpiderHunter.pathIndex=0;
+  normalSpiderHunter.hasPathTarget=false;
+  normalSpiderHunter.speed=0;
+  spiderEntity.rotation.y=Math.atan2(
+    target.pos.x-spiderEntity.position.x,
+    target.pos.z-spiderEntity.position.z
+  );
+  setSpiderAnimation("attack");
+
+  multiplayer.broadcastWorldEvent("spider_caught","main-spider",{
+    targetPlayerId,
+    x:spiderEntity.position.x,
+    y:spiderEntity.position.y,
+    z:spiderEntity.position.z,
+    rotationY:spiderEntity.rotation.y
+  });
+  return true;
 }
 
 function finishSpiderJumpscare(){
@@ -9318,6 +9451,7 @@ function publishMultiplayerSpiderSnapshot(dt){
 
 function applyRemoteSpiderSnapshot(dt){
   if(multiplayer.isWorldAuthority() || houseMode || tutorialOpenRoomActive) return;
+  if(spiderCaughtRemoteVictim && spiderCaughtFreezeTimer>0) return;
   if(poolroomsActive){
     spiderActive=false;
     spiderBehaviorState="idle";
@@ -9702,6 +9836,29 @@ function animate(){
   }
 
   applyRemoteSpiderSnapshot(dt);
+  if(
+    !multiplayer.isWorldAuthority() &&
+    pendingRemoteSpiderCatch &&
+    String(pendingRemoteSpiderCatch.targetPlayerId||"")===String(multiplayer.playerId||"")
+  ){
+    const payload=pendingRemoteSpiderCatch;
+    spiderEntity.position.set(
+      Number.isFinite(Number(payload.x)) ? Number(payload.x) : spiderEntity.position.x,
+      Number.isFinite(Number(payload.y)) ? Number(payload.y) : SPIDER_GROUND_OFFSET,
+      Number.isFinite(Number(payload.z)) ? Number(payload.z) : spiderEntity.position.z
+    );
+    if(Number.isFinite(Number(payload.rotationY))){
+      spiderEntity.rotation.y=Number(payload.rotationY);
+    }
+    spiderEntity.visible=true;
+    spiderActive=true;
+    remoteSpiderPositionInitialized=true;
+    startSpiderCatchFreeze({remoteVictim:true});
+    pendingRemoteSpiderCatch=null;
+  }
+  if(spiderCaughtRemoteVictim && spiderCaughtFreezeTimer>0){
+    updateRemoteSpiderCatchFreeze(dt);
+  }
   const flicker=flashlightFlicker(t);
   const lowBattery=Math.pow(THREE.MathUtils.clamp((35-battery)/35,0,1),1.15);
 
@@ -9829,7 +9986,26 @@ function animate(){
       if(spiderActive){
         spiderBehaviorTime+=dt;
 
-        if(spiderCaughtFreezeTimer>0){
+        if(spiderRemoteCatchTimer>0){
+          spiderRemoteCatchTimer=Math.max(0,spiderRemoteCatchTimer-dt);
+          spiderBehaviorState="caught";
+          normalSpiderHunter.speed=0;
+          normalSpiderHunter.step(dt);
+          setSpiderAnimation("attack");
+          if(spiderRemoteCatchTimer<=0){
+            spiderRemoteCatchTargetId=null;
+            spiderTargetPlayerId=null;
+            spiderActive=false;
+            spiderBehaviorState="idle";
+            normalSpiderHunter.hide();
+            spiderEntity.visible=false;
+            spiderRevealLight.visible=false;
+            spiderRevealLight.intensity=0;
+            clearSpiderPath();
+            nextEvent=clock.elapsedTime+24+Math.random()*28;
+            showSpiderScareMessage("THE SIGNAL FADES.",850);
+          }
+        }else if(spiderCaughtFreezeTimer>0){
           player.movementFrozen=true;
           // Three distinct beats: the player scrambles far backward, the
           // spider deliberately walks them down, then bites and drags them in
@@ -10010,22 +10186,33 @@ function animate(){
             resetPlayerAfterSpiderCatch();
           }
         }else{
-          const huntInfo={target:player,sprinting:player.isRunning,flashlightOn,crouched:player.crouched};
-          normalSpiderHunter.updateHunter(dt,t,huntInfo.target,{
-            sprinting:huntInfo.sprinting,
-            flashlightOn:huntInfo.flashlightOn,
-            crouched:huntInfo.crouched
+          const huntTarget=getSpiderHuntTarget();
+          const target=huntTarget || {
+            id:String(multiplayer.playerId||"local"),
+            local:true,
+            pos:player.pos,
+            crouched:player.crouched,
+            sprinting:player.isRunning,
+            flashlightOn
+          };
+          normalSpiderHunter.updateHunter(dt,t,target,{
+            sprinting:target.sprinting,
+            flashlightOn:target.flashlightOn,
+            crouched:target.crouched
           });
           normalSpiderHunter.step(dt);
 
-          const caughtX=huntInfo.target.pos.x;
-          const caughtZ=huntInfo.target.pos.z;
-          if(normalSpiderHunter.distanceToHitbox(caughtX,caughtZ)<=.06){
-            startSpiderCatchFreeze();
+          if(normalSpiderHunter.distanceToHitbox(target.pos.x,target.pos.z)<=.06){
+            if(target.local){
+              startSpiderCatchFreeze();
+            }else{
+              startRemoteSpiderCatch(target);
+            }
           }else if(
             spiderBehaviorTime>=SPIDER_NORMAL_ENCOUNTER_MAX_TIME
           ){
             spiderActive=false;
+            spiderTargetPlayerId=null;
             spiderBehaviorState="idle";
             spiderCaughtFreezeTimer=0;
             spiderRevealLight.visible=false;
@@ -10041,11 +10228,16 @@ function animate(){
         if(spiderActive){
           normalSpiderHunter.visualRig.root.visible=false;
           spiderEntity.visible=true;
-          spiderBehaviorState=
-            normalSpiderHunter.mode==="roam" && normalSpiderHunter.speed<.15 ? "peek" :
-            normalSpiderHunter.mode==="hidden" ? "idle" : "chase";
-          if(normalSpiderHunter.mode==="roam" || normalSpiderHunter.mode==="investigate"){
-            setSpiderAnimation(normalSpiderHunter.speed>.22 ? "chase" : "stalk");
+          if(spiderRemoteCatchTimer>0){
+            spiderBehaviorState="caught";
+            setSpiderAnimation("attack");
+          }else{
+            spiderBehaviorState=
+              normalSpiderHunter.mode==="roam" && normalSpiderHunter.speed<.15 ? "peek" :
+              normalSpiderHunter.mode==="hidden" ? "idle" : "chase";
+            if(normalSpiderHunter.mode==="roam" || normalSpiderHunter.mode==="investigate"){
+              setSpiderAnimation(normalSpiderHunter.speed>.22 ? "chase" : "stalk");
+            }
           }
           spiderVisibleToPlayer=playerHasLineOfSightToSpider(spiderEntity);
           // Keep the normal model renderable; wall depth testing handles real
@@ -10100,7 +10292,7 @@ function animate(){
       spiderCaughtFreezeTimer<=0 ||
       spiderCaughtElapsed>=SPIDER_CAUGHT_FREEZE_TIME ||
       !spiderActive ||
-      !multiplayer.isWorldAuthority() ||
+      (!multiplayer.isWorldAuthority() && !spiderCaughtRemoteVictim) ||
       houseMode ||
       tutorialOpenRoomActive
     )
