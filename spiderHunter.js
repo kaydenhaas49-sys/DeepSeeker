@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { SignalStalkerRig } from "./signalStalker.js?v=20261030-finish-pass1";
+import { SignalStalkerRig } from "./signalStalker.js?v=20261127-multiplayer-sync-fix2";
 
 /**
  * SpiderHunter
