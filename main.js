@@ -4974,6 +4974,8 @@ function setHouseMode(enabled,options={}){
 
   spiderEntity.visible=false;
   spiderActive=false;
+  spiderTargetPlayerId=null;
+  spiderRemoteCatchTimer=0;
   spiderBehaviorState="idle";
   spiderBehaviorTime=0;
 
@@ -5382,7 +5384,6 @@ let spiderAttackPlayed=false;
 let spiderActive=false;
 let spiderTargetPlayerId=null;
 let spiderRemoteCatchTimer=0;
-let spiderRemoteCatchTargetId=null;
 let pendingRemoteSpiderCatch=null;
 let spiderCaughtRemoteVictim=false;
 let spiderSyncElapsed=0;
@@ -6446,7 +6447,6 @@ function startBackroomsStalker(){
   spiderTargetPlayerId=null;
   getSpiderHuntTarget(true);
   spiderRemoteCatchTimer=0;
-  spiderRemoteCatchTargetId=null;
   const spawn=findSpiderStalkSpawnPosition();
   if(!spawn)return false;
 
@@ -7272,7 +7272,6 @@ function startRemoteSpiderCatch(target){
   if(!target || target.local || !target.id || spiderRemoteCatchTimer>0) return false;
 
   const targetPlayerId=String(target.id);
-  spiderRemoteCatchTargetId=targetPlayerId;
   spiderRemoteCatchTimer=SPIDER_CAUGHT_FREEZE_TIME+.7;
   spiderBehaviorState="caught";
   normalSpiderHunter.path.length=0;
@@ -9993,7 +9992,6 @@ function animate(){
           normalSpiderHunter.step(dt);
           setSpiderAnimation("attack");
           if(spiderRemoteCatchTimer<=0){
-            spiderRemoteCatchTargetId=null;
             spiderTargetPlayerId=null;
             spiderActive=false;
             spiderBehaviorState="idle";
