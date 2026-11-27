@@ -5,7 +5,7 @@ import {
   updateRemoteFlashlight,
   disposeRemoteFlashlight,
   flashlightFlicker
-} from "./character.js";
+} from "./character.js?v=20261127-multiplayer-sync-fix2";
 
 const SEND_INTERVAL = 0.10;
 const REMOTE_LERP = 14;
