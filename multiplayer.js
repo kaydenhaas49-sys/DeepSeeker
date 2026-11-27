@@ -417,6 +417,7 @@ export class Multiplayer {
           ? "poolrooms"
           : "backrooms",
       crouched: Boolean(state?.crouched),
+      running: Boolean(state?.running),
       flashlight: Boolean(state?.flashlight),
       playerName: this.sanitizeName(state?.playerName || ""),
       fallSequence: Number.isFinite(fallSequence) ? fallSequence : 0,
@@ -618,6 +619,41 @@ export class Multiplayer {
     return closest;
   }
 
+  getBackroomsPlayerTargets(){
+    const targets=[];
+    if((this.getLevel?.()||"backrooms")==="backrooms"){
+      targets.push({
+        id:String(this.playerId||"local"),
+        local:true,
+        pos:this.player.pos,
+        crouched:Boolean(this.player.crouched),
+        sprinting:Boolean(this.player.isRunning),
+        flashlightOn:Boolean(this.getFlashlightOn?.())
+      });
+    }
+
+    for(const remote of this.players.values()){
+      const state=remote.current || remote.target;
+      if(
+        !state ||
+        state.level!=="backrooms" ||
+        !Number.isFinite(Number(state.x)) ||
+        !Number.isFinite(Number(state.z))
+      ) continue;
+
+      targets.push({
+        id:String(remote.id),
+        local:false,
+        pos:{x:Number(state.x),z:Number(state.z)},
+        crouched:Boolean(state.crouched),
+        sprinting:Boolean(state.running),
+        flashlightOn:Boolean(state.flashlight)
+      });
+    }
+
+    return targets;
+  }
+
   startGameRoom() {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
 
@@ -656,6 +692,7 @@ export class Multiplayer {
       pitch: Number(this.player.pitch.toFixed(2)),
       level: this.getLevel?.()==="house" || this.getLevel?.()==="apartment" ? "house" : "backrooms",
       crouched: Boolean(this.player.crouched),
+      running: Boolean(this.player.isRunning),
       flashlight: Boolean(this.getFlashlightOn()),
       playerName: this.getPlayerName(),
       fallSequence: this.fallSequence,
@@ -677,6 +714,7 @@ export class Multiplayer {
       Math.abs(state.pitch - this.lastSent.pitch) > 0.03 ||
       state.level !== this.lastSent.level ||
       state.crouched !== this.lastSent.crouched ||
+      state.running !== this.lastSent.running ||
       state.flashlight !== this.lastSent.flashlight ||
       state.playerName !== this.lastSent.playerName ||
       state.fallSequence !== this.lastSent.fallSequence ||
