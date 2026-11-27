@@ -4,7 +4,7 @@ import { World, EYE, WALL_H, WALL_T, CHUNK_SIZE, MAP_MIN_CHUNK, MAP_MAX_CHUNK, m
 import { createTextures } from "./textures.js?v=20261030-finish-pass7";
 import { Player } from "./player.js?v=20261030-finish-pass7";
 import { HorrorAudio } from "./audio.js?v=20261030-finish-pass7";
-import { Multiplayer } from "./multiplayer.js?v=20261030-finish-pass7";
+import { Multiplayer } from "./multiplayer.js?v=20261127-spider-multiplayer-target1";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
