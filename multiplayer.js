@@ -761,6 +761,7 @@ export class Multiplayer {
       remote.current.pitch = remote.target.pitch;
       remote.current.level = remote.target.level;
       remote.current.crouched = remote.target.crouched;
+      remote.current.running = remote.target.running;
       remote.current.flashlight = remote.target.flashlight;
       remote.current.playerName = remote.target.playerName;
 
