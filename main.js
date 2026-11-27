@@ -6519,11 +6519,17 @@ function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15,requireV
        findSpiderSpawnPosition(minDistance,maxDistance));
   if(!spawn) return false;
 
+  const huntTarget=getSpiderHuntTarget(true) || {
+    id:String(multiplayer.playerId||"local"),
+    pos:player.pos
+  };
   const position=new THREE.Vector3(spawn.x,SPIDER_GROUND_OFFSET,spawn.z);
-  const lookTarget=new THREE.Vector3(player.pos.x,SPIDER_GROUND_OFFSET,player.pos.z);
+  const lookTarget=new THREE.Vector3(
+    huntTarget.pos.x,SPIDER_GROUND_OFFSET,huntTarget.pos.z
+  );
 
   spiderActive=true;
-  spiderTargetPlayerId=String(multiplayer.playerId||"local");
+  spiderTargetPlayerId=huntTarget.id;
   spiderBehaviorState="peek";
   spiderBehaviorTime=0;
   spiderScareRevealTimer=0;
@@ -6541,7 +6547,7 @@ function startTutorialStyleBackroomsSpider(minDistance=9,maxDistance=15,requireV
     return false;
   }
   spiderEntity.position.y=SPIDER_GROUND_OFFSET;
-  normalSpiderHunter.lastKnownTarget.set(player.pos.x,0,player.pos.z);
+  normalSpiderHunter.lastKnownTarget.set(huntTarget.pos.x,0,huntTarget.pos.z);
   normalSpiderHunter.lastSeenTime=clock.elapsedTime;
   normalSpiderHunter.beginChase();
 
